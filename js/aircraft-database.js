@@ -12,7 +12,7 @@
  * atmosphère standard (ISA), compilées depuis les manuels de vol publics
  * et fiches techniques constructeurs. Elles varient selon la version,
  * la masse, l'équipement. L'utilisateur DOIT vérifier avec le POH de
- * SON avion конкретного.
+ * SON avion.
  *
  * ⚠️ Ces valeurs sont des points de départ indicatifs. Elles ne
  * remplacent JAMAIS le manuel de vol (POH/AFM) de l'avion concerné.
