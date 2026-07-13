@@ -168,7 +168,7 @@ header.card { padding: 20px 24px 18px; position: relative; overflow: hidden; }
 
 #lbl-info { font-weight: 400; color: #bae6fd; margin-top: 6px; display: block; font-size: 0.9rem; border-top: 1px solid var(--border-color); padding-top: 8px;}
 
-.metar-dashboard { display: none; grid-template-columns: repeat(3, 1fr); gap: 15px; width: 100%; margin-top: 15px; }
+.metar-dashboard { display: none; grid-template-columns: repeat(2, 1fr); gap: 15px; width: 100%; margin-top: 15px; }
 .metar-dashboard.visible { display: grid; }
 .dashboard-cell { background: var(--inner-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; min-height: 200px; display: flex; flex-direction: column; }
 .dash-title { font-size: 10px; letter-spacing: 1.5px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 8px; }
@@ -599,6 +599,9 @@ body.mode-local #alternates-container { display: none !important; }
     transition: color 0.25s;
     display: flex;
     align-items: center;
+    flex: 1;
+    justify-content: center;
+    white-space: nowrap;
 }
 .flight-mode-toggle .seg-slider {
     position: absolute;

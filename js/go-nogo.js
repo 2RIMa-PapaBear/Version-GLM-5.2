@@ -33,7 +33,7 @@
 
 import { state, I18N, parseVisiToMeters, getCeiling, memoGet } from './core.js';
 import { parseWindString, selectBestRunway } from './engine.js';
-import { analyzeWeatherAlerts, analyzeForecastAlerts } from './weather.js';
+import { analyzeWeatherAlerts, analyzeForecastAlerts, openThresholdsModal } from './weather.js';
 import { getAirportByICAO } from './ui-module.js';
 import { getPerformanceData, densityAltitude, evaluateDensityAltitude } from './density-altitude.js';
 import { computeFlightWindow } from './flight-window.js';
@@ -374,6 +374,9 @@ export function renderGoNoGo() {
                     <div style="font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">${isFr ? 'Cat.' : 'Cat.'}</div>
                     <div style="font-size:18px; font-weight:800; color:${result.color};">${result.cat || '--'}</div>
                 </div>
+                <button id="go-nogo-config" class="go-nogo-config-btn" title="${isFr ? 'Réglages des minimums VFR' : 'VFR minima settings'}" style="background:none; border:none; cursor:pointer; padding:6px; border-radius:6px; color:var(--text-muted); flex-shrink:0; display:flex; align-items:center;">
+                    <i data-lucide="settings" style="width:18px; height:18px;"></i>
+                </button>
             </div>
             ${reasonsHtml}
         </div>
@@ -383,6 +386,9 @@ export function renderGoNoGo() {
     container.style.borderLeftWidth = '5px';
     container.style.display = 'block';
     if (window.lucide) window.lucide.createIcons({ root: container });
+
+    // Bouton de réglage des minimums VFR perso.
+    container.querySelector('#go-nogo-config')?.addEventListener('click', openThresholdsModal);
 }
 
 /**
