@@ -1,0 +1,23 @@
+# Dépendances
+node_modules/
+
+# Wrangler / Cloudflare
+.wrangler/
+.dev.vars
+
+# Fichiers de config locale (contenant potentiellement des secrets)
+config.local.js
+worker/.dev.vars
+js/config.local.js
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ZCode (fichiers internes de l'agent)
+.zcode/
+
+# Sauvegardes / copies
+*Copie*
+*.bak
+*.orig

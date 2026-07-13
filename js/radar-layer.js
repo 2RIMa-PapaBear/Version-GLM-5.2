@@ -1,21 +1,15 @@
 /* ================================================================
- * RADAR & SATELLITE — Animation précipitations + imagerie IR
+ * RADAR — Animation précipitations
  * ================================================================
  *
  * FONCTIONNALITÉ
  * --------------
  * Remplace l'ancien radar statique de regional-map.js par un
- * contrôleur animé multi-couches reposant sur RainViewer :
+ * contrôleur animé reposant sur RainViewer :
  *
- *   1. RADAR (précipitations) :
+ *   RADAR (précipitations) :
  *      - Frames passées (dernières ~2h, par pas de 10 min).
  *      - Animation en boucle, lecture/pause, slider temporel.
- *
- *   2. SATELLITE (infrarouge IR) — optionnel :
- *      - Imagerie satellite IR mondiale quand le flux est disponible.
- *      - Depuis janvier 2026, RainViewer a supprimé le flux IR ; le
- *        bouton est donc grisé avec un tooltip explicite tant que le
- *        flux satellite.infrared[] revient vide du manifeste.
  *
  * SOURCE
  * ------
@@ -85,14 +79,6 @@ function _buildRadarFrames(manifest) {
 }
 
 /**
- * Construit la liste des frames satellite IR (frame la plus récente d'abord).
- */
-function _buildSatFrames(manifest) {
-    const ir = manifest.satellite?.infrared || [];
-    return ir.map(f => ({ ...f }));
-}
-
-/**
  * Construit le template d'URL tuile RainViewer (v2) pour Leaflet.
  *
  * L'API v2 ne renvoie plus que le chemin de base (ex. /v2/radar/3aa62ff1a7da) ;
@@ -107,32 +93,24 @@ function _buildSatFrames(manifest) {
 function _tileUrl(host, path, color, smooth) {
     // Radar : {host}{path}/{size}/{z}/{x}/{y}/{color}/{smooth}_1.png
     // (snow=1 activé par défaut pour afficher les précipitations solides).
-    if (color != null) {
-        return `${host}${path}/${TILE_SIZE}/{z}/{x}/{y}/${color}/${smooth || 0}_1.png`;
-    }
-    // Satellite : {host}{path}/{size}/{z}/{x}/{y}/0_0.png
-    return `${host}${path}/${TILE_SIZE}/{z}/{x}/{y}/0_0.png`;
+    return `${host}${path}/${TILE_SIZE}/{z}/{x}/{y}/${color}/${smooth || 0}_1.png`;
 }
 
 /**
- * Fabrique un contrôleur radar+satellite pour une carte Leaflet.
+ * Fabrique un contrôleur radar pour une carte Leaflet.
  *
  * @param {L.Map} map Instance Leaflet.
  * @returns {{
  *   mountControls: (el: HTMLElement) => void,
  *   toggleRadar: (on: boolean) => Promise<void>,
- *   toggleSatellite: (on: boolean) => Promise<void>,
  *   destroy: () => void
  * }}
  */
 export function createPrecipController(map) {
     // ---- État interne ----
     let radarFrames = [];
-    let satFrames = [];
     let radarLayer = null;
-    let satLayer = null;
     let radarVisible = true;     // radar activé par défaut
-    let satVisible = false;
     let frameIdx = 0;            // index courant dans radarFrames
     let playing = false;
     let playTimer = null;
@@ -150,7 +128,6 @@ export function createPrecipController(map) {
         _initPromise = (async () => {
             const mf = await _loadManifest();
             radarFrames = _buildRadarFrames(mf);
-            satFrames = _buildSatFrames(mf);
             // Par défaut : frame la plus récente (dernière passée).
             const lastPastIdx = radarFrames.map(f => f.forecast).lastIndexOf(false);
             frameIdx = lastPastIdx >= 0 ? lastPastIdx : radarFrames.length - 1;
@@ -167,9 +144,6 @@ export function createPrecipController(map) {
 
     function _removeRadarLayer() {
         if (radarLayer) { map.removeLayer(radarLayer); radarLayer = null; }
-    }
-    function _removeSatLayer() {
-        if (satLayer) { map.removeLayer(satLayer); satLayer = null; }
     }
 
     /**
@@ -190,26 +164,6 @@ export function createPrecipController(map) {
             zIndex: 400,    // au-dessus du fond de carte, sous les marqueurs
         }).addTo(map);
         _updateFrameLabel();
-    }
-
-    /**
-     * Affiche la frame satellite IR la plus récente.
-     */
-    function _showSatFrame() {
-        if (!satVisible || satFrames.length === 0) return;
-        const host = _manifest?.host;
-        if (!host) return;
-        // Frame la plus récente (dernière du tableau infrared).
-        const f = satFrames[satFrames.length - 1];
-        if (!f) return;
-        const url = _tileUrl(host, f.path);
-        _removeSatLayer();
-        satLayer = L.tileLayer(url, {
-            opacity: 0.55,
-            tileSize: TILE_SIZE,
-            attribution: '© RainViewer (IR)',
-            zIndex: 390,
-        }).addTo(map);
     }
 
     // ---- Animation ----
@@ -297,12 +251,6 @@ export function createPrecipController(map) {
                 <input type="range" class="precip-slider" min="0" max="${Math.max(0, radarFrames.length - 1)}" value="${frameIdx}" step="1" aria-label="${isFr ? 'Horloge animation' : 'Animation clock'}">
                 <span class="precip-time-label">—</span>
             </div>
-            <div class="precip-control-group">
-                <button class="precip-toggle precip-toggle-sat" data-layer="sat" aria-pressed="false" title="${isFr ? 'Satellite infrarouge' : 'Infrared satellite'}">
-                    <i data-lucide="satellite" style="width:14px;height:14px;"></i>
-                    <span>${isFr ? 'Satellite' : 'Satellite'}</span>
-                </button>
-            </div>
         `;
 
         if (window.lucide) window.lucide.createIcons({ root: el });
@@ -335,43 +283,6 @@ export function createPrecipController(map) {
             _pause();
             _setFrame(parseInt(slider.value, 10));
         });
-
-        // Bouton satellite.
-        const satBtn = el.querySelector('.precip-toggle-sat');
-        satBtn?.addEventListener('click', async () => {
-            // Flux IR indisponible (RainViewer a supprimé le satellite en 2026) :
-            // on laisse le bouton grisé, rien à afficher.
-            if (satBtn.disabled) return;
-            satVisible = !satVisible;
-            satBtn.classList.toggle('active', satVisible);
-            satBtn.setAttribute('aria-pressed', String(satVisible));
-            if (satVisible) {
-                await _ensureInit();
-                _showSatFrame();
-            } else {
-                _removeSatLayer();
-            }
-        });
-    }
-
-    /**
-     * Met à jour la disponibilité du bouton satellite selon les frames IR.
-     * RainViewer ayant supprimé le flux satellite IR (2026), satFrames est
-     * souvent vide : on grise le bouton avec un tooltip explicite plutôt que
-     * de laisser un bouton muet qui ne fait rien.
-     */
-    function _refreshSatAvailability() {
-        if (!controlsEl) return;
-        const satBtn = controlsEl.querySelector('.precip-toggle-sat');
-        if (!satBtn) return;
-        const available = satFrames.length > 0;
-        satBtn.disabled = !available;
-        satBtn.style.opacity = available ? '' : '0.4';
-        satBtn.style.cursor = available ? '' : 'not-allowed';
-        const isFr = state.lang === 'fr';
-        satBtn.title = available
-            ? (isFr ? 'Satellite infrarouge' : 'Infrared satellite')
-            : (isFr ? 'Satellite IR indisponible (flux supprimé par RainViewer)' : 'IR satellite unavailable (discontinued by RainViewer)');
     }
 
     function _syncSliderMax() {
@@ -380,7 +291,6 @@ export function createPrecipController(map) {
         if (slider) slider.max = String(Math.max(0, radarFrames.length - 1));
         _syncSlider();
         _updateFrameLabel();
-        _refreshSatAvailability();
     }
 
     // ---- API publique du contrôleur ----
@@ -398,22 +308,12 @@ export function createPrecipController(map) {
                 _removeRadarLayer();
             }
         },
-        async toggleSatellite(on) {
-            satVisible = on;
-            if (on) {
-                await _ensureInit();
-                _showSatFrame();
-            } else {
-                _removeSatLayer();
-            }
-        },
         /** Pré-charge le manifeste (non bloquant, appelé au chargement du panneau). */
         preload() { return _ensureInit().then(_syncSliderMax); },
         /** Détruit le contrôleur : stoppe l'animation et retire les couches. */
         destroy() {
             _pause();
             _removeRadarLayer();
-            _removeSatLayer();
             controlsEl = null;
         },
     };

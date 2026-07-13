@@ -96,15 +96,13 @@ export const I18N = {
             "VA":"Cendres","DU":"Poussière","SA":"Sable",
             "NSW":"Fin Phéno","VV///":"Ciel invisible"
         },
-        // ---- Calques carte régionale (radar / satellite / espaces) ----
+        // ---- Calques carte régionale (radar / espaces) ----
         mapLayerRadar: "Radar",
-        mapLayerSatellite: "Satellite",
         mapLayerAirspaces: "Espaces",
         mapRadarPlay: "Lecture",
         mapRadarPause: "Pause",
         mapRadarAnimationClock: "Horloge animation",
         mapRadarLayers: "Couches radar",
-        mapSatelliteIr: "Satellite infrarouge",
         mapAirspacesTitle: "Espaces aériens (CTR, TMA, classes...)",
         mapPrecipAnimation: "Animation précipitations",
         // ---- PIREPs & info terrain (Phase 4) ----
@@ -199,15 +197,13 @@ export const I18N = {
             "VA":"Volcanic Ash","DU":"Dust","SA":"Sand",
             "NSW":"No Sig Weather","VV///":"Invisible Sky"
         },
-        // ---- Regional map layers (radar / satellite / airspaces) ----
+        // ---- Regional map layers (radar / airspaces) ----
         mapLayerRadar: "Radar",
-        mapLayerSatellite: "Satellite",
         mapLayerAirspaces: "Airspaces",
         mapRadarPlay: "Play",
         mapRadarPause: "Pause",
         mapRadarAnimationClock: "Animation clock",
         mapRadarLayers: "Radar layers",
-        mapSatelliteIr: "Infrared satellite",
         mapAirspacesTitle: "Airspaces (CTR, TMA, classes...)",
         mapPrecipAnimation: "Precipitation animation",
         // ---- PIREPs & airfield info (Phase 4) ----
