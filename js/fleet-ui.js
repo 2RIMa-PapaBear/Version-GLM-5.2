@@ -19,6 +19,7 @@ import {
     getFleet, getActiveAircraftId, setActiveAircraft,
     addAircraft, updateAircraft, deleteAircraft,
 } from './aircraft-fleet.js';
+import { searchAircraft } from './aircraft-database.js';
 
 let _onCloseCallback = null;
 
@@ -39,6 +40,9 @@ export function openFleetManager(onClose) {
 export function closeFleetManager() {
     const overlay = document.getElementById('fleet-overlay');
     if (overlay) overlay.style.display = 'none';
+    _hideSuggest();
+    document.removeEventListener('click', _onDocClick);
+    clearTimeout(_suggestDebounce);
     if (_onCloseCallback) {
         _onCloseCallback();
         _onCloseCallback = null;
@@ -129,7 +133,10 @@ function _render() {
         <div class="fleet-form" id="fleet-form">
             <input type="hidden" id="fleet-edit-id" value="">
             <div class="fleet-form-row">
-                <label>${isFr ? 'Nom / modèle' : 'Name / model'}<input type="text" id="fleet-name" placeholder="${isFr ? 'ex: Cessna 172 SP' : 'e.g. Cessna 172 SP'}" maxlength="40"></label>
+                <label>${isFr ? 'Nom / modèle' : 'Name / model'}<div class="fleet-name-field">
+                    <input type="text" id="fleet-name" placeholder="${isFr ? 'ex: Cessna 172 SP' : 'e.g. Cessna 172 SP'}" maxlength="40" autocomplete="off">
+                    <div class="fleet-suggest" id="fleet-suggest" role="listbox" hidden></div>
+                </div></label>
                 <label>${isFr ? 'Immatriculation' : 'Registration'}<input type="text" id="fleet-reg" placeholder="F-GABC" maxlength="12" style="text-transform:uppercase;"></label>
             </div>
             <div class="fleet-form-row">
@@ -169,6 +176,92 @@ function _render() {
 
     content.querySelector('#fleet-save').addEventListener('click', _doSave);
     content.querySelector('#fleet-cancel-form').addEventListener('click', _resetForm);
+
+    _setupNameAutocomplete();
+}
+
+/* ----------------------------------------------------------------
+ * Autocomplétion du champ nom : propose les avions de la base
+ * (aircraft-database.js) et pré-remplit type / roulement / 50ft.
+ * ---------------------------------------------------------------- */
+let _suggestDebounce = null;
+
+function _setupNameAutocomplete() {
+    const input = document.getElementById('fleet-name');
+    const box = document.getElementById('fleet-suggest');
+    if (!input || !box) return;
+
+    input.addEventListener('input', () => {
+        clearTimeout(_suggestDebounce);
+        const q = input.value.trim();
+        if (q.length < 2) { _hideSuggest(); return; }
+        _suggestDebounce = setTimeout(() => _renderSuggest(q), 180);
+    });
+
+    input.addEventListener('focus', () => {
+        const q = input.value.trim();
+        if (q.length >= 2) _renderSuggest(q);
+    });
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { _hideSuggest(); input.blur(); }
+        if (e.key === 'Enter' && !box.hidden) {
+            const first = box.querySelector('.fleet-suggest-item');
+            if (first) { e.preventDefault(); first.click(); }
+        }
+    });
+
+    // Ferme la liste si l'on clique en dehors. Enregistré une seule fois
+    // (le même _render peut être appelé plusieurs fois sans fermer le modal).
+    document.removeEventListener('click', _onDocClick);
+    document.addEventListener('click', _onDocClick);
+}
+
+function _onDocClick(e) {
+    const field = document.querySelector('.fleet-name-field');
+    if (field && !field.contains(e.target)) _hideSuggest();
+}
+
+function _renderSuggest(query) {
+    const box = document.getElementById('fleet-suggest');
+    if (!box) return;
+    const results = searchAircraft(query, 6);
+    if (results.length === 0) { _hideSuggest(); return; }
+    const isFr = state.lang === 'fr';
+    box.innerHTML = results.map((ac, i) => `
+        <div class="fleet-suggest-item" role="option" data-idx="${i}">
+            <span class="fleet-suggest-name">${_esc(ac.name)}</span>
+            <span class="fleet-suggest-dist">${ac.groundRoll}/${ac.fiftyFt} ft</span>
+        </div>
+    `).join('');
+    box.hidden = false;
+
+    box.querySelectorAll('.fleet-suggest-item').forEach(el => {
+        el.addEventListener('click', () => {
+            _applySuggestion(results[parseInt(el.dataset.idx, 10)]);
+        });
+    });
+}
+
+function _applySuggestion(ac) {
+    const nameEl = document.getElementById('fleet-name');
+    if (!ac) return;
+    // On ne remplit que les champs vides : ne pas écraser ce que le pilote
+    // a déjà saisi (ex: s'il a déjà mis son immatriculation ou ajusté la marge).
+    if (nameEl && !nameEl.value.trim()) nameEl.value = ac.name;
+    const typeEl = document.getElementById('fleet-type');
+    if (typeEl && !typeEl.value.trim()) typeEl.value = ac.type;
+    const rollEl = document.getElementById('fleet-roll');
+    if (rollEl && !rollEl.value.trim()) rollEl.value = ac.groundRoll;
+    const ftEl = document.getElementById('fleet-50ft');
+    if (ftEl && !ftEl.value.trim()) ftEl.value = ac.fiftyFt;
+    _hideSuggest();
+    nameEl?.focus();
+}
+
+function _hideSuggest() {
+    const box = document.getElementById('fleet-suggest');
+    if (box) { box.hidden = true; box.innerHTML = ''; }
 }
 
 /**
@@ -205,6 +298,7 @@ function _resetForm() {
     document.getElementById('fleet-50ft').value = '';
     document.getElementById('fleet-form-title').textContent = isFr ? 'Ajouter un avion' : 'Add an aircraft';
     document.getElementById('fleet-cancel-form').style.display = 'none';
+    _hideSuggest();
 }
 
 /**
