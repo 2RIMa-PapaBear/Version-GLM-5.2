@@ -443,13 +443,7 @@ Observation : 06/05 à 07:30 LOC
 <li>Détaille le vent, la visibilité et le plafond en chiffres</li>
 <li>Si un TEMPO dégrade les conditions, il s'affiche en complément</li>
 </ul>
-<p><strong>Alertes minima VFR</strong> :</p>
-<ul>
-<li>Détecte automatiquement les conditions dangereuses (orage, CB, grêle, givrage)</li>
-<li>Bouton ⚙️ pour <strong>configurer vos propres seuils</strong> (plafond, visibilité, vent, rafales, température, QNH)</li>
-<li>Deux niveaux : <strong>avertissement</strong> (orange) et <strong>danger</strong> (rouge)</li>
-<li>Seuils sauvegardés dans le navigateur</li>
-</ul>
+<p><strong>Alertes minima VFR</strong> : désormais <strong>intégrées à la bannière GO / NO-GO</strong> (voir ci-dessous). Le bouton ⚙️ dans le header du Go / No-Go permet de configurer vos seuils personnels (plafond, visibilité, vent, rafales, température, QNH).</p>
 <h3>Fonctionnalités supplémentaires</h3>
 <ul>
 <li><strong>Favoris</strong> (colonne de gauche) : ajoutez vos aéroports fréquents</li>
@@ -458,6 +452,15 @@ Observation : 06/05 à 07:30 LOC
 <li><strong>Curseur d'arrivée</strong> : cliquez-glissez sur le graphique pour régler votre heure d'arrivée prévue (UTC). L'affichage se met à jour en temps réel.</li>
 <li><strong>Aéroport le plus proche</strong> : si un terrain n'a pas de METAR/TAF, l'outil affiche automatiquement celui du terrain le plus proche (avec avertissement)</li>
 <li><strong>Heures aéronautiques</strong> : lever et coucher du soleil affichés sur le graphique (début de journée aéro = lever -30min, fin = coucher +30min)</li>
+</ul>
+<h3>Ma flotte d'avions</h3>
+<p>Vous volez rarement sur un seul type d'avion. La gestion de <strong>flotte</strong> vous permet d'enregistrer vos avions, chacun avec ses distances de référence issues du manuel de vol (POH) :</p>
+<ul>
+<li><strong>Ajout d'un avion</strong> : cliquez sur le bouton « Ma flotte » (icône avion). Saisissez le nom, l'immatriculation, le type et les distances de roulement / franchissement 50 ft.</li>
+<li><strong>Autocomplétion</strong> : pendant la saisie du nom/modèle, l'outil propose automatiquement les avions les plus courants (Cessna, Piper, Robin, Diamond, Cirrus…) avec leurs distances de référence pré-remplies. Cliquez sur une suggestion pour gagner du temps — <em>vérifiez toujours avec le POH de votre avion</em>.</li>
+<li><strong>Avion actif</strong> : un avion est sélectionné comme actif pour le calcul des performances de décollage. Basculez entre vos avions d'un clic.</li>
+<li><strong>Marge de sécurité</strong> : chaque avion a sa propre marge de sécurité (%) appliquée aux distances calculées.</li>
+<li><strong>Sauvegarde</strong> : votre flotte est stockée dans votre navigateur et restaurée automatiquement à chaque visite.</li>
 </ul>
 <hr />
 <h2>🟢 AIDE À LA DÉCISION</h2>
@@ -718,10 +721,9 @@ Density Altitude ≈ 4257 ft. Votre avion se comporte comme s'il était à 4257 
 </tbody>
 </table>
 <p><strong>Intérêt</strong> : si les terrains voisins tombent en MVFR/IFR, méfiance — le temps se ferme sur votre zone. Cliquez un marqueur pour charger ce terrain.</p>
-<p><strong>Boutons Radar et Satellite</strong> (barre au-dessus de la carte) :</p>
+<p><strong>Bouton Radar</strong> (barre au-dessus de la carte) :</p>
 <ul>
 <li><strong>Radar</strong> (activé par défaut) : précipitations en temps réel issues de RainViewer. Bouton <strong>lecture/pause</strong> pour animer les dernières heures et la prévision immédiate ; <strong>curseur temporel</strong> pour naviguer dans les frames.</li>
-<li><strong>Satellite</strong> : imagerie infrarouge mondiale (nuages, fronts) — utile là où le radar n'a pas de couverture (océans, régions isolées).</li>
 <li>En cas d'échec réseau ponctuel, un nouveau clic relance le chargement automatiquement.</li>
 </ul>
 <div class="mockup">
@@ -834,7 +836,7 @@ Density Altitude ≈ 4257 ft. Votre avion se comporte comme s'il était à 4257 
 <h3>Lecture audio ATIS-style</h3>
 <p>Le bouton <strong>🔊 Lire METAR</strong> utilise la synthèse vocale du navigateur pour énoncer le message. Utile pour s'habituer au rythme des messages ou pour un rappel mains-libres.</p>
 <h3>Minima VFR personnels</h3>
-<p>Le bouton <strong>⚙️</strong> dans le panneau d'alertes ouvre la configuration de vos seuils personnels :</p>
+<p>Le bouton <strong>⚙️</strong> dans le header de la <strong>bannière GO / NO-GO</strong> ouvre la configuration de vos seuils personnels :</p>
 <ul>
 <li>Plafond, visibilité, vent, rafales (seuil warning + danger)</li>
 <li>Température (haute + basse) et QNH (haut + bas)</li>

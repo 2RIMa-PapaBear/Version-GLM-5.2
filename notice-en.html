@@ -440,13 +440,7 @@ Observation : 06/05 at 07:30 LOC
 <li>Details wind, visibility and ceiling in numbers</li>
 <li>If a TEMPO worsens conditions, it is displayed alongside</li>
 </ul>
-<p><strong>VFR minima alerts</strong> :</p>
-<ul>
-<li>Automatically detects hazardous conditions (thunderstorm, CB, hail, icing)</li>
-<li>⚙️ button to <strong>configure your own thresholds</strong> (ceiling, visibility, wind, gusts, temperature, QNH)</li>
-<li>Two levels: <strong>warning</strong> (orange) and <strong>danger</strong> (red)</li>
-<li>Thresholds saved in your browser</li>
-</ul>
+<p><strong>VFR minima alerts</strong>: now <strong>integrated into the GO / NO-GO banner</strong> (see below). The ⚙️ button in the Go / No-Go header lets you configure your personal thresholds (ceiling, visibility, wind, gusts, temperature, QNH).</p>
 <h3>Additional features</h3>
 <ul>
 <li><strong>Favorites</strong> (left column): add your frequent airports</li>
@@ -455,6 +449,15 @@ Observation : 06/05 at 07:30 LOC
 <li><strong>Arrival cursor</strong>: click and drag on the chart to set your planned arrival time (UTC). The display updates in real time.</li>
 <li><strong>Nearest airport</strong>: if an airfield has no METAR/TAF, the tool automatically shows the nearest one (with a warning)</li>
 <li><strong>Aeronautical hours</strong>: sunrise and sunset displayed on the chart (aero day start = sunrise -30min, end = sunset +30min)</li>
+</ul>
+<h3>My Aircraft Fleet</h3>
+<p>You rarely fly a single type of aircraft. <strong>Fleet management</strong> lets you register your aircraft, each with its own reference distances from the Pilot Operating Handbook (POH):</p>
+<ul>
+<li><strong>Adding an aircraft</strong>: click the "My fleet" button (plane icon). Enter the name, registration, type and ground roll / 50 ft obstacle distances.</li>
+<li><strong>Autocomplete</strong>: as you type the name/model, the tool automatically suggests the most common aircraft (Cessna, Piper, Robin, Diamond, Cirrus…) with their reference distances pre-filled. Click a suggestion to save time — <em>always verify against your aircraft's POH</em>.</li>
+<li><strong>Active aircraft</strong>: one aircraft is selected as active for takeoff performance calculations. Switch between your aircraft with a single click.</li>
+<li><strong>Safety margin</strong>: each aircraft has its own safety margin (%) applied to the calculated distances.</li>
+<li><strong>Persistence</strong>: your fleet is stored in your browser and automatically restored on each visit.</li>
 </ul>
 <hr />
 <h2>🟢 DECISION SUPPORT</h2>
@@ -715,10 +718,9 @@ Density Altitude ≈ 4257 ft. Your aircraft behaves as if it were at 4257 ft in 
 </tbody>
 </table>
 <p><strong>Value</strong>: if nearby fields drop to MVFR/IFR, beware — the weather is closing in on your area. Click a marker to load that airfield.</p>
-<p><strong>Radar and Satellite buttons</strong> (bar above the map):</p>
+<p><strong>Radar button</strong> (bar above the map):</p>
 <ul>
 <li><strong>Radar</strong> (on by default): real-time precipitation from RainViewer. <strong>Play/pause</strong> button animates the past hours and near-term forecast; <strong>time slider</strong> scrubs through frames.</li>
-<li><strong>Satellite</strong>: global infrared imagery (clouds, fronts) — useful where radar has no coverage (oceans, remote regions).</li>
 <li>On a transient network failure, clicking again automatically retries the load.</li>
 </ul>
 <div class="mockup">
@@ -831,7 +833,7 @@ Density Altitude ≈ 4257 ft. Your aircraft behaves as if it were at 4257 ft in 
 <h3>ATIS-style Audio Readout</h3>
 <p>The <strong>🔊 Read METAR</strong> button uses the browser's speech synthesis to read the message. Useful for getting used to message rhythm or for a hands-free reminder.</p>
 <h3>Personal VFR Minima</h3>
-<p>The <strong>⚙️</strong> button in the alerts panel opens the configuration of your personal thresholds:</p>
+<p>The <strong>⚙️</strong> button in the <strong>GO / NO-GO banner</strong> header opens the configuration of your personal thresholds:</p>
 <ul>
 <li>Ceiling, visibility, wind, gusts (warning + danger threshold)</li>
 <li>Temperature (high + low) and QNH (high + low)</li>
