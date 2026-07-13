@@ -1002,6 +1002,49 @@ html.night-mode body::before {
 }
 .fleet-form-row input:focus { border-color: var(--primary); }
 
+/* Champ nom avec autocomplétion (base d'avions). */
+.fleet-name-field { position: relative; }
+.fleet-suggest {
+    position: absolute;
+    top: 100%;
+    left: 0; right: 0;
+    z-index: 20;
+    margin-top: 4px;
+    background: var(--input-bg, #1E293B);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    max-height: 220px;
+    overflow-y: auto;
+}
+.fleet-suggest-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    cursor: pointer;
+    font-size: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.fleet-suggest-item:last-child { border-bottom: none; }
+.fleet-suggest-item:hover {
+    background: rgba(56, 189, 248, 0.12);
+}
+.fleet-suggest-name {
+    color: var(--text-color, #F8FAFC);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.fleet-suggest-dist {
+    color: var(--text-muted);
+    font-size: 10px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
 .fleet-form-hint {
     display: flex;
     gap: 8px;
@@ -1033,7 +1076,7 @@ html.night-mode body::before {
 }
 
 /* ================================================================
- * MAP LAYERS BAR — Contrôles calques (radar / satellite / espaces)
+ * MAP LAYERS BAR — Contrôles calques (radar / espaces)
  * ================================================================ */
 .map-layers-bar {
     display: flex;
@@ -1082,11 +1125,6 @@ html.night-mode body::before {
     background: rgba(74, 222, 128, 0.12);
     border-color: #4ADE80;
     color: #4ADE80;
-}
-.precip-toggle.active.precip-toggle-sat {
-    background: rgba(168, 85, 247, 0.12);
-    border-color: #A855F7;
-    color: #A855F7;
 }
 .precip-toggle.active.precip-toggle-airspaces {
     background: rgba(251, 191, 36, 0.12);
@@ -1166,7 +1204,7 @@ html.night-mode body::before {
 }
 
 /* ---- Night mode : tuiles Leaflet passées en filtre rouge ----
- * Les tuiles radar/satellite/fond de carte sont des images RGB codées
+ * Les tuiles radar/fond de carte sont des images RGB codées
  * en dur. On applique le même filtre que pour le canvas météo afin de
  * préserver la vision nocturne (rhodopsine) tout en gardant la
  * sémantique des couleurs (vert=léger, rouge=fort).
@@ -1199,6 +1237,60 @@ html.night-mode .precip-play-btn {
     .precip-toggle span:not(.airspace-count) {
         display: none;  /* icônes seules sur mobile */
     }
+}
+
+/* ================================================================
+ * AIRSPACE STACK SELECTOR — Sélecteur de zones superposées
+ * ================================================================
+ * Quand le pilote clique sur une zone où plusieurs espaces se
+ * superposent (ex: ATZ sous TMA sous CTR), un popup liste toutes
+ * les zones à cet endroit pour permettre d'accéder aux zones
+ * masquées. Le polygone cliqué est aussi surligné (contour blanc). */
+.airspace-popup .leaflet-popup-content-wrapper {
+    background: var(--inner-bg, #1E293B);
+    color: var(--text-color, #F8FAFC);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+.airspace-popup .leaflet-popup-content { margin: 0; width: auto !important; }
+.airspace-popup .leaflet-popup-tip { background: var(--inner-bg, #1E293B); }
+
+.airspace-stack { padding: 10px 12px; min-width: 200px; }
+.airspace-stack-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-color);
+}
+.airspace-stack-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+}
+.airspace-stack-item:hover {
+    background: rgba(56, 189, 248, 0.12);
+}
+.airspace-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+.airspace-stack-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* ================================================================
