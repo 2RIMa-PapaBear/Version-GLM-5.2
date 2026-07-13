@@ -30,7 +30,7 @@
  * ================================================================ */
 
 import { state, getCeiling } from './core.js';
-import { memoGet } from './core.js';
+import { memoGet, fetchAvecRelais } from './core.js';
 import { getAirportByICAO } from './ui-module.js';
 
 // Cache session : on ne redemande pas l'API si on a déjà la valeur pour
@@ -62,9 +62,9 @@ export async function fetchFreezingLevel(icao) {
         // Open-Meteo : freezing_level_height est l'altitude du 0°C, en mètres,
         // au-dessus du niveau de la mer (geopotential). CORS natif.
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=freezing_level_height&timezone=auto`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('Open-Meteo HTTP ' + res.status);
-        const data = await res.json();
+        let data;
+        try { data = await fetchAvecRelais(url, 'json'); } catch { return null; }
+        if (!data) return null;
 
         const heightM = data?.current?.freezing_level_height;
         if (typeof heightM !== 'number' || isNaN(heightM)) return null;

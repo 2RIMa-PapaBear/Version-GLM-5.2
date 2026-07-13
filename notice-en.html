@@ -313,534 +313,252 @@
 </head>
 <body>
     <div class="container">
-        <a href="index.html" class="btn-back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg> Back to application</a>
-        <h1>📖 USER MANUAL - METAR/TAF Visualizer</h1>
+        <a href="index.html" class="btn-back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg> Back to app</a>
+        <h1>📖 USER MANUAL — METAR/TAF Visualizer</h1>
 <h2>Complete Guide for VFR and IFR Pilots</h2>
 <hr />
 <h2 id="toc">📑 TABLE OF CONTENTS</h2>
 <ol>
-<li><a href="#démarrage-rapide">Quick start</a></li>
-<li><a href="#interface-et-fonctionnalités">Interface and features</a></li>
-<li><a href="#aide-à-la-décision">Decision support (New)</a></li>
-<li><a href="#conscience-situationnelle">Situational awareness &amp; Deterioration (New)</a></li>
-<li><a href="#navigation-cross-country">Cross-country navigation (New)</a></li>
-<li><a href="#confort-cockpit">Comfort &amp; Customization (New)</a></li>
-<li><a href="#décryptage-metar">METAR decoding</a></li>
-<li><a href="#décryptage-taf">TAF decoding</a></li>
-<li><a href="#minima-vfr-vmc">VFR minima (VMC)</a></li>
-<li><a href="#exemples-pratiques">Practical examples</a></li>
-<li><a href="#glossaire-aviation">Aviation glossary</a></li>
-<li><a href="#conseils-dutilisation">Usage tips</a></li>
+<li><a href="#quick-start">Quick Start</a></li>
+<li><a href="#interface">Interface and Features</a></li>
+<li><a href="#decision">Decision Support</a></li>
+<li><a href="#situational">Situational Awareness</a></li>
+<li><a href="#navigation">Cross-Country Navigation</a></li>
+<li><a href="#frequencies">Frequencies &amp; Airfield Info</a></li>
+<li><a href="#comfort">Comfort &amp; Customization</a></li>
+<li><a href="#metar-decoding">METAR Decoding</a></li>
+<li><a href="#taf-decoding">TAF Decoding</a></li>
+<li><a href="#vfr-minima">VFR Minima (VMC)</a></li>
+<li><a href="#examples">Practical Examples</a></li>
+<li><a href="#glossary">Aviation Glossary</a></li>
+<li><a href="#tips">Usage Tips</a></li>
 </ol>
 <hr />
-<h2>🚀 QUICK START</h2>
-<h3>First use</h3>
+
+<!-- ====================== QUICK START ====================== -->
+<h2 id="quick-start">🚀 QUICK START</h2>
+<h3>First Use</h3>
 <ol>
-<li><strong>Select an airport</strong> :</li>
-<li>Click in the search field</li>
-<li>Type the ICAO code (e.g., <code>LFPG</code>) or the name (e.g., <code>Paris</code>)</li>
-<li>
-<p>Select from the list</p>
-</li>
-<li>
-<p><strong>Paste a METAR/TAF</strong> :</p>
-</li>
-<li>Copy the weather message from Météo France, AWC, etc.</li>
-<li>Paste it in the text area</li>
-<li>
-<p>The chart is drawn automatically, along with all associated widgets (flight window, wind compass, regional map, takeoff performance, GO/NO-GO). The airfield is identified from the ICAO code in the pasted message.</p>
-</li>
-<li>
-<p><strong>Interpret the chart</strong> :</p>
-</li>
-<li>Horizontal axis = time (UTC)</li>
-<li>Colored bands = weather conditions</li>
-<li>Solar curve = sunrise/sunset</li>
+<li>Enter an <strong>ICAO code</strong> (e.g. <code>KJFK</code>) or an <strong>airfield name</strong> (e.g. <code>New York</code>) in the search bar.</li>
+<li>Click <strong>"METAR"</strong> (current observation) or <strong>"TAF"</strong> (forecast).</li>
+<li>The chart and all widgets draw automatically: dashboard (wind, flight category, GO/NO-GO), flight window, regional map, takeoff performance, frequencies.</li>
 </ol>
-<hr />
-<h2>🎨 INTERFACE AND FEATURES</h2>
-<h3>Input area</h3>
-<p><strong>Airport search</strong> :
-- ICAO code (4 letters): <code>LFPG</code>, <code>LFPO</code>, <code>LFRV</code>
-- Airport name: <code>Paris</code>, <code>Orly</code>, <code>Vannes</code>
-- Autocomplete for 17,000+ airports worldwide</p>
-<p><strong>METAR/TAF text area</strong> :
-- Paste the raw message directly
-- Supports multi-line
-- Auto-parses on paste</p>
-<h3>Weather chart</h3>
-<p><strong>Color legend</strong> :</p>
+<div class="success">
+<p><strong>Tip</strong>: You can also paste a raw METAR or TAF message directly into the editor area. The tool will decode and display it.</p>
+</div>
+
+<h3>Arrival Cursor</h3>
+<p>Click and drag on the chart to set your <strong>planned arrival time</strong> (UTC). All TAF forecasts recalculate at that instant. Double-click to reset.</p>
+
+<!-- ====================== INTERFACE ====================== -->
+<h2 id="interface">🎨 INTERFACE AND FEATURES</h2>
+
+<h3>Search and Autocomplete</h3>
+<ul>
+<li><strong>Smart search</strong>: type an ICAO code (<code>KLAX</code>) or a city/airfield name (<code>Boston</code>, <code>Logan</code>).</li>
+<li><strong>Autocomplete</strong> across <strong>17,000+ airports</strong> worldwide.</li>
+<li><strong>Nearest airport</strong>: if an airfield has no METAR/TAF, the tool automatically shows the nearest one (with a warning).</li>
+</ul>
+
+<h3>Raw Message Editor</h3>
+<p>The editor area displays the raw METAR/TAF message with <strong>syntax highlighting</strong>. You can edit it manually — the display updates in real time.</p>
+
+<h3>Dashboard (3 cells)</h3>
+<p>Below the search bar, three cells appear automatically:</p>
 <table>
-<thead>
-<tr>
-<th>Color</th>
-<th>Meaning</th>
-<th>Conditions</th>
-</tr>
-</thead>
+<thead><tr><th>Cell</th><th>Description</th></tr></thead>
 <tbody>
-<tr>
-<td>🟢 <strong>VFR (#4ADE80)</strong></td>
-<td>Visual Flight Rules</td>
-<td>Vis &gt; 5mi (8000m) AND ceiling &gt; 3000ft</td>
-</tr>
-<tr>
-<td>🔵 <strong>MVFR (#38BDF8)</strong></td>
-<td>Marginal VFR</td>
-<td>Vis 3-5mi (4800-8000m) OR ceiling 1000-3000ft</td>
-</tr>
-<tr>
-<td>🔴 <strong>IFR (#F87171)</strong></td>
-<td>Instrument Flight Rules</td>
-<td>Vis 1-3mi (1600-4800m) OR ceiling 500-1000ft</td>
-</tr>
-<tr>
-<td>🟣 <strong>LIFR (#D946EF)</strong></td>
-<td>Low IFR</td>
-<td>Vis &lt; 1mi (1600m) OR ceiling &lt; 500ft</td>
-</tr>
+<tr><td><strong>🌬️ Wind Compass</strong></td><td>Wind rose with average wind, gusts, direction. Automatic best-runway selection. Click a runway bubble to force a choice.</td></tr>
+<tr><td><strong>🏷️ Flight Category</strong></td><td>VFR / MVFR / IFR / LIFR badge computed from ceiling and visibility.</td></tr>
+<tr><td><strong>🟢 GO / NO-GO</strong></td><td>Synthetic flight decision verdict (see "Decision Support").</td></tr>
 </tbody>
 </table>
-<p><strong>Chart elements</strong> :
-- <strong>Horizontal bands</strong> : Weather conditions over time
-- <strong>Yellow curve</strong> : Sun elevation (sunrise/sunset)
-- <strong>Annotations</strong> : Weather events (showers, thunderstorms, etc.)</p>
-<h3>Displayed information</h3>
-<p><strong>Header</strong> :</p>
-<pre><code>Airport : Paris/Charles de Gaulle (LFPG)
-Observation : 06/05 at 07:30 LOC
-(Currently at 07:35 at LFPG : 13°C, QNH 1011 hPa [real time])
-</code></pre>
+
+<h3>Favorites and History</h3>
 <ul>
-<li><strong>Observation</strong> : METAR time (local time)</li>
-<li><strong>Currently</strong> : Real-time weather via API</li>
+<li><strong>Favorites</strong> (left column): add your frequent airports with the star icon.</li>
+<li><strong>History</strong> (right column): your recent searches for quick access.</li>
 </ul>
-<p><strong>Weather details</strong> :
-- Temperature / Dew point
-- QNH (atmospheric pressure)
-- Wind (direction, speed, gusts)
-- Visibility
-- Weather conditions (rain, fog, etc.)
-- Cloud cover</p>
-<h3>Interactive dashboard</h3>
-<p>The app features a three-column dashboard (below the input area):</p>
-<p><strong>Wind compass</strong> :</p>
-<ul>
-<li>Displays real-time wind direction and speed</li>
-<li>Automatic <strong>best runway</strong> selection (most into-the-wind)</li>
-<li>Click runway bubbles to force a specific runway</li>
-<li>Color-coded by intensity: gray (calm), green, yellow, orange, red (dangerous)</li>
-<li>Gust indicator (G) when present</li>
-<li><strong>Direction variation</strong> (METAR group <code>170V250</code>): two arrowheads appear on the outer circle at the variation bounds, joined by a thin arc. The swept sector and values are shown below the compass. Works for both directional wind (<code>21006KT 170V250</code>) and variable wind (<code>VRB</code>).</li>
-<li><strong>Live temperature & QNH</strong>: the aerodrome info line shows live temperature (°C) and QNH (hPa), refreshed on every visit via Open-Meteo.</li>
-</ul>
-<p><strong>Flight category (badge)</strong> :</p>
-<ul>
-<li>Shows VFR / MVFR / IFR / LIFR with color coding</li>
-<li>Details wind, visibility and ceiling in numbers</li>
-<li>If a TEMPO worsens conditions, it is displayed alongside</li>
-</ul>
-<p><strong>VFR minima alerts</strong>: now <strong>integrated into the GO / NO-GO banner</strong> (see below). The ⚙️ button in the Go / No-Go header lets you configure your personal thresholds (ceiling, visibility, wind, gusts, temperature, QNH).</p>
-<h3>Additional features</h3>
-<ul>
-<li><strong>Favorites</strong> (left column): add your frequent airports</li>
-<li><strong>History</strong> (right column): your recent searches</li>
-<li><strong>Audio read-aloud</strong>: 🔊 button to listen to the METAR (speech synthesis)</li>
-<li><strong>Arrival cursor</strong>: click and drag on the chart to set your planned arrival time (UTC). The display updates in real time.</li>
-<li><strong>Nearest airport</strong>: if an airfield has no METAR/TAF, the tool automatically shows the nearest one (with a warning)</li>
-<li><strong>Aeronautical hours</strong>: sunrise and sunset displayed on the chart (aero day start = sunrise -30min, end = sunset +30min)</li>
-</ul>
+
+<h3>Header Buttons</h3>
+<table>
+<thead><tr><th>Button</th><th>Action</th></tr></thead>
+<tbody>
+<tr><td>🇫🇷 / 🇬🇧</td><td>Toggle French / English language</td></tr>
+<tr><td>📖 Manual</td><td>Opens this manual</td></tr>
+<tr><td>🌙 Night mode</td><td>Red filter preserving night vision</td></tr>
+<tr><td>🟦🟧 Local / Navigation</td><td>Toggle between local flight and cross-country navigation</td></tr>
+<tr><td>⬜ Express briefing</td><td>Cockpit view (verdict, wind, window in large format)</td></tr>
+<tr><td>🔗 Share</td><td>Generates a briefing link / QR code</td></tr>
+<tr><td>🔔 Watchdog</td><td>Automatic favorite monitoring with notifications</td></tr>
+</tbody>
+</table>
+
 <h3>My Aircraft Fleet</h3>
 <p>You rarely fly a single type of aircraft. <strong>Fleet management</strong> lets you register your aircraft, each with its own reference distances from the Pilot Operating Handbook (POH):</p>
 <ul>
-<li><strong>Adding an aircraft</strong>: click the "My fleet" button (plane icon). Enter the name, registration, type and ground roll / 50 ft obstacle distances.</li>
-<li><strong>Autocomplete</strong>: as you type the name/model, the tool automatically suggests the most common aircraft (Cessna, Piper, Robin, Diamond, Cirrus…) with their reference distances pre-filled. Click a suggestion to save time — <em>always verify against your aircraft's POH</em>.</li>
-<li><strong>Active aircraft</strong>: one aircraft is selected as active for takeoff performance calculations. Switch between your aircraft with a single click.</li>
-<li><strong>Safety margin</strong>: each aircraft has its own safety margin (%) applied to the calculated distances.</li>
-<li><strong>Persistence</strong>: your fleet is stored in your browser and automatically restored on each visit.</li>
+<li><strong>Adding an aircraft</strong>: click the "My fleet" button (plane icon, in the takeoff widget). Enter the name, registration, type and ground roll / 50 ft obstacle distances.</li>
+<li><strong>Autocomplete</strong>: as you type the name/model, the tool automatically suggests the most common aircraft (Cessna, Piper, Robin, Diamond, Cirrus…) with their reference distances pre-filled. <em>Always verify against your aircraft's POH.</em></li>
+<li><strong>Active aircraft</strong>: one aircraft is selected as active for performance calculations. Switch with a single click.</li>
+<li><strong>Safety margin</strong>: each aircraft has its own margin (%) applied to the calculated distances.</li>
+<li><strong>Persistence</strong>: your fleet is stored in your browser.</li>
 </ul>
-<hr />
-<h2>🟢 DECISION SUPPORT</h2>
+
+<!-- ====================== DECISION SUPPORT ====================== -->
+<h2 id="decision">🟢 DECISION SUPPORT</h2>
+
 <h3>GO / NO-GO Banner</h3>
-<p>The flagship feature: a <strong>synthetic banner</strong> that crosses all available data and displays a verdict at a glance:</p>
+<p>The flagship feature: a banner that <strong>crosses all available data</strong> and displays a verdict at a glance.</p>
 <table>
-<thead>
-<tr>
-<th>Verdict</th>
-<th>Color</th>
-<th>Meaning</th>
-</tr>
-</thead>
+<thead><tr><th>Verdict</th><th>Color</th><th>Meaning</th></tr></thead>
 <tbody>
-<tr>
-<td><strong>🟢 GO</strong></td>
-<td>Green</td>
-<td>All parameters green, you can fly safely</td>
-</tr>
-<tr>
-<td><strong>🟡 CAUTION</strong></td>
-<td>Orange</td>
-<td>One or more parameters require caution (flying possible but stay alert)</td>
-</tr>
-<tr>
-<td><strong>🔴 NO-GO</strong></td>
-<td>Red</td>
-<td>A blocking parameter makes the flight not recommended or prohibited</td>
-</tr>
+<tr><td><strong>GO</strong></td><td>🟢 Green</td><td>All parameters are green — you can fly safely</td></tr>
+<tr><td><strong>CAUTION</strong></td><td>🟠 Orange</td><td>Flying possible but stay alert — one or more parameters are marginal</td></tr>
+<tr><td><strong>NO-GO</strong></td><td>🔴 Red</td><td>Flight not recommended or prohibited — a critical parameter is exceeded</td></tr>
 </tbody>
 </table>
 <p><strong>Criteria automatically evaluated</strong>:</p>
 <ol>
-<li><strong>Aeronautical night</strong> → NO-GO (day VFR prohibited outside aero hours)</li>
-<li><strong>IFR/LIFR category</strong> → NO-GO (below VFR minima)</li>
-<li><strong>Danger alerts</strong> → NO-GO (your personal minima in red)</li>
-<li><strong>MVFR category</strong> → CAUTION (reduced VFR margins)</li>
-<li><strong>Warning alerts</strong> → CAUTION (your personal minima in orange)</li>
-<li><strong>High density altitude</strong> → CAUTION (degraded performance)</li>
-<li><strong>Strong crosswind</strong> → CAUTION/NO-GO (aircraft limits)</li>
-<li><strong>Falling QNH trend</strong> → CAUTION (deterioration likely)</li>
-<li><strong>Active SIGMET/AIRMET</strong> → CAUTION/NO-GO (en-route hazardous weather)</li>
+<li>Aeronautical night</li>
+<li>IFR / LIFR conditions (ceiling and visibility)</li>
+<li>Personal minima danger alerts (red) → NO-GO</li>
+<li>MVFR conditions → CAUTION</li>
+<li>Personal minima warning alerts (orange) → CAUTION</li>
+<li>High density altitude (degraded performance)</li>
+<li>Crosswind (based on active runway)</li>
+<li>Falling QNH trend (imminent deterioration)</li>
+<li>Active SIGMET / AIRMET in the area</li>
 </ol>
-<div class="success">
-<p><strong>Transparency</strong>: the verdict is never a simple light. It lists <strong>all reasons</strong> behind it, so you can understand and challenge or refine the assessment.</p>
-</div>
-<div class="mockup">
-<div class="mockup-caption">Preview of the GO / NO-GO banner — three verdict examples</div>
-<div class="mockup-stage">
+<div class="success"><p><strong>Transparency</strong>: the verdict always lists all reasons. No opaque decisions.</p></div>
+<p><strong>⚙️ button in the GO / NO-GO header</strong>: opens the configuration panel for your <strong>personal VFR minima</strong> (ceiling, visibility, wind, gusts, temperature, QNH) — see below.</p>
 
-<!-- GO example -->
-<div class="mck-gonogo mck-go">
-<div class="mck-gonogo-header">
-<div class="mck-gonogo-icon">✓</div>
-<div style="flex:1;">
-<div class="mck-gonogo-verdict">GO</div>
-<div class="mck-gonogo-sub">GO — You can fly</div>
-</div>
-<div class="mck-gonogo-cat"><div class="mck-gonogo-cat-lbl">Cat.</div><div class="mck-gonogo-cat-val">VFR</div></div>
-</div>
-<div class="mck-reasons">
-<div class="mck-reason mck-r-ok"><span class="mck-reason-icon">✓</span>All parameters are green.</div>
-</div>
-</div>
-
-<!-- CAUTION example -->
-<div class="mck-gonogo mck-caution" style="margin-top:14px;">
-<div class="mck-gonogo-header">
-<div class="mck-gonogo-icon">!</div>
-<div style="flex:1;">
-<div class="mck-gonogo-verdict">CAUTION</div>
-<div class="mck-gonogo-sub">Flying possible, stay alert</div>
-</div>
-<div class="mck-gonogo-cat"><div class="mck-gonogo-cat-lbl">Cat.</div><div class="mck-gonogo-cat-val">MVFR</div></div>
-</div>
-<div class="mck-reasons">
-<div class="mck-reason mck-r-caution"><span class="mck-reason-icon">☁</span>MVFR — reduced VFR margins</div>
-<div class="mck-reason mck-r-caution"><span class="mck-reason-icon">🌡</span>Density altitude worth watching (3250 ft)</div>
-<div class="mck-reason mck-r-caution"><span class="mck-reason-icon">↓</span>Pressure slightly falling (1.2 hPa/h)</div>
-</div>
-</div>
-
-<!-- NO-GO example -->
-<div class="mck-gonogo mck-nogo" style="margin-top:14px;">
-<div class="mck-gonogo-header">
-<div class="mck-gonogo-icon">✕</div>
-<div style="flex:1;">
-<div class="mck-gonogo-verdict">NO-GO</div>
-<div class="mck-gonogo-sub">Flight not recommended / prohibited</div>
-</div>
-<div class="mck-gonogo-cat"><div class="mck-gonogo-cat-lbl">Cat.</div><div class="mck-gonogo-cat-val">IFR</div></div>
-</div>
-<div class="mck-reasons">
-<div class="mck-reason mck-r-danger"><span class="mck-reason-icon">🌙</span>Aeronautical night — day VFR prohibited</div>
-<div class="mck-reason mck-r-danger"><span class="mck-reason-icon">☁</span>IFR conditions — below VFR minima</div>
-<div class="mck-reason mck-r-danger"><span class="mck-reason-icon">💨</span>Crosswind 17 kt on RWY 27 — check aircraft limits</div>
-</div>
-</div>
-
-</div>
-</div>
 <h3>Density Altitude Calculator</h3>
 <p><strong>Density altitude</strong> is the altitude at which the standard atmosphere (ISA) would have the same density as the actual air. This is what determines your aircraft's real performance: climb rate, takeoff distance, landing distance.</p>
-<p>The tool automatically computes, from the METAR:</p>
-<ul>
-<li><strong>Pressure Altitude</strong> = Field elevation + 27 × (1013 − QNH)</li>
-<li><strong>Density Altitude</strong> = Pressure Altitude + 118.8 × (Temperature − ISA Temperature)</li>
-</ul>
-<div class="warning">
-<p><strong>Example</strong>: A summer day at 30°C on a 2000 ft field, QNH 1013:<br />
-Density Altitude ≈ 4257 ft. Your aircraft behaves as if it were at 4257 ft in standard atmosphere! Significant climb rate loss, especially on grass runways.</p>
-</div>
-<h3>QNH Pressure Trend (3h)</h3>
-<p>Atmospheric pressure is one of the best indicators of weather evolution:</p>
-<table>
-<thead>
-<tr>
-<th>Trend</th>
-<th>Meaning</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>QNH stable or rising</td>
-<td>Stable weather, ridge, lasting VFR conditions</td>
-</tr>
-<tr>
-<td>Falling &gt; 1 hPa/h</td>
-<td>Monitor, deterioration likely</td>
-</tr>
-<tr>
-<td>Falling &gt; 2 hPa/h</td>
-<td>Significant deterioration imminent</td>
-</tr>
-<tr>
-<td>Falling &gt; 3 hPa/h</td>
-<td>Strong alert (deep depression, strong winds)</td>
-</tr>
-</tbody>
-</table>
-<p>The tool retrieves METAR history over the last 4 hours and computes the QNH slope automatically. The result feeds the GO/NO-GO banner.</p>
-<h3>SIGMET / AIRMET</h3>
-<p>The tool queries the AviationWeather API for <strong>en-route weather alerts</strong>:</p>
-<table>
-<thead>
-<tr>
-<th>Type</th>
-<th>Covered phenomena</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>SIGMET</strong></td>
-<td>Severe thunderstorms, heavy hail, severe turbulence, severe icing, mountain wave, volcanic ash</td>
-</tr>
-<tr>
-<td><strong>AIRMET</strong></td>
-<td>Moderate turbulence, moderate icing, low ceiling/visibility, strong winds</td>
-</tr>
-</tbody>
-</table>
-<div class="danger">
-<p><strong>Note</strong>: The AviationWeather API mainly covers the United States and the Western Atlantic. European sources (EUMETNET/SIA) will be integrated in a future version.</p>
-</div>
-<hr />
-<h2>🗺️ SITUATIONAL AWARENESS &amp; DETERIORATION</h2>
-<h3>Day VFR Flight Window</h3>
-<p>A dynamic banner shows in real time:</p>
-<ul>
-<li><strong>Civil sunrise / sunset times</strong> (UTC) for the displayed airfield</li>
-<li><strong>Current status</strong>:
-<ul>
-<li>🟢 <strong>Window open</strong> + time remaining before nightfall (countdown)</li>
-<li>🟡 <strong>Daylight ending soon</strong> (less than 30 min remaining)</li>
-<li>🔴 <strong>Aeronautical night</strong> — day VFR prohibited</li>
-</ul>
-</li>
-</ul>
-<p><strong>Aeronautical hours</strong>: from civil sunrise −30 min to civil sunset +30 min.</p>
-<div class="mockup">
-<div class="mockup-caption">Preview of the daylight window banner — three situations</div>
-<div class="mockup-stage">
+<p>Computed from the field elevation, QNH and actual outside air temperature (OAT).</p>
 
-<!-- Window open -->
-<div class="mck-window mck-w-open">
-<div class="mck-window-content">
-<div class="mck-w-icon">☀</div>
-<div>
-<div class="mck-w-status">FLIGHT WINDOW OPEN</div>
-<div class="mck-w-detail">3h45 remaining before nightfall</div>
-</div>
-<div class="mck-w-times">
-<div class="mck-w-time"><div class="mck-w-time-lbl">Civil sunrise</div><div class="mck-w-time-val">04:32 Z</div></div>
-<div class="mck-w-time"><div class="mck-w-time-lbl">Civil sunset</div><div class="mck-w-time-val">19:48 Z</div></div>
-<div class="mck-w-time"><div class="mck-w-time-lbl">Aero hours</div><div class="mck-w-time-val">04:02 Z<br>20:18 Z</div></div>
-</div>
-</div>
-</div>
+<h3>QNH Trend (3 h)</h3>
+<p>The tool retrieves METAR history to compute the <strong>3-hour pressure trend</strong>. A rapid drop (&gt; 2 hPa/h) indicates imminent deterioration and feeds the GO / NO-GO banner.</p>
 
-<!-- Daylight ending soon -->
-<div class="mck-window mck-w-closing" style="margin-top:12px;">
-<div class="mck-window-content">
-<div class="mck-w-icon">⚠</div>
-<div>
-<div class="mck-w-status">DAYLIGHT ENDING SOON</div>
-<div class="mck-w-detail">⚠ Only 0h22 before night — plan your return!</div>
-</div>
-<div class="mck-w-times">
-<div class="mck-w-time"><div class="mck-w-time-lbl">Civil sunset</div><div class="mck-w-time-val">19:48 Z</div></div>
-<div class="mck-w-time"><div class="mck-w-time-lbl">Aero end</div><div class="mck-w-time-val">20:18 Z</div></div>
-</div>
-</div>
-</div>
+<h3>Takeoff Performance Widget</h3>
+<p>Estimates your <strong>corrected takeoff distances</strong> (ground roll + 50 ft obstacle) based on density altitude, surface type and your active aircraft. Compares the result to the <strong>available runway length</strong> with a visual margin bar.</p>
+<ul>
+<li>Runway length detected automatically (editable manually).</li>
+<li>Applies your personal safety margin.</li>
+<li>Alert if the calculated distance exceeds the available runway.</li>
+</ul>
 
-<!-- Aeronautical night -->
-<div class="mck-window mck-w-night" style="margin-top:12px;">
-<div class="mck-window-content">
-<div class="mck-w-icon">🌙</div>
-<div>
-<div class="mck-w-status">AERONAUTICAL NIGHT — DAY VFR PROHIBITED</div>
-<div class="mck-w-detail">Next civil sunrise is tomorrow morning.</div>
-</div>
-<div class="mck-w-times">
-<div class="mck-w-time"><div class="mck-w-time-lbl">Civil sunrise</div><div class="mck-w-time-val">04:32 Z</div></div>
-<div class="mck-w-time"><div class="mck-w-time-lbl">Aero open</div><div class="mck-w-time-val">04:02 Z</div></div>
-</div>
-</div>
-</div>
-
-</div>
-</div>
-<h3>Interactive Regional Map</h3>
-<p>Open the "Regional map" panel to display:</p>
-<table>
-<thead>
-<tr>
-<th>Layer</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Base map</strong></td>
-<td>OpenStreetMap (dark theme)</td>
-</tr>
-<tr>
-<td><strong>Precipitation radar</strong></td>
-<td>RainViewer — incoming weather in real time (latest frame)</td>
-</tr>
-<tr>
-<td><strong>Current airfield</strong></td>
-<td>Central yellow marker</td>
-</tr>
-<tr>
-<td><strong>Nearby airfields</strong></td>
-<td>25 surrounding airfields with their flight category (VFR/MVFR/IFR/LIFR) as colored markers</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Value</strong>: if nearby fields drop to MVFR/IFR, beware — the weather is closing in on your area. Click a marker to load that airfield.</p>
-<p><strong>Radar button</strong> (bar above the map):</p>
-<ul>
-<li><strong>Radar</strong> (on by default): real-time precipitation from RainViewer. <strong>Play/pause</strong> button animates the past hours and near-term forecast; <strong>time slider</strong> scrubs through frames.</li>
-<li>On a transient network failure, clicking again automatically retries the load.</li>
-</ul>
-<div class="mockup">
-<div class="mockup-caption">Preview of the regional map — current airfield, neighbors, radar and route</div>
-<div class="mockup-stage">
-<div class="mck-map">
-<div class="mck-map-grid"></div>
-<!-- Route (navigation mode) -->
-<div class="mck-map-route"></div>
-<!-- Precipitation area (radar) -->
-<div class="mck-map-radar"></div>
-<!-- Current airfield (yellow, center) -->
-<div class="mck-map-pin mck-map-pin-lg mck-pin-current" style="top:50%; left:50%;"></div>
-<div class="mck-map-label" style="top:50%; left:50%;">LFPG ●</div>
-<!-- Nearby airfields -->
-<div class="mck-map-pin mck-pin-vfr" style="top:28%; left:62%;"></div>
-<div class="mck-map-label" style="top:28%; left:62%;">LFPB</div>
-<div class="mck-map-pin mck-pin-mvfr" style="top:38%; left:33%;"></div>
-<div class="mck-map-label" style="top:38%; left:33%;">LFO9</div>
-<div class="mck-map-pin mck-pin-vfr" style="top:68%; left:58%;"></div>
-<div class="mck-map-label" style="top:68%; left:58%;">LFPT</div>
-<div class="mck-map-pin mck-pin-ifr" style="top:72%; left:35%;"></div>
-<div class="mck-map-label" style="top:72%; left:35%;">LFOX</div>
-<div class="mck-map-pin mck-pin-vfr" style="top:22%; left:40%;"></div>
-<div class="mck-map-label" style="top:22%; left:40%;">LFPG</div>
-<!-- Departure (green) / Destination = current -->
-<div class="mck-map-pin mck-map-pin-lg mck-pin-vfr" style="top:30%; left:18%;"></div>
-<div class="mck-map-label" style="top:30%; left:18%;">LFO9 ●</div>
-</div>
-<div class="mck-map-legend">
-<span class="mck-ml-item"><span class="mck-ml-dot" style="background:#4ADE80;"></span> VFR</span>
-<span class="mck-ml-item"><span class="mck-ml-dot" style="background:#38BDF8;"></span> MVFR</span>
-<span class="mck-ml-item"><span class="mck-ml-dot" style="background:#F87171;"></span> IFR</span>
-<span class="mck-ml-item"><span class="mck-ml-dot" style="background:#D946EF;"></span> LIFR</span>
-<span class="mck-ml-item"><span class="mck-ml-dot" style="background:#FBBF24;"></span> Current airfield</span>
-<span class="mck-ml-item"><span class="mck-ml-dot" style="background:rgba(96,165,250,0.4);"></span> Precip. radar</span>
-</div>
-</div>
-</div>
-<h3>PIREPs — Pilot Reports</h3>
-<p>PIREPs (Pilot Reports) are the "freshest" information source: real-time reports from pilots in flight. They document:</p>
-<ul>
-<li>Actual cloud tops (CB tops, bases)</li>
-<li>Observed turbulence (intensity, altitude)</li>
-<li>Observed icing (intensity, type, altitude)</li>
-<li>Winds aloft</li>
-</ul>
-<p>Displayed in the regional map panel, sorted by priority (danger → caution → info).</p>
-<hr />
-<h2>✈️ CROSS-COUNTRY NAVIGATION</h2>
-<h3>Local / Navigation Mode</h3>
-<p>The toggle button at the top right adapts the display to your flight type:</p>
-<table>
-<thead>
-<tr>
-<th>Mode</th>
-<th>Display priority</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>🟦 Local</strong></td>
-<td>Real-time METAR observation, wind/active runway, density altitude, day window, imminent deterioration</td>
-</tr>
-<tr>
-<td><strong>🟧 Navigation</strong></td>
-<td>TAF forecast at arrival time (ETA), viable alternates, en-route weather</td>
-</tr>
-</tbody>
-</table>
-<h3>Alternates Comparator</h3>
-<p>In Navigation mode, the tool automatically displays a <strong>comparative table</strong> of the 6 most viable nearby airfields:</p>
-<ul>
-<li>Flight category (VFR/MVFR/IFR/LIFR)</li>
-<li>Visibility, ceiling, wind</li>
-<li>Sorted by viability then proximity</li>
-<li><strong>Click an airfield</strong> to load it immediately</li>
-</ul>
-<p>Essential for quickly choosing where to divert if the destination deteriorates.</p>
-<h3>Route Weather (Corridor)</h3>
-<p>On the regional map, in Navigation mode:</p>
-<ol>
-<li>Enter your <strong>departure airfield</strong> in the dedicated field</li>
-<li>The current airfield is the <strong>destination</strong></li>
-<li>The tool draws the route line and fetches METARs from airfields near the corridor</li>
-<li>Each airfield is shown with its flight category as a colored marker</li>
-</ol>
-<p>Answer the question: "is the weather closing in on my route?"</p>
-<hr />
-<h2>🌙 COMFORT &amp; CUSTOMIZATION</h2>
-<h3>Red Night Mode (Night Vision)</h3>
-<p>The <strong>🌙</strong> button activates red night mode. The interface switches to an exclusively red palette (>620nm) that <strong>preserves rhodopsin</strong> (retinal night vision).</p>
-<div class="warning">
-<p><strong>Aeronautical principle</strong>: even brief exposure to a white screen destroys night adaptation (30+ min to recover). Red light preserves it — which is why cockpits use red lighting.</p>
-</div>
-<p>The mode is <strong>persistent</strong> (saved between sessions) and applies a filter to canvas/SVG graphics to push the entire spectrum toward red without breaking color semantics.</p>
-<h3>Briefing PDF</h3>
-<p>The <strong>📄 Briefing PDF</strong> button generates a printable and shareable summary document:</p>
-<ul>
-<li>Header: airfield, generation date/time, message type</li>
-<li>Flight category with color coding</li>
-<li>Key values table (wind, visibility, ceiling, QNH, temperature)</li>
-<li>Suggested best runway + crosswind component</li>
-<li>Active VFR minima alerts</li>
-<li>Daylight flight window (civil sunrise/sunset)</li>
-<li>Raw message (METAR/TAF)</li>
-<li>Footer: disclaimer + source + pagination</li>
-</ul>
-<p>The file is named <code>Briefing_LFPG_20260702.pdf</code>. Ideal for keeping a written record of the briefing (required by many flying clubs and a good safety practice).</p>
-<h3>ATIS-style Audio Readout</h3>
-<p>The <strong>🔊 Read METAR</strong> button uses the browser's speech synthesis to read the message. Useful for getting used to message rhythm or for a hands-free reminder.</p>
 <h3>Personal VFR Minima</h3>
-<p>The <strong>⚙️</strong> button in the <strong>GO / NO-GO banner</strong> header opens the configuration of your personal thresholds:</p>
+<p>The <strong>⚙️</strong> button in the GO / NO-GO header opens the configuration of your personal thresholds:</p>
 <ul>
 <li>Ceiling, visibility, wind, gusts (warning + danger threshold)</li>
 <li>Temperature (high + low) and QNH (high + low)</li>
 <li>Individual enable/disable for each parameter</li>
 <li>Saved in your browser, automatically restored</li>
 </ul>
+
+<!-- ====================== SITUATIONAL AWARENESS ====================== -->
+<h2 id="situational">🗺️ SITUATIONAL AWARENESS</h2>
+
+<h3>Day VFR Flight Window</h3>
+<p>Banner displaying <strong>sunrise and sunset times</strong> (UTC and local), flight window status (open / closing soon / night) and a <strong>countdown</strong> before nightfall. Updates live every minute.</p>
+<table>
+<thead><tr><th>Status</th><th>Color</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>Window open</td><td>🟢 Green</td><td>You are in full daylight VFR</td></tr>
+<tr><td>Closing soon</td><td>🟠 Orange</td><td>Night is approaching (less than 30 min before sunset)</td></tr>
+<tr><td>Aeronautical night</td><td>🔴 Red</td><td>Night flight — qualifications required</td></tr>
+</tbody>
+</table>
+
+<h3>Interactive Regional Map</h3>
+<p>Open the "Regional map" panel to display:</p>
+<table>
+<thead><tr><th>Layer</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td>Base map</td><td>Satellite imagery (Esri)</td></tr>
+<tr><td>🟦 Radar</td><td>Real-time precipitation (RainViewer). Play/pause button to animate the past hours; time slider to scrub through frames.</td></tr>
+<tr><td>🟡 Current airfield</td><td>Yellow center marker</td></tr>
+<tr><td>Runways</td><td>Runway outlines colored by surface (green = grass, gray = concrete, ochre = dirt)</td></tr>
+<tr><td>Nearby airfields</td><td>Up to 25 surrounding fields with VFR/MVFR/IFR/LIFR colored markers</td></tr>
+<tr><td>🛩️ PIREPs</td><td>Pilot reports (turbulence, icing) in the area</td></tr>
+<tr><td>Airspaces</td><td>CTR, TMA, ATZ, ICAO classes — click a zone to highlight it</td></tr>
+</tbody>
+</table>
+<p><strong>Value</strong>: if nearby fields drop to MVFR/IFR, beware — the weather is closing in. Click a marker to load that airfield.</p>
+<p><strong>"Airfield" button</strong>: zooms directly to the current airfield to see runway details.</p>
+
+<h3>SIGMET / AIRMET</h3>
+<p>Detection of active <strong>SIGMETs</strong> (hazardous phenomena: thunderstorms, severe icing, turbulence) and <strong>AIRMETs</strong> (moderate) near your airfield. Feeds directly into the GO / NO-GO banner.</p>
+
+<h3>Icing Level</h3>
+<p>Retrieves the <strong>freezing level</strong> (0°C isotherm) from Open-Meteo and evaluates icing risk if clouds extend above it.</p>
+
+<!-- ====================== NAVIGATION ====================== -->
+<h2 id="navigation">✈️ CROSS-COUNTRY NAVIGATION</h2>
+
+<h3>Local / Navigation Mode</h3>
+<p>The toggle button <strong>🟦 Local / 🟧 Navigation</strong> adapts the display:</p>
+<table>
+<thead><tr><th>Mode</th><th>Display</th></tr></thead>
+<tbody>
+<tr><td>🟦 <strong>Local</strong></td><td>Real-time METAR observation, wind/active runway, density altitude, day window, imminent deterioration</td></tr>
+<tr><td>🟧 <strong>Navigation</strong></td><td>TAF forecast at arrival time (ETA), viable alternates, en-route weather</td></tr>
+</tbody>
+</table>
+
+<h3>Alternates Comparator</h3>
+<p>In Navigation mode, the tool automatically lists <strong>diversion airfields</strong> around your destination, with their flight category, visibility, ceiling and wind — sorted by viability for a quick decision.</p>
+
+<h3>Flight Planner</h3>
+<p>Enter your departure airfield in the regional map ("Departure") to compute:</p>
+<ul>
+<li><strong>Great-circle distance</strong> and true/magnetic course (automatic declination)</li>
+<li><strong>Surface and cruise wind</strong> (Open-Meteo)</li>
+<li><strong>Ground speed and estimated time en route</strong> (ETA)</li>
+<li><strong>Estimated fuel + legal reserves</strong> (day/night VFR)</li>
+</ul>
+
+<h3>Route Weather</h3>
+<p>Displays flight-category markers for airfields along your route, to anticipate possible en-route deterioration.</p>
+
+<h3>Elevation Profile</h3>
+<p>Samples the <strong>terrain elevation profile</strong> along the route to verify compliance with VFR clearance rules (500 ft / 1000 ft).</p>
+
+<!-- ====================== FREQUENCIES ====================== -->
+<h2 id="frequencies">📡 FREQUENCIES &amp; AIRFIELD INFO</h2>
+
+<h3>Radio Frequencies Widget</h3>
+<p>For each airfield enriched via OpenAIP, a panel displays the available <strong>radio frequencies</strong>: Tower, Ground, ATIS, Approach, etc.</p>
+
+<h3>Decoded ATIS</h3>
+<p>When the airfield publishes an <strong>ATIS</strong> (Automatic Terminal Information Service), the decoded message appears in the frequencies widget.</p>
+
+<h3>Official VAC Links</h3>
+<p>A button redirects to the country's <strong>official AIP portal</strong> (FAA for the USA, NATS for the UK, DFS for Germany…) to consult the visual approach chart (VAC).</p>
+
+<!-- ====================== COMFORT ====================== -->
+<h2 id="comfort">🌙 COMFORT &amp; CUSTOMIZATION</h2>
+
+<h3>Night Vision Mode</h3>
+<p>The 🌙 button activates a <strong>red filter</strong> across the entire interface, preserving rhodopsin (night vision). Ideal before a night flight or in a dimmed briefing room.</p>
+
+<h3>Express Briefing (Cockpit View)</h3>
+<p>The ⬜ button collapses the interface into a single centered column showing only the essentials in large format: GO/NO-GO verdict, flight category, wind/active runway, flight window. Designed for <strong>quick reading at 2 m</strong>.</p>
+
+<h3>Audio Read-Aloud</h3>
+<p>The 🔊 button reads the METAR aloud (browser speech synthesis), ATIS-style.</p>
+
+<h3>Briefing PDF</h3>
+<p>The "Briefing PDF" button generates a <strong>printable PDF document</strong> containing: airfield header, raw METAR/TAF, flight category, wind, visibility, ceiling, QNH, best runway, day window, alerts and takeoff distances.</p>
+
+<h3>Share by Link</h3>
+<p>The 🔗 button generates a <strong>permalink</strong> containing the airfield, raw message and arrival time. A QR code lets you open it on mobile.</p>
+
+<h3>Favorites Watchdog</h3>
+<p>The 🔁 button activates <strong>background monitoring</strong> of your favorite airfields. Every 15 min (configurable), the tool recomputes each favorite's flight category and sends a <strong>browser notification</strong> if a field degrades to CAUTION or NO-GO. The tab must stay open.</p>
+
 <hr />
+
 <h2>🔍 METAR DECODING</h2>
 <h3>General structure</h3>
 <pre><code>METAR LFPG 060730Z 34015G25KT 9999 FEW020 SCT040 BKN080 13/09 Q1011 NOSIG

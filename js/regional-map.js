@@ -21,6 +21,35 @@ const RUNWAY_MIN_ZOOM = 11;
 let _refreshToken = 0;
 let _lastLoadedIcao = null;
 
+// Marqueur de suivi du curseur d'élévation (déplacé en temps réel sur la carte).
+let _cursorMarker = null;
+
+// Synchronise le marqueur de carte avec le curseur du profil d'élévation.
+document.addEventListener('elevation-hover', (e) => {
+    if (!_map) return;
+    const d = e.detail;
+    if (!d) {
+        // Curseur quitté : masque le marqueur.
+        if (_cursorMarker) { _map.removeLayer(_cursorMarker); _cursorMarker = null; }
+        return;
+    }
+    // Crée ou déplace le marqueur à la position du curseur.
+    const latlng = [d.lat, d.lon];
+    if (!_cursorMarker) {
+        _cursorMarker = L.circleMarker(latlng, {
+            radius: 6,
+            fillColor: '#FBBF24',
+            color: '#fff',
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.9,
+            zIndexOffset: 1000,
+        }).addTo(_map);
+    } else {
+        _cursorMarker.setLatLng(latlng);
+    }
+});
+
 // Couleur du trait de piste selon le revêtement (codes FAA/OurAirports).
 // Durs (asphalte/béton/bitume) = gris clair, herbe = vert, terre = ocre, etc.
 const RUNWAY_SURFACE_COLORS = {
@@ -129,10 +158,10 @@ async function _initOrRefresh() {
     await _loadPireps(lat, lon);
     if (myToken !== _refreshToken) return;
 
-    const fromInput = document.getElementById('route-from-input');
-    const fromIcao = fromInput?.value?.trim().toUpperCase();
-    if (fromIcao && /^[A-Z]{4}$/.test(fromIcao) && fromIcao !== _currentIcao.toUpperCase()) {
-        await showRouteWeather(_map, fromIcao, _currentIcao);
+    const toInput = document.getElementById('route-to-input');
+    const toIcao = toInput?.value?.trim().toUpperCase();
+    if (toIcao && /^[A-Z]{4}$/.test(toIcao) && toIcao !== _currentIcao.toUpperCase()) {
+        await showRouteWeather(_map, _currentIcao, toIcao);
         if (myToken !== _refreshToken) return;
     }
 
