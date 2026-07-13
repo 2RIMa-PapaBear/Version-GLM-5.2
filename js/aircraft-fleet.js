@@ -1,0 +1,200 @@
+/* ================================================================
+ * AIRCRAFT FLEET — Gestion de la flotte d'avions du pilote
+ * ================================================================
+ *
+ * OBJECTIF
+ * --------
+ * Le pilote VFR vole rarement sur un seul type d'avion (C172, DR400,
+ * Robin, ULM...). Chacun a ses propres distances de décollage issues du
+ * manuel de vol (POH). Ce module gère une FLOTTE d'avions personnels,
+ * chacun avec ses paramètres, et un avion "actif" sélectionné pour le
+ * calcul de performance du terrain courant.
+ *
+ * STOCKAGE
+ * --------
+ * localStorage :
+ *   - 'ac-fleet'      : tableau d'avions [{id, name, registration, type, groundRoll, fiftyFt, safetyMargin}]
+ *   - 'ac-active-id'  : id de l'avion actif
+ *
+ * MIGRATION
+ * ---------
+ * Si l'ancien format (ac-takeoff-ref, avion unique) existe, il est migré
+ * automatiquement vers la flotte lors du premier accès.
+ * ================================================================ */
+
+const LS_FLEET = 'ac-fleet';
+const LS_ACTIVE = 'ac-active-id';
+
+// Avion de référence par défaut (C172 SP, niveau mer / ISA).
+const DEFAULT_C172 = {
+    name: 'Cessna 172 SP',
+    registration: '',
+    type: 'C172',
+    groundRoll: 830,
+    fiftyFt: 1400,
+    safetyMargin: 20,
+};
+
+/**
+ * Génère un identifiant unique simple.
+ */
+function _uid() {
+    return 'ac_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+}
+
+/**
+ * Lit la flotte depuis localStorage.
+ * Gère la migration depuis l'ancien format (avion unique ac-takeoff-ref).
+ * @returns {Array<Object>} Liste des avions.
+ */
+export function getFleet() {
+    let fleet = _readLs(LS_FLEET, []);
+
+    // Migration : si la flotte est vide mais l'ancien avion unique existe.
+    if (fleet.length === 0) {
+        const oldRef = _readLs('ac-takeoff-ref', null);
+        if (oldRef && typeof oldRef.groundRoll === 'number') {
+            const migrated = {
+                id: _uid(),
+                ...DEFAULT_C172,
+                name: 'Mon avion',
+                groundRoll: oldRef.groundRoll,
+                fiftyFt: oldRef.fiftyFt,
+                safetyMargin: 20,
+            };
+            fleet = [migrated];
+            _writeLs(LS_FLEET, fleet);
+            _writeLs(LS_ACTIVE, migrated.id);
+        }
+    }
+
+    // Flotte vide → on crée l'avion par défaut (C172) pour ne jamais
+    // laisser le pilote sans référence.
+    if (fleet.length === 0) {
+        const def = { id: _uid(), ...DEFAULT_C172 };
+        fleet = [def];
+        _writeLs(LS_FLEET, fleet);
+        _writeLs(LS_ACTIVE, def.id);
+    }
+
+    return fleet;
+}
+
+/**
+ * Retourne l'avion actuellement actif (sélectionné pour le calcul).
+ * Si l'id actif n'existe plus dans la flotte, retombe sur le premier.
+ * @returns {Object} L'avion actif.
+ */
+export function getActiveAircraft() {
+    const fleet = getFleet();
+    const activeId = _readLs(LS_ACTIVE, null);
+    let active = activeId ? fleet.find(a => a.id === activeId) : null;
+    if (!active) {
+        active = fleet[0];
+        _writeLs(LS_ACTIVE, active.id);
+    }
+    return active;
+}
+
+/**
+ * Retourne l'id de l'avion actif.
+ */
+export function getActiveAircraftId() {
+    return _readLs(LS_ACTIVE, null) || getFleet()[0]?.id || null;
+}
+
+/**
+ * Définit l'avion actif par son id.
+ * @param {string} id
+ */
+export function setActiveAircraft(id) {
+    const fleet = getFleet();
+    if (fleet.some(a => a.id === id)) {
+        _writeLs(LS_ACTIVE, id);
+    }
+}
+
+/**
+ * Ajoute un avion à la flotte.
+ * @param {Object} data {name, registration, type, groundRoll, fiftyFt, safetyMargin}
+ * @returns {Object} L'avion créé (avec id).
+ */
+export function addAircraft(data) {
+    const fleet = getFleet();
+    const aircraft = { id: _uid(), ..._sanitize(data) };
+    fleet.push(aircraft);
+    _writeLs(LS_FLEET, fleet);
+    return aircraft;
+}
+
+/**
+ * Met à jour un avion existant.
+ * @param {string} id
+ * @param {Object} data
+ * @returns {Object|null} L'avion mis à jour, ou null si introuvable.
+ */
+export function updateAircraft(id, data) {
+    const fleet = getFleet();
+    const idx = fleet.findIndex(a => a.id === id);
+    if (idx === -1) return null;
+    fleet[idx] = { ...fleet[idx], ..._sanitize(data), id };
+    _writeLs(LS_FLEET, fleet);
+    return fleet[idx];
+}
+
+/**
+ * Supprime un avion de la flotte. Garde toujours au moins un avion.
+ * @param {string} id
+ * @returns {boolean} true si supprimé.
+ */
+export function deleteAircraft(id) {
+    const fleet = getFleet();
+    if (fleet.length <= 1) return false; // toujours au moins 1
+    const idx = fleet.findIndex(a => a.id === id);
+    if (idx === -1) return false;
+    fleet.splice(idx, 1);
+    _writeLs(LS_FLEET, fleet);
+    // Si l'avion supprimé était actif, on active le premier restant.
+    if (getActiveAircraftId() === id) {
+        _writeLs(LS_ACTIVE, fleet[0].id);
+    }
+    return true;
+}
+
+/**
+ * Nettoie/valide les données d'un avion.
+ */
+function _sanitize(data) {
+    const gr = parseInt(data.groundRoll, 10);
+    const ft = parseInt(data.fiftyFt, 10);
+    const sm = parseInt(data.safetyMargin, 10);
+    return {
+        name: String(data.name || 'Avion').slice(0, 40),
+        registration: String(data.registration || '').slice(0, 12).toUpperCase(),
+        type: String(data.type || '').slice(0, 20),
+        groundRoll: isNaN(gr) || gr <= 0 ? DEFAULT_C172.groundRoll : gr,
+        fiftyFt: isNaN(ft) || ft <= 0 ? DEFAULT_C172.fiftyFt : ft,
+        safetyMargin: isNaN(sm) ? 20 : Math.max(0, Math.min(50, sm)),
+    };
+}
+
+// ----------------------------------------------------------------
+// Helpers localStorage
+// ----------------------------------------------------------------
+function _readLs(key, fallback) {
+    try {
+        const raw = localStorage.getItem(key);
+        if (raw == null) return fallback;
+        return JSON.parse(raw);
+    } catch {
+        return fallback;
+    }
+}
+
+function _writeLs(key, value) {
+    try {
+        localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+        /* quota */
+    }
+}
