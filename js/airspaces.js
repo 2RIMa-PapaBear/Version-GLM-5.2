@@ -54,10 +54,75 @@ const MIN_ZOOM = 9;
 // néanmoins une marge large pour ne rien masquer d'utile.
 const MAX_BASE_FT = 5000;
 
+// ----------------------------------------------------------------
+// Enums OpenAIP — l'API renvoie des ENTIERS, pas des chaînes.
+// Mapping basé sur le schéma OpenAIP et confirmé sur données réelles.
+// (Sans cette table, un CTR s'affiche « ? » et sa classe « classe 3 ».)
+// ----------------------------------------------------------------
+
+// type → nature de l'espace (OpenAIP enum 0–36).
+// Source : schéma OpenAIP /airspaces + vérification sur noms réels.
+const TYPE_MAP = {
+    0:  'OTHER',          // ex: ALPINE AREA, AREA
+    1:  'DROP',           // parachutage (PA = Parachute Area)
+    2:  'DANGER',         // ex: FIRINGAREA
+    3:  'PROHIBITED',
+    4:  'CTR',
+    5:  'TMA',            // CTA / TMA (peut être recadré via le nom)
+    6:  'ATZ',
+    7:  'TMA',
+    8:  'TMA',
+    9:  'TMA',
+    10: 'TMA',
+    11: 'TMZ',
+    12: 'RMZ',
+    13: 'ATZ',
+    14: 'GLIDER',
+    15: 'RESTRICTED',     // ex: A25, A27 (zones réglementées UK)
+    16: 'DANGER',
+    17: 'PROHIBITED',
+    18: 'RESTRICTED',     // ex: ALDBROUGH (RA - Restricted Area UK)
+    19: 'RESTRICTED',
+    20: 'RESTRICTED',
+    21: 'RESTRICTED',     // ex: UGR (zones ULM/UL aérien réglementées DE)
+    22: 'RESTRICTED',
+    23: 'RESTRICTED',
+    24: 'GLIDER',
+    25: 'GLIDER',
+    26: 'GLIDER',
+    27: 'GLIDER',
+    28: 'ACRO',           // voltige (ACRO)
+    29: 'DROP',           // park/parachutage
+    30: 'OTHER',
+    31: 'OTHER',
+    32: 'OTHER',
+    33: 'OTHER',
+    34: 'OTHER',
+    35: 'OTHER',
+    36: 'OTHER',
+};
+
+// icaoClass → lettre ICAO (OpenAIP enum 0–8).
+// Confirmé : type=4 (CTR) avec icaoClass=3 → classe D partout en Europe.
+const ICAO_CLASS_MAP = {
+    0: 'A',
+    1: 'B',
+    2: 'C',
+    3: 'D',
+    4: 'E',
+    5: 'F',
+    6: 'G',
+    7: 'SPECIAL',
+    8: 'NA',   // non applicable / non classé
+};
+
 // Couleurs par type/classe d'espace (cohérentes avec l'usage aéro).
 const AIRSPACE_STYLE = {
     CTR:    { color: '#EF4444', fill: 'rgba(239,68,68,0.10)',  weight: 2, label: 'CTR' },
     TMA:    { color: '#F97316', fill: 'rgba(249,115,22,0.10)', weight: 2, label: 'TMA' },
+    CTA:    { color: '#F97316', fill: 'rgba(249,115,22,0.10)', weight: 1.5, label: 'CTA' },
+    ATZ:    { color: '#FBBF24', fill: 'rgba(251,191,36,0.08)', weight: 1.2, label: 'ATZ' },
+    ACRO:   { color: '#A855F7', fill: 'rgba(168,85,247,0.08)', weight: 1, label: 'Voltige' },
     'A':    { color: '#DC2626', fill: 'rgba(220,38,38,0.10)',  weight: 1.5, label: 'A' },
     'B':    { color: '#DC2626', fill: 'rgba(220,38,38,0.10)',  weight: 1.5, label: 'B' },
     'C':    { color: '#F97316', fill: 'rgba(249,115,22,0.10)', weight: 1.5, label: 'C' },
@@ -130,25 +195,66 @@ function _bboxKey(minLat, minLon, maxLat, maxLon) {
 
 /**
  * Détermine le type/classe d'un espace OpenAIP pour le style.
- * OpenAIP expose 'type' (enum) et 'icaoClass' (lettre).
+ *
+ * ⚠️ L'API OpenAIP renvoie 'type' et 'icaoClass' sous forme d'ENTIERS
+ * (enums), pas de chaînes. On décode donc via les tables TYPE_MAP /
+ * ICAO_CLASS_MAP. On garde une robustesse par le nom (fallback) au cas
+ * où l'API changerait de convention.
+ *
+ * @returns {{ kind: string, classLetter: string }}
  */
-function _classify(as) {
+function _decodeAirspace(as) {
+    const typeName = _decodeType(as);
+    const classLetter = _decodeIcaoClass(as);
+    return { kind: typeName, classLetter };
+}
+
+/**
+ * Décode le type OpenAIP (entier → clé de style).
+ * Complète la table TYPE_MAP par inspection du nom de zone (robustesse).
+ */
+function _decodeType(as) {
+    // 1. Enum numérique (cas normal).
+    if (typeof as.type === 'number' && TYPE_MAP[as.type]) {
+        return TYPE_MAP[as.type];
+    }
+    // 2. Chaîne (ancienne API ou GeoJSON openaip) — on matche directement.
     const t = String(as.type || '').toUpperCase();
-    const cls = String(as.icaoClass || '').toUpperCase();
-
-    if (t.includes('CTR') || t === 'D') return 'CTR';
-    if (t.includes('TMA')) return 'TMA';
+    if (t === 'CTR' || t === 'D') return 'CTR';
+    if (t === 'TMA') return 'TMA';
+    if (t === 'CTA') return 'CTA';
+    if (t === 'ATZ') return 'ATZ';
+    if (t === 'RMZ') return 'RMZ';
+    if (t === 'TMZ') return 'TMZ';
     if (t.includes('RESTRICTED') || t === 'R') return 'RESTRICTED';
-    if (t.includes('DANGER') || t === 'P') return 'DANGER';
+    if (t.includes('DANGER') || t === 'Q') return 'DANGER';
     if (t.includes('PROHIBITED') || t === 'P') return 'PROHIBITED';
-    if (t.includes('RMZ')) return 'RMZ';
-    if (t.includes('TMZ')) return 'TMZ';
-    if (t.includes('GLIDER')) return 'GLIDER';
-    if (t.includes('DROP') || t.includes('PARACHUTE')) return 'DROP';
+    if (t.includes('GLIDER') || t.includes('GLIDING')) return 'GLIDER';
 
-    // Par classe ICAO.
-    if (cls && AIRSPACE_STYLE[cls]) return cls;
+    // 3. Fallback sur le nom de la zone.
+    const name = String(as.name || as.designator || '').toUpperCase();
+    if (/\bCTR\b/.test(name)) return 'CTR';
+    if (/\bTMA\b/.test(name)) return 'TMA';
+    if (/\bATZ\b/.test(name)) return 'ATZ';
+    if (/\bRMZ\b/.test(name)) return 'RMZ';
+    if (/\bTMZ\b/.test(name)) return 'TMZ';
+    if (/RESTRICT|REGUL|RTBA|R\d{2,}/.test(name)) return 'RESTRICTED';
+    if (/DANGER/.test(name)) return 'DANGER';
+    if (/PROHIB/.test(name)) return 'PROHIBITED';
+    if (/PARACHUTE|\bPA\b|\(PA\)/.test(name)) return 'DROP';
+    if (/ACRO|VOLTIGE|AEROBAT/.test(name)) return 'ACRO';
+    if (/GLIDER|PLANEUR|VOL.A.VOILE/.test(name)) return 'GLIDER';
+
     return 'OTHER';
+}
+
+/**
+ * Décode la classe ICAO OpenAIP (entier → lettre A-G).
+ */
+function _decodeIcaoClass(as) {
+    if (typeof as.icaoClass === 'number') return ICAO_CLASS_MAP[as.icaoClass] || '';
+    const c = String(as.icaoClass || '').toUpperCase();
+    return /^[A-G]$/.test(c) ? c : '';
 }
 
 /**
@@ -206,6 +312,23 @@ function _geometryToLatLngs(geometry, radiusKm = 5) {
     return rings;
 }
 
+/**
+ * Test point-in-polygon (ray casting). ring = [[lat, lon], ...].
+ * Sert à détecter quelles zones se superposent au point cliqué.
+ */
+function _pointInRing(lat, lng, ring) {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const lati = ring[i][0], loni = ring[i][1];
+        const latj = ring[j][0], lonj = ring[j][1];
+        if (((lati > lat) !== (latj > lat)) &&
+            (lng < (lonj - loni) * (lat - lati) / (latj - lati) + loni)) {
+            inside = !inside;
+        }
+    }
+    return inside;
+}
+
 // ----------------------------------------------------------------
 // Contrôleur Leaflet
 // ----------------------------------------------------------------
@@ -227,6 +350,13 @@ export function createAirspaceController(map) {
     let loaded = false;                             // données déjà chargées ?
     let controlsEl = null;
     let lastBboxKey = null;
+
+    // --- Surlignage & superposition ---
+    // highlighted : le polygone actuellement mis en évidence (contour blanc épais).
+    // polyMeta : Map L.polygon → métadonnées (item, ring, style, label de tooltip).
+    // Permet de retrouver la zone cliquée et de lister les zones superposées.
+    let highlighted = null;
+    let polyMeta = new Map();
 
     /**
      * Charge les espaces aériens pour une bbox.
@@ -277,6 +407,8 @@ export function createAirspaceController(map) {
      */
     function _render(items) {
         layerGroup.clearLayers();
+        polyMeta.clear();
+        highlighted = null;
         if (!Array.isArray(items)) return;
 
         const isFr = state.lang === 'fr';
@@ -287,10 +419,23 @@ export function createAirspaceController(map) {
             const baseFt = _baseFt(as);
             if (baseFt > MAX_BASE_FT) return;
 
-            const kind = _classify(as);
-            const style = AIRSPACE_STYLE[kind] || AIRSPACE_STYLE.OTHER;
+            const kind = _decodeAirspace(as);
+            const style = AIRSPACE_STYLE[kind.kind] || AIRSPACE_STYLE.OTHER;
             const radiusKm = (as.radius && typeof as.radius.value === 'number') ? as.radius.value : 5;
             const rings = _geometryToLatLngs(as.geometry, radiusKm);
+
+            const name = as.name || as.designator || style.label;
+            const lower = as.lower?.value ? `${Math.round(as.lower.value * 3.28084)} ft` : 'SFC';
+            const upper = as.upper?.value ? `${Math.round(as.upper.value * 3.28084)} ft` : '∞';
+            const cls = kind.classLetter;
+            const country = as.country || '';
+            // La classe ICAO n'est affichée que si elle est pertinente
+            // (A-G) ; on ignore 'NA' / 'SPECIAL' qui n'apportent rien au pilote.
+            const clsDisplay = /^[A-G]$/.test(cls) ? ` · classe ${cls}` : '';
+            const tooltip = `<strong>${escapeHtml(name)}</strong><br>
+                <span style="color:${style.color};font-weight:700;">${style.label}</span>${clsDisplay}<br>
+                ${isFr ? 'Alt.' : 'Alt.'}: ${lower} → ${upper}
+                ${country ? `<br>${country}` : ''}`;
 
             rings.forEach((ring, ringIdx) => {
                 if (ring.length < 2) return;
@@ -303,18 +448,25 @@ export function createAirspaceController(map) {
                     // On garde le premier anneau cliquable, les trous non.
                 });
 
-                const name = as.name || as.designator || style.label;
-                const lower = as.lower?.value ? `${Math.round(as.lower.value * 3.28084)} ft` : 'SFC';
-                const upper = as.upper?.value ? `${Math.round(as.upper.value * 3.28084)} ft` : '∞';
-                const cls = as.icaoClass || '—';
-                const country = as.country || '';
-                const tooltip = `<strong>${escapeHtml(name)}</strong><br>
-                    <span style="color:${style.color};font-weight:700;">${style.label}</span>
-                    ${cls !== '—' ? `· classe ${cls}` : ''}<br>
-                    ${isFr ? 'Alt.' : 'Alt.'}: ${lower} → ${upper}
-                    ${country ? `<br>${country}` : ''}`;
                 poly.bindTooltip(tooltip, { sticky: true, direction: 'top' });
 
+                // Au clic : surligne la zone (contour blanc épais) et, si des
+                // zones se superposent au point cliqué, propose un sélecteur.
+                poly.on('click', (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    const latlng = e.latlng;
+                    _highlightPoly(poly);
+                    const stacked = _findStackedAt(latlng.lat, latlng.lng);
+                    if (stacked.length > 1) {
+                        _showStackPopup(latlng, stacked, isFr);
+                    }
+                });
+
+                polyMeta.set(poly, {
+                    ring, style, tooltip,
+                    // Résumé court pour le sélecteur de superposition.
+                    summary: `${style.label} — ${escapeHtml(name)} (${lower} → ${upper})`,
+                });
                 layerGroup.addLayer(poly);
                 count++;
             });
@@ -328,6 +480,70 @@ export function createAirspaceController(map) {
                 badge.style.display = count > 0 ? 'inline-block' : 'none';
             }
         }
+    }
+
+    /**
+     * Surligne un polygone (contour blanc épais). Un seul à la fois :
+     * l'ancien surlignage est rétabli dans son style d'origine.
+     */
+    function _highlightPoly(poly) {
+        if (highlighted === poly) return;
+        if (highlighted && polyMeta.has(highlighted)) {
+            const m = polyMeta.get(highlighted);
+            highlighted.setStyle({ color: m.style.color, weight: m.style.weight });
+        }
+        poly.bringToFront();
+        poly.setStyle({ color: '#FFFFFF', weight: 4 });
+        highlighted = poly;
+    }
+
+    /**
+     * Retourne toutes les zones dont le polygone contient le point.
+     * Sert à détecter les superpositions (ex: ATZ sous TMA sous CTR).
+     */
+    function _findStackedAt(lat, lng) {
+        const found = [];
+        polyMeta.forEach((m, poly) => {
+            if (_pointInRing(lat, lng, m.ring)) {
+                found.push({ poly, ...m });
+            }
+        });
+        return found;
+    }
+
+    /**
+     * Affiche un popup de sélection quand plusieurs zones se superposent.
+     * Le pilote peut cliquer sur n'importe laquelle (y compris celles
+     * masquées sous une zone plus grande).
+     */
+    function _showStackPopup(latlng, stacked, isFr) {
+        const html = `
+            <div class="airspace-stack">
+                <div class="airspace-stack-title">${isFr ? `${stacked.length} zones superposées — cliquez pour sélectionner` : `${stacked.length} overlapping zones — click to select`}</div>
+                ${stacked.map((s, i) => `
+                    <div class="airspace-stack-item" data-idx="${i}">
+                        <span class="airspace-dot" style="background:${s.style.color};"></span>
+                        <span class="airspace-stack-name">${s.summary}</span>
+                    </div>
+                `).join('')}
+            </div>`;
+        const popup = L.popup({ className: 'airspace-popup', maxWidth: 280, closeButton: true })
+            .setLatLng(latlng)
+            .setContent(html)
+            .openOn(map);
+
+        const root = popup.getElement();
+        root?.querySelectorAll('.airspace-stack-item').forEach(el => {
+            el.addEventListener('click', () => {
+                const idx = parseInt(el.dataset.idx, 10);
+                const target = stacked[idx];
+                if (target) {
+                    _highlightPoly(target.poly);
+                    target.poly.openTooltip(latlng);
+                }
+                map.closePopup(popup);
+            });
+        });
     }
 
     /**
@@ -386,8 +602,19 @@ export function createAirspaceController(map) {
         }
     }
 
+    // Clic sur la carte (hors zone) : retire le surlignage.
+    function onMapClick() {
+        if (highlighted && polyMeta.has(highlighted)) {
+            const m = polyMeta.get(highlighted);
+            highlighted.setStyle({ color: m.style.color, weight: m.style.weight });
+            highlighted = null;
+        }
+        map.closePopup();
+    }
+
     map.on('moveend', onMapMove);
     map.on('zoomend', onMapMove);
+    map.on('click', onMapClick);
 
     return {
         mountControls,
@@ -397,9 +624,12 @@ export function createAirspaceController(map) {
         destroy() {
             map.off('moveend', onMapMove);
             map.off('zoomend', onMapMove);
+            map.off('click', onMapClick);
             map.removeLayer(layerGroup);
             layerGroup = null;
             controlsEl = null;
+            highlighted = null;
+            polyMeta.clear();
         },
     };
 }
