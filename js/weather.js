@@ -406,7 +406,7 @@ export function analyzeForecastAlerts(parsedData, targetHour) {
 }
 
 export function displayWeatherAlerts(rawText, parsedData = null, targetHour = null, containerId = 'weather-alerts-panel') {
-    const container = document.getElementById(containerId) || document.querySelector('.dashboard-cell:first-child');
+    const container = document.getElementById(containerId);
     if (!container) return;
 
     const tr = I18N[state.lang] || {};

@@ -1,4 +1,4 @@
-import { state, I18N, fetchAvecRelais, memoGet } from './core.js';
+import { state, I18N, fetchAvecRelais, memoGet, surfaceLabel } from './core.js';
 import { getAirportByICAO } from './ui-module.js';
 import { parseVisiToMeters, getCeiling } from './core.js';
 import { showRouteWeather } from './route-weather.js';
@@ -20,6 +20,47 @@ const RUNWAY_MIN_ZOOM = 11;
 
 let _refreshToken = 0;
 let _lastLoadedIcao = null;
+
+// Couleur du trait de piste selon le revêtement (codes FAA/OurAirports).
+// Durs (asphalte/béton/bitume) = gris clair, herbe = vert, terre = ocre, etc.
+const RUNWAY_SURFACE_COLORS = {
+    ASP: '#CBD5E1', BIT: '#CBD5E1', CON: '#E2E8F0', MAC: '#CBD5E1',
+    MIX: '#CBD5E1', PEM: '#CBD5E1', PER: '#CBD5E1', MEM: '#CBD5E1',
+    COP: '#CBD5E1', COM: '#CBD5E1', BRI: '#D6A87A',
+    GRS: '#4ADE80',
+    GRE: '#D97706', CLA: '#D97706', SAN: '#D97706', LAT: '#D97706', COR: '#D97706',
+    GVL: '#A8A29E',
+    ICE: '#7DD3FC', SNO: '#7DD3FC',
+    PSP: '#94A3B8',
+    WAT: '#60A5FA',
+    U:   '#94A3B8',
+};
+const RUNWAY_COLOR_DEFAULT = '#94A3B8';
+
+/**
+ * Retourne la couleur de trait pour un code de revêtement donné.
+ */
+function _runwayColorForSurface(code) {
+    return RUNWAY_SURFACE_COLORS[code] || RUNWAY_COLOR_DEFAULT;
+}
+
+/**
+ * Résout le code de revêtement d'une piste à partir de sa désignation.
+ * Ordre : apt.runwaySurfaces[desig] (avec/sans suffixe LRC) → apt.surface.
+ */
+function _resolveRunwaySurface(apt, desig) {
+    if (!apt) return null;
+    if (!desig) return apt.surface || null;
+    const key = desig.toUpperCase();
+    const keyBase = key.replace(/[LRC]$/, '');
+    if (apt.runwaySurfaces) {
+        return apt.runwaySurfaces[key]
+            || apt.runwaySurfaces[keyBase]
+            || apt.surface
+            || null;
+    }
+    return apt.surface || null;
+}
 
 export function toggleRegionalMap() {
     const panel = document.getElementById('regional-map-panel');
@@ -338,11 +379,15 @@ async function _drawRunways(lat, lon, apt) {
     if (drawn.length === 0) return;
 
     drawn.forEach(rw => {
+        // Couleur du trait selon le revêtement (herbe=béton=terre...).
+        const surfaceCode = _resolveRunwaySurface(apt, rw.desigAtEndB) || _resolveRunwaySurface(apt, rw.desigAtEndA);
+        const rwColor = _runwayColorForSurface(surfaceCode);
+
         L.polyline([rw.endA, rw.endB], {
-            color: '#94A3B8', weight: 7, opacity: 0.9, lineCap: 'round',
+            color: rwColor, weight: 5, opacity: 0.9, lineCap: 'round',
         }).addTo(_runwayLayer);
         L.polyline([rw.endA, rw.endB], {
-            color: '#1E293B', weight: 4, opacity: 1, lineCap: 'round', dashArray: '10,8',
+            color: '#1E293B', weight: 2.5, opacity: 1, lineCap: 'round', dashArray: '10,8',
         }).addTo(_runwayLayer);
 
         const mkIcon = txt => L.divIcon({
