@@ -2,7 +2,7 @@
  * APP — Orchestrateur principal (Zéro Dépendance Circulaire)
  * ================================================================ */
 
-import { state, memoSet, memoGet, escapeHtml, I18N } from './core.js';
+import { state, memoSet, memoGet, escapeHtml, I18N, fetchOpenMeteo } from './core.js';
 import { fetchAvecRelais } from './core.js';
 import { analyserMETAR, analyserTAF } from './engine.js';
 import { displayWeatherAlerts } from './weather.js';
@@ -11,7 +11,8 @@ import {
     sanitizeStorage, initAirportsDB, updateFavoritesUI, renderSearchHistory,
     initAutocomplete, handleInput, handleScroll, toggleLanguage, setLanguage,
     lireMETAR, stopAudio, updateFinalUI, _hideDashboard, addToHistory, toggleFavorite,
-    updateHighlights, getAirportByICAO, _selectAndFetch, enrichAirport
+    updateHighlights, getAirportByICAO, _selectAndFetch, enrichAirport,
+    getStartupFavorite
 } from './ui-module.js';
 import { initNightMode, toggleNightMode } from './night-mode.js';
 import { generateBriefingPDF } from './briefing-pdf.js';
@@ -24,12 +25,14 @@ import { preloadDeclination } from './magvar.js';
 import { showTakeoffWidget } from './takeoff-ui.js';
 import { showFrequenciesWidget } from './frequencies-ui.js';
 import { showFlightPlanner } from './flight-planner-ui.js';
+import { clearElevationChart } from './elevation-chart.js';
 import { initCockpitMode, toggleCockpitMode } from './cockpit-mode.js';
 import { openShareModal, hasPermalink, readPermalink } from './permalink.js';
 import { initWatchdog, openWatchdogPanel, getWatchdogSettings } from './watchdog.js';
 import { fetchAirportByIcao } from './openaip.js';
 
 const lastFetchTime = {};
+
 
 export function genererGraphique() {
     const raw = document.getElementById('tafInput').value;
@@ -96,9 +99,9 @@ export function genererGraphique() {
             // Toujours rafraîchir la température/QNH temps réel. On ne persiste
             // que le tzOffset (immuable) ; les valeurs current sont jetables.
             memo.tzOffset = memo.tzOffset === undefined ? 'FETCHING' : memo.tzOffset;
-            fetch(`https://api.open-meteo.com/v1/forecast?latitude=${memo.lat}&longitude=${memo.lon}&current=temperature_2m,pressure_msl&timezone=auto`)
-                .then(r => r.json()).then(d => {
-                    if (d.utc_offset_seconds !== undefined) {
+            fetchAvecRelais(`https://api.open-meteo.com/v1/forecast?latitude=${memo.lat}&longitude=${memo.lon}&current=temperature_2m,pressure_msl&timezone=auto`, 'json')
+                .then(d => {
+                    if (d && d.utc_offset_seconds !== undefined) {
                         memo.tzOffset = d.utc_offset_seconds / 3600;
                         memo.temperature = d.current ? d.current.temperature_2m : null;
                         memo.qnh = d.current ? d.current.pressure_msl : null;
@@ -117,6 +120,17 @@ export function genererGraphique() {
 
     // Rafraîchit le widget performance décollage (réagit au drag du scrubber).
     showTakeoffWidget(state.requestedIcao || res.code);
+
+    // Met à jour le label du bouton lecture audio selon le type de message.
+    const readBtn = document.getElementById('btn-read-metar');
+    if (readBtn) {
+        const isFr = state.lang === 'fr';
+        const label = state.isMetar
+            ? (isFr ? 'Lire METAR' : 'Read METAR')
+            : (isFr ? 'Lire TAF' : 'Read TAF');
+        readBtn.innerHTML = `<i data-lucide='volume-2' class='icon-sm'></i> ${label}`;
+        if (window.lucide) window.lucide.createIcons({ root: readBtn });
+    }
 }
 
 /**
@@ -251,6 +265,9 @@ export function telechargerMessage(typeMessage) {
         document.getElementById('icaoInput').value = estSubstitut ? codeDemandeInitial : codeOaciFinal;
         addToHistory(codeOaciFinal);
         renderSearchHistory('search-history-list', _selectAndFetch);
+
+        // Mémorise le dernier terrain consulté pour le restaurer au prochain ouverture.
+        try { localStorage.setItem('last-icao', codeOaciFinal); } catch { /* quota */ }
         
         if (estSubstitut) {
             state.warningMessage = tr.warnClosest.replace('{type}', typeMessage.toUpperCase()).replace('{req}', codeDemandeInitial).replace('{found}', codeOaciFinal);
@@ -297,22 +314,25 @@ export function telechargerMessage(typeMessage) {
         showFrequenciesWidget(state.requestedIcao || codeOaciFinal);
         // Met à jour la carte régionale si le panneau est ouvert.
         showRegionalMapFor(codeOaciFinal);
-        // Met à jour le terrain de destination affiché dans le route planner.
-        const routeToDisplay = document.getElementById('route-to-display');
-        if (routeToDisplay) routeToDisplay.textContent = codeOaciFinal;
+        // Met à jour le terrain de départ affiché dans le route planner.
+        const routeFromDisplay = document.getElementById('route-from-display');
+        if (routeFromDisplay) routeFromDisplay.textContent = codeOaciFinal;
         // Le comparateur d'alternates ne se charge qu'en mode Navigation.
         if (getFlightMode() === 'nav') {
             showAlternates(codeOaciFinal);
-            // Flight planner : visible si un terrain de départ est défini.
-            const fromIcao = (document.getElementById('route-from-input')?.value || '').trim().toUpperCase();
-            if (fromIcao && /^[A-Z]{4}$/.test(fromIcao) && fromIcao !== codeOaciFinal.toUpperCase()) {
-                showFlightPlanner(fromIcao, codeOaciFinal);
+            // Flight planner : visible si une destination est saisie.
+            const toIcao = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
+            if (toIcao && /^[A-Z]{4}$/.test(toIcao) && toIcao !== codeOaciFinal.toUpperCase()) {
+                showFlightPlanner(codeOaciFinal, toIcao);
+            } else {
+                clearElevationChart('elevation-profile-container');
             }
         } else {
             const altC = document.getElementById('alternates-container');
             if (altC) altC.style.display = 'none';
             const fpPanel = document.getElementById('flight-planner-panel');
             if (fpPanel) fpPanel.style.display = 'none';
+            clearElevationChart('elevation-profile-container');
         }
         genererGraphique();
     }
@@ -514,7 +534,9 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // Carte régionale : toggle du panneau repliable.
     const mapToggle = document.getElementById('regional-map-toggle');
-    if (mapToggle) mapToggle.addEventListener('click', toggleRegionalMap);
+    if (mapToggle) mapToggle.addEventListener('click', () => {
+        toggleRegionalMap();
+    });
 
     // Alternates : toggle du panneau repliable (même mécanisme que la carte).
     const altToggle = document.getElementById('alternates-toggle');
@@ -524,24 +546,25 @@ document.addEventListener('DOMContentLoaded', async function () {
         });
     }
 
-    // Météo de route : mise à jour quand le terrain de départ change.
-    const routeFromInput = document.getElementById('route-from-input');
-    if (routeFromInput) {
-        routeFromInput.addEventListener('input', () => {
-            routeFromInput.value = routeFromInput.value.toUpperCase();
+    // Météo de route : mise à jour quand la destination change.
+    const routeToInput = document.getElementById('route-to-input');
+    if (routeToInput) {
+        routeToInput.addEventListener('input', () => {
+            routeToInput.value = routeToInput.value.toUpperCase();
             // Si le panneau carte est ouvert, on rafraîchit la route.
             const panel = document.getElementById('regional-map-panel');
             if (panel && panel.classList.contains('open') && state.requestedIcao) {
                 showRegionalMapFor(state.requestedIcao, true);
             }
-            // Flight planner : recalcule si en mode navigation et route valide.
+            // Flight planner + profil d'élévation : recalcule si en mode navigation et route valide.
             if (getFlightMode() === 'nav' && state.requestedIcao) {
-                const fromIcao = routeFromInput.value.trim().toUpperCase();
-                if (fromIcao && /^[A-Z]{4}$/.test(fromIcao) && fromIcao !== state.requestedIcao.toUpperCase()) {
-                    showFlightPlanner(fromIcao, state.requestedIcao);
+                const toIcao = routeToInput.value.trim().toUpperCase();
+                if (toIcao && /^[A-Z]{4}$/.test(toIcao) && toIcao !== state.requestedIcao.toUpperCase()) {
+                    showFlightPlanner(state.requestedIcao, toIcao);
                 } else {
                     const fpPanel = document.getElementById('flight-planner-panel');
                     if (fpPanel) fpPanel.style.display = 'none';
+                    clearElevationChart('elevation-profile-container');
                 }
             }
         });
@@ -698,6 +721,18 @@ document.addEventListener('DOMContentLoaded', async function () {
             if (link.mode === 'nav') setFlightMode('nav');
             // Charge METAR ou TAF selon le paramètre.
             setTimeout(() => telechargerMessage(link.taf ? 'taf' : 'metar'), 300);
+        }
+    } else {
+        // ---- Pas de permalien : priorité au favori de démarrage, sinon dernier terrain ----
+        const startupIcao = getStartupFavorite();
+        const lastIcao = (() => { try { return localStorage.getItem('last-icao'); } catch { return null; } })();
+        const icaoToLoad = (startupIcao && /^[A-Z]{4}$/.test(startupIcao))
+            ? startupIcao
+            : (lastIcao && /^[A-Z]{4}$/.test(lastIcao) ? lastIcao : null);
+        if (icaoToLoad) {
+            const input = document.getElementById('icaoInput');
+            if (input) input.value = icaoToLoad;
+            setTimeout(() => telechargerMessage('metar'), 300);
         }
     }
 });

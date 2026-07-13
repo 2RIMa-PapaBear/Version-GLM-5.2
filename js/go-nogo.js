@@ -241,7 +241,7 @@ export function evaluateGoNoGo() {
 
     // ---- Couleur du verdict ----
     const colors = {
-        'GO': '#10B981',
+        'GO': '#4ADE80',
         'CAUTION': '#F59E0B',
         'NO-GO': '#EF4444',
     };
@@ -346,45 +346,42 @@ export function renderGoNoGo() {
     // Construit la liste des raisons.
     let reasonsHtml = '';
     if (result.reasons.length > 0) {
-        reasonsHtml = '<div class="go-nogo-reasons" style="margin-top:10px; display:flex; flex-direction:column; gap:6px;">';
+        reasonsHtml = '<div class="go-nogo-reasons" style="margin-top:6px; display:flex; flex-direction:column; gap:4px; flex:1; min-height:0; overflow-y:auto;">';
         result.reasons.forEach(r => {
             const col = r.level === 'danger' ? '#FCA5A5' : '#FCD34D';
-            const bg = r.level === 'danger' ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)';
-            reasonsHtml += `<div class="go-nogo-reason" style="display:flex; align-items:center; gap:8px; padding:6px 10px; background:${bg}; border-radius:6px; font-size:12px; color:${col};">
-                <i data-lucide="${r.icon}" style="width:16px; height:16px; flex-shrink:0;"></i>
+            const dot = r.level === 'danger' ? '#EF4444' : '#F59E0B';
+            reasonsHtml += `<div class="go-nogo-reason" style="display:flex; align-items:flex-start; gap:6px; padding:5px 8px; border-radius:5px; font-size:11px; line-height:1.3; color:${col};">
+                <span style="width:6px; height:6px; border-radius:50%; background:${dot}; flex-shrink:0; margin-top:4px;"></span>
                 <span>${r.text}</span>
             </div>`;
         });
         reasonsHtml += '</div>';
     } else if (result.verdict === 'GO') {
-        reasonsHtml = `<div style="margin-top:8px; font-size:12px; color:rgba(16,185,129,0.9);">${isFr ? 'Tous les paramètres sont au vert.' : 'All parameters are green.'}</div>`;
+        reasonsHtml = `<div style="margin-top:6px; padding:6px 8px; font-size:11px; color:rgba(74,222,128,0.9); display:flex; align-items:center; gap:6px;">
+            <span style="width:6px; height:6px; border-radius:50%; background:#4ADE80; flex-shrink:0;"></span>
+            ${isFr ? 'Tous les paramètres sont au vert.' : 'All parameters are green.'}
+        </div>`;
     }
 
     container.innerHTML = `
-        <div class="go-nogo-content">
-            <div class="go-nogo-header" style="display:flex; align-items:center; gap:14px;">
-                <div class="go-nogo-icon" style="width:52px; height:52px; border-radius:50%; background:${result.color}22; border:3px solid ${result.color}; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                    <i data-lucide="${icons[result.verdict]}" style="width:28px; height:28px; color:${result.color};"></i>
+        <div class="go-nogo-content" style="display:flex; flex-direction:column; height:100%;">
+            <div class="go-nogo-verdict-block" style="display:flex; flex-direction:column; align-items:center; gap:4px; padding-top:12px; padding-bottom:8px;">
+                <div class="go-nogo-icon" style="width:53px; height:53px; border-radius:50%; background:${result.color}22; border:3px solid ${result.color}; display:flex; align-items:center; justify-content:center;">
+                    <i data-lucide="${icons[result.verdict]}" style="width:29px; height:29px; color:${result.color};"></i>
                 </div>
-                <div style="flex:1; min-width:0;">
-                    <div style="font-size:22px; font-weight:900; color:${result.color}; letter-spacing:1px; line-height:1.1;">${result.verdict}</div>
-                    <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">${verdictLabels[result.verdict]}</div>
-                </div>
-                <div class="go-nogo-cat" style="text-align:center; padding:4px 12px; background:rgba(0,0,0,0.3); border-radius:8px; flex-shrink:0;">
-                    <div style="font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">${isFr ? 'Cat.' : 'Cat.'}</div>
-                    <div style="font-size:18px; font-weight:800; color:${result.color};">${result.cat || '--'}</div>
-                </div>
-                <button id="go-nogo-config" class="go-nogo-config-btn" title="${isFr ? 'Réglages des minimums VFR' : 'VFR minima settings'}" style="background:none; border:none; cursor:pointer; padding:6px; border-radius:6px; color:var(--text-muted); flex-shrink:0; display:flex; align-items:center;">
-                    <i data-lucide="settings" style="width:18px; height:18px;"></i>
-                </button>
+                <div style="font-size:20px; font-weight:900; color:${result.color}; letter-spacing:1px; line-height:1;">${result.verdict}</div>
+                <div style="font-size:9px; color:var(--text-muted); text-align:center; line-height:1.2;">${verdictLabels[result.verdict]}</div>
             </div>
             ${reasonsHtml}
+            <button id="go-nogo-config" class="go-nogo-config-btn" title="${isFr ? 'Réglages des Minimums VFR' : 'VFR minima settings'}" style="background:none; border:none; cursor:pointer; padding:3px; border-radius:6px; color:var(--text-muted); opacity:0.6; transition:opacity 0.2s; display:flex; align-items:center; margin-left:auto; margin-top:auto; align-self:flex-end;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">
+                <i data-lucide="settings" style="width:15px; height:15px;"></i>
+            </button>
         </div>
     `;
     container.style.background = result.color + '15';
     container.style.borderColor = result.color;
     container.style.borderLeftWidth = '5px';
-    container.style.display = 'block';
+    container.style.display = 'flex';
     if (window.lucide) window.lucide.createIcons({ root: container });
 
     // Bouton de réglage des minimums VFR perso.

@@ -521,3 +521,80 @@ export async function fetchAvecRelais(url, type = 'text') {
         throw e;
     }
 }
+
+// ----------------------------------------------------------------
+// File d'attente pour Open-Meteo (évite le rate-limit HTTP 429).
+// L'API gratuite limite le nombre de requêtes par minute. On sérialise
+// les appels avec un délai et un cache session pour éviter les doublons.
+// ----------------------------------------------------------------
+let _omRunning = false;
+const _omCache = new Map();
+const _omPending = new Map(); // url → Promise (pour dédupliquer les appels simultanés)
+const _OM_DELAY = 1500;       // ms entre chaque appel Open-Meteo.
+const _OM_RETRY_BASE = 3000;  // ms délai de base pour retry sur 429.
+
+/**
+ * Fetch Open-Meteo avec file d'attente, déduplication et cache session.
+ * @param {string} url URL Open-Meteo complète.
+ * @returns {Promise<Object|null>} Données JSON, ou null si échec.
+ */
+export async function fetchOpenMeteo(url) {
+    // Cache session (5 min) : évite de refetcher la même URL.
+    const cached = _omCache.get(url);
+    if (cached && Date.now() - cached.ts < 5 * 60 * 1000) return cached.data;
+
+    // Déduplication : si la même URL est déjà en cours, on partage le résultat.
+    if (_omPending.has(url)) return _omPending.get(url);
+
+    const promise = _omFetchQueued(url);
+    _omPending.set(url, promise);
+    try {
+        const data = await promise;
+        return data;
+    } finally {
+        _omPending.delete(url);
+    }
+}
+
+async function _omFetchQueued(url) {
+    // Attend que les requêtes précédentes soient terminées.
+    while (_omRunning) {
+        await new Promise(r => setTimeout(r, 100));
+    }
+    _omRunning = true;
+
+    try {
+        // Re-vérifie le cache au cas où une requête identique vient de finir.
+        const cached = _omCache.get(url);
+        if (cached && Date.now() - cached.ts < 5 * 60 * 1000) return cached.data;
+
+        // Retry avec backoff exponentiel sur 429.
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                const res = await fetch(url);
+                if (res.status === 429) {
+                    const wait = _OM_RETRY_BASE * (attempt + 1);
+                    console.warn(`Open-Meteo 429, retry ${attempt + 1}/3 dans ${wait}ms`);
+                    await new Promise(r => setTimeout(r, wait));
+                    continue;
+                }
+                if (!res.ok) {
+                    console.warn(`Open-Meteo HTTP ${res.status}`);
+                    return null;
+                }
+                const data = await res.json();
+                _omCache.set(url, { data, ts: Date.now() });
+                return data;
+            } catch (e) {
+                console.warn('Open-Meteo fetch error:', e.message);
+                return null;
+            }
+        }
+        console.warn('Open-Meteo: 3 retries épuisés pour', url.slice(0, 60));
+        return null;
+    } finally {
+        // Délai avant de libérer pour la prochaine requête.
+        await new Promise(r => setTimeout(r, _OM_DELAY));
+        _omRunning = false;
+    }
+}

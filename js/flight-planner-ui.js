@@ -27,6 +27,7 @@ import { getAirportByICAO } from './ui-module.js';
 import { getActiveAircraftId } from './aircraft-fleet.js';
 import { makeCollapsible } from './collapsible.js';
 import { computeFlightPlan, getDefaultAircraftPerf, RESERVES } from './flight-planner.js';
+import { renderElevationChart, clearElevationChart } from './elevation-chart.js';
 
 // Clé localStorage pour les perfs par avion (TAS, conso).
 const LS_PERF_PREFIX = 'ac-perf-';
@@ -118,6 +119,14 @@ export async function showFlightPlanner(fromIcao, toIcao) {
 
     _renderResult(body, plan, isFr, isNight, cruiseAlt, tasKt, burn);
     container.style.display = 'block';
+
+    // Affiche le profil d'élévation à partir du plan déjà calculé
+    // (évite un double fetch Open-Meteo qui provoque des HTTP 429).
+    if (plan.elevationProfile) {
+        renderElevationChart('elevation-profile-container', plan.elevationProfile, cruiseAlt, fromIcao, toIcao);
+    } else {
+        clearElevationChart('elevation-profile-container');
+    }
 }
 
 /**

@@ -76,16 +76,10 @@ function ftToM(ft) { return Math.round(ft * FT_TO_M); }
 export function getRunwayLength(icao) {
     if (!icao) return null;
 
-    // 1. Saisie manuelle du pilote (prioritaire : il peut corriger/affiner).
-    try {
-        const v = parseInt(localStorage.getItem(LS_RWY_LEN_PREFIX + icao.toUpperCase()), 10);
-        if (!isNaN(v) && v > 0) return v;
-    } catch { /* ignore */ }
-
     const apt = getAirportByICAO(icao);
     if (!apt) return null;
 
-    // 2. Piste active de la rose des vents : si le pilote a cliqué une piste
+    // 1. Piste active de la rose des vents : si le pilote a cliqué une piste
     //    (state.forcedRunway = "08L-26R") ou si une piste est suggérée par le
     //    vent, on cherche la longueur de CE numéro de piste.
     const activeRwyName = _getActiveRunwayName(apt);
@@ -94,7 +88,7 @@ export function getRunwayLength(icao) {
         if (typeof len === 'number' && len > 0) return len;
     }
 
-    // 3. Fallback : piste la plus longue du terrain.
+    // 2. Fallback : piste la plus longue du terrain.
     if (typeof apt.longestRunway === 'number' && apt.longestRunway > 0) {
         return apt.longestRunway;
     }

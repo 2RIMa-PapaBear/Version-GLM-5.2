@@ -168,7 +168,7 @@ header.card { padding: 20px 24px 18px; position: relative; overflow: hidden; }
 
 #lbl-info { font-weight: 400; color: #bae6fd; margin-top: 6px; display: block; font-size: 0.9rem; border-top: 1px solid var(--border-color); padding-top: 8px;}
 
-.metar-dashboard { display: none; grid-template-columns: repeat(2, 1fr); gap: 15px; width: 100%; margin-top: 15px; }
+.metar-dashboard { display: none; grid-template-columns: 30% 40% 30%; gap: 15px; width: 100%; margin-top: 15px; }
 .metar-dashboard.visible { display: grid; }
 .dashboard-cell { background: var(--inner-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; min-height: 200px; display: flex; flex-direction: column; }
 .dash-title { font-size: 10px; letter-spacing: 1.5px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 8px; }
@@ -561,10 +561,8 @@ body.mode-local #alternates-container { display: none !important; }
  * BANNIÈRE GO / NO-GO — Verdict synthétique de décision
  * ================================================================ */
 .go-nogo {
-    padding: 16px 20px;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border-color);
-    background: var(--inner-bg);
+    padding: 0;
+    border-radius: 10px;
     border-left-width: 5px;
     transition: background 0.4s ease, border-color 0.4s ease;
     animation: cardFadeIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -592,16 +590,16 @@ body.mode-local #alternates-container { display: none !important; }
 .flight-mode-toggle .seg {
     position: relative;
     z-index: 2;
-    padding: 6px 14px;
+    padding: 6px 0;
     font-size: 12px;
     font-weight: 600;
     color: var(--text-muted);
     transition: color 0.25s;
     display: flex;
     align-items: center;
-    flex: 1;
     justify-content: center;
     white-space: nowrap;
+    width: 90px;
 }
 .flight-mode-toggle .seg-slider {
     position: absolute;
@@ -976,7 +974,7 @@ html.night-mode body::before {
     align-items: center;
 }
 .fleet-mini-btn:hover:not(:disabled) { background: rgba(255,255,255,0.08); color: var(--text-color); }
-.fleet-mini-btn.active { color: #10B981; }
+.fleet-mini-btn.active { color: #4ADE80; }
 .fleet-mini-btn.fleet-delete:hover { color: #EF4444; }
 .fleet-mini-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
@@ -1406,12 +1404,12 @@ body.cockpit-mode #go-nogo-banner {
     font-size: 1.1em;
 }
 body.cockpit-mode #go-nogo-banner .go-nogo-icon {
-    width: 64px !important;
-    height: 64px !important;
+    width: 52px !important;
+    height: 52px !important;
 }
 body.cockpit-mode #go-nogo-banner .go-nogo-icon i {
-    width: 36px !important;
-    height: 36px !important;
+    width: 28px !important;
+    height: 28px !important;
 }
 body.cockpit-mode #flight-window-banner {
     font-size: 1.05em;
@@ -1573,7 +1571,7 @@ body.cockpit-mode header.card {
     right: 3px;
     width: 7px;
     height: 7px;
-    background: #10B981;
+    background: #4ADE80;
     border-radius: 50%;
     border: 1.5px solid var(--panel-bg);
     animation: pulse 2s ease-in-out infinite;
@@ -1678,12 +1676,12 @@ body.cockpit-mode header.card {
     transition: all 0.2s ease;
 }
 .wd-toggle.on {
-    background: rgba(16, 185, 129, 0.2);
-    border-color: #10B981;
+    background: rgba(74, 222, 128, 0.2);
+    border-color: #4ADE80;
 }
 .wd-toggle.on::after {
     left: 20px;
-    background: #10B981;
+    background: #4ADE80;
 }
 .wd-interval-row {
     display: flex;
@@ -1713,9 +1711,9 @@ body.cockpit-mode header.card {
     cursor: pointer;
 }
 .wd-perm-btn.granted {
-    background: rgba(16, 185, 129, 0.12);
-    border-color: rgba(16, 185, 129, 0.3);
-    color: #10B981;
+    background: rgba(74, 222, 128, 0.12);
+    border-color: rgba(74, 222, 128, 0.3);
+    color: #4ADE80;
 }
 .wd-check-btn {
     background: var(--primary);

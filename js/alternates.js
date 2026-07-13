@@ -89,9 +89,7 @@ export async function showAlternates(icao) {
 
         _render(rows.slice(0, 6), icao);
         container.style.display = 'block';
-        // Ouvre le panneau repliable au premier chargement des données
-        // (le pilote voit immédiatement les alternates, peut le replier ensuite).
-        container.classList.add('open');
+        // Le panneau reste replié : le pilote l'ouvre manuellement via le chevron.
     } catch (e) {
         console.warn('Alternates load failed:', e);
         container.style.display = 'none';

@@ -333,10 +333,30 @@ export function isFavorite(icao) {
     try { return (JSON.parse(localStorage.getItem('favorites')) || []).includes(icao); } catch (e) { console.warn('isFavorite failed:', e); return false; }
 }
 
+/**
+ * Retourne le favori à charger automatiquement au démarrage, ou null.
+ */
+export function getStartupFavorite() {
+    try { return localStorage.getItem('startup-favorite') || null; } catch (e) { return null; }
+}
+
+/**
+ * Définit ou retire le favori de démarrage.
+ * @param {string|null} icao Code OACI, ou null pour désactiver.
+ */
+export function setStartupFavorite(icao) {
+    try {
+        if (icao) localStorage.setItem('startup-favorite', icao);
+        else localStorage.removeItem('startup-favorite');
+    } catch (e) { /* quota */ }
+}
+
 export function updateFavoritesUI(onSelect) {
     const c = document.getElementById('favorites-list'); if (!c) return;
     let favs = []; try { favs = JSON.parse(localStorage.getItem('favorites')) || []; } catch {}
     if (favs.length === 0) { c.innerHTML = `<div class="history-empty">${I18N[state.lang].favorisEmpty}</div>`; return; }
+    const isFr = state.lang === 'fr';
+    const startup = getStartupFavorite();
     let html = '<div class="history-items">';
     favs.forEach(icao => {
         let apt = getAirportByICAO(icao);
@@ -344,33 +364,51 @@ export function updateFavoritesUI(onSelect) {
         if (state.memo[icao] === 'PENDING') displayName = I18N[state.lang].lblSearching;
         else if (state.memo[icao] && typeof state.memo[icao] === 'object' && state.memo[icao].name) displayName = state.memo[icao].name;
 
-        html += `<button class="history-item fav-item" data-icao="${escapeHtml(icao)}" style="display:flex; flex-direction:row; align-items:center; padding: 6px 12px 6px 4px; gap: 6px;">
+        const isStartup = icao === startup;
+
+        html += `<button class="history-item fav-item" data-icao="${escapeHtml(icao)}" style="display:flex; flex-direction:row; align-items:center; padding: 6px 8px 6px 4px; gap: 6px;">
             <div class="fav-remove-btn fav-remove" data-icao="${escapeHtml(icao)}" style="padding: 2px; margin:0;">
                 <i data-lucide="x" style="width:16px; height:16px; margin:0;"></i>
             </div>
             <div style="display:flex; flex-direction:column; flex:1; text-align:left;">
-                <span class="history-icao">${escapeHtml(icao)}</span>
+                <div style="display:flex; flex-direction:row; align-items:center; gap:4px;">
+                    <span class="history-icao">${escapeHtml(icao)}</span>
+                    <div class="fav-startup-btn fav-startup" data-icao="${escapeHtml(icao)}" title="${isFr ? (isStartup ? 'Ne plus charger au démarrage' : 'Charger au démarrage') : (isStartup ? 'Stop loading on startup' : 'Load on startup')}" style="padding:1px; cursor:pointer; opacity:${isStartup ? '1' : '0.4'}; color:${isStartup ? '#FBBF24' : 'var(--text-muted)'};">
+                        <i data-lucide="${isStartup ? 'pin' : 'pin-off'}" style="width:14px; height:14px; margin:0;"></i>
+                    </div>
+                </div>
                 <span class="history-name">${escapeHtml(displayName)}</span>
             </div>
         </button>`;
     });
     html += '</div>';
-    
+
     c.innerHTML = html;
-    
+
     if (window.lucide) window.lucide.createIcons({ root: c });
-    
+
     c.querySelectorAll('.fav-item').forEach(b => {
-        b.addEventListener('click', function(e) { 
-            if (!e.target.closest('.fav-remove')) onSelect(this.dataset.icao); 
+        b.addEventListener('click', function(e) {
+            if (!e.target.closest('.fav-remove') && !e.target.closest('.fav-startup')) onSelect(this.dataset.icao);
         });
     });
-    
+
     c.querySelectorAll('.fav-remove').forEach(i => {
-        i.addEventListener('click', function(e) { 
-            e.stopPropagation(); 
-            toggleFavorite(this.dataset.icao); 
-            updateFavoritesUI(onSelect); 
+        i.addEventListener('click', function(e) {
+            e.stopPropagation();
+            toggleFavorite(this.dataset.icao);
+            // Si le favori supprimé était le favori de démarrage, on le retire aussi.
+            if (this.dataset.icao === getStartupFavorite()) setStartupFavorite(null);
+            updateFavoritesUI(onSelect);
+        });
+    });
+
+    c.querySelectorAll('.fav-startup').forEach(i => {
+        i.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const icao = this.dataset.icao;
+            setStartupFavorite(getStartupFavorite() === icao ? null : icao);
+            updateFavoritesUI(onSelect);
         });
     });
 }

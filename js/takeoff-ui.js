@@ -15,8 +15,8 @@
 import { state, escapeHtml } from './core.js';
 import { makeCollapsible } from './collapsible.js';
 import {
-    evaluateTakeoffPerformance, getRunwayLength, setRunwayLength,
-    getAircraftRef, isRunwayLengthAuto, getActiveRunwayNameForIcao,
+    evaluateTakeoffPerformance, getRunwayLength,
+    getAircraftRef, getActiveRunwayNameForIcao,
 } from './takeoff-performance.js';
 import { getFleet, getActiveAircraftId, setActiveAircraft } from './aircraft-fleet.js';
 import { openFleetManager } from './fleet-ui.js';
@@ -82,10 +82,7 @@ function render(container, r, icao) {
     const lblDa = isFr ? 'Densité-alt.' : 'Density alt.';
     const lblMargin = isFr ? 'Marge' : 'Margin';
     const lblAcRef = isFr ? 'Réf. avion' : 'A/C ref';
-    const lblSetRwy = isFr ? 'm (piste la plus longue)' : 'm (longest runway)';
-    const lblSave = isFr ? 'OK' : 'Set';
     const ref = getAircraftRef();
-    const isAuto = isRunwayLengthAuto(icao);
     // Piste active selon la rose des vents (null si non définie).
     const activeRwy = getActiveRunwayNameForIcao(icao);
     // Revêtement de la piste active.
@@ -161,14 +158,12 @@ function render(container, r, icao) {
             <label style="font-size:11px; color:var(--text-muted); display:flex; flex-direction:column; gap:3px;">
                 <span style="display:flex; align-items:center; gap:5px;">
                     ${lblRwy}
-                    ${isAuto ? `<span title="${isFr ? 'Valeur automatique de la base' : 'Auto from database'}" style="font-size:8px; background:rgba(56,189,248,0.15); color:#38BDF8; padding:1px 5px; border-radius:3px; letter-spacing:0.5px; font-weight:600;">AUTO</span>` : ''}
                     ${activeRwy ? `<span title="${isFr ? 'Piste sélectionnée dans la rose des vents' : 'Runway selected in wind compass'}" style="font-size:8px; background:rgba(74,222,128,0.15); color:#4ADE80; padding:1px 5px; border-radius:3px; letter-spacing:0.5px; font-weight:700; font-family:'DM Mono',monospace;">RWY ${escapeHtml(activeRwy)}</span>` : ''}
                 </span>
-                <input type="number" id="to-rwy-input" value="${rwyLenM ?? ''}" placeholder="${lblSetRwy}"
-                    min="0" step="10"
-                    style="width:120px; background:var(--input-bg); border:1px solid var(--border-color); color:var(--primary); border-radius:6px; padding:5px 8px; font-family:'DM Mono',monospace; font-size:13px; font-weight:600; outline:none;">
+                <div style="width:120px; background:var(--input-bg); border:1px solid var(--border-color); color:var(--primary); border-radius:6px; padding:5px 8px; font-family:'DM Mono',monospace; font-size:13px; font-weight:600;">
+                    ${rwyLenM != null ? rwyLenM + ' m' : '—'}
+                </div>
             </label>
-            <button id="to-rwy-save" class="btn-secondary" style="padding:6px 14px; font-size:12px;">${lblSave}</button>
             ${r.margin != null ? `
                 <div style="margin-left:auto; text-align:right;">
                     <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px;">${lblMargin}</div>
@@ -212,30 +207,6 @@ function render(container, r, icao) {
                     state.refreshCallback();
                 }
             });
-        });
-    }
-
-    // Branchement du bouton de sauvegarde.
-    // La saisie est en mètres ; on convertit en pieds pour le stockage interne.
-    const saveBtn = container.querySelector('#to-rwy-save');
-    const rwyInput = container.querySelector('#to-rwy-input');
-    if (saveBtn && rwyInput) {
-        const doSave = () => {
-            const m = parseInt(rwyInput.value, 10);
-            // Conversion m → ft avant stockage (la base et les calculs sont en ft).
-            const ft = isNaN(m) ? null : Math.round(m / FT_TO_M);
-            setRunwayLength(icao, ft);
-            // Rafraîchit le widget + le dashboard complet (GO/NO-GO inclus).
-            showTakeoffWidget(icao);
-            if (state.refreshCallback) {
-                state.lastRenderState = null;
-                state.refreshCallback();
-            }
-        };
-        saveBtn.addEventListener('click', doSave);
-        // Enter = save.
-        rwyInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') { e.preventDefault(); doSave(); }
         });
     }
 

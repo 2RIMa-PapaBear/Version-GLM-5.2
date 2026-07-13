@@ -782,7 +782,7 @@ export function renderWindCompass(containerId, windStr, runways = null, forcedId
         </defs>
         <line x1="${CX}" y1="${CY - R_OUTER}" x2="${CX}" y2="${CY + R_OUTER}" stroke="${color}" stroke-width="1" opacity="0.4" transform="rotate(${wind.dir}, ${CX}, ${CY})"/>
         
-        <g class="wind-arrow" style="transform-origin: ${CX}px ${CY}px; --wind-angle: ${wind.dir}deg; animation: windArrowPulseIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;">
+        <g class="wind-arrow" style="transform-origin: ${CX}px ${CY}px; transform: rotate(${wind.dir}deg);">
             <circle cx="${CX}" cy="${yBase}" r="7" fill="none" stroke="${color}" stroke-width="2" opacity="${glowOpacity}" filter="url(#${uid}-glow)"/>
             <circle cx="${CX}" cy="${yBase}" r="3.5" fill="${color}"/>
             <line x1="${CX}" y1="${yBase}" x2="${CX}" y2="${yPointe}" stroke="url(#${uid}-grad)" stroke-width="3" stroke-linecap="round"/>
