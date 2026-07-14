@@ -175,7 +175,7 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
         <div style="font-size:11px; color:var(--text-muted); font-family:'DM Mono',monospace; margin-bottom:8px;">${escapeHtml(from)} → ${escapeHtml(to)}</div>
         ${_renderInputs(from, to, fromName, toName, alt, tas, burn, isNight, isFr)}
 
-        <div class="fp-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:8px 16px; font-size:12px; margin-top:10px;">
+        <div class="fp-grid" style="gap:8px 16px; margin-top:10px;">
             <div class="fp-cell">
                 <div class="fp-label">${isFr ? 'Distance' : 'Distance'}</div>
                 <div class="fp-value">${plan.distanceNm} NM <span style="color:var(--text-muted); font-size:10px;">(${plan.distanceKm} km)</span></div>
@@ -197,7 +197,7 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
         <div class="fp-section" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color);">
             <div class="fp-section-title">${isFr ? 'Vent à ' + plan.cruiseAltFt + ' ft' : 'Wind at ' + plan.cruiseAltFt + ' ft'}</div>
             ${wind ? `
-                <div class="fp-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:6px 16px; font-size:12px; margin-top:6px;">
+                <div class="fp-grid" style="margin-top:6px;">
                     <div class="fp-cell">
                         <div class="fp-label">${isFr ? 'Vent' : 'Wind'}</div>
                         <div class="fp-value">${String(wind.dir).padStart(3, '0')}° / ${wind.speedKt} kt</div>
@@ -213,7 +213,7 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
         </div>
 
         <div class="fp-section" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color);">
-            <div class="fp-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:6px 16px; font-size:12px;">
+            <div class="fp-grid">
                 <div class="fp-cell">
                     <div class="fp-label">${isFr ? 'Vitesse sol (GS)' : 'Ground speed'}</div>
                     <div class="fp-value">${plan.groundSpeed} kt</div>
@@ -227,7 +227,7 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
 
         <div class="fp-section" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color);">
             <div class="fp-section-title">${isFr ? 'Carburant' : 'Fuel'}</div>
-            <div class="fp-grid" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px 12px; font-size:12px; margin-top:6px;">
+            <div class="fp-grid fp-grid-3" style="margin-top:6px;">
                 <div class="fp-cell">
                     <div class="fp-label">${isFr ? 'Trajet' : 'Trip'}</div>
                     <div class="fp-value">${plan.fuel.tripFuelL} L</div>
@@ -246,7 +246,7 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
         ${cl ? `
             <div class="fp-section" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color);">
                 <div class="fp-section-title">${isFr ? 'Relief sous la route' : 'Terrain clearance'}</div>
-                <div class="fp-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:6px 16px; font-size:12px; margin-top:6px;">
+                <div class="fp-grid" style="margin-top:6px;">
                     <div class="fp-cell">
                         <div class="fp-label">${isFr ? 'Altitude max sol' : 'Max terrain'}</div>
                         <div class="fp-value">${plan.elevationProfile.maxFt} ft</div>
@@ -309,7 +309,7 @@ function _renderInputs(from, to, fromName, toName, alt, tas, burn, isNight, isFr
                 <div style="font-weight:700; color:var(--secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(to)} · ${escapeHtml(toName)}</div>
             </div>
         </div>
-        <div class="fp-inputs" style="display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:8px; align-items:end;">
+        <div class="fp-inputs">
             <label class="fp-input-label">
                 <span>${isFr ? 'Alt. croisière (ft)' : 'Cruise alt (ft)'}</span>
                 <input type="number" id="fp-cruise-alt" value="${alt}" min="0" step="500" class="fp-input">

@@ -2,13 +2,17 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Visualiseur METAR/TAF — Météo aéronautique en temps réel</title>
     <meta name="description" content="Décodez et visualisez graphiquement les messages météo aéronautiques METAR et TAF. Prévisions aérodrome, plafond, visibilité, vent, catégorie VFR/IFR. Outil gratuit pour pilotes.">
     <meta name="keywords" content="METAR, TAF, météo aéronautique, visualiseur METAR, décodeur TAF, VFR, IFR, plafond, visibilité, vent, aviation météo, météo aéroport, OACI, pilote">
     <meta name="author" content="PapaBear">
     <meta name="robots" content="index, follow">
     <meta name="theme-color" content="#020617">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="METAR/TAF">
     <link rel="canonical" href="">
     <meta property="og:title" content="Visualiseur METAR/TAF — Météo aéronautique en temps réel">
     <meta property="og:description" content="Décodez et visualisez graphiquement les messages météo aéronautiques METAR et TAF. Outil gratuit pour pilotes.">
@@ -24,15 +28,15 @@
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="data/airports.json?v=1.26.0" as="fetch" crossorigin>
-    <link rel="modulepreload" href="js/app.js?v=1.26">
+    <link rel="preload" href="data/airports.json?v=1.27.0" as="fetch" crossorigin>
+    <link rel="modulepreload" href="js/app.js?v=1.27">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.8.0/suncalc.min.js"
             integrity="sha384-ZHM8wxIpZLrn5eRq7p0QQvd4+K4Ve51xqJgNw1MqVv329Jntjpjal7C1C4rnZSSx"
             crossorigin="anonymous" defer></script>
-    <script src="vendor/lucide.min.js?v=1.26" defer></script>
+    <script src="vendor/lucide.min.js?v=1.27" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=1.26">
-    <link rel="stylesheet" href="css/wind-compass-styles.css?v=1.26">
+    <link rel="stylesheet" href="css/style.css?v=1.27">
+    <link rel="stylesheet" href="css/wind-compass-styles.css?v=1.27">
     <script>
         // Anti-flash mode nuit : applique la classe AVANT le premier rendu
         // pour éviter une explosion de lumière blanche destructrice pour la
@@ -238,9 +242,9 @@
 
 <div id="canvasTooltip" class="canvas-tooltip" role="tooltip"></div>
 
-    <script type="module" src="js/app.js?v=1.26"></script>
-    <script src="vendor/jspdf.umd.min.js?v=1.26" defer></script>
-    <link rel="stylesheet" href="vendor/leaflet.min.css?v=1.26">
-    <script src="vendor/leaflet.min.js?v=1.26" defer></script>
+    <script type="module" src="js/app.js?v=1.27"></script>
+    <script src="vendor/jspdf.umd.min.js?v=1.27" defer></script>
+    <link rel="stylesheet" href="vendor/leaflet.min.css?v=1.27">
+    <script src="vendor/leaflet.min.js?v=1.27" defer></script>
 </body>
 </html>

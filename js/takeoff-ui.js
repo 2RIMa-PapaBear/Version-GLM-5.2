@@ -126,7 +126,7 @@ function render(container, r, icao) {
                 ${fleet.map(ac => `<option value="${ac.id}" ${ac.id === activeId ? 'selected' : ''}>${escapeHtml(ac.name)}${ac.registration ? ' (' + escapeHtml(ac.registration) + ')' : ''}</option>`).join('')}
             </select>
         </div>
-        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px 16px; font-size:12px;">
+        <div class="to-metrics-grid">
             <div>
                 <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px;">${lblRoll}</div>
                 <div style="font-family:'DM Mono',monospace; font-weight:700; color:var(--text-color);">${ftToM(r.groundRoll)} m</div>

@@ -31,6 +31,7 @@
 
 import { state } from './core.js';
 import { showAlternates } from './alternates.js';
+import { clearElevationChart } from './elevation-chart.js';
 
 const STORAGE_KEY = 'flight-mode';
 
@@ -75,6 +76,15 @@ export function setFlightMode(mode) {
     // Le pilote ajustera via le scrubber.
     if (mode === 'local') {
         state.manualTargetHour = null;
+        // Nettoie la destination, le planificateur, le profil d'élévation
+        // et la route sur la carte (retour au vol local pur).
+        const toInput = document.getElementById('route-to-input');
+        if (toInput) toInput.value = '';
+        const fpPanel = document.getElementById('flight-planner-panel');
+        if (fpPanel) fpPanel.style.display = 'none';
+        clearElevationChart('elevation-profile-container');
+        // Rafraîchit la carte pour effacer la route précédente (via événement).
+        document.dispatchEvent(new CustomEvent('clear-route'));
     }
 
     // Réapplique la logique des alternates selon le mode :
