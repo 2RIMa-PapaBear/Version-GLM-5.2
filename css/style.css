@@ -72,6 +72,37 @@ body {
 
 @media (max-width: 1100px) { .container { grid-template-columns: 1fr; } .side-column { position: static; max-height: none; } }
 
+/* Sur mobile, les sidebars sont repliables (fermées par défaut).
+   Le titre devient un bouton toggle (curseur + chevron). */
+@media (max-width: 800px) {
+    .side-column { padding: 10px 12px; }
+    .side-column h3 {
+        cursor: pointer;
+        margin: 0;
+        padding: 4px 0;
+        user-select: none;
+    }
+    .side-column h3::after {
+        content: '▾';
+        margin-left: auto;
+        font-size: 12px;
+        transition: transform 0.2s;
+    }
+    /* Contenu replié par défaut. */
+    .side-column > div,
+    .side-column > button {
+        display: none;
+    }
+    /* Quand le titre est cliqué, on déploie. */
+    .side-column.expanded > div,
+    .side-column.expanded > button {
+        display: block;
+    }
+    .side-column.expanded h3::after {
+        transform: rotate(180deg);
+    }
+}
+
 @media (pointer: coarse) {
     .btn-help, .fav-load-btn, .fav-remove-btn, .history-item, .autocomplete-item, .rwy-bubble {
         min-height: 44px; 
@@ -197,6 +228,8 @@ header.card { padding: 20px 24px 18px; position: relative; overflow: hidden; }
 .vfr-chip-value { color: #ffffff; font-weight: 700; }
 
 @media (max-width: 800px) { .metar-dashboard { grid-template-columns: 1fr; } }
+
+.dashboard-cell { background: var(--inner-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; min-height: 200px; display: flex; flex-direction: column; }
 
 .dash-alert-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: var(--radius-sm); margin-bottom: 6px; }
 .dash-alert-row.danger { background: rgba(239, 68, 68, 0.12); border-left: 3px solid #EF4444; color: #FCA5A5; }
@@ -338,19 +371,6 @@ canvas { background-color: transparent; display: block; transition: opacity 0.3s
     100% {
         opacity: 1;
         transform: scale(1);
-    }
-}
-
-#metar-dashboard {
-    display: grid;
-    grid-template-columns: 0.85fr 1.3fr 1fr; 
-    gap: 15px;
-    align-items: stretch;
-}
-
-@media (max-width: 900px) {
-    #metar-dashboard {
-        grid-template-columns: 1fr;
     }
 }
 
@@ -627,11 +647,21 @@ html.night-mode .flight-mode-toggle .seg-slider {
     box-shadow: 0 2px 8px rgba(232, 160, 130, 0.3);
 }
 
-/* Adaptation mobile : le toggle passe en pleine largeur sur petit écran. */
+/* Adaptation mobile : header wraps dès tablette, compact sur téléphone. */
+@media (max-width: 900px) {
+    .header-controls { flex-wrap: wrap; gap: 6px; }
+}
+@media (max-width: 700px) {
+    .header-controls { gap: 4px; }
+    .btn-help, .btn-night-mode, .btn-cockpit-mode, .btn-share, .btn-watchdog {
+        padding: 6px 8px; font-size: 11px;
+    }
+    .flight-mode-toggle .seg { width: 75px; font-size: 11px; }
+}
 @media (max-width: 600px) {
     .header-controls { flex-wrap: wrap; }
     .flight-mode-toggle { width: 100%; justify-content: center; }
-    .flight-mode-toggle .seg { flex: 1; justify-content: center; }
+    .flight-mode-toggle .seg { flex: 1; justify-content: center; width: auto; }
 }
 
 /* ================================================================
@@ -838,6 +868,15 @@ html.night-mode body::before {
  * ================================================================ */
 .takeoff-panel {
     padding: 14px 18px;
+}
+.to-metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px 16px;
+    font-size: 12px;
+}
+@media (max-width: 500px) {
+    .to-metrics-grid { grid-template-columns: 1fr 1fr; }
 }
 .takeoff-panel .to-bar input[type="number"] {
     -moz-appearance: textfield;
@@ -1363,13 +1402,27 @@ html.night-mode .precip-play-btn {
     border-color: var(--primary);
 }
 
+/* Grilles du planificateur de vol (définies en CSS, pas en inline). */
+.fp-inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr auto;
+    gap: 8px;
+    align-items: end;
+}
+.fp-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 16px;
+    font-size: 12px;
+}
+.fp-grid-3 {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px 12px;
+}
+
 @media (max-width: 600px) {
-    .fp-inputs {
-        grid-template-columns: 1fr 1fr !important;
-    }
-    .fp-grid {
-        grid-template-columns: 1fr !important;
-    }
+    .fp-inputs { grid-template-columns: 1fr 1fr; }
+    .fp-grid, .fp-grid-3 { grid-template-columns: 1fr; }
 }
 
 @keyframes spin {

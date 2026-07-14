@@ -574,6 +574,20 @@ document.addEventListener('DOMContentLoaded', async function () {
     renderSearchHistory('search-history-list', _selectAndFetch);
     updateFavoritesUI(_selectAndFetch);
 
+    // Sidebars repliables sur mobile : clic sur le titre pour déplier/replier.
+    document.querySelectorAll('.side-column h3').forEach(h3 => {
+        h3.addEventListener('click', () => {
+            if (window.innerWidth <= 800) {
+                h3.closest('.side-column').classList.toggle('expanded');
+            }
+        });
+    });
+
+    // Efface la route sur la carte quand on passe en mode Local.
+    document.addEventListener('clear-route', () => {
+        if (state.requestedIcao) showRegionalMapFor(state.requestedIcao, true);
+    });
+
     document.addEventListener('click', (e) => {
         const bubble = e.target.closest('.rwy-bubble');
         if (bubble) {
