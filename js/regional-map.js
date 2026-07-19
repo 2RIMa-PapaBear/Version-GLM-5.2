@@ -1,5 +1,5 @@
 import { state, I18N, fetchAvecRelais, memoGet, surfaceLabel } from './core.js';
-import { getAirportByICAO } from './ui-module.js';
+import { getAirportByICAO, getAirportsInBbox } from './ui-module.js';
 import { parseVisiToMeters, getCeiling } from './core.js';
 import { showRouteWeather } from './route-weather.js';
 import { createPrecipController } from './radar-layer.js';
@@ -219,42 +219,49 @@ async function _loadNeighborCategories(lat, lon) {
         const minLat = lat - 2, maxLat = lat + 2;
         const minLon = lon - 2, maxLon = lon + 2;
 
+        // 1. Base locale : tous les aérodromes de la zone (piste >= 1000 ft).
+        const localAirports = getAirportsInBbox(minLat, minLon, maxLat, maxLon);
+
+        // 2. API AviationWeather : METAR des stations de la zone.
         const stationsUrl = `https://aviationweather.gov/api/data/stationinfo?bbox=${minLat},${minLon},${maxLat},${maxLon}&format=json&_t=${Date.now()}`;
         const stations = await fetchAvecRelais(stationsUrl, 'json');
-        if (!Array.isArray(stations)) return;
-
-        const nearby = stations
-            .map(s => ({
-                code: s.icaoId || s.id,
-                lat: s.lat, lon: s.lon,
-                dist: Math.pow(s.lat - lat, 2) + Math.pow(s.lon - lon, 2),
-            }))
-            .filter(s => s.code && /^[A-Z]{4}$/.test(s.code))
-            .sort((a, b) => a.dist - b.dist)
-            .slice(0, 25);
-
-        if (nearby.length === 0) return;
-
-        const idsStr = nearby.map(s => s.code).join(',');
-        const metarUrl = `https://aviationweather.gov/api/data/metar?ids=${idsStr}&format=json&_t=${Date.now()}`;
-        const metars = await fetchAvecRelais(metarUrl, 'json');
-        if (!Array.isArray(metars)) return;
 
         const metarByCode = {};
-        metars.forEach(m => {
-            const code = m.icaoId || m.stationId;
-            if (code) metarByCode[code] = m.rawOb || m.rawMetar || m.rawText || '';
-        });
+        if (Array.isArray(stations)) {
+            const nearby = stations
+                .map(s => ({ code: s.icaoId || s.id }))
+                .filter(s => s.code && /^[A-Z]{4}$/.test(s.code))
+                .slice(0, 50);
+
+            if (nearby.length > 0) {
+                const idsStr = nearby.map(s => s.code).join(',');
+                const metarUrl = `https://aviationweather.gov/api/data/metar?ids=${idsStr}&format=json&_t=${Date.now()}`;
+                const metars = await fetchAvecRelais(metarUrl, 'json');
+                if (Array.isArray(metars)) {
+                    metars.forEach(m => {
+                        const code = m.icaoId || m.stationId;
+                        if (code) metarByCode[code] = m.rawOb || m.rawMetar || m.rawText || '';
+                    });
+                }
+            }
+        }
 
         _clearNeighborMarkers();
-        nearby.forEach(s => {
-            if (s.code === _currentIcao) return;
-            const raw = metarByCode[s.code];
-            if (!raw) return;
 
-            const cat = _categoryFromMetar(raw);
-            if (!cat) return;
-            _addAirportMarker(s.lat, s.lon, s.code, '', cat, false);
+        // 3. Affiche tous les aérodromes de la base locale.
+        // Ceux avec METAR → marker coloré ; ceux sans METAR → marker gris.
+        localAirports.forEach(a => {
+            if (a.icao === _currentIcao) return;
+            const raw = metarByCode[a.icao];
+            if (raw) {
+                const cat = _categoryFromMetar(raw);
+                if (cat) {
+                    _addAirportMarker(a.lat, a.lon, a.icao, a.name, cat, false);
+                    return;
+                }
+            }
+            // Pas de METAR ou non catégorisable → marker gris.
+            _addAirportMarker(a.lat, a.lon, a.icao, a.name, null, false);
         });
     } catch (e) {
         console.warn('Neighbor categories load failed:', e);
@@ -341,7 +348,9 @@ function _addAirportMarker(lat, lon, icao, name, cat, isCurrent) {
 
     const label = isCurrent
         ? `<strong>${escapeHtml(icao)}</strong>${name ? ' — ' + escapeHtml(name) : ''}<br><em>${state.lang === 'fr' ? 'Terrain courant' : 'Current airport'}</em>`
-        : `<strong>${escapeHtml(icao)}</strong> — <span style="color:${color};font-weight:700;">${cat?.cat || '?'}</span>`;
+        : cat
+            ? `<strong>${escapeHtml(icao)}</strong>${name ? ' — ' + escapeHtml(name) : ''}<br><span style="color:${color};font-weight:700;">${cat.cat}</span>`
+            : `<strong>${escapeHtml(icao)}</strong>${name ? ' — ' + escapeHtml(name) : ''}<br><span style="color:#94A3B8;font-weight:700;">${state.lang === 'fr' ? 'Sans METAR' : 'No METAR'}</span>`;
 
     marker.bindTooltip(label, { permanent: false, direction: 'top' });
     if (isCurrent) _airportMarkers.push(marker);

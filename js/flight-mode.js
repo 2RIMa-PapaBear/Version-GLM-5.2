@@ -83,6 +83,10 @@ export function setFlightMode(mode) {
         const fpPanel = document.getElementById('flight-planner-panel');
         if (fpPanel) fpPanel.style.display = 'none';
         clearElevationChart('elevation-profile-container');
+        // Réinitialise le toggle Départ/Destination sur Départ.
+        document.querySelectorAll('.dep-dest-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.side === 'dep');
+        });
         // Rafraîchit la carte pour effacer la route précédente (via événement).
         document.dispatchEvent(new CustomEvent('clear-route'));
     }
@@ -128,12 +132,11 @@ function updateToggleLabels() {
  * Initialise le toggle au démarrage.
  */
 export function initFlightMode() {
-    const mode = getFlightMode();
-    document.body.classList.add(mode === 'nav' ? 'mode-nav' : 'mode-local');
+    // Au démarrage, on force toujours le mode 'local' (vol local par défaut).
+    setFlightMode('local');
 
     const toggle = document.getElementById('flight-mode-toggle');
     if (toggle) {
-        toggle.setAttribute('data-mode', mode);
         toggle.addEventListener('click', toggleFlightMode);
         updateToggleLabels();
     }

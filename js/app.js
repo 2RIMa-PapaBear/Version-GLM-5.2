@@ -33,6 +33,10 @@ import { fetchAirportByIcao } from './openaip.js';
 
 const lastFetchTime = {};
 
+// Toggle Départ/Destination (mode Navigation).
+let _depIcao = null;       // mémorise le code de départ pendant la consultation destination.
+let _viewingDest = false;  // true quand on consulte la destination (pas le départ).
+
 
 export function genererGraphique() {
     const raw = document.getElementById('tafInput').value;
@@ -315,8 +319,11 @@ export function telechargerMessage(typeMessage) {
         // Met à jour la carte régionale si le panneau est ouvert.
         showRegionalMapFor(codeOaciFinal);
         // Met à jour le terrain de départ affiché dans le route planner.
-        const routeFromDisplay = document.getElementById('route-from-display');
-        if (routeFromDisplay) routeFromDisplay.textContent = codeOaciFinal;
+        // Sauf si on consulte la destination via le toggle (le départ ne change pas).
+        if (!_viewingDest) {
+            const routeFromDisplay = document.getElementById('route-from-display');
+            if (routeFromDisplay) routeFromDisplay.textContent = codeOaciFinal;
+        }
         // Le comparateur d'alternates ne se charge qu'en mode Navigation.
         if (getFlightMode() === 'nav') {
             showAlternates(codeOaciFinal);
@@ -531,6 +538,36 @@ document.addEventListener('DOMContentLoaded', async function () {
     document.getElementById('btn-stop-audio').addEventListener('click', stopAudio);
     const btnBriefing = document.getElementById('btn-briefing-pdf');
     if (btnBriefing) btnBriefing.addEventListener('click', generateBriefingPDF);
+
+    // Toggle Départ/Destination (mode Navigation uniquement).
+    // Bascule le contenu de #icaoInput entre le terrain courant et la destination.
+    document.querySelectorAll('.dep-dest-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const side = btn.dataset.side;
+            const input = document.getElementById('icaoInput');
+            const toInput = document.getElementById('route-to-input');
+            if (side === 'dep') {
+                // Retour au départ : restaure le code mémorisé.
+                if (_depIcao) {
+                    input.value = _depIcao;
+                    _depIcao = null;
+                    _viewingDest = false;
+                    telechargerMessage('metar');
+                }
+            } else {
+                // Va à la destination : mémorise le départ actuel.
+                const destIcao = (toInput?.value || '').trim().toUpperCase();
+                if (destIcao && /^[A-Z]{4}$/.test(destIcao)) {
+                    _depIcao = input.value.trim().toUpperCase();
+                    _viewingDest = true;
+                    input.value = destIcao;
+                    telechargerMessage('taf');
+                }
+            }
+            // Met à jour le state actif.
+            document.querySelectorAll('.dep-dest-btn').forEach(b => b.classList.toggle('active', b === btn));
+        });
+    });
 
     // Carte régionale : toggle du panneau repliable.
     const mapToggle = document.getElementById('regional-map-toggle');

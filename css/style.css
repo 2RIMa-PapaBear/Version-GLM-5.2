@@ -327,7 +327,35 @@ canvas { background-color: transparent; display: block; transition: opacity 0.3s
 .threshold-inputs input[type="number"] { padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); font-size: 14px; background: var(--input-bg); color: var(--text-color); font-family: 'DM Mono', monospace; font-weight: bold;}
 .modal-footer { display: flex; justify-content: flex-end; gap: 12px; padding: 20px; border-top: 1px solid var(--border-color); background: var(--inner-bg);}
 
-.audio-controls { display: flex; gap: 10px; margin-top: 15px; }
+.audio-controls { display: flex; gap: 10px; margin-top: 15px; align-items: center; flex-wrap: wrap; }
+
+/* Toggle Départ/Destination (mode Navigation uniquement). */
+.dep-dest-toggle {
+    display: none;
+    background: var(--inner-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 3px;
+    gap: 2px;
+}
+body.mode-nav .dep-dest-toggle { display: flex; }
+.dep-dest-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    padding: 7px 12px;
+    border-radius: calc(var(--radius-sm) - 2px);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+.dep-dest-btn:hover { color: var(--text-color); }
+.dep-dest-btn.active {
+    background: var(--primary);
+    color: white;
+}
 .btn-primary { background: #0284C7; color: white; border: none; padding: 10px 15px; border-radius: var(--radius-sm); cursor: pointer; font-weight: 600; transition: all 0.25s cubic-bezier(0.22,1,0.36,1); display: flex; align-items:center; position: relative; overflow: hidden;}
 .btn-primary:hover { background: #0369A1; transform: translateY(-2px); box-shadow: 0 4px 16px rgba(2, 132, 199, 0.4); }
 .side-column .btn-primary { background: rgba(15, 23, 42, 0.65); color: var(--primary); border: 1px solid var(--border-color); font-size: 12px; padding: 8px 12px; width: 100%; justify-content: center; }
