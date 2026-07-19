@@ -74,6 +74,25 @@ export function getAirportByICAO(icao) {
 }
 
 /**
+ * Retourne tous les aérodromes dans un rectangle englobant (bbox).
+ * Exclut les ULM/hélistations (piste < 1000 ft / ~300 m).
+ * @param {number} minLat Latitude minimale.
+ * @param {number} minLon Longitude minimale.
+ * @param {number} maxLat Latitude maximale.
+ * @param {number} maxLon Longitude maximale.
+ * @returns {Array<{icao:string,name:string,lat:number,lon:number}>}
+ */
+export function getAirportsInBbox(minLat, minLon, maxLat, maxLon) {
+    return AIRPORTS
+        .filter(a =>
+            a.lat >= minLat && a.lat <= maxLat &&
+            a.lon >= minLon && a.lon <= maxLon &&
+            (a.longestRunway || 0) >= 1000  // exclut ULM/hélistations
+        )
+        .map(a => ({ icao: a.icao, name: a.name, lat: a.lat, lon: a.lon }));
+}
+
+/**
  * Enrichit (ou crée) l'entrée d'un terrain dans l'index en mémoire avec
  * des données plus fraîches (OpenAIP). Les champs existants de la base
  * locale sont conservés, les champs OpenAIP les écrasent s'ils sont plus

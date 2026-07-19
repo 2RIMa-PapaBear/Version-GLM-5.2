@@ -28,15 +28,15 @@
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="data/airports.json?v=1.27.0" as="fetch" crossorigin>
-    <link rel="modulepreload" href="js/app.js?v=1.27">
+    <link rel="preload" href="data/airports.json?v=1.30.0" as="fetch" crossorigin>
+    <link rel="modulepreload" href="js/app.js?v=1.30">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.8.0/suncalc.min.js"
             integrity="sha384-ZHM8wxIpZLrn5eRq7p0QQvd4+K4Ve51xqJgNw1MqVv329Jntjpjal7C1C4rnZSSx"
             crossorigin="anonymous" defer></script>
-    <script src="vendor/lucide.min.js?v=1.27" defer></script>
+    <script src="vendor/lucide.min.js?v=1.30" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=1.27">
-    <link rel="stylesheet" href="css/wind-compass-styles.css?v=1.27">
+    <link rel="stylesheet" href="css/style.css?v=1.30">
+    <link rel="stylesheet" href="css/wind-compass-styles.css?v=1.30">
     <script>
         // Anti-flash mode nuit : applique la classe AVANT le premier rendu
         // pour éviter une explosion de lumière blanche destructrice pour la
@@ -186,6 +186,7 @@
                 <span class="map-legend-item"><span class="map-dot" style="background:#38BDF8;"></span> MVFR</span>
                 <span class="map-legend-item"><span class="map-dot" style="background:#F87171;"></span> IFR</span>
                 <span class="map-legend-item"><span class="map-dot" style="background:#D946EF;"></span> LIFR</span>
+                <span class="map-legend-item"><span class="map-dot" style="background:#94A3B8;"></span> <span id="lbl-no-metar">Sans METAR</span></span>
                 <span class="map-legend-item"><span class="map-dot" style="background:#FBBF24;"></span> <span id="lbl-current-apt">Terrain courant</span></span>
             </div>
             <div id="elevation-profile-container" style="display:none; margin-top:10px; padding:8px; background:var(--inner-bg); border:1px solid var(--border-color); border-radius:8px;">
@@ -203,6 +204,10 @@
         <div id="alertes-meteo" class="alertes-container" style="display: none;"></div>
         
         <div class="audio-controls">
+            <div id="dep-dest-toggle" class="dep-dest-toggle">
+                <button class="dep-dest-btn active" data-side="dep">🛫 <span id="lbl-dep-btn">Départ</span></button>
+                <button class="dep-dest-btn" data-side="dest">🛬 <span id="lbl-dest-btn">Destination</span></button>
+            </div>
             <button id="btn-read-metar" class="btn-secondary"></button>
             <button id="btn-stop-audio" class="btn-secondary"></button>
             <button id="btn-briefing-pdf" class="btn-primary" title="Générer un briefing PDF imprimable">
@@ -242,9 +247,9 @@
 
 <div id="canvasTooltip" class="canvas-tooltip" role="tooltip"></div>
 
-    <script type="module" src="js/app.js?v=1.27"></script>
-    <script src="vendor/jspdf.umd.min.js?v=1.27" defer></script>
-    <link rel="stylesheet" href="vendor/leaflet.min.css?v=1.27">
-    <script src="vendor/leaflet.min.js?v=1.27" defer></script>
+    <script type="module" src="js/app.js?v=1.30"></script>
+    <script src="vendor/jspdf.umd.min.js?v=1.30" defer></script>
+    <link rel="stylesheet" href="vendor/leaflet.min.css?v=1.30">
+    <script src="vendor/leaflet.min.js?v=1.30" defer></script>
 </body>
 </html>
