@@ -15,7 +15,7 @@ import {
     getStartupFavorite
 } from './ui-module.js';
 import { initNightMode, toggleNightMode } from './night-mode.js';
-import { generateBriefingPDF } from './briefing-pdf.js';
+import { generateBriefingPDF } from './briefing-pdf.js'; // TODO: bouton supprimé, module conservé
 import { showFlightWindow, hideFlightWindow } from './flight-window.js';
 import { initFlightMode, setFlightMode, getFlightMode } from './flight-mode.js';
 import { renderGoNoGo, refreshPressureTrend, refreshSigmet, refreshFreezingLevel } from './go-nogo.js';
@@ -73,7 +73,14 @@ export function genererGraphique() {
     // bouton), on suit le code OACI du message collé : cela synchronise la carte
     // régionale, le créneau de vol et les autres widgets avec le terrain affiché.
     // La recherche par bouton initialise requestedIcao dans traiterSucces.
-    if (res.code && /^[A-Z]{4}$/.test(res.code)) state.requestedIcao = res.code;
+    // state.requestedIcao est déjà positionné par traiterSucces lors d'une
+    // recherche par bouton. On ne l'écrase avec res.code que lors d'un collage
+    // manuel (pas de recherche → requestedIcao peut être null ou obsolète).
+    // On évite aussi d'écraser quand res.code est un substitut (ex: LFRD au
+    // lieu de LFRT demandé) : traiterSucces a déjà mis le bon code.
+    if (res.code && /^[A-Z]{4}$/.test(res.code) && !state.requestedIcao) {
+        state.requestedIcao = res.code;
+    }
 
     state.isMetar = res.isMetar;
     // Ces opérations ne dépendent pas de l'heure d'arrivée (manualTargetHour) :
@@ -84,9 +91,11 @@ export function genererGraphique() {
         // Affiche le créneau de vol jour pour le terrain collé (comme le chemin
         // bouton). showFlightWindow se cache seul si lat/lon est indisponible.
         showFlightWindow(state.requestedIcao);
-        // Met à jour la carte régionale si le panneau est déjà ouvert (sinon elle
-        // s'initialisera avec le bon ICAO à la prochaine ouverture).
-        showRegionalMapFor(state.requestedIcao);
+        // Met à jour la carte régionale UNIQUEMENT si on n'est pas en train de
+        // consulter la destination (sinon le trajet reste départ→destination).
+        if (!_viewingDest) {
+            showRegionalMapFor(state.requestedIcao);
+        }
 
         const memo = memoGet(res.code);
         if (memo && memo !== 'PENDING' && memo.lat != null && memo.lon != null) {
@@ -118,11 +127,9 @@ export function genererGraphique() {
 
     updateFinalUI(res, raw, state.forcedRunway);
 
-    // Rendu de la bannière GO/NO-GO (synthèse de décision).
-    // Lancé après updateFinalUI pour bénéficier de l'état à jour.
+    // Rendu de la bannière GO/NO-GO et du widget décollage (s'adaptent au
+    // message affiché, qu'il soit départ ou destination).
     renderGoNoGo();
-
-    // Rafraîchit le widget performance décollage (réagit au drag du scrubber).
     showTakeoffWidget(state.requestedIcao || res.code);
 
     // Met à jour le label du bouton lecture audio selon le type de message.
@@ -233,7 +240,7 @@ export function telechargerMessage(typeMessage) {
 
     state.forcedRunway = null;
     state.manualTargetHour = null;
-    state.requestedIcao = icao; // Mémorisera le terrain demandé dès le départ
+    state.requestedIcao = icao;
     
     textarea.value = tr.searchInProgress;
     if(activeBtn) activeBtn.classList.add('btn-loading');
@@ -297,44 +304,46 @@ export function telechargerMessage(typeMessage) {
         // (ex: LFEA), même si la météo vient d'un terrain voisin (LFRH).
         showFlightWindow(state.requestedIcao || codeOaciFinal);
         // Récupère la tendance QNH en arrière-plan (alimente le GO/NO-GO).
-        refreshPressureTrend(codeOaciFinal);
+        refreshPressureTrend(state.requestedIcao);
         // Récupère les SIGMET/AIRMET de la zone (alimente le GO/NO-GO).
-        const sigApt = getAirportByICAO(codeOaciFinal);
-        const sigMemo = memoGet(codeOaciFinal);
+        const sigApt = getAirportByICAO(state.requestedIcao);
+        const sigMemo = memoGet(state.requestedIcao);
         const sigLat = sigMemo?.lat ?? sigApt?.lat ?? null;
         const sigLon = sigMemo?.lon ?? sigApt?.lon ?? null;
-        refreshSigmet(sigLat, sigLon, codeOaciFinal);
+        refreshSigmet(sigLat, sigLon, state.requestedIcao);
         // Récupère le niveau de gel / isotherme 0°C (alimente le GO/NO-GO).
-        refreshFreezingLevel(codeOaciFinal);
+        refreshFreezingLevel(state.requestedIcao);
         // Précharge la déclinaison magnétique (alimente rose des vents + GO/NO-GO).
-        preloadDeclination(codeOaciFinal);
+        preloadDeclination(state.requestedIcao);
         // Enrichit les données du terrain via OpenAIP (arrière-plan, non-bloquant).
         // Les détails plus frais (pistes, radio, déclinaison) sont fusionnés puis
-        // l'UI est rafraîchie.
-        _enrichFromOpenAIP(codeOaciFinal);
+        // l'UI est rafraîchie. On utilise state.requestedIcao (LFRT) et non le
+        // substitut (LFRD) pour enrichir le BON terrain.
+        _enrichFromOpenAIP(state.requestedIcao);
         // Affiche le widget de performance décollage (densité-altitude vs piste).
-        showTakeoffWidget(state.requestedIcao || codeOaciFinal);
+        showTakeoffWidget(state.requestedIcao);
         // Affiche les fréquences radio du terrain (alimenté par OpenAIP).
-        showFrequenciesWidget(state.requestedIcao || codeOaciFinal);
-        // Met à jour la carte régionale si le panneau est ouvert.
-        showRegionalMapFor(codeOaciFinal);
-        // Met à jour le terrain de départ affiché dans le route planner.
-        // Sauf si on consulte la destination via le toggle (le départ ne change pas).
+        showFrequenciesWidget(state.requestedIcao);
+        // Quand on consulte la destination via le toggle, on ne touche PAS à la
+        // carte régionale ni au route planner : le trajet reste départ→destination.
         if (!_viewingDest) {
+            showRegionalMapFor(codeOaciFinal);
             const routeFromDisplay = document.getElementById('route-from-display');
             if (routeFromDisplay) routeFromDisplay.textContent = codeOaciFinal;
         }
-        // Le comparateur d'alternates ne se charge qu'en mode Navigation.
-        if (getFlightMode() === 'nav') {
-            showAlternates(codeOaciFinal);
+        // Le comparateur d'alternates et le calcul de navigation utilisent le
+        // DÉPART (_depIcao si on consulte la destination, sinon codeOaciFinal).
+        const depForNav = _viewingDest ? _depIcao : codeOaciFinal;
+        if (depForNav && getFlightMode() === 'nav') {
+            showAlternates(depForNav);
             // Flight planner : visible si une destination est saisie.
             const toIcao = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
-            if (toIcao && /^[A-Z]{4}$/.test(toIcao) && toIcao !== codeOaciFinal.toUpperCase()) {
-                showFlightPlanner(codeOaciFinal, toIcao);
+            if (toIcao && /^[A-Z]{4}$/.test(toIcao) && toIcao !== depForNav.toUpperCase()) {
+                showFlightPlanner(depForNav, toIcao);
             } else {
                 clearElevationChart('elevation-profile-container');
             }
-        } else {
+        } else if (!_viewingDest) {
             const altC = document.getElementById('alternates-container');
             if (altC) altC.style.display = 'none';
             const fpPanel = document.getElementById('flight-planner-panel');
@@ -536,8 +545,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
     document.getElementById('btn-read-metar').addEventListener('click', () => lireMETAR(document.getElementById('tafInput').value));
     document.getElementById('btn-stop-audio').addEventListener('click', stopAudio);
-    const btnBriefing = document.getElementById('btn-briefing-pdf');
-    if (btnBriefing) btnBriefing.addEventListener('click', generateBriefingPDF);
 
     // Toggle Départ/Destination (mode Navigation uniquement).
     // Bascule le contenu de #icaoInput entre le terrain courant et la destination.
