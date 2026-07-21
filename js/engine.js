@@ -690,7 +690,7 @@ export function renderWindCompass(containerId, windStr, runways = null, forcedId
         if (surfCode) {
             const surfText = surfaceLabel(surfCode, state.lang);
             const isSoft = SOFT_SURFACES.has(surfCode);
-            const surfColor = isSoft ? '#FBBF24' : 'var(--text-muted)';
+            const surfColor = isSoft ? '#FBBF24' : '#94A3B8';
             surfHtml = `<div style="font-size:10px; color:${surfColor}; margin-top:6px; display:flex; align-items:center; gap:4px; justify-content:center;">
                 ${isSoft ? `<i data-lucide="alert-triangle" style="width:11px;height:11px;"></i>` : `<i data-lucide="layers" style="width:11px;height:11px;"></i>`}
                 <span>${surfText}</span>
@@ -782,7 +782,7 @@ export function renderWindCompass(containerId, windStr, runways = null, forcedId
         </defs>
         <line x1="${CX}" y1="${CY - R_OUTER}" x2="${CX}" y2="${CY + R_OUTER}" stroke="${color}" stroke-width="1" opacity="0.4" transform="rotate(${wind.dir}, ${CX}, ${CY})"/>
         
-        <g class="wind-arrow" style="transform-origin: ${CX}px ${CY}px; transform: rotate(${wind.dir}deg);">
+        <g class="wind-arrow" style="transform-origin: ${CX}px ${CY}px; transform: rotate(${wind.dir}deg);" data-wind-dir="${wind.dir}" data-cx="${CX}" data-cy="${CY}">
             <circle cx="${CX}" cy="${yBase}" r="7" fill="none" stroke="${color}" stroke-width="2" opacity="${glowOpacity}" filter="url(#${uid}-glow)"/>
             <circle cx="${CX}" cy="${yBase}" r="3.5" fill="${color}"/>
             <line x1="${CX}" y1="${yBase}" x2="${CX}" y2="${yPointe}" stroke="url(#${uid}-grad)" stroke-width="3" stroke-linecap="round"/>
