@@ -15,7 +15,6 @@ import {
     getStartupFavorite
 } from './ui-module.js';
 import { initNightMode, toggleNightMode } from './night-mode.js';
-import { generateBriefingPDF } from './briefing-pdf.js'; // TODO: bouton supprimé, module conservé
 import { showFlightWindow, hideFlightWindow } from './flight-window.js';
 import { initFlightMode, setFlightMode, getFlightMode } from './flight-mode.js';
 import { renderGoNoGo, refreshPressureTrend, refreshSigmet, refreshFreezingLevel } from './go-nogo.js';

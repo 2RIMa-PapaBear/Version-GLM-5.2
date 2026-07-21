@@ -614,7 +614,7 @@ export function setLanguage(l) {
     const tr = I18N[l];
     const elIcao = document.getElementById('icaoInput'); if (elIcao) elIcao.placeholder = tr.placeholderIcao;
     const elTaf = document.getElementById('tafInput'); if (elTaf) elTaf.placeholder = tr.placeholderTaf;
-    const dict = { 'lbl-source': tr.lblSource, 'lbl-aero-hours': tr.lblAeroHours, 'btn-add-favorite': tr.btnAddFavorite, 'btn-read-metar': tr.btnReadMetar, 'btn-stop-audio': tr.btnStopAudio, 'lbl-briefing-pdf': tr.btnBriefingPdf, 'lbl-favoris-title': tr.favorisTitle, 'footer-warning': tr.footerWarning, 'leg-clr': tr.legClr, 'leg-few': tr.legFew, 'leg-sct': tr.legSct, 'leg-bkn': tr.legBkn, 'leg-ovc': tr.legOvc, 'leg-vv': tr.legVv };
+    const dict = { 'lbl-source': tr.lblSource, 'lbl-aero-hours': tr.lblAeroHours, 'btn-add-favorite': tr.btnAddFavorite, 'btn-read-metar': tr.btnReadMetar, 'btn-stop-audio': tr.btnStopAudio, 'lbl-favoris-title': tr.favorisTitle, 'footer-warning': tr.footerWarning, 'leg-clr': tr.legClr, 'leg-few': tr.legFew, 'leg-sct': tr.legSct, 'leg-bkn': tr.legBkn, 'leg-ovc': tr.legOvc, 'leg-vv': tr.legVv };
     Object.keys(dict).forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = dict[id]; });
     updateFavoritesUI(_selectAndFetch);
     renderSearchHistory('search-history-list', _selectAndFetch);
