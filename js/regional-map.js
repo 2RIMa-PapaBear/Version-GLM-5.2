@@ -1,15 +1,20 @@
 import { state, I18N, fetchAvecRelais, memoGet, surfaceLabel } from './core.js';
 import { getAirportByICAO, getAirportsInBbox } from './ui-module.js';
-import { parseVisiToMeters, getCeiling } from './core.js';
+import { parseVisiToMeters, getCeiling, CAT_COLORS } from './core.js';
+import { HAZARD_COLORS } from './sigmet.js';
 import { showRouteWeather } from './route-weather.js';
 import { createPrecipController } from './radar-layer.js';
 import { createAirspaceController } from './airspaces.js';
+import { createSatelliteController } from './satellite-layer.js';
 import { fetchPireps, pirepDisplayMeta } from './pireps.js';
 import { getRunwayThresholds } from './runways-geo.js';
 
 let _map = null;
 let _precip = null;
 let _airspaces = null;
+let _sigmetLayer = null;
+let _satellite = null;
+let _currentBaseLayer = null;
 let _pirepMarkers = [];
 let _airportMarkers = [];
 let _neighborMarkers = [];
@@ -21,19 +26,17 @@ const RUNWAY_MIN_ZOOM = 11;
 let _refreshToken = 0;
 let _lastLoadedIcao = null;
 
-// Marqueur de suivi du curseur d'élévation (déplacé en temps réel sur la carte).
 let _cursorMarker = null;
 
-// Synchronise le marqueur de carte avec le curseur du profil d'élévation.
 document.addEventListener('elevation-hover', (e) => {
     if (!_map) return;
     const d = e.detail;
     if (!d) {
-        // Curseur quitté : masque le marqueur.
+
         if (_cursorMarker) { _map.removeLayer(_cursorMarker); _cursorMarker = null; }
         return;
     }
-    // Crée ou déplace le marqueur à la position du curseur.
+
     const latlng = [d.lat, d.lon];
     if (!_cursorMarker) {
         _cursorMarker = L.circleMarker(latlng, {
@@ -50,8 +53,6 @@ document.addEventListener('elevation-hover', (e) => {
     }
 });
 
-// Couleur du trait de piste selon le revêtement (codes FAA/OurAirports).
-// Durs (asphalte/béton/bitume) = gris clair, herbe = vert, terre = ocre, etc.
 const RUNWAY_SURFACE_COLORS = {
     ASP: '#CBD5E1', BIT: '#CBD5E1', CON: '#E2E8F0', MAC: '#CBD5E1',
     MIX: '#CBD5E1', PEM: '#CBD5E1', PER: '#CBD5E1', MEM: '#CBD5E1',
@@ -66,17 +67,10 @@ const RUNWAY_SURFACE_COLORS = {
 };
 const RUNWAY_COLOR_DEFAULT = '#94A3B8';
 
-/**
- * Retourne la couleur de trait pour un code de revêtement donné.
- */
 function _runwayColorForSurface(code) {
     return RUNWAY_SURFACE_COLORS[code] || RUNWAY_COLOR_DEFAULT;
 }
 
-/**
- * Résout le code de revêtement d'une piste à partir de sa désignation.
- * Ordre : apt.runwaySurfaces[desig] (avec/sans suffixe LRC) → apt.surface.
- */
 function _resolveRunwaySurface(apt, desig) {
     if (!apt) return null;
     if (!desig) return apt.surface || null;
@@ -111,6 +105,35 @@ export function showRegionalMapFor(icao, force = false) {
     }
 }
 
+// Redessine uniquement la route sur la carte (sans tout recharger).
+// Appelée quand l'utilisateur modifie destination ou waypoints en mode Navigation.
+export function refreshRoute() {
+    if (!_map || !_currentIcao) return;
+    const toInput = document.getElementById('route-to-input');
+    const toIcao = toInput?.value?.trim().toUpperCase();
+    if (toIcao && /^[A-Z]{4}$/.test(toIcao) && toIcao !== _currentIcao.toUpperCase()) {
+        showRouteWeather(_map, _currentIcao, toIcao);
+    }
+}
+
+// Fonds de carte disponibles (source unique pour le basemap switcher).
+// Chaque entrée crée une NOUVELLE couche à chaque appel — ne pas réutiliser l'instance.
+const BASEMAPS = {
+    satellite: () => L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics',
+        maxZoom: 19, maxNativeZoom: 19,
+    }),
+    osm: () => L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors', maxZoom: 19,
+    }),
+    dark: () => L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
+        attribution: '© CARTO © OpenStreetMap contributors', maxZoom: 19, subdomains: 'abcd',
+    }),
+    terrain: () => L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenTopoMap (CC-BY-SA)', maxZoom: 17, subdomains: 'abc',
+    }),
+};
+
 async function _initOrRefresh() {
     if (!_currentIcao) return;
 
@@ -126,14 +149,10 @@ async function _initOrRefresh() {
     if (isFirstInit) {
         const el = document.getElementById('regional-map');
         if (!el || typeof L === 'undefined') return;
-        
+
         _map = L.map(el, { zoomControl: true, attributionControl: true, maxZoom: 19 }).setView([lat, lon], 7);
 
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics',
-            maxZoom: 19, maxNativeZoom: 19,
-        }).addTo(_map);
-
+        _currentBaseLayer = BASEMAPS.satellite().addTo(_map);
         el.dataset.baseLayer = 'satellite';
 
         _initLayerControls();
@@ -178,15 +197,131 @@ function _initLayerControls() {
         mapEl?.parentNode?.insertBefore(bar, mapEl);
     }
 
+    _mountBasemapSwitcher(bar);
+
     _precip = createPrecipController(_map);
     _precip.mountControls(bar);
 
     _airspaces = createAirspaceController(_map);
     _airspaces.mountControls(bar);
 
+    _sigmetLayer = createSigmetController(_map);
+    _sigmetLayer.mountControls(bar);
+
+    _satellite = createSatelliteController(_map);
+    _satellite.mountControls(bar);
+
     _mountZoomAirfieldButton(bar);
 
     _precip.toggleRadar(true);
+
+    // Écoute les mises à jour SIGMET émises par go-nogo.js (event custom 'sigmets-updated').
+    document.addEventListener('sigmets-updated', (e) => {
+        if (_sigmetLayer && e.detail) _sigmetLayer.refresh(e.detail);
+    });
+
+    // Redessine la route quand l'utilisateur modifie destination ou waypoints.
+    document.addEventListener('route-changed', () => {
+        refreshRoute();
+    });
+}
+
+// Sélecteur de fond de carte (satellite / OSM / sombre / relief).
+function _mountBasemapSwitcher(bar) {
+    const isFr = state.lang === 'fr';
+    const group = document.createElement('div');
+    group.className = 'precip-control-group';
+    const options = [
+        ['satellite', isFr ? 'Satellite' : 'Satellite'],
+        ['osm',       isFr ? 'Plan'      : 'Map'],
+        ['dark',      isFr ? 'Sombre'    : 'Dark'],
+        ['terrain',   isFr ? 'Relief'    : 'Terrain'],
+    ];
+    group.innerHTML = `
+        <select class="basemap-select" title="${isFr ? 'Fond de carte' : 'Base map'}" aria-label="${isFr ? 'Fond de carte' : 'Base map'}">
+            ${options.map(([v, lbl]) => `<option value="${v}" ${v === 'satellite' ? 'selected' : ''}>${lbl}</option>`).join('')}
+        </select>`;
+    bar.appendChild(group);
+    group.querySelector('.basemap-select')?.addEventListener('change', (ev) => {
+        const key = ev.target.value;
+        if (!BASEMAPS[key] || !_map) return;
+        if (_currentBaseLayer) _map.removeLayer(_currentBaseLayer);
+        _currentBaseLayer = BASEMAPS[key]().addTo(_map);
+        _currentBaseLayer.bringToBack();   // les couches météo restent au-dessus
+        const el = document.getElementById('regional-map');
+        if (el) el.dataset.baseLayer = key;
+    });
+}
+
+// Contrôleur SIGMET/AIRMET : trace les polygones de hazard sur la carte.
+// Suit le pattern des autres contrôleurs (createPrecipController, createAirspaceController).
+function createSigmetController(map) {
+    let layer = null;
+    let visible = true;   // visible par défaut (les polygones apparaissent dès qu'on a des données)
+    let sigmets = [];
+
+    function _redraw() {
+        if (layer) { map.removeLayer(layer); layer = null; }
+        if (!visible || !sigmets || !sigmets.length) return;
+
+        const markers = [];
+        for (const s of sigmets) {
+            const color = HAZARD_COLORS[s.hazard] || HAZARD_COLORS.OTHER;
+            const isAirmet = s.type === 'AIRMET';
+            const label = isAirmet ? `AIRMET ${s.hazard}` : `SIGMET ${s.hazard}`;
+            const popupHtml = `<div style="max-width:280px;"><b style="color:${color};">${label}</b><br>` +
+                              `<pre style="white-space:pre-wrap; font-family:'DM Mono',monospace; font-size:11px; margin-top:4px;">${_escapeHtml(s.raw)}</pre></div>`;
+
+            if (s.polygon && s.polygon.length >= 3) {
+                markers.push(L.polygon(s.polygon, {
+                    color, weight: 2, opacity: 0.9, fillColor: color, fillOpacity: 0.12,
+                    dashArray: isAirmet ? '4 4' : null, zIndex: 500,
+                }).bindPopup(popupHtml));
+            } else if (s.center) {
+                markers.push(L.circleMarker([s.center.lat, s.center.lon], {
+                    radius: 8, color, weight: 2, fillColor: color, fillOpacity: 0.25, zIndex: 500,
+                }).bindPopup(popupHtml));
+            }
+        }
+        if (markers.length) {
+            layer = L.layerGroup(markers).addTo(map);
+        }
+    }
+
+    return {
+        refresh(newSigmets) { sigmets = newSigmets || []; _redraw(); },
+        toggle(on) { visible = on; _redraw(); },
+        isVisible() { return visible; },
+        mountControls(bar) {
+            const isFr = state.lang === 'fr';
+            const group = document.createElement('div');
+            group.className = 'precip-control-group';
+            group.innerHTML = `
+                <button class="precip-toggle sigmet-toggle ${visible ? 'active' : ''}" aria-pressed="${String(visible)}" title="${isFr ? 'Afficher les SIGMET/AIRMET' : 'Show SIGMET/AIRMET'}">
+                    <i data-lucide="alert-triangle" style="width:14px;height:14px;"></i>
+                    <span>${isFr ? 'SIGMET' : 'SIGMET'}</span>
+                </button>`;
+            bar.appendChild(group);
+            if (window.lucide) window.lucide.createIcons({ root: group });
+            group.querySelector('.sigmet-toggle')?.addEventListener('click', (ev) => {
+                visible = !visible;
+                ev.currentTarget.setAttribute('aria-pressed', String(visible));
+                ev.currentTarget.classList.toggle('active', visible);
+                _redraw();
+            });
+            // Replay : si des SIGMET ont déjà été fetchés (event émis avant l'init de la carte),
+            // on les récupère depuis state._sigmets pour ne pas les perdre.
+            if (state._sigmets && state._sigmets.length) {
+                sigmets = state._sigmets;
+                _redraw();
+            }
+        },
+        destroy() { if (layer) map.removeLayer(layer); },
+    };
+}
+
+function _escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 
 function _mountZoomAirfieldButton(bar) {
@@ -219,10 +354,8 @@ async function _loadNeighborCategories(lat, lon) {
         const minLat = lat - 2, maxLat = lat + 2;
         const minLon = lon - 2, maxLon = lon + 2;
 
-        // 1. Base locale : tous les aérodromes de la zone (piste >= 1000 ft).
         const localAirports = getAirportsInBbox(minLat, minLon, maxLat, maxLon);
 
-        // 2. API AviationWeather : METAR des stations de la zone.
         const stationsUrl = `https://aviationweather.gov/api/data/stationinfo?bbox=${minLat},${minLon},${maxLat},${maxLon}&format=json&_t=${Date.now()}`;
         const stations = await fetchAvecRelais(stationsUrl, 'json');
 
@@ -248,8 +381,6 @@ async function _loadNeighborCategories(lat, lon) {
 
         _clearNeighborMarkers();
 
-        // 3. Affiche tous les aérodromes de la base locale.
-        // Ceux avec METAR → marker coloré ; ceux sans METAR → marker gris.
         localAirports.forEach(a => {
             if (a.icao === _currentIcao) return;
             const raw = metarByCode[a.icao];
@@ -260,7 +391,7 @@ async function _loadNeighborCategories(lat, lon) {
                     return;
                 }
             }
-            // Pas de METAR ou non catégorisable → marker gris.
+
             _addAirportMarker(a.lat, a.lon, a.icao, a.name, null, false);
         });
     } catch (e) {
@@ -324,12 +455,8 @@ function _categoryFromMetar(raw) {
     return { cat: 'VFR' };
 }
 
-const CAT_PIN_COLORS = {
-    VFR: '#4ADE80',
-    MVFR: '#38BDF8',
-    IFR: '#F87171',
-    LIFR: '#D946EF',
-};
+// Alias sémantique pour la carte régionale — source unique : CAT_COLORS (core.js)
+const CAT_PIN_COLORS = CAT_COLORS;
 
 function _addAirportMarker(lat, lon, icao, name, cat, isCurrent) {
     if (!_map) return;
@@ -417,7 +544,7 @@ async function _drawRunways(lat, lon, apt) {
     if (drawn.length === 0) return;
 
     drawn.forEach(rw => {
-        // Couleur du trait selon le revêtement (herbe=béton=terre...).
+
         const surfaceCode = _resolveRunwaySurface(apt, rw.desigAtEndB) || _resolveRunwaySurface(apt, rw.desigAtEndA);
         const rwColor = _runwayColorForSurface(surfaceCode);
 

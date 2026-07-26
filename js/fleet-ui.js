@@ -1,19 +1,3 @@
-/* ================================================================
- * FLEET UI — Gestion de la flotte d'avions (modal)
- * ================================================================
- *
- * Panneau modal permettant au pilote de gérer sa flotte :
- *   - Lister les avions enregistrés
- *   - Ajouter / éditer / supprimer un avion
- *   - Chaque avion : nom, immatriculation, type, distances de référence
- *     (roulement + franchissement 50ft au niveau mer/ISA), marge de
- *     sécurité personnalisée.
- *
- * Les distances de référence proviennent du manuel de vol (POH) de
- * l'avion, rubrique "performances de décollage" au niveau de la mer en
- * atmosphère standard (ISA).
- * ================================================================ */
-
 import { state } from './core.js';
 import {
     getFleet, getActiveAircraftId, setActiveAircraft,
@@ -23,10 +7,6 @@ import { searchAircraft } from './aircraft-database.js';
 
 let _onCloseCallback = null;
 
-/**
- * Ouvre le modal de gestion de la flotte.
- * @param {Function} [onClose] Callback appelé à la fermeture (pour rafraîchir le widget).
- */
 export function openFleetManager(onClose) {
     _onCloseCallback = onClose || null;
     _ensureModal();
@@ -34,9 +14,6 @@ export function openFleetManager(onClose) {
     document.getElementById('fleet-overlay').style.display = 'flex';
 }
 
-/**
- * Ferme le modal.
- */
 export function closeFleetManager() {
     const overlay = document.getElementById('fleet-overlay');
     if (overlay) overlay.style.display = 'none';
@@ -49,9 +26,6 @@ export function closeFleetManager() {
     }
 }
 
-/**
- * Crée le squelette du modal s'il n'existe pas encore.
- */
 function _ensureModal() {
     if (document.getElementById('fleet-overlay')) return;
 
@@ -74,7 +48,6 @@ function _ensureModal() {
     `;
     document.body.appendChild(overlay);
 
-    // Fermeture au clic sur l'overlay (hors du modal).
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) closeFleetManager();
     });
@@ -82,9 +55,6 @@ function _ensureModal() {
     if (window.lucide) window.lucide.createIcons({ root: overlay });
 }
 
-/**
- * Rend le contenu du modal (liste + formulaire).
- */
 function _render() {
     const content = document.getElementById('fleet-content');
     if (!content) return;
@@ -93,7 +63,6 @@ function _render() {
     const fleet = getFleet();
     const activeId = getActiveAircraftId();
 
-    // --- Liste des avions ---
     let html = `<div class="fleet-list-section">
         <div class="fleet-section-title">${isFr ? 'Avions enregistrés' : 'Registered aircraft'} (${fleet.length})</div>`;
 
@@ -127,7 +96,6 @@ function _render() {
     });
     html += `</div>`;
 
-    // --- Formulaire d'ajout/édition ---
     html += `<div class="fleet-form-section">
         <div class="fleet-section-title" id="fleet-form-title">${isFr ? 'Ajouter un avion' : 'Add an aircraft'}</div>
         <div class="fleet-form" id="fleet-form">
@@ -163,7 +131,6 @@ function _render() {
     content.innerHTML = html;
     if (window.lucide) window.lucide.createIcons({ root: content });
 
-    // --- Branchement des actions ---
     content.querySelectorAll('[data-action]').forEach(btn => {
         btn.addEventListener('click', () => {
             const action = btn.dataset.action;
@@ -180,10 +147,6 @@ function _render() {
     _setupNameAutocomplete();
 }
 
-/* ----------------------------------------------------------------
- * Autocomplétion du champ nom : propose les avions de la base
- * (aircraft-database.js) et pré-remplit type / roulement / 50ft.
- * ---------------------------------------------------------------- */
 let _suggestDebounce = null;
 
 function _setupNameAutocomplete() {
@@ -211,8 +174,6 @@ function _setupNameAutocomplete() {
         }
     });
 
-    // Ferme la liste si l'on clique en dehors. Enregistré une seule fois
-    // (le même _render peut être appelé plusieurs fois sans fermer le modal).
     document.removeEventListener('click', _onDocClick);
     document.addEventListener('click', _onDocClick);
 }
@@ -246,8 +207,7 @@ function _renderSuggest(query) {
 function _applySuggestion(ac) {
     const nameEl = document.getElementById('fleet-name');
     if (!ac) return;
-    // On ne remplit que les champs vides : ne pas écraser ce que le pilote
-    // a déjà saisi (ex: s'il a déjà mis son immatriculation ou ajusté la marge).
+
     if (nameEl && !nameEl.value.trim()) nameEl.value = ac.name;
     const typeEl = document.getElementById('fleet-type');
     if (typeEl && !typeEl.value.trim()) typeEl.value = ac.type;
@@ -264,9 +224,6 @@ function _hideSuggest() {
     if (box) { box.hidden = true; box.innerHTML = ''; }
 }
 
-/**
- * Remplit le formulaire avec les données d'un avion (mode édition).
- */
 function _fillForm(id) {
     const ac = getFleet().find(a => a.id === id);
     if (!ac) return;
@@ -284,9 +241,6 @@ function _fillForm(id) {
     document.getElementById('fleet-cancel-form').style.display = 'inline-block';
 }
 
-/**
- * Réinitialise le formulaire (mode ajout).
- */
 function _resetForm() {
     const isFr = state.lang === 'fr';
     document.getElementById('fleet-edit-id').value = '';
@@ -301,9 +255,6 @@ function _resetForm() {
     _hideSuggest();
 }
 
-/**
- * Enregistre (ajout ou édition) l'avion du formulaire.
- */
 function _doSave() {
     const isFr = state.lang === 'fr';
     const name = document.getElementById('fleet-name').value.trim();
@@ -340,9 +291,6 @@ function _doSave() {
     _render();
 }
 
-/**
- * Supprime un avion (avec confirmation).
- */
 function _doDelete(id) {
     const isFr = state.lang === 'fr';
     const ac = getFleet().find(a => a.id === id);

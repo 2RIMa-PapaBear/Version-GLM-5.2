@@ -1,45 +1,15 @@
-/* ================================================================
- * FLIGHT WINDOW — Créneau de vol jour VFR & alerte nuit
- * ================================================================
- *
- * CONTEXTE RÉGLEMENTAIRE (France / EASA)
- * ---------------------------------------
- * En France, le VFR de jour s'exerce entre les "heures aéronautiques"
- * définies comme : du lever du soleil -30 min au coucher du soleil
- * +30 min (Crépuscules civils). Hors de cette fenêtre, le vol VFR
- * de jour n'est pas autorisé (réservé au VFR de nuit, très encadré :
- * terrains habilités, qualification spécifique).
- *
- * FONCTIONNALITÉ
- * --------------
- * Ce module affiche une bannière dynamique qui indique au pilote :
- *  - Les heures de lever / coucher civil (UTC) du terrain affiché.
- *  - L'état actuel : FENÊTRE OUVERTE / PAS ENCORE / NUIT AÉRONAUTIQUE.
- *  - Le temps restant avant la tombée de la nuit (compte à rebours).
- *  - Un code couleur : vert (ouvert), ambre (bientôt fermée / pas ouverte),
- *    rouge (nuit — vol VFR de jour interdit).
- *
- * La bannière se met à jour toutes les minutes en live.
- * ================================================================ */
-
 import { state, I18N, memoGet } from './core.js';
 import { getAirportByICAO } from './ui-module.js';
 
 let _updateInterval = null;
 let _currentIcao = null;
 
-/**
- * Affiche (ou masque) la bannière du créneau de vol jour.
- * À appeler après chaque chargement de météo, avec le code OACI du terrain.
- * @param {string|null} icao Code OACI du terrain affiché (null pour masquer).
- */
 export function showFlightWindow(icao) {
     const container = document.getElementById('flight-window-banner');
     if (!container) return;
 
     _currentIcao = icao;
 
-    // Pas de terrain ou SunCalc indisponible : on masque.
     if (!icao || typeof SunCalc === 'undefined') {
         container.style.display = 'none';
         stopLiveUpdate();
@@ -51,7 +21,6 @@ export function showFlightWindow(icao) {
     const lat = memo?.lat ?? apt?.lat ?? null;
     const lon = memo?.lon ?? apt?.lon ?? null;
 
-    // Coordonnées indisponibles : on masque.
     if (lat == null || lon == null) {
         container.style.display = 'none';
         stopLiveUpdate();
@@ -62,9 +31,6 @@ export function showFlightWindow(icao) {
     startLiveUpdate(lat, lon);
 }
 
-/**
- * Masque la bannière (appelé quand on efface les données).
- */
 export function hideFlightWindow() {
     const container = document.getElementById('flight-window-banner');
     if (container) container.style.display = 'none';
@@ -72,20 +38,12 @@ export function hideFlightWindow() {
     _currentIcao = null;
 }
 
-/**
- * Calcule l'état de la fenêtre de vol jour pour une position et une date.
- * @param {number} lat
- * @param {number} lon
- * @param {Date} now Date de référence (défaut : maintenant).
- * @returns {Object|null} { sunrise, sunset, aeroStart, aeroEnd, status, minutesLeft }
- */
 export function computeFlightWindow(lat, lon, now = new Date()) {
     if (typeof SunCalc === 'undefined' || lat == null || lon == null) return null;
 
     const times = SunCalc.getTimes(now, lat, lon);
     if (!times.sunrise || !times.sunset || isNaN(times.sunrise.getTime())) return null;
 
-    // Heures aéronautiques : lever -30min / coucher +30min.
     const aeroStart = new Date(times.sunrise.getTime() - 30 * 60000);
     const aeroEnd = new Date(times.sunset.getTime() + 30 * 60000);
 
@@ -102,7 +60,6 @@ export function computeFlightWindow(lat, lon, now = new Date()) {
         minutesLeft = Math.round((aeroEnd - now) / 60000);
     }
 
-    // Alerte "fenêtre se ferme bientôt" : moins de 30 min restantes.
     if (status === 'open' && minutesLeft !== null && minutesLeft <= 30) {
         status = 'closing';
     }
@@ -110,9 +67,6 @@ export function computeFlightWindow(lat, lon, now = new Date()) {
     return { sunrise: times.sunrise, sunset: times.sunset, aeroStart, aeroEnd, status, minutesLeft };
 }
 
-/**
- * Génère le HTML de la bannière.
- */
 function render(lat, lon) {
     const container = document.getElementById('flight-window-banner');
     if (!container) return;
@@ -130,31 +84,30 @@ function render(lat, lon) {
         return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} Z`;
     };
 
-    // Configuration couleur/label selon le statut.
     const configs = {
         open: {
-            color: '#10B981',       // vert
+            color: '#10B981',
             bg: 'rgba(16, 185, 129, 0.12)',
             icon: 'sun',
             label: isFr ? 'FENÊTRE DE VOL OUVERTE' : 'FLIGHT WINDOW OPEN',
             detail: _formatRemaining(w.minutesLeft, isFr, false),
         },
         closing: {
-            color: '#F59E0B',       // ambre
+            color: '#F59E0B',
             bg: 'rgba(245, 158, 11, 0.12)',
             icon: 'alert-triangle',
             label: isFr ? 'FIN DE JOURNÉE PROCHE' : 'DAYLIGHT ENDING SOON',
             detail: _formatRemaining(w.minutesLeft, isFr, true),
         },
         before: {
-            color: '#F59E0B',       // ambre
+            color: '#F59E0B',
             bg: 'rgba(245, 158, 11, 0.12)',
             icon: 'sunrise',
             label: isFr ? "PAS ENCORE EN HEURES DE JOUR" : 'NOT YET IN DAYLIGHT',
             detail: isFr ? `Ouverture dans ${_mmss(w.minutesLeft)}` : `Opens in ${_mmss(w.minutesLeft)}`,
         },
         night: {
-            color: '#EF4444',       // rouge
+            color: '#EF4444',
             bg: 'rgba(239, 68, 68, 0.12)',
             icon: 'moon',
             label: isFr ? 'NUIT AÉRONAUTIQUE — VFR DE JOUR INTERDIT' : 'AERONAUTICAL NIGHT — DAY VFR PROHIBITED',
@@ -201,9 +154,6 @@ function render(lat, lon) {
     if (window.lucide) window.lucide.createIcons({ root: container });
 }
 
-/**
- * Formate le temps restant avant la tombée de la nuit.
- */
 function _formatRemaining(minutes, isFr, urgent) {
     if (minutes === null) return '';
     const h = Math.floor(minutes / 60);
@@ -215,9 +165,6 @@ function _formatRemaining(minutes, isFr, urgent) {
     return isFr ? `${timeStr} restantes avant la nuit` : `${timeStr} before nightfall`;
 }
 
-/**
- * Formate un nombre de minutes en "XhYY" ou "YYmin".
- */
 function _mmss(minutes) {
     if (minutes === null) return '--';
     const h = Math.floor(minutes / 60);
@@ -226,21 +173,15 @@ function _mmss(minutes) {
     return `${m} min`;
 }
 
-/**
- * Démarre la mise à jour live (toutes les minutes).
- */
 function startLiveUpdate(lat, lon) {
     stopLiveUpdate();
     _updateInterval = setInterval(() => {
-        // Ne met à jour que si on est toujours sur le même terrain.
+
         const memo = _currentIcao ? memoGet(_currentIcao) : null;
         render(lat, lon);
     }, 60000);
 }
 
-/**
- * Arrête la mise à jour live.
- */
 function stopLiveUpdate() {
     if (_updateInterval) {
         clearInterval(_updateInterval);

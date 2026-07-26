@@ -1,69 +1,29 @@
-/* ================================================================
- * ROUTE ELEVATION — Profil d'élévation du sol le long d'une route
- * ================================================================
- *
- * POURQUOI
- * --------
- * En VFR de transit (surtout en montagne ou en traversée de relief),
- * connaître l'altitude du sol le long de la route est vital :
- *   - Détecter un col ou une ligne de crête sous la route qui réduit
- *     la marge de franchissement (hélicoptère ou ULM, mais aussi
- *     avion en cas de panne moteur → zone d'atterrissage forcée).
- *   - Vérifier qu'on respecte la règle VFR des 500 ft sol (ou 1000 ft
- *     au-dessus des obstacles les plus élevés en agglomération).
- *   - Visualiser un "profil de vol" qui aide à planifier l'altitude
- *     de croisière optimale.
- *
- * SOURCE
- * ------
- * Open-Meteo elevation endpoint — gratuit, sans clé, CORS natif.
- *   GET /v1/elevation?latitude=lat1,lat2,...&longitude=lon1,lon2,...
- * Retourne un tableau d'élévations (mètres) pour chaque point.
- *
- * On échantillonne la route départ→destination en N points (défaut 20)
- * pour obtenir un profil lisse sans saturer l'API.
- *
- * SOURCE : Open Topo Data (api.opentopodata.org) — API publique gratuite
- * basée sur SRTM 90m. Indépendante d'Open-Meteo pour éviter les conflits
- * de rate-limit avec les requêtes météo.
- * ================================================================ */
-
-import { fetchAvecRelais } from './core.js';
+// fetch direct (sans proxy ni queue) : l'endpoint /elevation d'Open-Meteo autorise
+// CORS nativement et n'a pas de limite stricte nécessitant la queue de fetchOpenMeteo.
+async function _fetchElevation(url) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    try {
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) return null;
+        return await res.json();
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
 
 const ENDPOINT = 'https://api.open-meteo.com/v1/elevation';
 const FT_PER_M = 3.28084;
 
-// Nombre de points d'échantillonnage le long de la route.
-// Adapté à la distance : ~1 point tous les 3 NM, pour capter les reliefs
-// significatifs même sur les longues traversées.
-// Open Topo Data accepte jusqu'à 100 points par requête.
 const DEFAULT_SAMPLES = 20;
 const MAX_SAMPLES = 100;
 
-// Cache session (clé : route arrondie au 0.01° + nombre de points).
 const _cache = new Map();
-const TTL_MS = 24 * 60 * 60 * 1000;  // 24 h (le relief ne change pas).
+const TTL_MS = 24 * 60 * 60 * 1000;
 
-/**
- * Récupère le profil d'élévation le long d'une route.
- * @param {number} fromLat Latitude départ.
- * @param {number} fromLon Longitude départ.
- * @param {number} toLat   Latitude destination.
- * @param {number} toLon   Longitude destination.
- * @param {number} [samples=20] Nombre de points.
- * @returns {Promise<{
- *   points: Array<{lat:number, lon:number, elevFt:number, frac:number}>,
- *   maxFt: number,
- *   minFt: number,
- *   avgFt: number
- * }|null>}
- *   frac = position le long de la route (0=départ, 1=destination).
- */
 export async function fetchRouteElevation(fromLat, fromLon, toLat, toLon, samples) {
     if (fromLat == null || toLat == null) return null;
 
-    // Nombre de points adaptatif si non spécifié : ~1 point / 3 NM.
-    // On estime la distance par la formule haversine simplifiée.
     let n = DEFAULT_SAMPLES;
     if (samples == null) {
         const distNm = _haversineNm(fromLat, fromLon, toLat, toLon);
@@ -72,14 +32,12 @@ export async function fetchRouteElevation(fromLat, fromLon, toLat, toLon, sample
         n = Math.max(2, Math.min(samples, MAX_SAMPLES));
     }
 
-    // La clé de cache inclut le nombre de points (sinon un appel avec plus de
-    // points récupère un profil sous-échantillonné mis en cache avant).
     const key = `${fromLat.toFixed(2)},${fromLon.toFixed(2)},${toLat.toFixed(2)},${toLon.toFixed(2)},${n}`;
     const cached = _cache.get(key);
     if (cached && Date.now() - cached.ts < TTL_MS) return cached.profile;
 
     try {
-        // Échantillonnage linéaire de la route.
+
         const lats = [];
         const lons = [];
         for (let i = 0; i < n; i++) {
@@ -88,12 +46,10 @@ export async function fetchRouteElevation(fromLat, fromLon, toLat, toLon, sample
             lons.push((fromLon + (toLon - fromLon) * t).toFixed(4));
         }
 
-        // Open-Meteo elevation via le proxy (change l'IP source → évite le 429
-        // et contourne les restrictions CORS depuis free.fr).
         const url = `${ENDPOINT}?latitude=${lats.join(',')}&longitude=${lons.join(',')}`;
         let data;
         try {
-            data = await fetchAvecRelais(url, 'json');
+            data = await _fetchElevation(url);
         } catch (e) {
             console.warn('Route elevation fetch error:', e.message);
             return null;
@@ -103,7 +59,6 @@ export async function fetchRouteElevation(fromLat, fromLon, toLat, toLon, sample
         const elevs = data?.elevation;
         if (!Array.isArray(elevs) || elevs.length !== n) return null;
 
-        // Construit les points avec conversion m → ft.
         const points = [];
         let maxFt = -Infinity, minFt = Infinity, sumFt = 0;
         for (let i = 0; i < n; i++) {
@@ -135,13 +90,6 @@ export async function fetchRouteElevation(fromLat, fromLon, toLat, toLon, sample
     }
 }
 
-/**
- * Évalue la marge de franchissement pour une altitude de croisière donnée.
- * @param {Object} profile Résultat de fetchRouteElevation.
- * @param {number} cruiseAltFt Altitude de croisière (ft MSL).
- * @param {number} [minClearanceFt=1000] Marge réglementaire mini (ft).
- * @returns {{minClearanceFt:number, worstPoint:Object|null, level:'ok'|'caution'|'danger'}}
- */
 export function evaluateClearance(profile, cruiseAltFt, minClearanceFt = 1000) {
     if (!profile?.points?.length) return { minClearanceFt: null, worstPoint: null, level: 'ok' };
 
@@ -157,21 +105,61 @@ export function evaluateClearance(profile, cruiseAltFt, minClearanceFt = 1000) {
     }
 
     let level = 'ok';
-    if (worstClear < 0) level = 'danger';              // sous le sol !
+    if (worstClear < 0) level = 'danger';
     else if (worstClear < minClearanceFt) level = 'caution';
 
     return { minClearanceFt: worstClear, worstPoint: worst, level };
 }
 
-/**
- * Invalide le cache session.
- */
 export function _clearCache() { _cache.clear(); }
 
-/**
- * Distance haversine entre deux points (NM). Sert à adapter le nombre
- * de points d'échantillonnage à la longueur de la route.
- */
+// Profil d'élévation multi-segments : concatène plusieurs fetchRouteElevation
+// (un par leg), en recalculant `frac` sur la distance cumulée totale.
+// `segments` = [[fromLat, fromLon, toLat, toLon], ...].
+export async function fetchMultiSegmentElevation(segments) {
+    if (!Array.isArray(segments) || !segments.length) return null;
+
+    const profiles = [];
+    const distances = [];
+    let totalNm = 0;
+
+    for (const [fla, flo, tla, tlo] of segments) {
+        const prof = await fetchRouteElevation(fla, flo, tla, tlo);
+        if (!prof) return null;   // si un segment échoue, on abandonne (cohérence)
+        const nm = _haversineNm(fla, flo, tla, tlo);
+        profiles.push(prof);
+        distances.push(nm);
+        totalNm += nm;
+    }
+
+    if (totalNm === 0) return null;
+
+    // Concatène en évitant les doublons aux jonctions (le dernier point d'un segment
+    // ≈ le premier point du suivant) — on décale frac sur la distance cumulée.
+    const allPoints = [];
+    let cumNm = 0;
+    for (let s = 0; s < profiles.length; s++) {
+        const prof = profiles[s];
+        const segNm = distances[s];
+        const start = allPoints.length > 0 ? 1 : 0; // skip doublon de jonction
+        for (let i = start; i < prof.points.length; i++) {
+            const p = prof.points[i];
+            const localFrac = i / (prof.points.length - 1);
+            const globalFrac = (cumNm + localFrac * segNm) / totalNm;
+            allPoints.push({ ...p, frac: globalFrac });
+        }
+        cumNm += segNm;
+    }
+
+    const elevs = allPoints.map(p => p.elevFt);
+    return {
+        points: allPoints,
+        maxFt: Math.max(...elevs),
+        minFt: Math.min(...elevs),
+        avgFt: Math.round(elevs.reduce((a, b) => a + b, 0) / elevs.length),
+    };
+}
+
 function _haversineNm(lat1, lon1, lat2, lon2) {
     const R = 6371000;
     const toRad = d => d * Math.PI / 180;

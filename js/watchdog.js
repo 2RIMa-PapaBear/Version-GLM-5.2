@@ -1,52 +1,12 @@
-/* ================================================================
- * WATCHDOG — Surveillance active des terrains favoris
- * ================================================================
- *
- * OBJECTIF
- * --------
- * Tant que l'application est ouverte (onglet actif), un minuteur
- * vérifie périodiquement la météo des terrains favoris et alerte le
- * pilote si :
- *   - Un terrain passe en NO-GO (IFR/LIFR, vent trop fort...).
- *   - Un terrain jusqu'alors vert se dégrade (passe en CAUTION).
- *   - Un terrain était vert et devient rouge sur les minimas perso.
- *
- * Cette surveillance proactive évite au pilote de rafraîchir
- * manuellement chaque terrain pendant qu'il prépare autre chose.
- *
- * LIMITES (app 100% statique)
- * ---------------------------
- * Le vrai "push serveur → app fermée" nécessite un backend. En
- * statique, le maximum faisable est :
- *   - Une vérification périodique TANT QUE l'onglet est ouvert.
- *   - L'API Notification (si permission accordée) pour alerter même
- *     si l'onglet est en arrière-plan (mais pas fermé).
- *
- * C'est exactement ce que fait ce module.
- *
- * IMPLÉMENTATION
- * --------------
- * - Minuteur réglable (défaut 15 min, min 5 min).
- * - Recalcule la catégorie de vol de chaque favori.
- * - Compare avec l'état précédent pour ne pas spammer (n'alerte que
- *   sur les transitions : VFR→IFR, GO→NO-GO).
- * - Notification navigateur + badge visuel sur les favoris concernés.
- * ================================================================ */
-
 import { state, fetchAvecRelais } from './core.js';
 
 const LS_KEY = 'watchdog-settings';
 const DEFAULT_INTERVAL_MIN = 15;
 const MIN_INTERVAL_MIN = 5;
 
-// État précédent des favoris (pour détecter les transitions).
-let _lastStates = new Map();   // icao → 'GO' | 'CAUTION' | 'NO-GO'
+let _lastStates = new Map();
 let _timer = null;
 
-/**
- * Lit les réglages du watchdog.
- * @returns {{enabled:boolean, intervalMin:number, notify:boolean}}
- */
 export function getWatchdogSettings() {
     try {
         const raw = JSON.parse(localStorage.getItem(LS_KEY));
@@ -60,9 +20,6 @@ export function getWatchdogSettings() {
     }
 }
 
-/**
- * Sauvegarde les réglages.
- */
 export function setWatchdogSettings(settings) {
     try {
         localStorage.setItem(LS_KEY, JSON.stringify({
@@ -70,31 +27,22 @@ export function setWatchdogSettings(settings) {
             intervalMin: Math.max(MIN_INTERVAL_MIN, settings.intervalMin ?? DEFAULT_INTERVAL_MIN),
             notify: settings.notify ?? false,
         }));
-    } catch { /* quota */ }
+    } catch {   }
 
-    // Applique immédiatement.
     if (settings.enabled) startWatchdog();
     else stopWatchdog();
 }
 
-/**
- * Démarre la surveillance.
- */
 export function startWatchdog() {
     stopWatchdog();
     const s = getWatchdogSettings();
     if (!s.enabled) return;
 
-    // Premier check immédiat (pour initialiser l'état de référence).
     _check();
 
-    // Puis répétition.
     _timer = setInterval(_check, s.intervalMin * 60 * 1000);
 }
 
-/**
- * Arrête la surveillance.
- */
 export function stopWatchdog() {
     if (_timer) {
         clearInterval(_timer);
@@ -102,9 +50,6 @@ export function stopWatchdog() {
     }
 }
 
-/**
- * Vérifie l'état de tous les favoris et déclenche les alertes.
- */
 async function _check() {
     const s = getWatchdogSettings();
     if (!s.enabled) return;
@@ -137,17 +82,14 @@ async function _check() {
             const newState = _evaluateState(raw);
             const oldState = _lastStates.get(icao);
 
-            // Détecte une DÉGRADATION (transition vers un état pire).
             if (oldState && _isWorse(newState, oldState)) {
                 alerts.push({ icao, oldState, newState, raw });
             }
             _lastStates.set(icao, newState);
 
-            // Met à jour le badge visuel sur le favori.
             _updateFavoriteBadge(icao, newState);
         }
 
-        // Notifie si dégradations.
         if (alerts.length > 0 && s.notify) {
             _notify(alerts, isFr);
         }
@@ -156,16 +98,11 @@ async function _check() {
     }
 }
 
-/**
- * Évalue l'état d'un terrain depuis son METAR.
- * @returns {'GO'|'CAUTION'|'NO-GO'}
- */
 function _evaluateState(raw) {
-    // Visi.
+
     const visiMatch = raw.match(/KT(?:\s+\d{3}V\d{3})?\s+(\d{4})\b/);
     const visiM = visiMatch ? (parseInt(visiMatch[1], 10) === 9999 ? 10000 : parseInt(visiMatch[1], 10)) : 10000;
 
-    // Plafond.
     let ceilHund = 999;
     const cloudMatches = [...raw.matchAll(/\b(BKN|OVC)(\d{3})/g)];
     cloudMatches.forEach(m => {
@@ -176,24 +113,17 @@ function _evaluateState(raw) {
     if (vvMatch) ceilHund = parseInt(vvMatch[1], 10);
     if (/CAVOK|NSC|SKC|NCD/.test(raw)) ceilHund = 999;
 
-    // Catégorie.
     if (ceilHund < 5 || visiM < 1600) return 'NO-GO';
     if (ceilHund < 10 || visiM < 4800) return 'NO-GO';
     if (ceilHund <= 30 || visiM <= 8000) return 'CAUTION';
     return 'GO';
 }
 
-/**
- * Indique si newState est pire que oldState.
- */
 function _isWorse(newState, oldState) {
     const rank = { 'GO': 0, 'CAUTION': 1, 'NO-GO': 2 };
     return rank[newState] > rank[oldState];
 }
 
-/**
- * Met à jour le badge visuel sur un favori dans la liste.
- */
 function _updateFavoriteBadge(icao, state) {
     const favList = document.getElementById('favorites-list');
     if (!favList) return;
@@ -213,9 +143,6 @@ function _updateFavoriteBadge(icao, state) {
     badge.textContent = state;
 }
 
-/**
- * Envoie une notification navigateur.
- */
 function _notify(alerts, isFr) {
     if (!('Notification' in window)) return;
     if (Notification.permission !== 'granted') return;
@@ -232,13 +159,9 @@ function _notify(alerts, isFr) {
 
     try {
         new Notification(title, { body, icon: 'icon.svg', tag: 'watchdog' });
-    } catch { /* certaines implémentations requièrent un service worker */ }
+    } catch {   }
 }
 
-/**
- * Demande la permission de notifications.
- * @returns {Promise<boolean>} true si accordée.
- */
 export async function requestNotificationPermission() {
     if (!('Notification' in window)) return false;
     if (Notification.permission === 'granted') return true;
@@ -247,35 +170,21 @@ export async function requestNotificationPermission() {
     return result === 'granted';
 }
 
-/**
- * Initialise le watchdog au démarrage (si activé).
- */
 export function initWatchdog() {
     const s = getWatchdogSettings();
     if (s.enabled) startWatchdog();
 }
 
-/**
- * Force un check immédiat (bouton "Vérifier maintenant").
- */
 export function checkNow() {
     return _check();
 }
 
 export const WATCHDOG_DEFAULTS = { INTERVAL_MIN: DEFAULT_INTERVAL_MIN, MIN_INTERVAL_MIN };
 
-// ----------------------------------------------------------------
-// Modal de réglages
-// ----------------------------------------------------------------
-
-/**
- * Ouvre le panneau de réglages du watchdog.
- */
 export function openWatchdogPanel() {
     const isFr = state.lang === 'fr';
     const s = getWatchdogSettings();
 
-    // Ferme un éventuel modal existant.
     closeWatchdogPanel();
 
     const overlay = document.createElement('div');

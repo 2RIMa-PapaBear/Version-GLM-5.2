@@ -1,31 +1,7 @@
-/* ================================================================
- * ALTERNATES — Comparateur de terrains de déroutement
- * ================================================================
- *
- * CONTEXTE
- * --------
- * En navigation VFR, le pilote doit toujours avoir un "plan B" : vers
- * quel terrain se détourner si la destination se dégrade (ou si la
- * météo de route se ferme). Ce module affiche côte à côte les METARs
- * des terrains voisins de la destination, avec leur catégorie de vol,
- * pour choisir rapidement l'alternate le plus viable.
- *
- * FONCTIONNEMENT
- * --------------
- * 1. Récupère les terrains dans un rayon de ~3° autour du terrain courant.
- * 2. Demande les METARs en une requête groupée.
- * 3. Affiche un tableau comparatif : code, nom, catégorie, visi, plafond, vent.
- * 4. Trie par "viabilité" (VFR d'abord, puis proximité).
- * ================================================================ */
-
 import { state, I18N, fetchAvecRelais, memoGet } from './core.js';
 import { getAirportByICAO } from './ui-module.js';
-import { parseVisiToMeters, getCeiling } from './core.js';
+import { parseVisiToMeters, getCeiling, CAT_COLORS } from './core.js';
 
-/**
- * Charge et affiche le comparateur d'alternates pour un terrain.
- * @param {string} icao Code OACI du terrain de destination.
- */
 export async function showAlternates(icao) {
     const container = document.getElementById('alternates-container');
     if (!container) return;
@@ -41,7 +17,7 @@ export async function showAlternates(icao) {
     }
 
     try {
-        // 1. Terrains voisins.
+
         const stationsUrl = `https://aviationweather.gov/api/data/stationinfo?bbox=${lat - 3},${lon - 3},${lat + 3},${lon + 3}&format=json&_t=${Date.now()}`;
         const stations = await fetchAvecRelais(stationsUrl, 'json');
         if (!Array.isArray(stations)) { container.style.display = 'none'; return; }
@@ -59,7 +35,6 @@ export async function showAlternates(icao) {
 
         if (nearby.length === 0) { container.style.display = 'none'; return; }
 
-        // 2. METARs groupés.
         const metarUrl = `https://aviationweather.gov/api/data/metar?ids=${nearby.map(s => s.code).join(',')}&format=json&_t=${Date.now()}`;
         const metars = await fetchAvecRelais(metarUrl, 'json');
         if (!Array.isArray(metars)) { container.style.display = 'none'; return; }
@@ -70,7 +45,6 @@ export async function showAlternates(icao) {
             if (code) metarByCode[code] = m.rawOb || m.rawMetar || m.rawText || '';
         });
 
-        // 3. Construit les entrées avec catégorie calculée.
         const rows = nearby
             .map(s => {
                 const raw = metarByCode[s.code.toUpperCase()];
@@ -83,30 +57,24 @@ export async function showAlternates(icao) {
 
         if (rows.length === 0) { container.style.display = 'none'; return; }
 
-        // 4. Trie : VFR d'abord, puis par distance.
         const catPriority = { VFR: 0, MVFR: 1, IFR: 2, LIFR: 3 };
         rows.sort((a, b) => (catPriority[a.cat.cat] ?? 9) - (catPriority[b.cat.cat] ?? 9) || a.dist - b.dist);
 
         _render(rows.slice(0, 6), icao);
         container.style.display = 'block';
-        // Le panneau reste replié : le pilote l'ouvre manuellement via le chevron.
+
     } catch (e) {
         console.warn('Alternates load failed:', e);
         container.style.display = 'none';
     }
 }
 
-/**
- * Affiche le tableau comparatif.
- */
 function _render(rows, destIcao) {
     const isFr = state.lang === 'fr';
     const list = document.getElementById('alternates-list');
     if (!list) return;
 
-    const catColors = {
-        VFR: '#4ADE80', MVFR: '#38BDF8', IFR: '#F87171', LIFR: '#D946EF',
-    };
+    const catColors = CAT_COLORS;
 
     const lblCat = isFr ? 'Cat.' : 'Cat.';
     const lblVisi = isFr ? 'Visi' : 'Visi';
@@ -143,7 +111,6 @@ function _render(rows, destIcao) {
     });
     html += `</div>`;
 
-    // Note explicative.
     html += `<div style="font-size:11px; color:var(--text-muted); margin-top:10px; line-height:1.5;">
         <i data-lucide="info" style="width:13px;height:13px;vertical-align:middle;"></i>
         ${isFr
@@ -154,7 +121,6 @@ function _render(rows, destIcao) {
     list.innerHTML = html;
     if (window.lucide) window.lucide.createIcons({ root: list });
 
-    // Rend les cellules cliquables pour charger le terrain.
     list.querySelectorAll('.alt-cell-name').forEach(cell => {
         cell.style.cursor = 'pointer';
         cell.addEventListener('click', () => {
@@ -167,9 +133,6 @@ function _render(rows, destIcao) {
     });
 }
 
-/**
- * Extrait visi/plafond/vent d'un METAR et calcule la catégorie.
- */
 function _categoryFromMetar(raw) {
     const visiMatch = raw.match(/KT(?:\s+\d{3}V\d{3})?\s+(\d{4})\b/);
     const visiM = visiMatch ? (parseInt(visiMatch[1], 10) === 9999 ? 10000 : parseInt(visiMatch[1], 10)) : parseVisiToMeters('');
@@ -184,7 +147,6 @@ function _categoryFromMetar(raw) {
     if (vvMatch) ceilHund = parseInt(vvMatch[1], 10);
     if (/CAVOK|NSC|SKC|NCD/.test(raw)) ceilHund = 999;
 
-    // Vent.
     const windMatch = raw.match(/\b(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?KT\b/);
     const wind = windMatch ? {
         variable: windMatch[1] === 'VRB',

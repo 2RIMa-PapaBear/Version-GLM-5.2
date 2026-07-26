@@ -1,78 +1,38 @@
-/* ================================================================
- * FREEZING LEVEL — Niveau de gel (isotherme 0°C)
- * ================================================================
- *
- * POURQUOI
- * --------
- * Pour un pilote VFR, le niveau où la température atteint 0°C est
- * critique dans deux scénarios :
- *
- *   1. GIVRAGE : si le pilote pénètre un nuage (scud running, vol en
- *      montagne, inversion) alors que la température est ≤ 0°C, le
- *      givrage est quasi certain. L'isotherme 0°C marque la limite
- *      basse du risque.
- *
- *   2. PLAFOND/ SOMMET : si le plafond (BKN/OVC) est au-dessus de
- *      l'isotherme 0°C, les gouttelettes du nuage sont surfondues →
- *      givrage à la traversée.
- *
- *      Ex : plafond 4000 ft, isotherme 0°C à 3500 ft → le bas du nuage
- *      est sous 0°C → givrage probable si on y entre.
- *
- * SOURCE
- * ------
- * Open-Meteo fournit gratuitement le "freezing level height" via
- * l'endpoint forecast. On l'appelle pour les coordonnées du terrain.
- * Open-Meteo supporte CORS nativement → pas de proxy nécessaire.
- *
- * On compare ensuite l'isotherme au plafond METAR courant pour alerter
- * sur le risque de givrage par nuage traversé.
- * ================================================================ */
-
 import { state, getCeiling } from './core.js';
-import { memoGet, fetchAvecRelais } from './core.js';
-import { getAirportByICAO } from './ui-module.js';
+import { memoGet, fetchOpenMeteo } from './core.js';
 
-// Cache session : on ne redemande pas l'API si on a déjà la valeur pour
-// un terrain donné (elle évolue lentement). TTL de 30 min.
 const _cache = new Map();
 const TTL_MS = 30 * 60 * 1000;
 
-/**
- * Récupère l'altitude du niveau de gel (isotherme 0°C) pour un terrain.
- * @param {string} icao Code OACI.
- * @returns {Promise<{altFt: number, source: string}|null>}
- *   altFt : altitude de l'isotherme 0°C en pieds (MSL).
- *   null si indisponible.
- */
 export async function fetchFreezingLevel(icao) {
     if (!icao) return null;
 
-    // Cache.
     const cached = _cache.get(icao);
     if (cached && Date.now() - cached.ts < TTL_MS) return cached.value;
 
     const memo = memoGet(icao);
-    const apt = getAirportByICAO(icao);
-    const lat = memo?.lat ?? apt?.lat ?? null;
-    const lon = memo?.lon ?? apt?.lon ?? null;
+    const lat = memo?.lat ?? null;
+    const lon = memo?.lon ?? null;
     if (lat == null || lon == null) return null;
 
     try {
-        // Open-Meteo : freezing_level_height est l'altitude du 0°C, en mètres,
-        // au-dessus du niveau de la mer (geopotential). CORS natif.
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=freezing_level_height&timezone=auto`;
+
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=freezing_level_height,relative_humidity_2m,dew_point_2m&timezone=auto`;
         let data;
-        try { data = await fetchAvecRelais(url, 'json'); } catch { return null; }
+        try { data = await fetchOpenMeteo(url); } catch { return null; }
         if (!data) return null;
 
         const heightM = data?.current?.freezing_level_height;
         if (typeof heightM !== 'number' || isNaN(heightM)) return null;
 
-        // Conversion mètres → pieds.
         const altFt = Math.round(heightM * 3.28084);
 
-        const value = { altFt, source: 'Open-Meteo' };
+        const value = {
+            altFt,
+            source: 'Open-Meteo',
+            humidity: typeof data?.current?.relative_humidity_2m === 'number' ? data.current.relative_humidity_2m : null,
+            dewPointC: typeof data?.current?.dew_point_2m === 'number' ? data.current.dew_point_2m : null,
+        };
         _cache.set(icao, { value, ts: Date.now() });
         return value;
     } catch (e) {
@@ -81,52 +41,106 @@ export async function fetchFreezingLevel(icao) {
     }
 }
 
-/**
- * Évalue le risque de givrage en croisant l'isotherme 0°C et le plafond
- * METAR courant.
- *
- * Règle : si le plafond (BKN/OVC le plus bas) est AU-DESSUS de
- * l'isotherme 0°C, le bas du nuage est sous 0°C → givrage probable à
- * la traversée. Plus l'écart est faible, plus le risque est élevé.
- *
- * @param {number} freezingLevelFt Altitude du 0°C (ft MSL).
- * @param {string} nuageStr Chaîne nuageuse du METAR (ex: "BKN040 OVC080").
- * @returns {{level: 'ok'|'caution'|'danger', message: string}|null}
- */
-export function evaluateIcingRisk(freezingLevelFt, nuageStr) {
+// Évaluation du risque de givrage (carburation / cellule).
+//
+// Combine deux approches complémentaires :
+//   1. Comparaison plafond vs isotherme 0°C (logique historique, inchangée pour go-nogo).
+//   2. Analyse thermodynamique T / Td / spread (norme C-FIP simplifiée) :
+//        - Zone critique de givrage : T ∈ [-2°C ; +2°C] avec air humide (nuage ou spread ≤ 2°C).
+//        - Zone modérée              : T ∈ [-15°C ; -2°C] avec nuage significatif.
+//        - Hors risque               : T > +2°C (trop chaud) ou air très sec (spread > 5°C).
+//      La saturation proche (spread T-Td ≤ 2°C) élève le niveau d'un cran.
+//
+// RÉTRO-COMPATIBILITÉ : tempC / tdC sont optionnels. Si absents, on retombe sur la
+// logique historique (plafond vs isotherme). Les appelants existants (go-nogo.js)
+// n'ont pas besoin d'être modifiés.
+export function evaluateIcingRisk(freezingLevelFt, nuageStr, tempC = null, tdC = null) {
     if (freezingLevelFt == null || isNaN(freezingLevelFt)) return null;
     if (!nuageStr) return null;
 
-    const ceilHund = getCeiling(nuageStr);
-    if (ceilHund >= 999) return null; // pas de plafond défini (CAVOK/NSC).
-
-    const ceilingFt = ceilHund * 100;
-
-    // Pas de nuage au-dessus du niveau de gel → pas de risque identifié.
-    if (ceilingFt < freezingLevelFt) {
-        return {
-            level: 'ok',
-            message: state.lang === 'fr'
-                ? `Niveau de gel à ${Math.round(freezingLevelFt)} ft — sous le plafond`
-                : `Freezing level at ${Math.round(freezingLevelFt)} ft — below ceiling`,
-        };
-    }
-
-    // Plafond au-dessus de l'isotherme 0°C : le bas du nuage est sous 0°C.
-    const margin = ceilingFt - freezingLevelFt;
     const isFr = state.lang === 'fr';
-    if (margin < 2000) {
-        return {
-            level: 'danger',
-            message: isFr
-                ? `GIVRAGE PROBABLE — plafond ${ceilingFt} ft, isotherme 0°C à ${Math.round(freezingLevelFt)} ft`
-                : `LIKELY ICING — ceiling ${ceilingFt} ft, freezing level at ${Math.round(freezingLevelFt)} ft`,
-        };
+    const flLabel = Math.round(freezingLevelFt);
+    const fl0Msg = isFr
+        ? `Isotherme 0°C à ${flLabel} ft`
+        : `Freezing level at ${flLabel} ft`;
+
+    // --- Approche 1 : plafond vs isotherme (historique) ---
+    const ceilHund = getCeiling(nuageStr);
+    const ceilingFt = (ceilHund >= 999) ? null : ceilHund * 100;
+    const hasSignificantCloud = ceilingFt != null; // BKN/OVC/VV détecté
+
+    // --- Approche 2 : thermodynamique T / Td ---
+    // Calcule un niveau de risque 'ok' | 'caution' | 'danger' | null si pas de donnée T.
+    let thermoLevel = null; // null = analyse thermo indisponible
+    if (typeof tempC === 'number' && !isNaN(tempC)) {
+        const spread = (typeof tdC === 'number' && !isNaN(tdC)) ? (tempC - tdC) : null;
+        const saturated = spread != null && spread <= 2;       // air proche saturation
+        const veryDry = spread != null && spread > 5;            // air très sec
+
+        if (tempC > 2 || veryDry) {
+            thermoLevel = 'ok';                                  // trop chaud ou trop sec
+        } else if (tempC >= -2 && tempC <= 2) {
+            // Zone critique -2..+2°C : givrage probable si humidité/nuage présent.
+            thermoLevel = (hasSignificantCloud || saturated) ? 'danger' : 'caution';
+        } else if (tempC >= -15) {
+            // Zone modérée -15..-2°C : risque en nuage, aggravé par saturation.
+            thermoLevel = (hasSignificantCloud || saturated) ? 'caution' : 'ok';
+        } else {
+            // T < -15°C : air très froid et sec (glace pure), risque faible côté carburation.
+            thermoLevel = 'ok';
+        }
     }
-    return {
-        level: 'caution',
-        message: isFr
-            ? `Risque de givrage en nuage — isotherme 0°C à ${Math.round(freezingLevelFt)} ft`
-            : `Icing risk in cloud — freezing level at ${Math.round(freezingLevelFt)} ft`,
-    };
+
+    // Rétro-compatibilité : sans donnée thermo ET sans plafond exploitable, on ne peut
+    // rien conclure (comportement identique à l'ancienne version qui retournait null).
+    if (thermoLevel == null && ceilingFt == null) return null;
+
+    // --- Fusion : on prend le risque le plus élevé entre thermo et approche plafond ---
+    const SEV = { ok: 0, caution: 1, danger: 2 };
+    let level = 'ok';
+    let detail = '';
+
+    if (thermoLevel != null && SEV[thermoLevel] > SEV[level]) {
+        level = thermoLevel;
+        const tLabel = `${Math.round(tempC)}°C`;
+        const tdLabel = (typeof tdC === 'number' && !isNaN(tdC)) ? `${Math.round(tdC)}°C` : null;
+        if (level === 'danger') {
+            detail = isFr
+                ? `GIVRAGE PROBABLE — T ${tLabel}${tdLabel ? `, Td ${tdLabel}` : ''}`
+                : `LIKELY ICING — OAT ${tLabel}${tdLabel ? `, dew ${tdLabel}` : ''}`;
+        } else if (level === 'caution') {
+            detail = isFr
+                ? `Risque de givrage — T ${tLabel}${tdLabel ? `, Td ${tdLabel}` : ''}`
+                : `Icing risk — OAT ${tLabel}${tdLabel ? `, dew ${tdLabel}` : ''}`;
+        }
+    }
+
+    // Approche plafond vs isotherme : on ne l'applique que si la thermo n'a pas déjà
+    // remonté un danger (pour éviter un double signal dans le message).
+    if (ceilingFt != null && ceilingFt >= freezingLevelFt && level !== 'danger') {
+        const margin = ceilingFt - freezingLevelFt;
+        if (margin < 2000) {
+            level = 'danger';
+            detail = isFr
+                ? `GIVRAGE PROBABLE — plafond ${ceilingFt} ft, ${fl0Msg}`
+                : `LIKELY ICING — ceiling ${ceilingFt} ft, ${fl0Msg}`;
+        } else if (level !== 'caution') {
+            level = 'caution';
+            detail = isFr
+                ? `Risque de givrage en nuage — ${fl0Msg}`
+                : `Icing risk in cloud — ${fl0Msg}`;
+        }
+    }
+
+    // Message final : si niveau ok, message informatif (isotherme 0°C / sous le plafond).
+    let message;
+    if (level === 'ok') {
+        message = ceilingFt != null && ceilingFt < freezingLevelFt
+            ? (isFr ? `${fl0Msg} — sous le plafond` : `${fl0Msg} — below ceiling`)
+            : (isFr ? `${fl0Msg} — pas de risque détecté` : `${fl0Msg} — no risk detected`);
+    } else {
+        message = detail;
+    }
+
+    return { level, message };
 }

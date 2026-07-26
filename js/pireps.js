@@ -1,47 +1,8 @@
-/* ================================================================
- * PIREPS — Pilot Reports (rapports en vol des pilotes)
- * ================================================================
- *
- * POURQUOI
- * --------
- * Les PIREPs (Pilot Reports) sont des observations météo faites en
- * vol par d'autres pilotes : turbulence, givrage observé, base et
- * sommet de nuages, visibilité en vol. Ce sont les données les plus
- * "fraîches" et crédibles dont dispose un pilote avant son propre vol
- * — un pilote qui signale une turbulence sévère sur une route est
- * une information autrement plus actionnable qu'une prévision AIRMET.
- *
- * SOURCE
- * ------
- * API AviationWeather.gov /data/aircraftrep — PIREPs mondiaux.
- * Comme l'endpoint ne renvoie pas les en-têtes CORS, on passe par
- * le proxy Google Apps Script existant (fetchAvecRelais).
- *
- * Les PIREPs sont codés dans un format spécifique (UR PA..., UUA
- * pour urgent). On parse le texte brut pour extraire : localisation,
- * type d'observation (turbu/givrage/base-sommet), intensité, altitude.
- *
- * INTÉGRATION
- * -----------
- * On filtre géographiquement (comme pour les SIGMETs) autour de la
- * zone d'intérêt, puis on place des marqueurs sur la carte régionale.
- * Le pilote voit en un coup d'œil les conditions réelles signalées
- * par ses confrères.
- * ================================================================ */
-
 import { fetchAvecRelais } from './core.js';
 
-// Cache session par bbox arrondie.
 const _cache = new Map();
-const TTL_MS = 10 * 60 * 1000;  // 10 min (les PIREPs évoluent vite).
+const TTL_MS = 10 * 60 * 1000;
 
-/**
- * Récupère les PIREPs proches d'un point et les parse.
- * @param {number} lat Latitude du centre.
- * @param {number} lon Longitude du centre.
- * @param {number} [radiusDeg=3] Rayon de recherche en degrés (~1° ≈ 111 km).
- * @returns {Promise<Array<{raw:string, type:string, lat:number, lon:number, altFt:number, intensity:string}>>}
- */
 export async function fetchPireps(lat, lon, radiusDeg = 3) {
     if (lat == null || lon == null) return [];
 
@@ -50,7 +11,7 @@ export async function fetchPireps(lat, lon, radiusDeg = 3) {
     if (cached && Date.now() - cached.ts < TTL_MS) return cached.pireps;
 
     try {
-        // Endpoint AviationWeather aircraftrep : PIREPs récents (24h).
+
         const url = `https://aviationweather.gov/api/data/aircraftrep?format=json&_t=${Date.now()}`;
         const data = await fetchAvecRelais(url, 'json');
 
@@ -61,15 +22,13 @@ export async function fetchPireps(lat, lon, radiusDeg = 3) {
             const raw = p.rawOb || p.rawText || p.raw || '';
             if (!raw) continue;
 
-            // Coordonnées du PIREP.
             const pLat = typeof p.lat === 'number' ? p.lat : null;
             const pLon = typeof p.lon === 'number' ? p.lon : null;
 
-            // Filtrage géographique si coords disponibles.
             if (pLat != null && pLon != null) {
                 if (Math.abs(pLat - lat) > radiusDeg || Math.abs(pLon - lon) > radiusDeg) continue;
             } else {
-                // Sans coords, on tente d'extraire depuis le texte (rare mais possible).
+
                 continue;
             }
 
@@ -92,15 +51,9 @@ export async function fetchPireps(lat, lon, radiusDeg = 3) {
     }
 }
 
-/**
- * Parse un PIREP brut pour extraire type/intensité/altitude.
- * Format typique : "UUA / OV LFMN / TM 1230 / FL080 / TB SEV / IC LGT"
- * @returns {{type:string, intensity:string, altFt:number|null}}
- */
 function _parsePirep(raw) {
     const upper = raw.toUpperCase();
 
-    // Détection du type de phénomène.
     let type = 'OTHER';
     if (/\bTB\b|TURB|TURBULENCE/.test(upper)) type = 'TURB';
     else if (/\bICE\b|ICING|\bFZRA\b|\bFZDZ\b/.test(upper)) type = 'ICE';
@@ -108,14 +61,12 @@ function _parsePirep(raw) {
     else if (/VIS|VISIBILITY/.test(upper)) type = 'VIS';
     else if (/WND|WIND/.test(upper)) type = 'WIND';
 
-    // Intensité (LGT = light, MOD = moderate, SEV = severe, EXT = extreme).
     let intensity = '';
     const intMatch = upper.match(/\b(LGT|MOD|SEV|EXT|EXTRM|LIGHT|MODERATE|SEVERE|EXTREME)\b/);
     if (intMatch) {
         intensity = intMatch[1];
     }
 
-    // Altitude : FL080, FL250, ou altitude "080", "15000".
     let altFt = null;
     const flMatch = upper.match(/\bFL(\d{3})\b/);
     if (flMatch) {
@@ -128,12 +79,6 @@ function _parsePirep(raw) {
     return { type, intensity, altFt };
 }
 
-/**
- * Retourne les métadonnées d'affichage (icône, couleur, libellé) d'un type PIREP.
- * @param {string} type Type de phénomène (TURB/ICE/CLOUD/VIS/WIND/OTHER).
- * @param {string} intensity Intensité (LGT/MOD/SEV/EXT).
- * @returns {{icon:string, color:string, labelFr:string, labelEn:string}}
- */
 export function pirepDisplayMeta(type, intensity) {
     const sev = /^(SEV|EXT|EXTRM|SEVERE|EXTREME)$/.test(intensity);
     const mod = /^(MOD|MODERATE)$/.test(intensity);
@@ -179,7 +124,4 @@ export function pirepDisplayMeta(type, intensity) {
     return META[type] || META.OTHER;
 }
 
-/**
- * Invalide le cache session.
- */
 export function _clearCache() { _cache.clear(); }

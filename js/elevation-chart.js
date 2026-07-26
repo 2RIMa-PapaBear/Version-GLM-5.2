@@ -1,43 +1,20 @@
-/* ================================================================
- * ELEVATION CHART — Profil d'élévation interactif (canvas)
- * ================================================================
- *
- * Affiche le profil du terrain entre le départ et la destination sous
- * la carte régionale. Le pilote peut :
- *   - survoler pour voir l'altitude/distance du point sous le curseur,
- *   - zoomer (molette) verticalement,
- *   - glisser horizontalement pour se déplacer le long de la route.
- *
- * Une ligne horizontale représente l'altitude de croisière saisie dans
- * le planificateur de vol, pour visualiser la clearance.
- * ================================================================ */
-
 const PAD = { top: 18, right: 16, bottom: 28, left: 52 };
 const MIN_H = 100;
 
-// État d'interaction (un seul graphique à la fois).
 let _canvas = null;
 let _ctx = null;
 let _profile = null;
 let _cruiseFt = 0;
 let _fromIcao = '';
 let _toIcao = '';
-let _hoverFrac = null;       // position du curseur (0-1), null si hors canvas.
-let _zoomMin = null;         // min Y affiché (ft), null = auto.
+let _hoverFrac = null;
+let _zoomMin = null;
 let _zoomMax = null;
 let _dragging = false;
 let _dragStartX = 0;
 let _dragOffset = 0;
 let _distTotalKm = 0;
 
-/**
- * Affiche le profil d'élévation dans le conteneur donné.
- * @param {string} containerId ID du conteneur parent.
- * @param {Object} profile Résultat de fetchRouteElevation ({points, maxFt, minFt, avgFt}).
- * @param {number} cruiseAltFt Altitude de croisière (ft).
- * @param {string} fromIcao Code OACI départ.
- * @param {string} toIcao Code OACI destination.
- */
 export function renderElevationChart(containerId, profile, cruiseAltFt, fromIcao, toIcao) {
     const container = document.getElementById(containerId);
     if (!container || !profile?.points?.length) {
@@ -54,22 +31,17 @@ export function renderElevationChart(containerId, profile, cruiseAltFt, fromIcao
     _zoomMax = null;
     _hoverFrac = null;
 
-    // Distance totale (km) depuis le premier/dernier point.
     const pts = profile.points;
     _distTotalKm = _haversineKm(pts[0].lat, pts[0].lon, pts[pts.length - 1].lat, pts[pts.length - 1].lon);
 
-    // Met à jour le label de route.
     const label = document.getElementById('elev-route-label');
     if (label) label.textContent = `${fromIcao} → ${toIcao} · ${Math.round(_distTotalKm)} km`;
 
     _ensureCanvas(container);
     _draw();
-    // Rediffère le dessin : si le conteneur était invisible au moment du
-    // premier _draw() (panneau carte fermé), le canvas avait une largeur nulle.
-    // requestAnimationFrame + timeout double pour couvrir le délai d'animation CSS.
+
     requestAnimationFrame(() => { _draw(); setTimeout(_draw, 250); });
 
-    // Met à jour le label de route.
     const titleEl = container.querySelector('.elev-title');
     if (titleEl) {
         const lang = document.documentElement.lang || 'fr';
@@ -80,9 +52,6 @@ export function renderElevationChart(containerId, profile, cruiseAltFt, fromIcao
     }
 }
 
-/**
- * Masque et vide le graphique.
- */
 export function clearElevationChart(containerId) {
     const container = document.getElementById(containerId);
     if (container) container.style.display = 'none';
@@ -94,10 +63,6 @@ export function clearElevationChart(containerId) {
     }
     _profile = null;
 }
-
-// ----------------------------------------------------------------
-// Rendu canvas
-// ----------------------------------------------------------------
 
 function _ensureCanvas(container) {
     const old = document.getElementById('elevation-canvas');
@@ -118,7 +83,6 @@ function _ensureCanvas(container) {
 
     _attachListeners();
 
-    // ResizeObserver pour gérer la responsivité.
     if (window.ResizeObserver) {
         const ro = new ResizeObserver(() => _draw());
         ro.observe(_canvas);
@@ -142,19 +106,16 @@ function _draw() {
     const plotW = cw - PAD.left - PAD.right;
     const plotH = ch - PAD.top - PAD.bottom;
 
-    // Échelle Y (altitude) : englobe le terrain + l'altitude de croisière.
     let yMin = _zoomMin ?? Math.min(_profile.minFt, _cruiseFt) - 200;
     let yMax = _zoomMax ?? Math.max(_profile.maxFt, _cruiseFt) + 200;
-    if (yMax - yMin < 500) yMax = yMin + 500; // évite une échelle trop plate.
+    if (yMax - yMin < 500) yMax = yMin + 500;
 
     const xOf = frac => PAD.left + frac * plotW;
     const yOf = elev => PAD.top + (1 - (elev - yMin) / (yMax - yMin)) * plotH;
 
-    // --- Fond ---
     _ctx.fillStyle = 'rgba(255,255,255,0.03)';
     _ctx.fillRect(PAD.left, PAD.top, plotW, plotH);
 
-    // --- Grille horizontale + labels Y ---
     _ctx.strokeStyle = 'rgba(255,255,255,0.06)';
     _ctx.lineWidth = 1;
     _ctx.fillStyle = 'rgba(255,255,255,0.35)';
@@ -171,7 +132,6 @@ function _draw() {
         _ctx.fillText(Math.round(elev) + ' ft', PAD.left - 6, y + 3);
     }
 
-    // --- Aire sous la courbe ---
     _ctx.beginPath();
     _ctx.moveTo(xOf(pts[0].frac), PAD.top + plotH);
     pts.forEach(p => _ctx.lineTo(xOf(p.frac), yOf(p.elevFt)));
@@ -183,7 +143,6 @@ function _draw() {
     _ctx.fillStyle = grad;
     _ctx.fill();
 
-    // --- Ligne de terrain ---
     _ctx.beginPath();
     pts.forEach((p, i) => {
         const x = xOf(p.frac), y = yOf(p.elevFt);
@@ -193,7 +152,6 @@ function _draw() {
     _ctx.lineWidth = 1.8;
     _ctx.stroke();
 
-    // --- Ligne altitude de croisière ---
     if (_cruiseFt > yMin && _cruiseFt < yMax) {
         const yc = yOf(_cruiseFt);
         _ctx.beginPath();
@@ -210,7 +168,6 @@ function _draw() {
         _ctx.fillText(Math.round(_cruiseFt) + ' ft', PAD.left + 4, yc - 4);
     }
 
-    // --- Axe X : distance ---
     _ctx.fillStyle = 'rgba(255,255,255,0.35)';
     _ctx.font = '9px "DM Mono", monospace';
     _ctx.textAlign = 'center';
@@ -222,7 +179,6 @@ function _draw() {
         _ctx.fillText(km + ' km', x, ch - PAD.bottom + 16);
     }
 
-    // --- Labels départ / arrivée ---
     _ctx.textAlign = 'left';
     _ctx.fillStyle = 'rgba(255,255,255,0.5)';
     _ctx.font = 'bold 9px "DM Mono", monospace';
@@ -230,14 +186,12 @@ function _draw() {
     _ctx.textAlign = 'right';
     _ctx.fillText(_toIcao, cw - PAD.right - 2, PAD.top + 10);
 
-    // --- Curseur de survol ---
     if (_hoverFrac != null) {
         const hx = xOf(_hoverFrac);
         const pt = _nearestPoint(_hoverFrac);
         if (pt) {
             const hy = yOf(pt.elevFt);
 
-            // Ligne verticale.
             _ctx.beginPath();
             _ctx.setLineDash([3, 3]);
             _ctx.moveTo(hx, PAD.top);
@@ -247,7 +201,6 @@ function _draw() {
             _ctx.stroke();
             _ctx.setLineDash([]);
 
-            // Point sur la courbe.
             _ctx.beginPath();
             _ctx.arc(hx, hy, 4, 0, Math.PI * 2);
             _ctx.fillStyle = '#FB923C';
@@ -256,7 +209,6 @@ function _draw() {
             _ctx.lineWidth = 1.5;
             _ctx.stroke();
 
-            // Tooltip.
             const km = Math.round(pt.frac * _distTotalKm);
             const clearance = Math.round(_cruiseFt - pt.elevFt);
             const lines = [
@@ -307,10 +259,6 @@ function _nearestPoint(frac) {
     return best;
 }
 
-// ----------------------------------------------------------------
-// Interactions
-// ----------------------------------------------------------------
-
 function _attachListeners() {
     if (!_canvas) return;
     _canvas.addEventListener('mousemove', _onMove);
@@ -359,10 +307,6 @@ function _onLeave() {
     _emitHover();
 }
 
-/**
- * Émet un événement DOM 'elevation-hover' avec la position (lat, lon)
- * du point sous le curseur, pour synchroniser le marqueur sur la carte.
- */
 function _emitHover() {
     if (!_profile) return;
     const pt = _hoverFrac != null ? _nearestPoint(_hoverFrac) : null;
@@ -374,7 +318,7 @@ function _emitHover() {
 function _onWheel(e) {
     e.preventDefault();
     if (!_profile) return;
-    // Zoom vertical : resserre l'échelle Y autour du curseur.
+
     const factor = e.deltaY > 0 ? 1.15 : 0.87;
     let yMin = _zoomMin ?? Math.min(_profile.minFt, _cruiseFt) - 200;
     let yMax = _zoomMax ?? Math.max(_profile.maxFt, _cruiseFt) + 200;
@@ -398,7 +342,6 @@ function _onUp() {
     }
 }
 
-// --- Touch (mobile) ---
 let _lastTouchX = 0;
 
 function _onTouchStart(e) {
@@ -419,10 +362,6 @@ function _onTouchMove(e) {
         _emitHover();
     }
 }
-
-// ----------------------------------------------------------------
-// Utils
-// ----------------------------------------------------------------
 
 function _haversineKm(lat1, lon1, lat2, lon2) {
     const R = 6371;

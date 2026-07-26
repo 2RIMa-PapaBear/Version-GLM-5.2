@@ -1,56 +1,16 @@
-/* ================================================================
- * RADAR — Animation précipitations
- * ================================================================
- *
- * FONCTIONNALITÉ
- * --------------
- * Remplace l'ancien radar statique de regional-map.js par un
- * contrôleur animé reposant sur RainViewer :
- *
- *   RADAR (précipitations) :
- *      - Frames passées (dernières ~2h, par pas de 10 min).
- *      - Animation en boucle, lecture/pause, slider temporel.
- *
- * SOURCE
- * ------
- * RainViewer — https://api.rainviewer.com/public/weather-maps.json
- * Gratuit, sans clé, CORS natif. API v2 : le manifeste renvoie
- * l'hôte tuile + des chemins de base hash (ex. /v2/radar/3aa62ff1a7da)
- * auxquels on suffixe /{size}/{z}/{x}/{y}/{color}/{smooth}_1.png.
- *
- * ARCHITECTURE
- * ------------
- * createPrecipController(map) fabrique un contrôleur encapsulant :
- *   - le chargement du manifeste RainViewer (cache 10 min),
- *   - les couches Leaflet (une active à la fois par type),
- *   - l'horloge d'animation (setInterval, vitesse réglable),
- *   - le rendu HTML des contrôles dans un conteneur fourni.
- *
- * Le contrôleur est créé une fois par carte et détruit à la fermeture
- * du panneau pour libérer les minuteurs et les couches.
- * ================================================================ */
-
 import { state } from './core.js';
 
 const MANIFEST_URL = 'https://api.rainviewer.com/public/weather-maps.json';
-const MANIFEST_TTL_MS = 10 * 60 * 1000;      // rafraîchi toutes les 10 min
-const DEFAULT_SPEED_MS = 600;                 // ms entre frames à vitesse normale
+const MANIFEST_TTL_MS = 10 * 60 * 1000;
+const DEFAULT_SPEED_MS = 600;
 const TILE_SIZE = 256;
-// Schéma de couleur RainViewer : 2 = original (vert→jaune→rouge).
-// smooth=1 active l'interpolation spatiale (rendu plus doux).
+
 const RADAR_COLOR = 2;
 const RADAR_SMOOTH = 1;
 
-// Cache du manifeste (partagé entre contrôleurs d'une même session).
 let _manifest = null;
 let _manifestTs = 0;
 
-/**
- * Charge le manifeste RainViewer, avec cache session de 10 min.
- * Timeout de 12s : un fetch qui pend indéfiniment laisse la carte vide
- * sans feedback. On échoue vite pour pouvoir réessayer au prochain toggle.
- * @returns {Promise<Object>} Manifeste RainViewer.
- */
 async function _loadManifest() {
     if (_manifest && Date.now() - _manifestTs < MANIFEST_TTL_MS) return _manifest;
     const controller = new AbortController();
@@ -66,89 +26,52 @@ async function _loadManifest() {
     }
 }
 
-/**
- * Construit la liste des frames radar (passées + prévision).
- * Les frames passées sont inversées pour obtenir un ordre chronologique.
- * @param {Object} manifest Manifeste RainViewer.
- * @returns {Array<{time:number, path:string, forecast:boolean}>}
- */
 function _buildRadarFrames(manifest) {
     const past = (manifest.radar?.past || []).map(f => ({ ...f, forecast: false }));
     const nowcast = (manifest.radar?.nowcast || []).map(f => ({ ...f, forecast: true }));
     return [...past, ...nowcast];
 }
 
-/**
- * Construit le template d'URL tuile RainViewer (v2) pour Leaflet.
- *
- * L'API v2 ne renvoie plus que le chemin de base (ex. /v2/radar/3aa62ff1a7da) ;
- * il faut lui suffixer taille / {z}/{x}/{y} / couleur / options.
- *
- * @param {string} host Hôte (manifest.host).
- * @param {string} path Chemin de base (manifest.radar.past[].path).
- * @param {number} [color] Schéma couleur (radar seulement ; ex. 2 = original).
- * @param {number} [smooth] Lissage spatial 0/1 (radar seulement).
- * @returns {string} Template avec jetons {z}/{x}/{y} pour L.tileLayer.
- */
 function _tileUrl(host, path, color, smooth) {
-    // Radar : {host}{path}/{size}/{z}/{x}/{y}/{color}/{smooth}_1.png
-    // (snow=1 activé par défaut pour afficher les précipitations solides).
+
     return `${host}${path}/${TILE_SIZE}/{z}/{x}/{y}/${color}/${smooth || 0}_1.png`;
 }
 
-/**
- * Fabrique un contrôleur radar pour une carte Leaflet.
- *
- * @param {L.Map} map Instance Leaflet.
- * @returns {{
- *   mountControls: (el: HTMLElement) => void,
- *   toggleRadar: (on: boolean) => Promise<void>,
- *   destroy: () => void
- * }}
- */
 export function createPrecipController(map) {
-    // ---- État interne ----
+
     let radarFrames = [];
     let radarLayer = null;
-    let radarVisible = true;     // radar activé par défaut
-    let frameIdx = 0;            // index courant dans radarFrames
+    let radarVisible = true;
+    let frameIdx = 0;
     let playing = false;
     let playTimer = null;
     let speedMs = DEFAULT_SPEED_MS;
-    let controlsEl = null;       // conteneur des contrôles (pour rafraîchir l'UI)
+    let controlsEl = null;
 
-    // ---- Initialisation asynchrone (non bloquante) ----
     let _initPromise = null;
     let _initOk = false;
     function _ensureInit() {
-        // Si l'init a déjà réussi, on retourne le cache. Si la promesse est en
-        // cours, on attend. Si elle a échoué, on réessaie : un échec réseau
-        // ponctuel ne doit pas verrouiller le bouton pour toute la session.
+
         if (_initOk && _initPromise) return _initPromise;
         _initPromise = (async () => {
             const mf = await _loadManifest();
             radarFrames = _buildRadarFrames(mf);
-            // Par défaut : frame la plus récente (dernière passée).
+
             const lastPastIdx = radarFrames.map(f => f.forecast).lastIndexOf(false);
             frameIdx = lastPastIdx >= 0 ? lastPastIdx : radarFrames.length - 1;
             _initOk = true;
         })().catch(e => {
             console.warn('Precip controller init failed:', e);
-            _initOk = false;  // autorise une nouvelle tentative au prochain clic
+            _initOk = false;
             _initPromise = null;
         });
         return _initPromise;
     }
 
-    // ---- Gestion des couches Leaflet ----
-
     function _removeRadarLayer() {
         if (radarLayer) { map.removeLayer(radarLayer); radarLayer = null; }
     }
 
-    /**
-     * Affiche la frame radar à l'index courant.
-     */
     function _showRadarFrame() {
         if (!radarVisible || radarFrames.length === 0) return;
         const host = _manifest?.host;
@@ -161,12 +84,10 @@ export function createPrecipController(map) {
             opacity: 0.65,
             tileSize: TILE_SIZE,
             attribution: '© RainViewer',
-            zIndex: 400,    // au-dessus du fond de carte, sous les marqueurs
+            zIndex: 400,
         }).addTo(map);
         _updateFrameLabel();
     }
-
-    // ---- Animation ----
 
     function _play() {
         if (playing || radarFrames.length < 2) return;
@@ -190,8 +111,6 @@ export function createPrecipController(map) {
         _showRadarFrame();
         _syncSlider();
     }
-
-    // ---- Mises à jour de l'UI des contrôles ----
 
     function _updatePlayBtn() {
         if (!controlsEl) return;
@@ -227,12 +146,6 @@ export function createPrecipController(map) {
         label.textContent = `${hhmm} Z${tag ? ' ' + tag : ''}`;
     }
 
-    // ---- Contrôles DOM ----
-
-    /**
-     * Rend la barre de contrôles dans le conteneur fourni.
-     * @param {HTMLElement} el Conteneur (ex. .map-layers-bar).
-     */
     function mountControls(el) {
         controlsEl = el;
         const isFr = state.lang === 'fr';
@@ -255,7 +168,6 @@ export function createPrecipController(map) {
 
         if (window.lucide) window.lucide.createIcons({ root: el });
 
-        // Bouton radar.
         const radarBtn = el.querySelector('.precip-toggle-radar');
         radarBtn?.addEventListener('click', async () => {
             radarVisible = !radarVisible;
@@ -271,13 +183,11 @@ export function createPrecipController(map) {
             }
         });
 
-        // Bouton play/pause.
         el.querySelector('.precip-play-btn')?.addEventListener('click', async () => {
             await _ensureInit();
             if (playing) _pause(); else _play();
         });
 
-        // Slider temporel.
         const slider = el.querySelector('.precip-slider');
         slider?.addEventListener('input', () => {
             _pause();
@@ -293,8 +203,6 @@ export function createPrecipController(map) {
         _updateFrameLabel();
     }
 
-    // ---- API publique du contrôleur ----
-
     return {
         mountControls,
         async toggleRadar(on) {
@@ -308,9 +216,9 @@ export function createPrecipController(map) {
                 _removeRadarLayer();
             }
         },
-        /** Pré-charge le manifeste (non bloquant, appelé au chargement du panneau). */
+
         preload() { return _ensureInit().then(_syncSliderMax); },
-        /** Détruit le contrôleur : stoppe l'animation et retire les couches. */
+
         destroy() {
             _pause();
             _removeRadarLayer();

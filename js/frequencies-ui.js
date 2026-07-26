@@ -1,25 +1,8 @@
-/* ================================================================
- * FREQUENCIES UI — Affichage des fréquences radio du terrain
- * ================================================================
- *
- * Affiche les fréquences radio (Tour, Sol, ATIS, Approche...) du
- * terrain courant, issues d'OpenAIP. Le widget s'affiche sous le
- * widget performance décollage.
- *
- * Les fréquences sont disponibles après enrichissement OpenAIP. Si
- * l'enrichissement n'a pas eu lieu (offline, API HS), le widget reste
- * masqué.
- * ================================================================ */
-
 import { state, escapeHtml } from './core.js';
 import { getAirportByICAO } from './ui-module.js';
 import { fetchAtis, getVacLink } from './atc-info.js';
 import { makeCollapsible } from './collapsible.js';
 
-/**
- * Affiche/masque le widget fréquences pour le terrain courant.
- * @param {string|null} icao Code OACI (null = masquer).
- */
 export async function showFrequenciesWidget(icao) {
     const container = document.getElementById('frequencies-widget');
     if (!container) return;
@@ -32,41 +15,33 @@ export async function showFrequenciesWidget(icao) {
     const apt = getAirportByICAO(icao);
     const hasFreqs = apt && Array.isArray(apt.frequencies) && apt.frequencies.length > 0;
 
-    // Lien VAC officiel (peut être null si le pays n'est pas reconnu).
     const vac = getVacLink(icao);
 
     if (!hasFreqs && !vac) {
-        // Ni fréquences, ni VAC → on masque.
+
         container.style.display = 'none';
         return;
     }
 
     const isFr = state.lang === 'fr';
-    // Prépare le panel repliable et rend dans le body.
+
     const body = makeCollapsible(container, isFr ? 'Fréquences & info terrain' : 'Frequencies & airfield info', 'radio-tower');
 
-    // Affiche immédiatement les fréquences + VAC, puis complète l'ATIS
-    // en arrière-plan (non bloquant).
     render(body, apt, vac, null, isFr);
     container.style.display = 'block';
 
-    // Récupère l'ATIS en arrière-plan.
     const atis = await fetchAtis(icao);
     if (atis) {
         render(body, apt, vac, atis, isFr);
     }
 }
 
-/**
- * Génère le HTML du widget (fréquences + ATIS + lien VAC).
- */
 function render(container, apt, vac, atis, isFr) {
-    // Sépare les fréquences principales des secondaires.
+
     const freqs = apt?.frequencies || [];
     const primary = freqs.filter(f => f.primary);
     const others = freqs.filter(f => !f.primary);
 
-    // Construit les lignes de fréquences.
     const freqRow = (f) => {
         const isPrimary = f.primary;
         const freqStr = f.freq.toFixed(3);
@@ -82,7 +57,6 @@ function render(container, apt, vac, atis, isFr) {
         <span>${isFr ? 'Fréquences & info terrain' : 'Frequencies & airfield info'}</span>
     </div>`;
 
-    // ATIS (si disponible).
     if (atis?.raw) {
         html += `<div style="margin-bottom:8px; padding:8px 10px; background:rgba(45,212,191,0.08); border:1px solid rgba(45,212,191,0.25); border-radius:6px;">
             <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
@@ -93,21 +67,18 @@ function render(container, apt, vac, atis, isFr) {
         </div>`;
     }
 
-    // Fréquences principales (Tour) en premier si elles existent.
     if (primary.length > 0) {
         html += `<div style="display:flex; flex-direction:column; gap:5px; margin-bottom:${others.length > 0 ? '8px' : '0'};">`;
         primary.forEach(f => { html += freqRow(f); });
         html += `</div>`;
     }
 
-    // Autres fréquences.
     if (others.length > 0) {
         html += `<div style="display:flex; flex-direction:column; gap:5px;">`;
         others.forEach(f => { html += freqRow(f); });
         html += `</div>`;
     }
 
-    // Lien vers le portail AIP officiel du pays (eAIP).
     if (vac) {
         html += `<a href="${escapeHtml(vac.url)}" target="_blank" rel="noopener noreferrer"
             style="display:flex; align-items:center; gap:8px; margin-top:8px; padding:8px 12px; background:rgba(56,189,248,0.08); border:1px solid rgba(56,189,248,0.25); border-radius:6px; text-decoration:none; color:var(--primary); font-size:12px; font-weight:600; transition:background 0.15s;"

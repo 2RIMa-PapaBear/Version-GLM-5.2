@@ -1,55 +1,23 @@
-/* ================================================================
- * PRESSURE TREND — Tendance de pression QNH (3h)
- * ================================================================
- *
- * CONTEXTE MÉTÉOROLOGIQUE
- * -----------------------
- * La pression atmosphérique au niveau de la mer (QNH) est l'un des
- * meilleurs indicateurs de l'évolution du temps :
- *
- *   QNH STABLE ou EN HAUSSE  → temps stable, dorsale, conditions VFR qui durent.
- *   QNH EN BAISSE RAPIDE     → dégradation imminente : arrivée d'une perturbation,
- *                              d'un thalweg, d'un front. Le vent forcit, le plafond
- *                              et la visibilité vont se dégrader.
- *
- * Règle empirique du pilote :
- *   - Chute > 1 hPa/h     → surveiller, dégradation probable.
- *   - Chute > 2 hPa/h     → dégradation significative imminente.
- *   - Chute > 3 hPa/h     → alerte forte (dépression profonde, vent fort).
- *
- * IMPLÉMENTATION
- * --------------
- * On récupère l'historique des METARs (4 dernières heures) via l'API
- * AviationWeather et on calcule la pente du QNH entre le plus ancien
- * et le plus récent. Le résultat alimente la bannière GO/NO-GO.
- * ================================================================ */
-
 import { state, I18N, fetchAvecRelais } from './core.js';
 
-/**
- * Récupère l'historique des METARs pour un terrain et calcule la tendance QNH.
- * @param {string} icao Code OACI.
- * @returns {Promise<{trendHpaPerHour: number, deltaHpa: number, hoursSpan: number, currentQnh: number, oldestQnh: number}|null>}
- */
 export async function fetchPressureTrend(icao) {
     if (!icao) return null;
     try {
-        // hours=4 : on récupère les METARs des 4 dernières heures.
+
         const url = `https://aviationweather.gov/api/data/metar?ids=${icao}&hours=4&format=json&_t=${Date.now()}`;
         const data = await fetchAvecRelais(url, 'json');
         if (!Array.isArray(data) || data.length < 2) return null;
 
-        // Extrait les QNH et heures d'observation, triés du plus ancien au plus récent.
         const points = data
             .map(m => {
-                // Le QNH est dans rawOb (ex: "Q1013") ou obsTime.
+
                 const raw = m.rawOb || m.rawMetar || m.rawText || '';
                 const qnhMatch = raw.match(/\bQ(\d{4})\b/);
                 const inHgMatch = raw.match(/\bA(\d{4})\b/);
                 let qnh = null;
                 if (qnhMatch) qnh = parseInt(qnhMatch[1], 10);
                 else if (inHgMatch) qnh = Math.round(parseInt(inHgMatch[1], 10) / 100 * 33.8639);
-                // Heure d'observation : observeTime (ISO) ou extraction depuis rawOb.
+
                 let obsTime = m.observeTime ? new Date(m.observeTime) : null;
                 if (!obsTime || isNaN(obsTime)) {
                     const timeMatch = raw.match(/\b(\d{2})(\d{2})(\d{2})Z\b/);
@@ -70,7 +38,7 @@ export async function fetchPressureTrend(icao) {
         const newest = points[points.length - 1];
         const deltaHpa = newest.qnh - oldest.qnh;
         const hoursSpan = (newest.time - oldest.time) / 3600000;
-        if (hoursSpan < 0.5) return null; // pas assez de recul
+        if (hoursSpan < 0.5) return null;
 
         const trendHpaPerHour = deltaHpa / hoursSpan;
 
@@ -87,17 +55,11 @@ export async function fetchPressureTrend(icao) {
     }
 }
 
-/**
- * Évalue la tendance et retourne un message d'alerte si pertinent.
- * @param {Object} trend Résultat de fetchPressureTrend.
- * @returns {{level: 'ok'|'caution'|'danger', icon: string, message: string}|null}
- */
 export function evaluatePressureTrend(trend) {
     if (!trend || trend.trendHpaPerHour == null) return null;
     const isFr = state.lang === 'fr';
     const rate = trend.trendHpaPerHour;
 
-    // Hausse : temps qui se stabilise ou s'améliore.
     if (rate > 0.5) {
         return {
             level: 'ok',
@@ -108,7 +70,6 @@ export function evaluatePressureTrend(trend) {
         };
     }
 
-    // Baisse.
     const absRate = Math.abs(rate);
     if (absRate >= 3) {
         return {

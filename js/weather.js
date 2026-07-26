@@ -1,7 +1,3 @@
-/* ================================================================
- * WEATHER — Alertes météo : parsing, affichage, seuils
- * ================================================================ */
-
 import { I18N, parseVisiToMeters, getCeiling, findActiveValueAtHour } from './core.js';
 import { state } from './core.js';
 import { parseWindString } from './engine.js';
@@ -18,7 +14,7 @@ export const DEFAULT_THRESHOLDS = {
 };
 
 export function getThresholds() {
-    let th = JSON.parse(JSON.stringify(DEFAULT_THRESHOLDS)); 
+    let th = JSON.parse(JSON.stringify(DEFAULT_THRESHOLDS));
     try {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved && saved !== 'undefined') {
@@ -64,7 +60,7 @@ function _unlockBodyScroll() {
 export function openThresholdsModal() {
     const tr = I18N[state.lang] || {};
     const th = getThresholds();
-    
+
     const existing = document.getElementById('thresholds-modal');
     if (existing) existing.remove();
 
@@ -179,7 +175,7 @@ export function openThresholdsModal() {
             </div>
         </div>
     `;
-    
+
     document.body.appendChild(modal);
     if (window.lucide) window.lucide.createIcons({ root: modal });
 
@@ -215,11 +211,11 @@ export function openThresholdsModal() {
     modal.addEventListener('click', (e) => {
         if (e.target === modal) closeModal();
     });
-    
+
     document.getElementById('btn-reset-th').addEventListener('click', () => {
         saveThresholds(DEFAULT_THRESHOLDS);
         closeModal();
-        openThresholdsModal(); 
+        openThresholdsModal();
     });
 
     document.getElementById('btn-save-th').addEventListener('click', () => {
@@ -271,7 +267,7 @@ function _buildAlertsFromValues(v) {
     const th = getThresholds();
     const tr = I18N[state.lang] || {};
     const alerts = [];
-    
+
     const txtPlafondCritique = tr.alertCeilingDang || 'Plafond critique';
     const txtPlafondBas = tr.alertCeilingWarn || 'Plafond bas';
     const txtVisiCritique = tr.alertVisiDang || 'Visibilité critique';
@@ -285,22 +281,22 @@ function _buildAlertsFromValues(v) {
         if (v.ceiling <= th.ceiling.danger) alerts.push({ category:'ceiling', level:'danger', icon:'arrow-down', title: txtPlafondCritique, value:v.ceiling });
         else if (v.ceiling <= th.ceiling.warning) alerts.push({ category:'ceiling', level:'warning', icon:'cloud', title: txtPlafondBas, value:v.ceiling });
     }
-    
+
     if (th.visibility.enabled && v.visi !== null) {
         if (v.visi <= th.visibility.danger) alerts.push({ category:'visibility', level:'danger', icon:'eye-off', title: txtVisiCritique, value:v.visi });
         else if (v.visi <= th.visibility.warning) alerts.push({ category:'visibility', level:'warning', icon:'eye-off', title: txtVisiBasse, value:v.visi });
     }
-    
+
     if (th.wind.enabled && v.windSpd !== null) {
         if (v.windSpd >= th.wind.danger) alerts.push({ category:'wind', level:'danger', icon:'wind', title: txtVentCritique, value:v.windSpd });
         else if (v.windSpd >= th.wind.warning) alerts.push({ category:'wind', level:'warning', icon:'wind', title: txtVentFort, value:v.windSpd });
     }
-    
+
     if (th.gusts.enabled && v.windGust !== null) {
         if (v.windGust >= th.gusts.danger) alerts.push({ category:'gusts', level:'danger', icon:'wind', title: txtRafalesCritiques, value:v.windGust });
         else if (v.windGust >= th.gusts.warning) alerts.push({ category:'gusts', level:'warning', icon:'wind', title: txtRafalesFortes, value:v.windGust });
     }
-    
+
     const txtOrage = tr.alertThunderstorm || 'Orage';
     const txtCb = tr.alertCumulonimbus || 'Cumulonimbus';
     const txtTcu = tr.alertToweringCu || 'Towering Cumulus';
@@ -312,7 +308,7 @@ function _buildAlertsFromValues(v) {
     if (v.tcu) alerts.push({ category:'phenomenon', level:'warning', icon:'cloud', title: txtTcu, value:'TCU' });
     if (v.gr) alerts.push({ category:'phenomenon', level:'danger', icon:'cloud-snow', title: txtGrele, value:'GR' });
     if (v.fz) alerts.push({ category:'phenomenon', level:'warning', icon:'snowflake', title: txtGivrage, value:'FZ' });
-    
+
     return alerts;
 }
 
@@ -321,14 +317,14 @@ export function analyzeWeatherAlerts(input) {
     if (!text) return [];
 
     const v = { windSpd: null, windGust: null, visi: null, ceiling: null, cb: false, tcu: false, ts: false, gr: false, fz: false };
-    
+
     const windMatch = text.match(/\b(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?KT\b/);
     if (windMatch) { v.windSpd = parseInt(windMatch[2]); if (windMatch[3]) v.windGust = parseInt(windMatch[3]); }
-    
+
     const visiMatch = text.match(/KT(?:\s+\d{3}V\d{3})?\s+(\d{4})\b/);
     if (visiMatch) v.visi = parseInt(visiMatch[1]) === 9999 ? 10000 : parseInt(visiMatch[1]);
     else { const visiSM = text.match(/\b(\d+(?:\/\d+)?)SM\b/); if (visiSM) v.visi = Math.round((visiSM[1].includes('/') ? parseFloat(visiSM[1].split('/')[0]) / parseFloat(visiSM[1].split('/')[1]) : parseFloat(visiSM[1])) * 1609); }
-    
+
     const cloudMatches = [...text.matchAll(/\b(FEW|SCT|BKN|OVC)(\d{3})/g)];
     let lowestCeiling = null;
     cloudMatches.forEach(m => {
@@ -336,10 +332,10 @@ export function analyzeWeatherAlerts(input) {
         if ((type === 'BKN' || type === 'OVC') && (lowestCeiling === null || altFt < lowestCeiling)) lowestCeiling = altFt;
     });
     if (lowestCeiling !== null) v.ceiling = lowestCeiling;
-    
+
     const vvMatch = text.match(/\bVV(\d{3})\b/);
     if (vvMatch) { const vvFt = parseInt(vvMatch[1]) * 100; if (v.ceiling === null || vvFt < v.ceiling) v.ceiling = vvFt; }
-    
+
     const afterTimeMatch = text.match(/\d{6}Z\s+(.*)/);
     const weatherText = afterTimeMatch ? afterTimeMatch[1] : text;
 
@@ -349,13 +345,13 @@ export function analyzeWeatherAlerts(input) {
     if (/\bTS\b|\b\+?TSRA\b|\bVCTS\b/.test(weatherText)) v.ts = true;
     if (/\bGR\b/.test(weatherText)) v.gr = true;
     if (/\bFZ/.test(weatherText)) v.fz = true;
-    
+
     return _buildAlertsFromValues(v);
 }
 
 export function analyzeForecastAlerts(parsedData, targetHour) {
     if (!parsedData || targetHour == null) return [];
-    
+
     const getBase = (arr) => findActiveValueAtHour(arr, targetHour) || '';
 
     const base = parsedData.base || {};
@@ -454,7 +450,7 @@ export function displayWeatherAlerts(rawText, parsedData = null, targetHour = nu
 
     container.innerHTML = html;
     if (window.lucide) window.lucide.createIcons({ root: container });
-    
+
     const btn = document.getElementById('btn-config-alerts');
     if (btn) btn.addEventListener('click', openThresholdsModal);
 }

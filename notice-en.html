@@ -363,8 +363,8 @@
 <h3>Raw Message Editor</h3>
 <p>The editor area displays the raw METAR/TAF message with <strong>syntax highlighting</strong>. You can edit it manually — the display updates in real time.</p>
 
-<h3>Dashboard (3 cells)</h3>
-<p>Below the search bar, three cells appear automatically:</p>
+<h3>Dashboard</h3>
+<p>Below the search bar, the dashboard appears automatically:</p>
 <table>
 <thead><tr><th>Cell</th><th>Description</th></tr></thead>
 <tbody>
@@ -373,6 +373,21 @@
 <tr><td><strong>🟢 GO / NO-GO</strong></td><td>Synthetic flight decision verdict (see "Decision Support").</td></tr>
 </tbody>
 </table>
+
+<h3>Decoded-data widgets</h3>
+<p>Below the dashboard, a row of 4 widgets shows the key data at a glance:</p>
+<table>
+<thead><tr><th>Widget</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><strong>🌬️ Wind</strong></td><td>Direction (with an arrow pointing where the wind comes from), strength colored by range, gusts, variation.</td></tr>
+<tr><td><strong>👁️ Visibility & Ceiling</strong></td><td>Values colored by flight category (green = VFR, red = LIFR).</td></tr>
+<tr><td><strong>🌡️ Temperature & Dew point</strong></td><td>T, Td, spread + <strong>icing risk</strong> pill (🟢/🟡/🔴) computed from temperature, humidity and freezing level.</td></tr>
+<tr><td><strong>⏱️ Pressure (QNH)</strong></td><td>QNH in hPa (+ inHg if present).</td></tr>
+</tbody>
+</table>
+
+<h3>Weather model comparison</h3>
+<p>Below the widgets, a panel compares forecasts from <strong>3 global models</strong> (ECMWF / GFS / ICON) on wind at H+3. When models diverge, a "High uncertainty" warning is shown — useful to gauge forecast reliability.</p>
 
 <h3>Favorites and History</h3>
 <ul>
@@ -475,13 +490,15 @@
 <table>
 <thead><tr><th>Layer</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td>Base map</td><td>Satellite imagery (Esri)</td></tr>
+<tr><td>🗺️ Base map</td><td>4-base selector: Satellite (Esri), Map (OpenStreetMap), Dark (CARTO), Terrain (OpenTopoMap)</td></tr>
 <tr><td>🟦 Radar</td><td>Real-time precipitation (RainViewer). Play/pause button to animate the past hours; time slider to scrub through frames.</td></tr>
+<tr><td>☁️ Clouds</td><td>Cloud cover as isolines (Open-Meteo + d3-contour): curved colored contours by range (clear → dense overcast). Hover shows the octas label (e.g. "Scattered clouds — 2/8").</td></tr>
 <tr><td>🟡 Current airfield</td><td>Yellow center marker</td></tr>
 <tr><td>Runways</td><td>Runway outlines colored by surface (green = grass, gray = concrete, ochre = dirt)</td></tr>
 <tr><td>Nearby airfields</td><td>Up to 25 surrounding fields with VFR/MVFR/IFR/LIFR colored markers</td></tr>
 <tr><td>🛩️ PIREPs</td><td>Pilot reports (turbulence, icing) in the area</td></tr>
-<tr><td>Airspaces</td><td>CTR, TMA, ATZ, ICAO classes — click a zone to highlight it</td></tr>
+<tr><td>🛡️ Airspaces</td><td>CTR, TMA, ATZ, ICAO classes — click a zone to highlight it</td></tr>
+<tr><td>🔺 SIGMET/AIRMET</td><td>Colored polygons by hazard (red = thunderstorms, blue = icing, orange = turbulence). Enable the "SIGMET" layer.</td></tr>
 </tbody>
 </table>
 <p><strong>Value</strong>: if nearby fields drop to MVFR/IFR, beware — the weather is closing in. Click a marker to load that airfield.</p>
@@ -489,6 +506,7 @@
 
 <h3>SIGMET / AIRMET</h3>
 <p>Detection of active <strong>SIGMETs</strong> (hazardous phenomena: thunderstorms, severe icing, turbulence) and <strong>AIRMETs</strong> (moderate) near your airfield. Feeds directly into the GO / NO-GO banner.</p>
+<p>SIGMETs/AIRMETs are now <strong>plotted on the map</strong>: colored polygons by hazard type (red = thunderstorms, blue = icing, orange = turbulence…). Enable the "SIGMET" layer in the map toolbar. Click a zone to display the raw message.</p>
 
 <h3>Icing Level</h3>
 <p>Retrieves the <strong>freezing level</strong> (0°C isotherm) from Open-Meteo and evaluates icing risk if clouds extend above it.</p>
@@ -512,11 +530,12 @@
 <h3>Flight Planner</h3>
 <p>Enter your departure airfield in the regional map ("Departure") to compute:</p>
 <ul>
-<li><strong>Great-circle distance</strong> and true/magnetic course (automatic declination)</li>
+<li><strong>Great-circle distance</strong> and true/magnetic course (declination computed locally via the WMM model, network-independent)</li>
 <li><strong>Surface and cruise wind</strong> (Open-Meteo)</li>
 <li><strong>Ground speed and estimated time en route</strong> (ETA)</li>
 <li><strong>Estimated fuel + legal reserves</strong> (day/night VFR)</li>
 </ul>
+<p><strong>Multi-waypoint</strong>: the "Waypoints (optional)" field lets you enter one or more intermediate stops (ICAO codes separated by spaces, e.g. "LFPB LFOB"). The computation then runs as multi-leg: aggregated distance/fuel/time, concatenated elevation profile, and a multi-point polyline drawn on the map.</p>
 
 <h3>Route Weather</h3>
 <p>Displays flight-category markers for airfields along your route, to anticipate possible en-route deterioration.</p>
@@ -530,8 +549,8 @@
 <h3>Radio Frequencies Widget</h3>
 <p>For each airfield enriched via OpenAIP, a panel displays the available <strong>radio frequencies</strong>: Tower, Ground, ATIS, Approach, etc.</p>
 
-<h3>Decoded ATIS</h3>
-<p>When the airfield publishes an <strong>ATIS</strong> (Automatic Terminal Information Service), the decoded message appears in the frequencies widget.</p>
+<h3>ATIS Frequency</h3>
+<p>The <strong>ATIS frequency</strong> (Automatic Terminal Information Service) is shown in the frequencies widget when available via OpenAIP. The raw ATIS message is no longer fetched (the corresponding AviationWeather endpoint was removed in 2025) — to hear the message, tune the indicated frequency.</p>
 
 <h3>Official VAC Links</h3>
 <p>A button redirects to the country's <strong>official AIP portal</strong> (FAA for the USA, NATS for the UK, DFS for Germany…) to consult the visual approach chart (VAC).</p>
@@ -547,9 +566,6 @@
 
 <h3>Audio Read-Aloud</h3>
 <p>The 🔊 button reads the METAR aloud (browser speech synthesis), ATIS-style.</p>
-
-<h3>Briefing PDF</h3>
-<p>The "Briefing PDF" button generates a <strong>printable PDF document</strong> containing: airfield header, raw METAR/TAF, flight category, wind, visibility, ceiling, QNH, best runway, day window, alerts and takeoff distances.</p>
 
 <h3>Share by Link</h3>
 <p>The 🔗 button generates a <strong>permalink</strong> containing the airfield, raw message and arrival time. A QR code lets you open it on mobile.</p>
@@ -1610,7 +1626,12 @@ TEMPO 0912 SHRA
 - ✅ Computes the <strong>day VFR flight window</strong> and alerts on aero night
 - ✅ <strong>Regional map</strong>: precipitation radar + nearby categories + PIREPs
 - ✅ <strong>Alternates comparator</strong> and route weather (Navigation mode)
-- ✅ Generates a printable, shareable <strong>Briefing PDF</strong></p>
+- ✅ <strong>Decoded-data widgets</strong>: wind, visibility/ceiling, temperature/icing, QNH
+- ✅ <strong>SIGMET/AIRMET mapped</strong> on the map (colored polygons by hazard)
+- ✅ <strong>Cloud-cover layer</strong> (isolines in octas, via Open-Meteo + d3-contour)
+- ✅ <strong>Model comparison</strong> (ECMWF / GFS / ICON)
+- ✅ <strong>Multi-waypoint</strong> flight planner
+- ✅ <strong>Magnetic declination</strong> computed locally (WMM model, network-independent)</p>
 <p><strong>What the tool does NOT do (yet)</strong> :
 - ❌ Does not replace the official weather briefing
 - ❌ Does not make decisions for you (the verdict is an aid, not an order)

@@ -1,49 +1,8 @@
-/* ================================================================
- * PERMALINK — Partage d'état par URL + QR code
- * ================================================================
- *
- * OBJECTIF
- * --------
- * Permettre au pilote de partager un briefing précis : "regarde la
- * météo de LFPG à 14h30 en mode navigation". Au lieu d'expliquer
- * comment configurer l'app, on génère une URL qui encode l'état, et
- * un QR code scannable depuis le tableau d'affichage du club.
- *
- * FORMAT
- * ------
- * L'URL utilise des paramètres de recherche standard :
- *   ?icao=LFPG&taf=1&t=14.5&mode=nav
- *
- *   - icao : code OACI du terrain à charger.
- *   - taf  : 1 pour TAF, absent = METAR.
- *   - t    : heure d'arrivée (HPP) en heures décimales.
- *   - mode : 'nav' ou 'local'.
- *
- * Au chargement de l'app, si ces paramètres existent, on les applique
- * AVANT le premier rendu pour éviter un flash.
- *
- * QR CODE
- * -------
- * Généré en canvas pur, sans dépendance. Implémentation minimale d'un
- * encodeur QR (niveau L, version automatique). Pour rester léger, on
- * utilise une approche simple adaptée aux URLs courtes (< 100 cars).
- *
- * NB : un vrai encodeur QR complet est complexe ; pour ne pas alourdir
- * l'app, on propose le lien copiable + un QR via une API publique de
- * génération (api.qrserver.com) qui ne nécessite pas de clé et qui
- * fonctionne en <img> simple. Le QR est chargé comme image, pas de
- * logique de dessin.
- * ================================================================ */
-
 import { state } from './core.js';
 
-/**
- * Construit l'URL de partage à partir de l'état courant.
- * @returns {string} URL complète avec paramètres.
- */
 export function buildPermalink() {
     const url = new URL(window.location.href);
-    url.search = '';  // nettoie les anciens params.
+    url.search = '';
 
     const icao = state.requestedIcao;
     if (icao) {
@@ -61,10 +20,6 @@ export function buildPermalink() {
     return url.toString();
 }
 
-/**
- * Lit les paramètres de l'URL courante.
- * @returns {{icao:string|null, taf:boolean, t:number|null, mode:'local'|'nav'|null}}
- */
 export function readPermalink() {
     const params = new URLSearchParams(window.location.search);
     return {
@@ -75,39 +30,22 @@ export function readPermalink() {
     };
 }
 
-/**
- * Indique si l'URL courante contient des paramètres de permalink.
- * @returns {boolean}
- */
 export function hasPermalink() {
     return new URLSearchParams(window.location.search).has('icao');
 }
 
-/**
- * Construit l'URL d'un QR code pour une URL donnée.
- * Utilise api.qrserver.com (gratuit, sans clé, renvoie une image).
- * @param {string} url URL à encoder.
- * @param {number} [size=200] Taille en pixels.
- * @returns {string} URL de l'image QR.
- */
 export function buildQrImageUrl(url, size = 200) {
     return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(url)}`;
 }
 
-/**
- * Copie un texte dans le presse-papier (avec fallback navigateur).
- * @param {string} text
- * @returns {Promise<boolean>} true si réussi.
- */
 export async function copyToClipboard(text) {
     try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
             await navigator.clipboard.writeText(text);
             return true;
         }
-    } catch { /* fallback */ }
+    } catch {   }
 
-    // Fallback : méthode dépréciée mais robuste.
     try {
         const ta = document.createElement('textarea');
         ta.value = text;
@@ -123,15 +61,11 @@ export async function copyToClipboard(text) {
     }
 }
 
-/**
- * Ouvre le modal de partage (URL copiable + QR code).
- */
 export function openShareModal() {
     const isFr = state.lang === 'fr';
     const url = buildPermalink();
     const qrUrl = buildQrImageUrl(url, 220);
 
-    // Ferme un éventuel modal existant.
     closeShareModal();
 
     const overlay = document.createElement('div');
@@ -174,13 +108,11 @@ export function openShareModal() {
     `;
     document.body.appendChild(overlay);
 
-    // Fermeture au clic sur l'overlay.
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) closeShareModal();
     });
     overlay.querySelector('#share-close')?.addEventListener('click', closeShareModal);
 
-    // Copie.
     overlay.querySelector('#share-copy-btn')?.addEventListener('click', async () => {
         const ok = await copyToClipboard(url);
         const btn = overlay.querySelector('#share-copy-btn');
@@ -198,9 +130,6 @@ export function openShareModal() {
     if (window.lucide) window.lucide.createIcons({ root: overlay });
 }
 
-/**
- * Ferme le modal de partage.
- */
 export function closeShareModal() {
     const existing = document.getElementById('share-overlay');
     if (existing) existing.remove();

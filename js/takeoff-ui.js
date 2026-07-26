@@ -1,17 +1,3 @@
-/* ================================================================
- * TAKEOFF UI — Widget performance décollage
- * ================================================================
- *
- * Affiche un panneau compact sous le GO/NO-GO qui présente :
- *   - la distance de décollage corrigée (roulement + franchissement 50ft),
- *   - un champ pour saisir la longueur de piste du terrain (persistée),
- *   - une barre de marge visuelle (roulement / 50ft vs piste disponible).
- *
- * Le widget n'apparaît que si la densité-altitude est calculable
- * (i.e. on a l'élévation + QNH + OAT). La saisie de la longueur de piste
- * est optionnelle mais débloque le verdict de marge.
- * ================================================================ */
-
 import { state, escapeHtml } from './core.js';
 import { makeCollapsible } from './collapsible.js';
 import {
@@ -22,10 +8,6 @@ import { getFleet, getActiveAircraftId, setActiveAircraft } from './aircraft-fle
 import { openFleetManager } from './fleet-ui.js';
 import { getActiveRunwaySurfaceInfo, surfaceLabel, isSoftSurface } from './runway-surface.js';
 
-/**
- * Affiche/masque le widget takeoff pour le terrain courant.
- * @param {string|null} icao Code OACI (null = masquer).
- */
 export function showTakeoffWidget(icao) {
     const container = document.getElementById('takeoff-widget');
     if (!container) return;
@@ -44,7 +26,6 @@ export function showTakeoffWidget(icao) {
     const isFr = state.lang === 'fr';
     const body = makeCollapsible(container, isFr ? 'Performance décollage' : 'Takeoff performance', 'plane-takeoff');
 
-    // Injecte le bouton « Flotte » dans le header repliable (avant le chevron).
     const header = container.querySelector('.collapsible-header');
     if (header && !header.querySelector('#to-fleet-btn')) {
         const lblManage = isFr ? 'Gérer la flotte' : 'Manage fleet';
@@ -54,7 +35,7 @@ export function showTakeoffWidget(icao) {
         fleetBtn.title = lblManage;
         fleetBtn.style.cssText = 'background:none; border:1px solid var(--border-color); color:var(--text-muted); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer; display:flex; align-items:center; gap:4px; margin-left:auto; margin-right:8px;';
         fleetBtn.innerHTML = `<i data-lucide="plane" style="width:13px;height:13px;"></i> ${isFr ? 'Flotte' : 'Fleet'}`;
-        // Empêche le clic sur le bouton de toggle le panel.
+
         fleetBtn.addEventListener('click', (e) => e.stopPropagation());
         header.appendChild(fleetBtn);
         if (window.lucide) window.lucide.createIcons({ root: header });
@@ -64,15 +45,10 @@ export function showTakeoffWidget(icao) {
     container.style.display = 'block';
 }
 
-// Facteur de conversion pied → mètre.
 const FT_TO_M = 0.3048;
 
-/** Convertit pieds en mètres, arrondi à l'entier. */
 function ftToM(ft) { return Math.round(ft * FT_TO_M); }
 
-/**
- * Génère le HTML du widget.
- */
 function render(container, r, icao) {
     const isFr = state.lang === 'fr';
 
@@ -83,20 +59,17 @@ function render(container, r, icao) {
     const lblMargin = isFr ? 'Marge' : 'Margin';
     const lblAcRef = isFr ? 'Réf. avion' : 'A/C ref';
     const ref = getAircraftRef();
-    // Piste active selon la rose des vents (null si non définie).
+
     const activeRwy = getActiveRunwayNameForIcao(icao);
-    // Revêtement de la piste active.
+
     const surfInfo = getActiveRunwaySurfaceInfo(icao);
     const surfSoft = surfInfo ? isSoftSurface(surfInfo.code) : false;
 
-    // Liste des avions pour le sélecteur.
     const fleet = getFleet();
     const activeId = getActiveAircraftId();
     const lblManage = isFr ? 'Gérer la flotte' : 'Manage fleet';
     const lblAircraft = isFr ? 'Avion' : 'Aircraft';
 
-    // Barre visuelle de marge (si longueur de piste connue).
-    // Les pourcentages restent en unités internes (ft) — c'est un ratio.
     let barHtml = '';
     if (r.runwayLength != null) {
         const rollPct = Math.min(100, (r.groundRoll / r.runwayLength) * 100);
@@ -116,7 +89,7 @@ function render(container, r, icao) {
     }
 
     const marginColor = r.level === 'danger' ? '#EF4444' : (r.level === 'caution' ? '#F59E0B' : '#10B981');
-    // Longueur de piste affichée en mètres (conversion depuis le stockage en ft).
+
     const rwyLenM = r.runwayLength != null ? ftToM(r.runwayLength) : null;
 
     container.innerHTML = `
@@ -181,7 +154,6 @@ function render(container, r, icao) {
         </div>
     `;
 
-    // Sélecteur d'avion : change l'avion actif et rafraîchit.
     const acSelect = container.querySelector('#to-aircraft-select');
     if (acSelect) {
         acSelect.addEventListener('change', () => {
@@ -194,13 +166,11 @@ function render(container, r, icao) {
         });
     }
 
-    // Bouton « Flotte » : ouvre le modal de gestion.
-    // Le bouton est dans le header repliable (parent du body), pas dans le body lui-même.
     const fleetBtn = container.closest('.collapsible-panel')?.querySelector('#to-fleet-btn');
     if (fleetBtn) {
         fleetBtn.addEventListener('click', () => {
             openFleetManager(() => {
-                // Au retour : rafraîchit le widget + dashboard.
+
                 showTakeoffWidget(icao);
                 if (state.refreshCallback) {
                     state.lastRenderState = null;
