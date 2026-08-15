@@ -51,7 +51,7 @@ export async function fetchPireps(lat, lon, radiusDeg = 3) {
 
     try {
         // Endpoint AviationWeather aircraftrep : PIREPs récents (24h).
-        const url = `https://aviationweather.gov/api/data/aircraftrep?format=json&_t=${Date.now()}`;
+        const url = `https://aviationweather.gov/api/data/aircraftrep?format=json`;
         const data = await fetchAvecRelais(url, 'json');
 
         if (!Array.isArray(data)) return [];

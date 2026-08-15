@@ -35,7 +35,7 @@ export async function fetchPressureTrend(icao) {
     if (!icao) return null;
     try {
         // hours=4 : on récupère les METARs des 4 dernières heures.
-        const url = `https://aviationweather.gov/api/data/metar?ids=${icao}&hours=4&format=json&_t=${Date.now()}`;
+        const url = `https://aviationweather.gov/api/data/metar?ids=${icao}&hours=4&format=json`;
         const data = await fetchAvecRelais(url, 'json');
         if (!Array.isArray(data) || data.length < 2) return null;
 

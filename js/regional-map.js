@@ -367,7 +367,7 @@ async function _loadNeighborCategories(lat, lon) {
         const localAirports = getAirportsInBbox(minLat, minLon, maxLat, maxLon);
 
         // 2. API AviationWeather : METAR des stations de la zone.
-        const stationsUrl = `https://aviationweather.gov/api/data/stationinfo?bbox=${minLat},${minLon},${maxLat},${maxLon}&format=json&_t=${Date.now()}`;
+        const stationsUrl = `https://aviationweather.gov/api/data/stationinfo?bbox=${minLat},${minLon},${maxLat},${maxLon}&format=json`;
         const stations = await fetchAvecRelais(stationsUrl, 'json');
 
         const metarByCode = {};
@@ -379,7 +379,7 @@ async function _loadNeighborCategories(lat, lon) {
 
             if (nearby.length > 0) {
                 const idsStr = nearby.map(s => s.code).join(',');
-                const metarUrl = `https://aviationweather.gov/api/data/metar?ids=${idsStr}&format=json&_t=${Date.now()}`;
+                const metarUrl = `https://aviationweather.gov/api/data/metar?ids=${idsStr}&format=json`;
                 const metars = await fetchAvecRelais(metarUrl, 'json');
                 if (Array.isArray(metars)) {
                     metars.forEach(m => {

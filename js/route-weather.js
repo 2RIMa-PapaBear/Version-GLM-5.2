@@ -74,7 +74,7 @@ async function _loadCorridorMetars(map, fromLat, fromLon, toLat, toLon) {
         const minLon = Math.min(fromLon, toLon) - 1;
         const maxLon = Math.max(fromLon, toLon) + 1;
 
-        const stationsUrl = `https://aviationweather.gov/api/data/stationinfo?bbox=${minLat},${minLon},${maxLat},${maxLon}&format=json&_t=${Date.now()}`;
+        const stationsUrl = `https://aviationweather.gov/api/data/stationinfo?bbox=${minLat},${minLon},${maxLat},${maxLon}&format=json`;
         const stations = await fetchAvecRelais(stationsUrl, 'json');
         if (!Array.isArray(stations)) return;
 
@@ -89,7 +89,7 @@ async function _loadCorridorMetars(map, fromLat, fromLon, toLat, toLon) {
 
         if (corridorStations.length === 0) return;
 
-        const metarUrl = `https://aviationweather.gov/api/data/metar?ids=${corridorStations.map(s => s.icaoId).join(',')}&format=json&_t=${Date.now()}`;
+        const metarUrl = `https://aviationweather.gov/api/data/metar?ids=${corridorStations.map(s => s.icaoId).join(',')}&format=json`;
         const metars = await fetchAvecRelais(metarUrl, 'json');
         if (!Array.isArray(metars)) return;
 
