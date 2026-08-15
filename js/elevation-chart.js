@@ -22,6 +22,7 @@ let _profile = null;
 let _cruiseFt = 0;
 let _fromIcao = '';
 let _toIcao = '';
+let _waypoints = null;        // [{icao, lat, lon}] waypoints intermédiaires (ou null).
 let _hoverFrac = null;       // position du curseur (0-1), null si hors canvas.
 let _zoomMin = null;         // min Y affiché (ft), null = auto.
 let _zoomMax = null;
@@ -37,8 +38,9 @@ let _distTotalKm = 0;
  * @param {number} cruiseAltFt Altitude de croisière (ft).
  * @param {string} fromIcao Code OACI départ.
  * @param {string} toIcao Code OACI destination.
+ * @param {Array|null} waypoints Waypoints intermédiaires [{icao, lat, lon}] pour multi-leg.
  */
-export function renderElevationChart(containerId, profile, cruiseAltFt, fromIcao, toIcao) {
+export function renderElevationChart(containerId, profile, cruiseAltFt, fromIcao, toIcao, waypoints = null) {
     const container = document.getElementById(containerId);
     if (!container || !profile?.points?.length) {
         clearElevationChart(containerId);
@@ -48,6 +50,7 @@ export function renderElevationChart(containerId, profile, cruiseAltFt, fromIcao
     container.style.display = 'block';
     _profile = profile;
     _cruiseFt = cruiseAltFt || 0;
+    _waypoints = (waypoints && waypoints.length > 2) ? waypoints : null;
     _fromIcao = fromIcao || '';
     _toIcao = toIcao || '';
     _zoomMin = null;
@@ -230,6 +233,37 @@ function _draw() {
     _ctx.textAlign = 'right';
     _ctx.fillText(_toIcao, cw - PAD.right - 2, PAD.top + 10);
 
+    // --- Marqueurs waypoints intermédiaires (multi-leg) ---
+    if (_waypoints && _waypoints.length > 2) {
+        for (let i = 1; i < _waypoints.length - 1; i++) {
+            const wp = _waypoints[i];
+            // Trouve le frac du point de profil le plus proche du waypoint.
+            const frac = _findWaypointFrac(wp);
+            if (frac == null) continue;
+            const wx = xOf(frac);
+
+            // Ligne verticale pointillée ambre.
+            _ctx.beginPath();
+            _ctx.setLineDash([3, 3]);
+            _ctx.moveTo(wx, PAD.top);
+            _ctx.lineTo(wx, PAD.top + plotH);
+            _ctx.strokeStyle = 'rgba(251, 191, 36, 0.5)';
+            _ctx.lineWidth = 1;
+            _ctx.stroke();
+            _ctx.setLineDash([]);
+
+            // Point + label ICAO en haut.
+            _ctx.fillStyle = '#FBBF24';
+            _ctx.beginPath();
+            _ctx.arc(wx, PAD.top + 2, 3, 0, Math.PI * 2);
+            _ctx.fill();
+            _ctx.fillStyle = '#FBBF24';
+            _ctx.font = 'bold 9px "DM Mono", monospace';
+            _ctx.textAlign = 'center';
+            _ctx.fillText(wp.icao, wx, PAD.top - 4 > 0 ? PAD.top - 4 : PAD.top + 14);
+        }
+    }
+
     // --- Curseur de survol ---
     if (_hoverFrac != null) {
         const hx = xOf(_hoverFrac);
@@ -303,6 +337,18 @@ function _nearestPoint(frac) {
     for (const p of _profile.points) {
         const d = Math.abs(p.frac - frac);
         if (d < bestD) { bestD = d; best = p; }
+    }
+    return best;
+}
+
+// Trouve le frac du point de profil le plus proche (en lat/lon) d'un waypoint.
+function _findWaypointFrac(wp) {
+    if (!_profile?.points || !wp) return null;
+    let best = null, bestD = Infinity;
+    for (const p of _profile.points) {
+        if (p.lat == null || p.lon == null) continue;
+        const d = _haversineKm(p.lat, p.lon, wp.lat, wp.lon);
+        if (d < bestD) { bestD = d; best = p.frac; }
     }
     return best;
 }

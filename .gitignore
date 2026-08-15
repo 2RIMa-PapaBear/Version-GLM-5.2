@@ -21,3 +21,7 @@ Thumbs.db
 *Copie*
 *.bak
 *.orig
+
+# Builds générés (Tauri / bundler)
+dist/
+src-tauri/target/

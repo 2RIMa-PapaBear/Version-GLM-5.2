@@ -31,7 +31,7 @@
  * TTL 1 heure (les vents évoluent sur cette échelle).
  * ================================================================ */
 
-import { fetchAvecRelais } from './core.js';
+import { fetchOpenMeteo } from './core.js';
 
 const ENDPOINT = 'https://api.open-meteo.com/v1/forecast';
 
@@ -67,7 +67,7 @@ export async function fetchWindsAloft(lat, lon) {
             `&current=${vars}&timezone=auto`;
 
         let data;
-        try { data = await fetchAvecRelais(url, 'json'); } catch { return null; }
+        try { data = await fetchOpenMeteo(url); } catch { return null; }
         if (!data) return null;
 
         const cur = data?.current;

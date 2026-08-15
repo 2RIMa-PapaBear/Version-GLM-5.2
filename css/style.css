@@ -199,7 +199,7 @@ header.card { padding: 20px 24px 18px; position: relative; overflow: hidden; }
 
 #lbl-info { font-weight: 400; color: #bae6fd; margin-top: 6px; display: block; font-size: 0.9rem; border-top: 1px solid var(--border-color); padding-top: 8px;}
 
-.metar-dashboard { display: none; grid-template-columns: 30% 40% 30%; gap: 15px; width: 100%; margin-top: 15px; }
+.metar-dashboard { display: none; grid-template-columns: 1fr 1.3fr 1fr; gap: 15px; width: 100%; margin-top: 15px; }
 .metar-dashboard.visible { display: grid; }
 .dashboard-cell { background: var(--inner-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; min-height: 200px; display: flex; flex-direction: column; }
 .dash-title { font-size: 10px; letter-spacing: 1.5px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 8px; }
@@ -223,13 +223,38 @@ header.card { padding: 20px 24px 18px; position: relative; overflow: hidden; }
 
 .vfr-cat { font-size: 44px; font-weight: 900; letter-spacing: 2px; line-height: 1; text-shadow: 0 2px 4px rgba(0,0,0,0.3); font-family: 'DM Sans', sans-serif; display: flex; align-items: center; }
 
+/* ===== WIDGETS DONNÉES DÉCRYPTÉES ===== */
+.decrypted-widgets { display: none; grid-template-columns: repeat(4, 1fr); gap: 15px; width: 100%; margin-top: 15px; }
+.decrypted-widgets.visible { display: grid; }
+.widget-card { position: relative; overflow: hidden; min-height: 140px; }
+.widget-watermark { position: absolute; right: -10px; bottom: -15px; width: 90px; height: 90px; color: var(--text-color); opacity: 0.06; pointer-events: none; }
+.widget-title { font-size: 10px; letter-spacing: 1.5px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; position: relative; z-index: 1; }
+.widget-title .widget-title-icon { width: 14px; height: 14px; }
+.widget-body { display: flex; flex-direction: column; gap: 8px; position: relative; z-index: 1; flex: 1; }
+.widget-value { font-family: 'DM Mono', monospace; font-size: 22px; font-weight: 600; color: var(--text-color); line-height: 1.2; }
+.widget-value .widget-unit { font-size: 13px; color: var(--text-muted); font-weight: 400; margin-left: 3px; }
+.widget-sub { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--text-muted); }
+.widget-row { display: flex; align-items: center; gap: 8px; }
+.widget-row .widget-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; min-width: 64px; }
+.widget-row .widget-data { font-family: 'DM Mono', monospace; font-size: 14px; color: var(--text-color); }
+.widget-arrow { display: inline-block; transition: transform 0.3s ease; }
+.widget-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.widget-pill .widget-pill-dot { width: 8px; height: 8px; border-radius: 50%; }
+.widget-pill.icing-ok      { background: rgba(74, 222, 128, 0.15);  color: var(--cat-vfr); }
+.widget-pill.icing-ok      .widget-pill-dot { background: var(--cat-vfr); }
+.widget-pill.icing-caution { background: rgba(251, 191, 36, 0.18);  color: #FBBF24; }
+.widget-pill.icing-caution .widget-pill-dot { background: #FBBF24; }
+.widget-pill.icing-danger  { background: rgba(248, 113, 113, 0.18); color: var(--cat-ifr); }
+.widget-pill.icing-danger  .widget-pill-dot { background: var(--cat-ifr); }
+.widget-empty { color: var(--text-dim); font-style: italic; font-size: 13px; }
+@media (max-width: 800px) { .decrypted-widgets { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 500px) { .decrypted-widgets { grid-template-columns: 1fr; } }
+
 .vfr-chip { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.25); padding: 8px 12px; border-radius: var(--radius-sm); font-size: 11px; backdrop-filter: blur(4px); letter-spacing: 0.5px; width: 100%; margin: 0; }
 .vfr-chip-label { color: rgba(255,255,255,0.7); font-weight: 600; text-transform: uppercase; font-size: 10px; }
 .vfr-chip-value { color: #ffffff; font-weight: 700; }
 
 @media (max-width: 800px) { .metar-dashboard { grid-template-columns: 1fr; } }
-
-.dashboard-cell { background: var(--inner-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; min-height: 200px; display: flex; flex-direction: column; }
 
 .dash-alert-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: var(--radius-sm); margin-bottom: 6px; }
 .dash-alert-row.danger { background: rgba(239, 68, 68, 0.12); border-left: 3px solid #EF4444; color: #FCA5A5; }
@@ -1164,6 +1189,21 @@ html.night-mode body::before {
     gap: 6px;
 }
 
+.basemap-select {
+    padding: 5px 8px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-color);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    outline: none;
+}
+.basemap-select:hover { border-color: var(--border-hover); }
+.basemap-select:focus { border-color: var(--focus-ring); }
+
 .precip-toggle {
     display: flex;
     align-items: center;
@@ -1451,6 +1491,27 @@ html.night-mode .precip-play-btn {
 @media (max-width: 600px) {
     .fp-inputs { grid-template-columns: 1fr 1fr; }
     .fp-grid, .fp-grid-3 { grid-template-columns: 1fr; }
+}
+
+/* === Log de navigation (tableau waypoints) === */
+.fp-navlog { width: 100%; border-collapse: collapse; font-family: 'DM Mono', monospace; font-size: 11px; }
+.fp-navlog th {
+    text-transform: uppercase; font-size: 9px; color: var(--text-muted);
+    font-weight: 700; padding: 4px 6px; text-align: right;
+    border-bottom: 1px solid var(--border-color); letter-spacing: 0.5px;
+}
+.fp-navlog th:first-child { text-align: left; }
+.fp-navlog td {
+    padding: 4px 6px; text-align: right;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05); color: var(--text-color);
+}
+.fp-navlog td:first-child { text-align: left; color: var(--text-muted); white-space: nowrap; }
+.fp-navlog td:first-child b { color: var(--text-color); }
+.fp-navlog tr.total td { font-weight: 700; border-top: 1px solid var(--border-color); border-bottom: none; color: var(--primary); }
+.fp-navlog .freq-cell { color: #38BDF8; white-space: nowrap; }
+@media (max-width: 600px) {
+    .fp-navlog { font-size: 10px; }
+    .fp-navlog th, .fp-navlog td { padding: 3px 4px; }
 }
 
 @keyframes spin {

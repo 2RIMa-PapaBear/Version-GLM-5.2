@@ -28,15 +28,16 @@
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="data/airports.json?v=1.44.0" as="fetch" crossorigin>
-    <link rel="modulepreload" href="js/app.js?v=1.44">
+    <link rel="preload" href="data/airports.json?v=1.15.0" as="fetch" crossorigin>
+    <link rel="modulepreload" href="js/app.js?v=1.66">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.8.0/suncalc.min.js"
             integrity="sha384-ZHM8wxIpZLrn5eRq7p0QQvd4+K4Ve51xqJgNw1MqVv329Jntjpjal7C1C4rnZSSx"
             crossorigin="anonymous" defer></script>
-    <script src="vendor/lucide.min.js?v=1.44" defer></script>
+    <script src="vendor/lucide.min.js?v=1.66" defer></script>
+    <script src="vendor/geomag.js?v=1.66" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=1.44">
-    <link rel="stylesheet" href="css/wind-compass-styles.css?v=1.44">
+    <link rel="stylesheet" href="css/style.css?v=1.66">
+    <link rel="stylesheet" href="css/wind-compass-styles.css?v=1.66">
     <script>
         // Anti-flash mode nuit : applique la classe AVANT le premier rendu
         // pour éviter une explosion de lumière blanche destructrice pour la
@@ -138,6 +139,14 @@
             <aside id="go-nogo-banner" class="dashboard-cell go-nogo" role="status" aria-live="polite" aria-atomic="true" style="display:none;"></aside>
             <div id="wind-compass-container" class="dashboard-cell"></div>
             <div id="flight-cat-badge" class="dashboard-cell" role="status" aria-live="polite"></div>
+        </div>
+
+        <!-- Widgets données décryptées (Vent / Visi+Plafond / T°+Td+givrage / QNH) -->
+        <div id="decrypted-widgets" class="decrypted-widgets" hidden>
+            <div id="widget-wind" class="dashboard-cell widget-card" data-icon="wind"></div>
+            <div id="widget-visi" class="dashboard-cell widget-card" data-icon="eye"></div>
+            <div id="widget-temp" class="dashboard-cell widget-card" data-icon="thermometer"></div>
+            <div id="widget-qnh"  class="dashboard-cell widget-card" data-icon="gauge"></div>
         </div>
     </header>
 
@@ -244,9 +253,9 @@
 
 <div id="canvasTooltip" class="canvas-tooltip" role="tooltip"></div>
 
-    <script type="module" src="js/app.js?v=1.44"></script>
-    <script src="vendor/jspdf.umd.min.js?v=1.44" defer></script>
-    <link rel="stylesheet" href="vendor/leaflet.min.css?v=1.44">
-    <script src="vendor/leaflet.min.js?v=1.44" defer></script>
+    <script type="module" src="js/app.js?v=1.66"></script>
+    <script src="vendor/jspdf.umd.min.js?v=1.66" defer></script>
+    <link rel="stylesheet" href="vendor/leaflet.min.css?v=1.66">
+    <script src="vendor/leaflet.min.js?v=1.66" defer></script>
 </body>
 </html>
