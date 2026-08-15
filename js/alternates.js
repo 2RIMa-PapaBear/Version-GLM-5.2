@@ -18,7 +18,7 @@ export async function showAlternates(icao) {
 
     try {
 
-        const stationsUrl = `https://aviationweather.gov/api/data/stationinfo?bbox=${lat - 3},${lon - 3},${lat + 3},${lon + 3}&format=json&_t=${Date.now()}`;
+        const stationsUrl = `https://aviationweather.gov/api/data/stationinfo?bbox=${lat - 3},${lon - 3},${lat + 3},${lon + 3}&format=json`;
         const stations = await fetchAvecRelais(stationsUrl, 'json');
         if (!Array.isArray(stations)) { container.style.display = 'none'; return; }
 
@@ -35,7 +35,7 @@ export async function showAlternates(icao) {
 
         if (nearby.length === 0) { container.style.display = 'none'; return; }
 
-        const metarUrl = `https://aviationweather.gov/api/data/metar?ids=${nearby.map(s => s.code).join(',')}&format=json&_t=${Date.now()}`;
+        const metarUrl = `https://aviationweather.gov/api/data/metar?ids=${nearby.map(s => s.code).join(',')}&format=json`;
         const metars = await fetchAvecRelais(metarUrl, 'json');
         if (!Array.isArray(metars)) { container.style.display = 'none'; return; }
 

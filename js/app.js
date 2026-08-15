@@ -205,7 +205,7 @@ function _chercherNomAeroport(icao, validityStr) {
 
     // Fallback API : code absent de la base locale.
     memoSet(icao, 'PENDING');
-    fetchAvecRelais(`https://aviationweather.gov/api/data/stationinfo?ids=${icao}&format=json&_t=${Date.now()}`, 'json')
+    fetchAvecRelais(`https://aviationweather.gov/api/data/stationinfo?ids=${icao}&format=json`, 'json')
         .then(data => {
             if (data && data.length > 0) {
                 // On capture l'élévation (elev en mètres → convertie en pieds)
@@ -362,7 +362,7 @@ export function telechargerMessage(typeMessage) {
         
         // Nouvelle technique : On demande les 30 TAFs en une seule requête JSON à l'API américaine
         const idsStr = topN.map(st => st.code).join(',');
-        const url = `https://aviationweather.gov/api/data/${typeMessage.toLowerCase()}?ids=${idsStr}&format=json&_t=${Date.now()}`;
+        const url = `https://aviationweather.gov/api/data/${typeMessage.toLowerCase()}?ids=${idsStr}&format=json`;
         
         fetchAvecRelais(url, 'json')
             .then(data => {
@@ -391,8 +391,13 @@ export function telechargerMessage(typeMessage) {
                     nettoyerUI(); state.lastRenderState=null; genererGraphique();
                 }
             })
-            .catch(() => {
-                textarea.value = `${tr.errNetwork} (${codeDemandeInitial})`;
+            .catch((err) => {
+                // Affiche le message précis du relais si disponible (timeout, 504…),
+                // sinon le message réseau générique.
+                const detail = (err && err.message && !err.message.includes('fetch'))
+                    ? err.message
+                    : tr.errNetwork;
+                textarea.value = `${detail} (${codeDemandeInitial})`;
                 nettoyerUI();
             });
     }
@@ -404,7 +409,7 @@ export function telechargerMessage(typeMessage) {
         const maxLat = lat + 1.5;
         const maxLon = lon + 1.5;
         
-        const noaaUrl = `https://aviationweather.gov/api/data/stationinfo?bbox=${minLat},${minLon},${maxLat},${maxLon}&format=json&_t=${Date.now()}`;
+        const noaaUrl = `https://aviationweather.gov/api/data/stationinfo?bbox=${minLat},${minLon},${maxLat},${maxLon}&format=json`;
         
         fetchAvecRelais(noaaUrl, 'json')
             .then(stations => {
@@ -434,7 +439,7 @@ export function telechargerMessage(typeMessage) {
     }
 
     if (icao.length === 4 && /^[A-Z]{4}$/.test(icao)) {
-        fetchAvecRelais(`https://aviationweather.gov/api/data/stationinfo?ids=${icao}&format=json&_t=${Date.now()}`, 'json')
+        fetchAvecRelais(`https://aviationweather.gov/api/data/stationinfo?ids=${icao}&format=json`, 'json')
             .then(data => {
                 if (data && data.length > 0) lancerRechercheZone(data[0].lat, data[0].lon, icao, data[0].site || data[0].name);
                 else {

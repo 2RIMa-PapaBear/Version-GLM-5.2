@@ -4,7 +4,7 @@ export async function fetchSigmetAirmet(lat, lon, radiusDeg = 5) {
     if (lat == null || lon == null) return [];
     try {
 
-        const url = `https://aviationweather.gov/api/data/sigmet?format=json&_t=${Date.now()}`;
+        const url = `https://aviationweather.gov/api/data/sigmet?format=json`;
         const data = await fetchAvecRelais(url, 'json');
 
         if (!Array.isArray(data)) return [];

@@ -525,19 +525,23 @@ export async function fetchAvecRelais(url, type = 'text') {
     }
 
     try {
-        let rawData;
-        try {
-            rawData = await _oneAttempt();
-        } catch (e) {
-            // Retry unique si AviationWeather a renvoyé du HTML (intermittent sous charge).
-            // Attendre 1.5s avant le 2e essai suffit la plupart du temps.
-            if (e.message === '__HTML_INATTENDU__') {
-                await new Promise(r => setTimeout(r, 1500));
+        let rawData = null;
+        let lastErr = null;
+        // Jusqu'à 3 tentatives avec backoff progressif (1.5s puis 3.5s) :
+        // le proxy Google Apps Script renvoie parfois un 504 (HTML) de quelques
+        // secondes sous charge — un retry unique ne suffit pas toujours.
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
                 rawData = await _oneAttempt();
-            } else {
-                throw e;
+                lastErr = null;
+                break;
+            } catch (e) {
+                if (e.message !== '__HTML_INATTENDU__') throw e;
+                lastErr = e;
+                if (attempt < 2) await new Promise(r => setTimeout(r, 1500 + attempt * 2000));
             }
         }
+        if (lastErr) throw lastErr;
 
         return type === 'json' ? JSON.parse(rawData) : rawData;
     } catch (e) {

@@ -15,7 +15,7 @@ export async function fetchAtis(icao) {
     // On tente quand même (au cas où il réapparaisse), mais tout échec est silencieux :
     // le widget fréquences fonctionne sans ATIS (fréquences OpenAIP).
     try {
-        const url = `https://aviationweather.gov/api/data/atis?station=${encodeURIComponent(key)}&format=json&_t=${Date.now()}`;
+        const url = `https://aviationweather.gov/api/data/atis?station=${encodeURIComponent(key)}&format=json`;
         const data = await fetchAvecRelais(url, 'json');
 
         const item = Array.isArray(data) ? data[0] : data;

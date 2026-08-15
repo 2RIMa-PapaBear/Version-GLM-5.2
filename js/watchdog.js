@@ -117,7 +117,7 @@ async function _check() {
 
     try {
         const idsStr = favs.join(',');
-        const url = `https://aviationweather.gov/api/data/metar?ids=${encodeURIComponent(idsStr)}&format=json&_t=${Date.now()}`;
+        const url = `https://aviationweather.gov/api/data/metar?ids=${encodeURIComponent(idsStr)}&format=json`;
         const data = await fetchAvecRelais(url, 'json');
         if (!Array.isArray(data)) return;
 
