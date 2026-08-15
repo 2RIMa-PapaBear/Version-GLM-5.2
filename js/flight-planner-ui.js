@@ -1,42 +1,31 @@
-/* ================================================================
- * FLIGHT PLANNER UI — Panneau de navigation VFR
- * ================================================================
- *
- * Affiche un panneau (visible seulement en mode "navigation") qui
- * présente les résultats du calcul de vol :
- *
- *   - Route : distance (NM/km), cap vrai, cap magnétique.
- *   - Vent : force/direction à l'altitude de croisière, dérive.
- *   - Performances : vitesse sol, temps de vol (ETA).
- *   - Carburant : voyage + réserve légale + total.
- *   - Profil d'élévation : hauteur max du relief, marge de
- *     franchissement, alerte si sous le minimum.
- *
- * Le pilote saisit :
- *   - L'altitude de croisière (ft MSL).
- *   - La vitesse air vraie (kt) — pré-remplie depuis l'avion actif.
- *   - La consommation (L/h) — pré-remplie.
- *   - Le type de vol (jour/nuit) — détermine la réserve légale.
- *
- * Les valeurs de TAS/conso sont persistées par avion dans la flotte
- * (localStorage) pour ne pas les re-saisir à chaque fois.
- * ================================================================ */
-
 import { state, escapeHtml } from './core.js';
-import { getAirportByICAO } from './ui-module.js';
+import { getAirportByICAO, enrichAirport } from './ui-module.js';
 import { getActiveAircraftId } from './aircraft-fleet.js';
 import { makeCollapsible } from './collapsible.js';
-import { computeFlightPlan, getDefaultAircraftPerf, RESERVES } from './flight-planner.js';
+import { computeFlightPlan, computeMultiLegFlightPlan, getDefaultAircraftPerf, RESERVES } from './flight-planner.js';
 import { renderElevationChart, clearElevationChart } from './elevation-chart.js';
+import { fetchAirportByIcao } from './openaip.js';
 
-// Clé localStorage pour les perfs par avion (TAS, conso).
 const LS_PERF_PREFIX = 'ac-perf-';
 
-/**
- * Lit les perfs (TAS, conso) persistées pour un avion.
- * @param {string} acId
- * @returns {{tasKt:number, fuelBurnLph:number}}
- */
+// Retourne la fréquence principale (TWR/AFIS) d'un terrain, ou null si non disponible.
+function _getMainFreq(icao) {
+    const apt = getAirportByICAO(icao);
+    if (!apt?.frequencies?.length) return null;
+    const primary = apt.frequencies.find(f => f.primary) || apt.frequencies.find(f => f.type === 'TWR' || f.type === 'AFIS');
+    return primary || apt.frequencies[0];
+}
+
+// Charge les fréquences manquantes des waypoints en arrière-plan, puis re-rend le panneau.
+function _preloadWaypointFreqs(plan, reRenderFn) {
+    if (!plan?.waypoints) return;
+    const missing = plan.waypoints.filter(w => !_getMainFreq(w.icao));
+    if (!missing.length) return;
+    Promise.all(missing.map(w =>
+        fetchAirportByIcao(w.icao).then(e => { if (e) enrichAirport(w.icao, e); }).catch(() => {})
+    )).then(() => { if (typeof reRenderFn === 'function') reRenderFn(); });
+}
+
 function _readPerf(acId) {
     const def = getDefaultAircraftPerf();
     if (!acId) return def;
@@ -49,30 +38,21 @@ function _readPerf(acId) {
                 fuelBurnLph: typeof p.fuelBurnLph === 'number' ? p.fuelBurnLph : def.fuelBurnLph,
             };
         }
-    } catch { /* ignore */ }
+    } catch {   }
     return def;
 }
 
-/**
- * Persiste les perfs pour un avion.
- */
 function _writePerf(acId, tasKt, fuelBurnLph) {
     if (!acId) return;
     try {
         localStorage.setItem(LS_PERF_PREFIX + acId, JSON.stringify({ tasKt, fuelBurnLph }));
-    } catch { /* quota */ }
+    } catch {   }
 }
 
-/**
- * Affiche/masque le panneau flight planner.
- * @param {string|null} fromIcao Code OACI départ (null = masquer).
- * @param {string|null} toIcao   Code OACI destination.
- */
 export async function showFlightPlanner(fromIcao, toIcao) {
     const container = document.getElementById('flight-planner-panel');
     if (!container) return;
 
-    // Masqué si pas de route valide.
     if (!fromIcao || !toIcao || fromIcao === toIcao) {
         container.style.display = 'none';
         return;
@@ -82,11 +62,8 @@ export async function showFlightPlanner(fromIcao, toIcao) {
     const acId = getActiveAircraftId();
     const perf = _readPerf(acId);
 
-    // Prépare le panel repliable et récupère le body.
     const body = makeCollapsible(container, isFr ? 'Calcul de navigation' : 'Flight plan', 'navigation');
 
-    // Altitude de croisière par défaut : 2500 ft MSL (typique VFR transit).
-    // Mémorisée dans le champ input entre les recalculs.
     let cruiseAlt = 2500;
     const altInput = body.querySelector('#fp-cruise-alt');
     if (altInput && altInput.value) cruiseAlt = parseInt(altInput.value, 10);
@@ -97,16 +74,14 @@ export async function showFlightPlanner(fromIcao, toIcao) {
     const nightInput = body.querySelector('#fp-night');
     const isNight = nightInput ? nightInput.checked : false;
 
-    // Rendu initial (état "calcul en cours").
     _renderLoading(body, fromIcao, toIcao, cruiseAlt, tasKt, burn, isNight, isFr);
 
-    // Calcul (async : appels Open-Meteo pour vent + élévation).
-    const plan = await computeFlightPlan(fromIcao, toIcao, {
-        cruiseAltFt: cruiseAlt,
-        tasKt,
-        fuelBurnLph: burn,
-        isNight,
-    });
+    // Multi-waypoints si state.route est défini (≥3 OACI), sinon plan A→B simple.
+    const route = (Array.isArray(state.route) && state.route.length >= 3)
+        ? state.route : [fromIcao, toIcao];
+    const plan = route.length >= 3
+        ? await computeMultiLegFlightPlan(route, { cruiseAltFt: cruiseAlt, tasKt, fuelBurnLph: burn, isNight })
+        : await computeFlightPlan(fromIcao, toIcao, { cruiseAltFt: cruiseAlt, tasKt, fuelBurnLph: burn, isNight });
 
     if (!plan) {
         _renderError(body, fromIcao, toIcao, isFr);
@@ -114,24 +89,29 @@ export async function showFlightPlanner(fromIcao, toIcao) {
         return;
     }
 
-    // Persiste les perfs si elles ont changé.
     _writePerf(acId, tasKt, burn);
 
     _renderResult(body, plan, isFr, isNight, cruiseAlt, tasKt, burn);
     container.style.display = 'block';
 
-    // Affiche le profil d'élévation à partir du plan déjà calculé
-    // (évite un double fetch Open-Meteo qui provoque des HTTP 429).
+    // Pré-charge les fréquences des waypoints en arrière-plan puis re-rend.
+    if (plan.isMultiLeg && plan.waypoints) {
+        _preloadWaypointFreqs(plan, () => {
+            if (!_recalculating) _renderResult(body, plan, isFr, isNight, cruiseAlt, tasKt, burn);
+        });
+    }
+
     if (plan.elevationProfile) {
-        renderElevationChart('elevation-profile-container', plan.elevationProfile, cruiseAlt, fromIcao, toIcao);
+        // En multi-leg, passe les waypoints intermédiaires pour les afficher sur le profil.
+        const waypoints = (plan.isMultiLeg && plan.waypoints)
+            ? plan.waypoints.map(w => ({ icao: w.icao, lat: w.lat, lon: w.lon }))
+            : null;
+        renderElevationChart('elevation-profile-container', plan.elevationProfile, cruiseAlt, fromIcao, toIcao, waypoints);
     } else {
         clearElevationChart('elevation-profile-container');
     }
 }
 
-/**
- * Rendu de l'état "calcul en cours".
- */
 function _renderLoading(container, from, to, alt, tas, burn, isNight, isFr) {
     const fromName = getAirportByICAO(from)?.name || from;
     const toName = getAirportByICAO(to)?.name || to;
@@ -148,12 +128,18 @@ function _renderLoading(container, from, to, alt, tas, burn, isNight, isFr) {
     _wireInputs(container, from, to);
 }
 
-/**
- * Rendu du résultat complet.
- */
 function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
-    const from = plan.from.icao;
-    const to = plan.to.icao;
+    // Gère les deux formats de plan :
+    //   - single-leg : { from, to, distanceNm, trueCourse, magHeading, windCorrection, legTimeMin, ... }
+    //   - multi-leg  : { waypoints[], legs[], totalDistanceNm, totalTimeMin, fuel, declination, ... }
+    // On normalise vers une vue synthétique (1re jambe pour cap/vent, totaux pour distance/temps/fuel).
+    const isMulti = Array.isArray(plan.legs) && plan.legs.length > 0;
+    const firstLeg = isMulti ? plan.legs[0] : plan;
+    const fromIcao = isMulti ? (plan.waypoints?.[0]?.icao || '') : (plan.from?.icao || '');
+    const toIcao = isMulti ? (plan.waypoints?.[plan.waypoints.length - 1]?.icao || '') : (plan.to?.icao || '');
+
+    const from = fromIcao;
+    const to = toIcao;
     const fromName = getAirportByICAO(from)?.name || from;
     const toName = getAirportByICAO(to)?.name || to;
 
@@ -165,10 +151,20 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
     };
 
     const wind = plan.wind;
-    const wc = plan.windCorrection;
+    const wc = isMulti ? (firstLeg.windCorrection || {}) : plan.windCorrection;
     const cl = plan.clearance;
 
-    // Couleur de la marge de franchissement.
+    // Champs unifiés single-leg / multi-leg.
+    const distanceNm = isMulti ? plan.totalDistanceNm : plan.distanceNm;
+    const distanceKm = isMulti ? plan.totalDistanceKm : plan.distanceKm;
+    const trueCourse = isMulti ? firstLeg.trueCourse : plan.trueCourse;
+    const magHeading = isMulti ? firstLeg.magHeading : plan.magHeading;
+    const declination = plan.declination ?? 0;
+    const cruiseAltFt = plan.cruiseAltFt;
+    const groundSpeed = isMulti ? firstLeg.groundSpeed : plan.groundSpeed;
+    const legTimeMin = isMulti ? plan.totalTimeMin : plan.legTimeMin;
+    const fuel = plan.fuel;
+
     const clearColor = cl?.level === 'danger' ? '#EF4444' : (cl?.level === 'caution' ? '#F59E0B' : '#10B981');
 
     container.innerHTML = `
@@ -178,24 +174,24 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
         <div class="fp-grid" style="gap:8px 16px; margin-top:10px;">
             <div class="fp-cell">
                 <div class="fp-label">${isFr ? 'Distance' : 'Distance'}</div>
-                <div class="fp-value">${plan.distanceNm} NM <span style="color:var(--text-muted); font-size:10px;">(${plan.distanceKm} km)</span></div>
+                <div class="fp-value">${distanceNm} NM <span style="color:var(--text-muted); font-size:10px;">(${distanceKm} km)</span></div>
             </div>
             <div class="fp-cell">
                 <div class="fp-label">${isFr ? 'Cap vrai (TC)' : 'True course'}</div>
-                <div class="fp-value">${String(plan.trueCourse).padStart(3, '0')}°</div>
+                <div class="fp-value">${String(trueCourse).padStart(3, '0')}°</div>
             </div>
             <div class="fp-cell">
                 <div class="fp-label">${isFr ? 'Cap magnétique' : 'Magnetic heading'}</div>
-                <div class="fp-value" style="color:var(--primary); font-size:16px; font-weight:800;">${String(plan.magHeading).padStart(3, '0')}°</div>
+                <div class="fp-value" style="color:var(--primary); font-size:16px; font-weight:800;">${String(magHeading).padStart(3, '0')}°</div>
             </div>
             <div class="fp-cell">
                 <div class="fp-label">${isFr ? 'Déclinaison' : 'Declination'}</div>
-                <div class="fp-value">${plan.declination > 0 ? '+' : ''}${plan.declination}°</div>
+                <div class="fp-value">${declination > 0 ? '+' : ''}${declination}°</div>
             </div>
         </div>
 
         <div class="fp-section" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color);">
-            <div class="fp-section-title">${isFr ? 'Vent à ' + plan.cruiseAltFt + ' ft' : 'Wind at ' + plan.cruiseAltFt + ' ft'}</div>
+            <div class="fp-section-title">${isFr ? 'Vent à ' + cruiseAltFt + ' ft' : 'Wind at ' + cruiseAltFt + ' ft'}</div>
             ${wind ? `
                 <div class="fp-grid" style="margin-top:6px;">
                     <div class="fp-cell">
@@ -216,11 +212,11 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
             <div class="fp-grid">
                 <div class="fp-cell">
                     <div class="fp-label">${isFr ? 'Vitesse sol (GS)' : 'Ground speed'}</div>
-                    <div class="fp-value">${plan.groundSpeed} kt</div>
+                    <div class="fp-value">${groundSpeed} kt</div>
                 </div>
                 <div class="fp-cell">
                     <div class="fp-label">${isFr ? 'Temps de vol' : 'Flight time'}</div>
-                    <div class="fp-value" style="color:var(--secondary); font-weight:800;">${fmtTime(plan.legTimeMin)}</div>
+                    <div class="fp-value" style="color:var(--secondary); font-weight:800;">${fmtTime(legTimeMin)}</div>
                 </div>
             </div>
         </div>
@@ -230,15 +226,15 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
             <div class="fp-grid fp-grid-3" style="margin-top:6px;">
                 <div class="fp-cell">
                     <div class="fp-label">${isFr ? 'Trajet' : 'Trip'}</div>
-                    <div class="fp-value">${plan.fuel.tripFuelL} L</div>
+                    <div class="fp-value">${fuel.tripFuelL} L</div>
                 </div>
                 <div class="fp-cell">
                     <div class="fp-label">${isFr ? 'Réserve' : 'Reserve'} (${isNight ? RESERVES.NIGHT_MIN : RESERVES.DAY_MIN}min)</div>
-                    <div class="fp-value">${plan.fuel.reserveL} L</div>
+                    <div class="fp-value">${fuel.reserveL} L</div>
                 </div>
                 <div class="fp-cell">
                     <div class="fp-label">${isFr ? 'Total requis' : 'Total req.'}</div>
-                    <div class="fp-value" style="color:var(--primary); font-weight:800; font-size:15px;">${plan.fuel.totalL} L</div>
+                    <div class="fp-value" style="color:var(--primary); font-weight:800; font-size:15px;">${fuel.totalL} L</div>
                 </div>
             </div>
         </div>
@@ -269,6 +265,46 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
             </div>
         ` : ''}
 
+        ${plan.isMultiLeg && plan.legs?.length ? `
+            <div class="fp-section" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color);">
+                <div class="fp-section-title">${isFr ? 'Détail des waypoints (' + plan.legs.length + ')' : 'Leg details (' + plan.legs.length + ')'}</div>
+                <table class="fp-navlog" style="margin-top:6px;">
+                    <thead>
+                        <tr>
+                            <th>${isFr ? 'Tronçon' : 'Leg'}</th>
+                            <th>${isFr ? 'Dist' : 'Dist'}</th>
+                            <th>${isFr ? 'Cap' : 'Hdg'}</th>
+                            <th>ETE</th>
+                            <th>${isFr ? 'Conso' : 'Fuel'}</th>
+                            <th>${isFr ? 'Fréq' : 'Freq'}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${plan.legs.map(lg => {
+                            const f = _getMainFreq(lg.to.icao);
+                            return `
+                            <tr>
+                                <td><b>${escapeHtml(lg.from.icao)}</b> → <b>${escapeHtml(lg.to.icao)}</b></td>
+                                <td>${lg.distanceNm} NM</td>
+                                <td>${String(lg.magHeading).padStart(3,'0')}°</td>
+                                <td>${fmtTime(lg.legTimeMin)}</td>
+                                <td>${lg.fuel.tripFuelL} L</td>
+                                <td class="freq-cell">${f ? f.freq.toFixed(3) + ' ' + escapeHtml(f.type) : '—'}</td>
+                            </tr>`;
+                        }).join('')}
+                        <tr class="total">
+                            <td>${isFr ? 'TOTAL' : 'TOTAL'}</td>
+                            <td>${plan.totalDistanceNm} NM</td>
+                            <td>—</td>
+                            <td>${fmtTime(plan.totalTimeMin)}</td>
+                            <td>${plan.fuel.tripFuelL} L</td>
+                            <td>—</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        ` : ''}
+
         <div style="font-size:10px; color:var(--text-muted); margin-top:10px; line-height:1.4;">
             <i data-lucide="info" style="width:11px;height:11px;vertical-align:middle;"></i>
             ${isFr
@@ -280,9 +316,6 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
     _wireInputs(container, from, to);
 }
 
-/**
- * Rendu en cas d'erreur (coordonnées manquantes).
- */
 function _renderError(container, from, to, isFr) {
     container.innerHTML = `
         <div style="padding:14px; text-align:center; color:var(--text-muted); font-size:12px;">
@@ -293,10 +326,9 @@ function _renderError(container, from, to, isFr) {
     if (window.lucide) window.lucide.createIcons({ root: container });
 }
 
-/**
- * Rendu des champs de saisie (réutilisés dans loading + result).
- */
 function _renderInputs(from, to, fromName, toName, alt, tas, burn, isNight, isFr) {
+    const waypointsValue = (state.route && state.route.length > 2)
+        ? state.route.slice(1, -1).join(' ') : '';
     return `
         <div class="fp-route" style="display:flex; align-items:center; gap:8px; margin-bottom:10px; font-size:12px;">
             <div style="flex:1; min-width:0;">
@@ -310,6 +342,10 @@ function _renderInputs(from, to, fromName, toName, alt, tas, burn, isNight, isFr
             </div>
         </div>
         <div class="fp-inputs">
+            <label class="fp-input-label" style="grid-column: 1 / -1;" title="${isFr ? 'Waypoints intermédiaires (codes OACI séparés par espaces)' : 'Intermediate waypoints (ICAO codes, space-separated)'}">
+                <span>${isFr ? 'Waypoints (optionnel)' : 'Waypoints (optional)'}</span>
+                <input type="text" id="fp-waypoints" value="${escapeHtml(waypointsValue)}" placeholder="${isFr ? 'LFPB LFOB puis Tab' : 'LFPB LFOB then Tab'}" class="fp-input" style="font-family:'DM Mono',monospace; text-transform:uppercase;">
+            </label>
             <label class="fp-input-label">
                 <span>${isFr ? 'Alt. croisière (ft)' : 'Cruise alt (ft)'}</span>
                 <input type="number" id="fp-cruise-alt" value="${alt}" min="0" step="500" class="fp-input">
@@ -330,13 +366,37 @@ function _renderInputs(from, to, fromName, toName, alt, tas, burn, isNight, isFr
     `;
 }
 
-/**
- * Branche les écouteurs sur les inputs pour recalculer en live.
- */
 function _wireInputs(container, from, to) {
-    const recalc = () => showFlightPlanner(from, to);
+    // Garde-fou anti-récursion : showFlightPlanner recrée le DOM et rewire les inputs,
+    // ce qui peut redéclencher 'change' et boucler (OOM). Le flag bloque les recalculs
+    // pendant qu'un recalcul est en cours.
+    let _recalculating = false;
+    const recalc = () => {
+        if (_recalculating) return;   // évite la récursion pendant le re-render
+        _recalculating = true;
+        try {
+            // Lit les waypoints saisis et peuple state.route pour le multi-leg.
+            const wpInput = container.querySelector('#fp-waypoints');
+            if (wpInput) {
+                const wps = wpInput.value.trim().toUpperCase().split(/\s+/).filter(w => /^[A-Z]{4}$/.test(w));
+                state.route = wps.length ? [from, ...wps, to] : null;
+            }
+            showFlightPlanner(from, to);
+            // Notifie la carte régionale de redessiner la route avec les waypoints.
+            // setTimeout(0) : attend que le DOM du panneau soit recréé avant de notifier,
+            // pour éviter que le re-render ne détruise le champ waypoints en cours de saisie.
+            setTimeout(() => window.dispatchEvent(new CustomEvent('route-changed')), 0);
+        } finally {
+            _recalculating = false;
+        }
+    };
+    // change/blur : recalc immédiat (l'utilisateur a fini de saisir).
     container.querySelector('#fp-cruise-alt')?.addEventListener('change', recalc);
     container.querySelector('#fp-tas')?.addEventListener('change', recalc);
     container.querySelector('#fp-burn')?.addEventListener('change', recalc);
     container.querySelector('#fp-night')?.addEventListener('change', recalc);
+    // IMPORTANT : on n'écoute QUE 'change' (déclenché à la perte de focus / Entrée),
+    // jamais 'input' (frappe clavier). Sinon showFlightPlanner recrée le DOM et
+    // détruit le champ en cours de saisie → l'utilisateur ne peut pas taper ses waypoints.
+    container.querySelector('#fp-waypoints')?.addEventListener('change', recalc);
 }

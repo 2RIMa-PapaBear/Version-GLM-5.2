@@ -1,42 +1,9 @@
-/* ================================================================
- * OPENAIP — Intégration API OpenAIP pour données aérodromes
- * ================================================================
- *
- * OBJECTIF
- * --------
- * Enrichir les données d'aérodromes (pistes, revêtement, radio,
- * élévation, déclinaison magnétique) via l'API OpenAIP, plus à jour
- * et plus détaillée que la base locale airports.json.
- *
- * ARCHITECTURE HYBRIDE
- * --------------------
- * airports.json reste la base synchrone (vitesse, offline, 36 appels
- * par rendu). OpenAIP intervient en ARRIÈRE-PLAN au chargement d'un
- * terrain : on fetch les détails, on les fusionne dans le memo, puis
- * on rafraîchit l'UI. Le tout est mis en cache IndexedDB pour les
- * visites suivantes.
- *
- * SOURCE
- * ------
- * GET https://api.core.openaip.net/api/airports?search={query}&limit={n}
- * Auth : header x-openaip-api-key
- * CORS supporté nativement (pas de proxy nécessaire).
- *
- * MAPPING DES DONNÉES
- * -------------------
- * OpenAIP retourne des unités en mètres (unit:0) et des codes de
- * revêtement mainComposite (0=asphalte/béton, 1=bitume, 2=herbe...).
- * On convertit vers le format interne de l'app (ft, codes ASP/GRE...).
- * ================================================================ */
-
 import { OPENAIP_API_KEY } from './config.local.js';
+import { injectMagvar } from './magvar.js';
 
 const BASE_URL = 'https://api.core.openaip.net/api/airports';
 const FT_PER_M = 3.28084;
 
-// ----------------------------------------------------------------
-// Cache IndexedDB (store dédié OpenAIP)
-// ----------------------------------------------------------------
 const IDB_NAME = 'openaip-cache';
 const IDB_STORE = 'airports';
 const IDB_VERSION = 1;
@@ -75,57 +42,29 @@ async function _idbPut(icao, data) {
             tx.oncomplete = () => { db.close(); resolve(); };
             tx.onerror = () => { db.close(); reject(tx.error); };
         });
-    } catch { /* quota / mode privé */ }
+    } catch {   }
 }
 
-// ----------------------------------------------------------------
-// Mapping OpenAIP → format interne
-// ----------------------------------------------------------------
-
-/**
- * Convertit le code de revêtement OpenAIP (mainComposite) en code interne.
- *
- * Nomenclature OpenAIP (confirmée) :
- *   0 = ASPH  Asphalt   (asphalte)
- *   1 = CONC  Concrete  (béton)
- *   2 = GRASS Grass     (herbe)
- *   3 = GRA   Gravel    (gravier)
- *   4 = DIRT  Dirt      (terre)
- *   5 = SAND  Sand      (sable)
- *   6 = WAT   Water     (eau — hydravion)
- *
- * Mapping vers nos codes internes (standard OurAirports/SurfaceTypes) :
- *   ASPH → ASP, CONC → CON, GRASS → GRS, GRA → GVL, DIRT → GRE, SAND → SAN, WAT → WAT.
- */
 function _mapSurface(mainComposite) {
     switch (mainComposite) {
-        case 0: return 'ASP';   // Asphalt
-        case 1: return 'CON';   // Concrete
-        case 2: return 'GRS';   // Grass
-        case 3: return 'GVL';   // Gravel
-        case 4: return 'GRE';   // Dirt (terre tassée)
-        case 5: return 'SAN';   // Sand
-        case 6: return 'WAT';   // Water
-        default: return 'U';    // Unknown
+        case 0: return 'ASP';
+        case 1: return 'CON';
+        case 2: return 'GRS';
+        case 3: return 'GVL';
+        case 4: return 'GRE';
+        case 5: return 'SAN';
+        case 6: return 'WAT';
+        default: return 'U';
     }
 }
 
-/**
- * Convertit mètres → pieds (arrondi).
- */
 function _mToFt(m) { return Math.round(m * FT_PER_M); }
 
-/**
- * Transforme un terrain OpenAIP en objet format interne (compatible airports.json).
- * @param {Object} aip Terrain OpenAIP brut.
- * @returns {Object} Terrain au format interne.
- */
 function _mapAirport(aip) {
     const [lon, lat] = aip.geometry?.coordinates || [null, null];
     const elevM = aip.elevation?.value;
     const elevFt = typeof elevM === 'number' ? _mToFt(elevM) : null;
 
-    // Pistes : on regroupe par paire (designator opposés) et on convertit.
     const runways = [];
     const runwayLengths = {};
     const runwaySurfaces = {};
@@ -150,48 +89,46 @@ function _mapAirport(aip) {
         }
     });
 
-    // Surface dominante : la plus fréquente.
     if (Object.keys(surfCounts).length > 0) {
         dominantSurface = Object.entries(surfCounts).sort((a, b) => b[1] - a[1])[0][0];
     }
 
-    // Fréquences radio (champ 'frequencies' dans l'API OpenAIP).
     const FREQ_TYPE_LABELS = {
-        0: 'APP',   // Approach
-        1: 'ARR',   // Arrival
-        2: 'DEP',   // Departure
-        3: 'CTR',   // Center
-        4: 'FIS',   // Flight Information Service
-        5: 'AFIS',  // Aerodrome FIS
-        6: 'RAD',   // Radar
-        7: 'INFO',  // Information
-        8: 'DEL',   // Clearance Delivery
-        9: 'GND',   // Ground
-        10: 'TWR',  // Tower (alt code)
-        11: 'ATIS', // ATIS (alt code)
+        0: 'APP',
+        1: 'ARR',
+        2: 'DEP',
+        3: 'CTR',
+        4: 'FIS',
+        5: 'AFIS',
+        6: 'RAD',
+        7: 'INFO',
+        8: 'DEL',
+        9: 'GND',
+        10: 'TWR',
+        11: 'ATIS',
         12: 'VOLMET',
-        13: 'OPS',  // Operations
-        14: 'TWR',  // Tower
-        15: 'ATIS', // ATIS
-        16: 'UNK',  // Unknown
-        17: 'AOC',  // Aeronautical Operational Control
-        18: 'EMER', // Emergency
+        13: 'OPS',
+        14: 'TWR',
+        15: 'ATIS',
+        16: 'UNK',
+        17: 'AOC',
+        18: 'EMER',
         19: 'SAFETY',
     };
     const frequencies = (aip.frequencies || [])
-        .filter(f => f && f.value)  // ignore les fréquences vides
+        .filter(f => f && f.value)
         .map(f => ({
             freq: parseFloat(f.value),
             name: f.name || '',
             type: FREQ_TYPE_LABELS[f.type] ?? 'COM',
             primary: !!f.primary,
         }))
-        .filter(f => !isNaN(f.freq))  // garde uniquement les fréquences valides
-        // Trie : primary d'abord, puis par type, puis par fréquence.
+        .filter(f => !isNaN(f.freq))
+
         .sort((a, b) => (b.primary - a.primary) || a.freq - b.freq);
 
     return {
-        icao: aip.name?.match(/[A-Z]{4}/)?.[0] || '',  // best-effort
+        icao: aip.name?.match(/[A-Z]{4}/)?.[0] || '',
         name: aip.name || '',
         country: aip.country || '',
         lat,
@@ -210,11 +147,6 @@ function _mapAirport(aip) {
     };
 }
 
-/**
- * Reconstruit les paires de pistes au format airports.json.
- * OpenAIP liste chaque seuil séparément (04, 22, 08, 26...).
- * On regroupe les seuils opposés en paires "04 (039°)/22 (219°)".
- */
 function _buildRunwayPairs(aipRunways) {
     if (!aipRunways || aipRunways.length === 0) return [];
     const pairs = [];
@@ -222,7 +154,7 @@ function _buildRunwayPairs(aipRunways) {
 
     aipRunways.forEach(rw => {
         if (used.has(rw.designator)) return;
-        // Cherche le seuil opposé (cap inverse ≈ +180°).
+
         const oppHeading = (rw.trueHeading + 180) % 360;
         let opp = aipRunways.find(o =>
             !used.has(o.designator) &&
@@ -230,7 +162,7 @@ function _buildRunwayPairs(aipRunways) {
             Math.abs(o.trueHeading - oppHeading) < 5
         );
         if (!opp) {
-            // Pas d'opposé : piste seule (helipad, etc.).
+
             pairs.push(`${rw.designator} (${String(Math.round(rw.trueHeading)).padStart(3,'0')}°)`);
             used.add(rw.designator);
             return;
@@ -243,28 +175,14 @@ function _buildRunwayPairs(aipRunways) {
     return pairs;
 }
 
-// ----------------------------------------------------------------
-// API publique
-// ----------------------------------------------------------------
-
-// Cache mémoire des terrains déjà fetch ce cycle (évite les double-fetch).
 const _memCache = new Map();
 
-/**
- * Charge un terrain depuis OpenAIP par code OACI, avec cache.
- * @param {string} icao Code OACI (ex: 'LFPG').
- * @param {Object} [opts]
- * @param {boolean} [opts.forceRefresh] Forcer le re-fetch (ignore cache).
- * @returns {Promise<Object|null>} Terrain au format interne, ou null.
- */
 export async function fetchAirportByIcao(icao, opts = {}) {
     if (!icao) return null;
     const key = icao.toUpperCase();
 
-    // 1. Cache mémoire.
     if (!opts.forceRefresh && _memCache.has(key)) return _memCache.get(key);
 
-    // 2. Cache IndexedDB.
     if (!opts.forceRefresh) {
         const cached = await _idbGet(key);
         if (cached?.data) {
@@ -273,7 +191,6 @@ export async function fetchAirportByIcao(icao, opts = {}) {
         }
     }
 
-    // 3. Fetch OpenAIP.
     try {
         const url = `${BASE_URL}?search=${encodeURIComponent(key)}&limit=1`;
         const res = await fetch(url, {
@@ -289,8 +206,14 @@ export async function fetchAirportByIcao(icao, opts = {}) {
         if (!item) return null;
 
         const mapped = _mapAirport(item);
-        // Le code OACI exact peut manquer dans le mapping best-effort → on l'injecte.
+
         mapped.icao = key;
+
+        // Réinjecte la déclinaison magnétique d'OpenAIP dans le cache magvar,
+        // pour que getDeclinationForIcao() renvoie une valeur réelle au lieu de 0.
+        if (typeof mapped.magneticDeclination === 'number') {
+            injectMagvar(key, mapped.magneticDeclination);
+        }
 
         _memCache.set(key, mapped);
         _idbPut(key, mapped);
@@ -301,12 +224,6 @@ export async function fetchAirportByIcao(icao, opts = {}) {
     }
 }
 
-/**
- * Recherche textuelle pour l'autocomplétion (nom, ville, code OACI).
- * @param {string} query Texte de recherche (min 2 caractères).
- * @param {number} [limit=8] Nombre max de résultats.
- * @returns {Promise<Array<{icao,name,country,lat,lon,type}>>}
- */
 export async function searchAirports(query, limit = 8) {
     if (!query || query.trim().length < 2) return [];
     try {
@@ -327,30 +244,20 @@ export async function searchAirports(query, limit = 8) {
                 lon,
                 type: a.type,
             };
-        }).filter(a => a.name); // filtre les résultats vides
+        }).filter(a => a.name);
     } catch {
         return [];
     }
 }
 
-/**
- * Tente d'extraire un code OACI d'un terrain OpenAIP.
- * OpenAIP ne stocke pas toujours l'ICAO dans un champ dédié ; on essaie
- * plusieurs sources.
- */
 function _extractIcao(aip) {
-    // Certains terrains ont l'ICAO dans un champ dédié.
+
     if (aip.icaoId && /^[A-Z]{4}$/.test(aip.icaoId)) return aip.icaoId;
     if (aip.ICAO && /^[A-Z]{4}$/.test(aip.ICAO)) return aip.ICAO;
-    // Sinon on cherche dans le nom (ex: "PARIS CHARLES DE GAULLE" → pas d'ICAO).
-    // Dans ce cas, on retourne une chaîne vide ; l'autocomplétion affichera
-    // juste le nom.
+
     return '';
 }
 
-/**
- * Réinitialise le cache mémoire (tests).
- */
 export function _clearMemCache() {
     _memCache.clear();
 }

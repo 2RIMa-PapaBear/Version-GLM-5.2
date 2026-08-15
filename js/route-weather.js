@@ -1,38 +1,12 @@
-/* ================================================================
- * ROUTE WEATHER — Météo le long d'une route (corridor)
- * ================================================================
- *
- * CONTEXTE
- * --------
- * En navigation VFR, le pilote a besoin de savoir si la météo se
- * dégrade sur sa route, pas seulement à destination. Ce module trace
- * la ligne entre deux terrains (départ → destination) et récupère les
- * METARs des terrains proches de cette route pour afficher une "coupe
- * météo" du corridor.
- *
- * IMPLÉMENTATION
- * --------------
- * On calcule une boîte allongée le long du segment départ-destination,
- * on récupère les stations et METARs dans cette zone, puis on place
- * des marqueurs colorés (catégorie de vol) le long de la route sur la
- * carte régionale. On trace aussi la ligne de route elle-même.
- * ================================================================ */
-
-import { state, I18N, fetchAvecRelais, memoGet } from './core.js';
+import { state, I18N, fetchAvecRelais, memoGet, escapeHtml } from './core.js';
 import { getAirportByICAO } from './ui-module.js';
-import { parseVisiToMeters } from './core.js';
+import { parseVisiToMeters, CAT_COLORS } from './core.js';
 
 let _routeLayer = null;
 let _routeMarkers = [];
+let _waypointMarkers = [];
 
-/**
- * Affiche (ou met à jour) la météo de route entre deux terrains sur la
- * carte Leaflet passée en paramètre.
- * @param {L.Map} map Instance Leaflet.
- * @param {string} fromIcao Code OACI de départ.
- * @param {string} toIcao Code OACI de destination.
- */
-export async function showRouteWeather(map, fromIcao, toIcao) {
+export async function showRouteWeather(map, fromIcao, toIcao, opts = {}) {
     if (!map || !fromIcao || !toIcao || fromIcao === toIcao) {
         _clearRoute(map);
         return;
@@ -55,28 +29,46 @@ export async function showRouteWeather(map, fromIcao, toIcao) {
 
     _clearRoute(map);
 
-    // 1. Trace la ligne de route.
-    _routeLayer = L.polyline([[fromLat, fromLon], [toLat, toLon]], {
+    // Construit la liste des points : A→B simple, ou multi-waypoints si state.route est défini.
+    const route = (Array.isArray(state.route) && state.route.length >= 3)
+        ? state.route : [fromIcao, toIcao];
+    const routePoints = [];
+    for (const icao of route) {
+        if (!icao) continue;
+        const apt = getAirportByICAO(icao);
+        const memo = memoGet(icao);
+        const lat = memo?.lat ?? apt?.lat ?? null;
+        const lon = memo?.lon ?? apt?.lon ?? null;
+        if (lat != null && lon != null) routePoints.push([lat, lon, icao]);
+    }
+    if (routePoints.length < 2) { _clearRoute(map); return; }
+
+    // Polyline principale (A→B ou multi-points).
+    _routeLayer = L.polyline(routePoints.map(p => [p[0], p[1]]), {
         color: '#FBBF24',
         weight: 3,
         opacity: 0.7,
         dashArray: '8, 6',
     }).addTo(map);
 
-    // 2. Marqueurs départ/destination.
     _addRouteEndpoint(map, fromLat, fromLon, fromIcao, true);
     _addRouteEndpoint(map, toLat, toLon, toIcao, false);
+    // Marqueurs intermédiaires pour les waypoints (cercles ambre) — ajoutés directement
+    // à la map (pas à la polyline, qui n'accepte pas addTo).
+    _waypointMarkers = routePoints.slice(1, -1).map(p => {
+        return L.circleMarker([p[0], p[1]], {
+            radius: 5, color: '#FBBF24', weight: 2, fillColor: '#FBBF24', fillOpacity: 0.4,
+        }).addTo(map).bindPopup(`<b>${escapeHtml(p[2])}</b>`);
+    });
 
-    // 3. Récupère les METARs le long du corridor.
-    await _loadCorridorMetars(map, fromLat, fromLon, toLat, toLon);
+    if (!opts.skipMetars) {
+        await _loadCorridorMetars(map, fromLat, fromLon, toLat, toLon);
+    }
 }
 
-/**
- * Récupère et place les METARs des terrains proches du corridor.
- */
 async function _loadCorridorMetars(map, fromLat, fromLon, toLat, toLon) {
     try {
-        // Boîte englobante élargie autour du segment.
+
         const minLat = Math.min(fromLat, toLat) - 1;
         const maxLat = Math.max(fromLat, toLat) + 1;
         const minLon = Math.min(fromLon, toLon) - 1;
@@ -86,7 +78,6 @@ async function _loadCorridorMetars(map, fromLat, fromLon, toLat, toLon) {
         const stations = await fetchAvecRelais(stationsUrl, 'json');
         if (!Array.isArray(stations)) return;
 
-        // Filtre les stations proches de la ligne (distance < ~0.8°).
         const corridorStations = stations
             .filter(s => {
                 if (!s.icaoId || !/^[A-Z]{4}$/.test(s.icaoId)) return false;
@@ -98,7 +89,6 @@ async function _loadCorridorMetars(map, fromLat, fromLon, toLat, toLon) {
 
         if (corridorStations.length === 0) return;
 
-        // METARs groupés.
         const metarUrl = `https://aviationweather.gov/api/data/metar?ids=${corridorStations.map(s => s.icaoId).join(',')}&format=json&_t=${Date.now()}`;
         const metars = await fetchAvecRelais(metarUrl, 'json');
         if (!Array.isArray(metars)) return;
@@ -109,8 +99,7 @@ async function _loadCorridorMetars(map, fromLat, fromLon, toLat, toLon) {
             if (code) metarByCode[code] = m.rawOb || m.rawMetar || m.rawText || '';
         });
 
-        // Place un marqueur pour chaque terrain du corridor avec sa catégorie.
-        const catColors = { VFR: '#4ADE80', MVFR: '#38BDF8', IFR: '#F87171', LIFR: '#D946EF' };
+        const catColors = CAT_COLORS;
         corridorStations.forEach(s => {
             const raw = metarByCode[s.icaoId.toUpperCase()];
             if (!raw) return;
@@ -155,11 +144,10 @@ function _clearRoute(map) {
     }
     _routeMarkers.forEach(m => map.removeLayer(m));
     _routeMarkers = [];
+    _waypointMarkers.forEach(m => map.removeLayer(m));
+    _waypointMarkers = [];
 }
 
-/**
- * Distance entre un point et un segment (en degrés, approximation).
- */
 function _pointToSegmentDist(px, py, x1, y1, x2, y2) {
     const dx = x2 - x1, dy = y2 - y1;
     const len2 = dx * dx + dy * dy;

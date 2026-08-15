@@ -1,36 +1,3 @@
-/* ================================================================
- * GO / NO-GO — Bannière synthétique de décision de vol
- * ================================================================
- *
- * PHILOSOPHIE
- * -----------
- * La fonctionnalité « killer » : le pilote ne vient pas lire 12 valeurs,
- * il vient répondre à UNE question : "Est-ce que je décolle, sereinement ?"
- *
- * Cette bannière croise TOUTES les données disponibles et affiche un
- * verdict synthétique en un coup d'œil :
- *
- *   🟢 GO     — Tout est vert, vous pouvez voler sereinement.
- *   🟡 CAUTION — Un ou plusieurs paramètres demandent prudence (orange).
- *   🔴 NO-GO   — Un paramètre bloquant rend le vol déconseillé/interdit.
- *
- * CRITÈRES ÉVALUÉS (par ordre de priorité NO-GO → CAUTION)
- * ---------------------------------------------------------
- *  1. NUIT AÉRONAUTIQUE     → NO-GO (VFR de jour interdit)
- *  2. Catégorie IFR/LIFR    → NO-GO (conditions sous les minimas VFR)
- *  3. Alertes danger        → NO-GO (minimas perso en rouge)
- *  4. Catégorie MVFR        → CAUTION (marge réduite)
- *  5. Alertes warning       → CAUTION (minimas perso en orange)
- *  6. Densité altitude haute → CAUTION (performances)
- *  7. Vent travers fort     → CAUTION (limites avion)
- *  8. Sinon                 → GO
- *
- * TRANSPARENCE
- * ------------
- * Le verdict n'est jamais un simple feu : il liste les raisons qui l'ont
- * motivé, pour que le pilote comprenne et puisse contester/affiner.
- * ================================================================ */
-
 import { state, I18N, parseVisiToMeters, getCeiling, memoGet } from './core.js';
 import { parseWindString, selectBestRunway } from './engine.js';
 import { analyzeWeatherAlerts, analyzeForecastAlerts, openThresholdsModal } from './weather.js';
@@ -44,10 +11,6 @@ import { getDeclinationForIcao } from './magvar.js';
 import { evaluateIcingRisk, fetchFreezingLevel } from './freezing-level.js';
 import { evaluateTakeoffPerformance } from './takeoff-performance.js';
 
-/**
- * Calcule la catégorie de vol courante depuis l'état.
- * @returns {{cat: string}|null}
- */
 function _currentCategory() {
     const parsed = state.lastParsed;
     if (!parsed) return null;
@@ -61,10 +24,6 @@ function _currentCategory() {
     return { cat: 'VFR' };
 }
 
-/**
- * Évalue l'ensemble des conditions et retourne un verdict structuré.
- * @returns {{verdict: 'GO'|'CAUTION'|'NO-GO'|'UNKNOWN', reasons: Array, color: string, cat: string}|null}
- */
 export function evaluateGoNoGo() {
     const parsed = state.lastParsed;
     if (!parsed) return null;
@@ -74,7 +33,6 @@ export function evaluateGoNoGo() {
     const reasons = [];
     let verdict = 'GO';
 
-    // ---- 1. Catégorie de vol ----
     const catObj = _currentCategory();
 
     if (catObj.cat === 'LIFR' || catObj.cat === 'IFR') {
@@ -95,7 +53,6 @@ export function evaluateGoNoGo() {
         });
     }
 
-    // ---- 2. Alertes minimas perso (danger + warning) ----
     const raw = document.getElementById('tafInput')?.value || '';
     let alerts = [];
     if (parsed.isMetar) {
@@ -125,7 +82,6 @@ export function evaluateGoNoGo() {
         });
     }
 
-    // ---- 3. Nuit aéronautique (NO-GO si VFR de jour) ----
     const memo = memoGet(parsed.code);
     const apt = getAirportByICAO(icao);
     const lat = memo?.lat ?? apt?.lat ?? null;
@@ -152,7 +108,6 @@ export function evaluateGoNoGo() {
         }
     }
 
-    // ---- 4. Densité altitude (CAUTION si élevée) ----
     const perf = getPerformanceData();
     if (perf) {
         const daResult = densityAltitude(perf.elevationFt, perf.qnh, perf.oat);
@@ -165,10 +120,6 @@ export function evaluateGoNoGo() {
         }
     }
 
-    // ---- 4a. Performance décollage vs longueur piste ----
-    // Le module "killer" VFR : traduit la densité-altitude en distance de
-    // décollage concrète et la compare à la piste. Nécessite que le pilote
-    // ait renseigné la longueur de piste du terrain (sinon : informatif seul).
     const toResult = evaluateTakeoffPerformance(icao);
     if (toResult) {
         if (toResult.level === 'danger') {
@@ -180,7 +131,6 @@ export function evaluateGoNoGo() {
         }
     }
 
-    // ---- 4b. Tendance de pression QNH (CAUTION/DANGER si chute rapide) ----
     if (state._pressureTrend) {
         const evalPt = evaluatePressureTrend(state._pressureTrend);
         if (evalPt && evalPt.level !== 'ok') {
@@ -189,7 +139,6 @@ export function evaluateGoNoGo() {
         }
     }
 
-    // ---- 4c. SIGMET / AIRMET actifs sur la zone ----
     if (state._sigmets && state._sigmets.length > 0) {
         const sigAlerts = evaluateSigmetAirmet(state._sigmets);
         sigAlerts.forEach(a => {
@@ -200,7 +149,6 @@ export function evaluateGoNoGo() {
         });
     }
 
-    // ---- 4d. Risque de givrage (isotherme 0°C vs plafond) ----
     if (state._freezingLevel != null) {
         const nuageStr = parsed.base?.nuage?.[0]?.val || '';
         const icing = evaluateIcingRisk(state._freezingLevel, nuageStr);
@@ -212,19 +160,17 @@ export function evaluateGoNoGo() {
         }
     }
 
-    // ---- 5. Vent traversier (CAUTION si > 70% de la limite) ----
     const windStr = parsed.base?.vent?.[0]?.val;
     const wind = windStr ? parseWindString(windStr) : null;
     if (wind && apt && apt.runways && wind.dir !== null) {
-        // Correction de déclinaison : vent en degrés vrais, piste en magnétique.
+
         const dec = getDeclinationForIcao(icao);
         const rwyData = selectBestRunway(apt.runways, wind, null, dec);
         if (rwyData.active) {
-            // Direction du vent corrigée en magnétique pour le calcul traversier.
+
             const magWindDir = (((wind.dir - dec) % 360) + 360) % 360;
             const xw = Math.abs(wind.speed * Math.sin((magWindDir - rwyData.active.hdg) * Math.PI / 180));
-            // Limite travers typique d'un avion école : 15 kt (demonstrated).
-            // Au-delà de 12 kt (80%), on met en garde.
+
             if (xw >= 12) {
                 if (verdict === 'GO') verdict = 'CAUTION';
                 reasons.push({
@@ -239,7 +185,6 @@ export function evaluateGoNoGo() {
         }
     }
 
-    // ---- Couleur du verdict ----
     const colors = {
         'GO': '#4ADE80',
         'CAUTION': '#F59E0B',
@@ -249,16 +194,8 @@ export function evaluateGoNoGo() {
     return { verdict, reasons, color: colors[verdict] || '#94A3B8', cat: catObj.cat };
 }
 
-// Mémorise le terrain pour lequel la tendance a été calculée, afin de
-// ne pas relancer l'appel API si on n'a pas changé de terrain.
 let _trendIcao = null;
 
-/**
- * Récupère (en arrière-plan) la tendance de pression QNH pour le terrain
- * courant, puis rafraîchit la bannière GO/NO-GO.
- * À appeler après chaque chargement de météo. Non-bloquant.
- * @param {string} icao Code OACI du terrain.
- */
 export async function refreshPressureTrend(icao) {
     if (!icao || icao === _trendIcao && state._pressureTrend) return;
     _trendIcao = icao;
@@ -266,22 +203,14 @@ export async function refreshPressureTrend(icao) {
     const trend = await fetchPressureTrend(icao);
     if (trend && _trendIcao === icao) {
         state._pressureTrend = trend;
-        // Rafraîchit la bannière avec la nouvelle donnée.
+
         renderGoNoGo();
     }
 }
 
-// Mémorise le terrain pour lequel les SIGMET ont été récupérés.
 let _sigmetIcao = null;
 let _sigmetCoords = null;
 
-/**
- * Récupère (en arrière-plan) les SIGMET/AIRMET actifs autour du terrain,
- * puis rafraîchit la bannière GO/NO-GO. Non-bloquant.
- * @param {number} lat Latitude du terrain.
- * @param {number} lon Longitude du terrain.
- * @param {string} icao Code OACI (pour le cache).
- */
 export async function refreshSigmet(lat, lon, icao) {
     if (lat == null || lon == null) return;
     const key = `${lat.toFixed(1)},${lon.toFixed(1)}`;
@@ -292,19 +221,14 @@ export async function refreshSigmet(lat, lon, icao) {
     const sigmets = await fetchSigmetAirmet(lat, lon);
     if (_sigmetIcao === icao) {
         state._sigmets = sigmets;
+        // Notifie la carte régionale pour tracé des polygones SIGMET/AIRMET.
+        document.dispatchEvent(new CustomEvent('sigmets-updated', { detail: sigmets }));
         renderGoNoGo();
     }
 }
 
-// Mémorise le terrain pour lequel le niveau de gel a été récupéré.
 let _freezingIcao = null;
 
-/**
- * Récupère (en arrière-plan) l'altitude du niveau de gel (isotherme 0°C)
- * pour le terrain courant, puis rafraîchit la bannière GO/NO-GO.
- * Non-bloquant. À appeler après chaque chargement de météo.
- * @param {string} icao Code OACI du terrain.
- */
 export async function refreshFreezingLevel(icao) {
     if (!icao || icao === _freezingIcao && state._freezingLevel != null) return;
     _freezingIcao = icao;
@@ -316,9 +240,6 @@ export async function refreshFreezingLevel(icao) {
     }
 }
 
-/**
- * Affiche la bannière GO/NO-GO dans le DOM.
- */
 export function renderGoNoGo() {
     const container = document.getElementById('go-nogo-banner');
     if (!container) return;
@@ -343,7 +264,6 @@ export function renderGoNoGo() {
         'NO-GO': isFr ? 'NO-GO — Vol déconseillé/interdit' : 'NO-GO — Flight not recommended/prohibited',
     };
 
-    // Construit la liste des raisons.
     let reasonsHtml = '';
     if (result.reasons.length > 0) {
         reasonsHtml = '<div class="go-nogo-reasons" style="margin-top:6px; display:flex; flex-direction:column; gap:4px; flex:1; min-height:0; overflow-y:auto;">';
@@ -384,13 +304,9 @@ export function renderGoNoGo() {
     container.style.display = 'flex';
     if (window.lucide) window.lucide.createIcons({ root: container });
 
-    // Bouton de réglage des minimums VFR perso.
     container.querySelector('#go-nogo-config')?.addEventListener('click', openThresholdsModal);
 }
 
-/**
- * Formate le texte d'une alerte pour la bannière.
- */
 function _formatAlertText(alert, isFr) {
     if (alert.category === 'phenomenon') return alert.title;
     let unit = '';

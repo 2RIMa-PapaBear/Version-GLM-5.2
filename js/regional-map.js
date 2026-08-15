@@ -1,6 +1,7 @@
 import { state, I18N, fetchAvecRelais, memoGet, surfaceLabel } from './core.js';
 import { getAirportByICAO, getAirportsInBbox } from './ui-module.js';
 import { parseVisiToMeters, getCeiling } from './core.js';
+import { HAZARD_COLORS } from './sigmet.js';
 import { showRouteWeather } from './route-weather.js';
 import { createPrecipController } from './radar-layer.js';
 import { createAirspaceController } from './airspaces.js';
@@ -10,6 +11,8 @@ import { getRunwayThresholds } from './runways-geo.js';
 let _map = null;
 let _precip = null;
 let _airspaces = null;
+let _sigmetLayer = null;
+let _currentBaseLayer = null;
 let _pirepMarkers = [];
 let _airportMarkers = [];
 let _neighborMarkers = [];
@@ -111,6 +114,23 @@ export function showRegionalMapFor(icao, force = false) {
     }
 }
 
+// Fonds de carte disponibles (source unique pour le basemap switcher).
+const BASEMAPS = {
+    satellite: () => L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics',
+        maxZoom: 19, maxNativeZoom: 19,
+    }),
+    osm: () => L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors', maxZoom: 19,
+    }),
+    dark: () => L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
+        attribution: '© CARTO © OpenStreetMap contributors', maxZoom: 19, subdomains: 'abcd',
+    }),
+    terrain: () => L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenTopoMap (CC-BY-SA)', maxZoom: 17, subdomains: 'abc',
+    }),
+};
+
 async function _initOrRefresh() {
     if (!_currentIcao) return;
 
@@ -129,12 +149,11 @@ async function _initOrRefresh() {
         
         _map = L.map(el, { zoomControl: true, attributionControl: true, maxZoom: 19 }).setView([lat, lon], 7);
 
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics',
-            maxZoom: 19, maxNativeZoom: 19,
-        }).addTo(_map);
-
-        el.dataset.baseLayer = 'satellite';
+        // Fond de carte : mémorisé dans localStorage, satellite par défaut.
+        const savedBase = localStorage.getItem('mt-basemap');
+        const baseKey = (savedBase && BASEMAPS[savedBase]) ? savedBase : 'satellite';
+        _currentBaseLayer = BASEMAPS[baseKey]().addTo(_map);
+        el.dataset.baseLayer = baseKey;
 
         _initLayerControls();
 
@@ -184,9 +203,134 @@ function _initLayerControls() {
     _airspaces = createAirspaceController(_map);
     _airspaces.mountControls(bar);
 
+    _sigmetLayer = createSigmetController(_map);
+    _sigmetLayer.mountControls(bar);
+
     _mountZoomAirfieldButton(bar);
 
     _precip.toggleRadar(true);
+
+    // Basemap switcher AJOUTÉ EN DERNIER (les autres contrôleurs pouvaient réorganiser la barre).
+    try { _mountBasemapSwitcher(bar); } catch (e) { console.error('basemap switcher failed:', e.message); }
+
+    // Écoute les mises à jour SIGMET émises par go-nogo.js (event custom 'sigmets-updated').
+    document.addEventListener('sigmets-updated', (e) => {
+        if (_sigmetLayer && e.detail) _sigmetLayer.refresh(e.detail);
+    });
+
+    // Redessine la route quand les waypoints changent (event émis par flight-planner-ui).
+    // On ne redessine QUE la polyline + marqueurs, SANS recharger les METARs du corridor
+    // (qui font 2 appels proxy et peuvent saturer si l'utilisateur tape rapidement).
+    window.addEventListener('route-changed', () => {
+        if (!_map || !_currentIcao) return;
+        const toInput = document.getElementById('route-to-input');
+        const toIcao = toInput?.value?.trim().toUpperCase();
+        if (toIcao && /^[A-Z]{4}$/.test(toIcao) && toIcao !== _currentIcao.toUpperCase()) {
+            showRouteWeather(_map, _currentIcao, toIcao, { skipMetars: true });
+        }
+    });
+}
+
+// Contrôleur SIGMET/AIRMET : trace les polygones de hazard sur la carte.
+function createSigmetController(map) {
+    let layer = null;
+    let visible = true;
+    let sigmets = [];
+
+    function _redraw() {
+        if (layer) { map.removeLayer(layer); layer = null; }
+        if (!visible || !sigmets || !sigmets.length) return;
+
+        const markers = [];
+        for (const s of sigmets) {
+            const color = HAZARD_COLORS[s.hazard] || HAZARD_COLORS.OTHER;
+            const isAirmet = s.type === 'AIRMET';
+            const label = isAirmet ? `AIRMET ${s.hazard}` : `SIGMET ${s.hazard}`;
+            const popupHtml = `<div style="max-width:280px;"><b style="color:${color};">${label}</b><br>` +
+                              `<pre style="white-space:pre-wrap; font-family:'DM Mono',monospace; font-size:11px; margin-top:4px;">${_escapeHtml(s.raw)}</pre></div>`;
+
+            if (s.polygon && s.polygon.length >= 3) {
+                markers.push(L.polygon(s.polygon, {
+                    color, weight: 2, opacity: 0.9, fillColor: color, fillOpacity: 0.12,
+                    dashArray: isAirmet ? '4 4' : null, zIndex: 500,
+                }).bindPopup(popupHtml));
+            } else if (s.center) {
+                markers.push(L.circleMarker([s.center.lat, s.center.lon], {
+                    radius: 8, color, weight: 2, fillColor: color, fillOpacity: 0.25, zIndex: 500,
+                }).bindPopup(popupHtml));
+            }
+        }
+        if (markers.length) {
+            layer = L.layerGroup(markers).addTo(map);
+        }
+    }
+
+    return {
+        refresh(newSigmets) { sigmets = newSigmets || []; _redraw(); },
+        toggle(on) { visible = on; _redraw(); },
+        isVisible() { return visible; },
+        mountControls(bar) {
+            const isFr = state.lang === 'fr';
+            const group = document.createElement('div');
+            group.className = 'precip-control-group';
+            group.innerHTML = `
+                <button class="precip-toggle sigmet-toggle ${visible ? 'active' : ''}" aria-pressed="${String(visible)}" title="${isFr ? 'Afficher les SIGMET/AIRMET' : 'Show SIGMET/AIRMET'}">
+                    <i data-lucide="alert-triangle" style="width:14px;height:14px;"></i>
+                    <span>SIGMET</span>
+                </button>`;
+            bar.appendChild(group);
+            if (window.lucide) window.lucide.createIcons({ root: group });
+            group.querySelector('.sigmet-toggle')?.addEventListener('click', (ev) => {
+                visible = !visible;
+                ev.currentTarget.setAttribute('aria-pressed', String(visible));
+                ev.currentTarget.classList.toggle('active', visible);
+                _redraw();
+            });
+            // Replay : si des SIGMET ont déjà été fetchés avant l'init de la carte.
+            if (state._sigmets && state._sigmets.length) {
+                sigmets = state._sigmets;
+                _redraw();
+            }
+        },
+        destroy() { if (layer) map.removeLayer(layer); },
+    };
+}
+
+function _escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+// Sélecteur de fond de carte (satellite / OSM / sombre / relief).
+function _mountBasemapSwitcher(bar) {
+    if (!bar) return;
+    const isFr = state.lang === 'fr';
+    const group = document.createElement('div');
+    group.className = 'precip-control-group';
+    // Récupère le fond mémorisé pour pré-sélectionner le <select>.
+    const savedBase = localStorage.getItem('mt-basemap');
+    const currentBase = (savedBase && BASEMAPS[savedBase]) ? savedBase : 'satellite';
+    const options = [
+        ['satellite', 'Satellite'],
+        ['osm',       isFr ? 'Plan'   : 'Map'],
+        ['dark',      isFr ? 'Sombre' : 'Dark'],
+        ['terrain',   isFr ? 'Relief' : 'Terrain'],
+    ];
+    group.innerHTML = `
+        <select class="basemap-select" title="${isFr ? 'Fond de carte' : 'Base map'}" aria-label="${isFr ? 'Fond de carte' : 'Base map'}">
+            ${options.map(([v, lbl]) => `<option value="${v}" ${v === currentBase ? 'selected' : ''}>${lbl}</option>`).join('')}
+        </select>`;
+    bar.appendChild(group);
+    group.querySelector('.basemap-select')?.addEventListener('change', (ev) => {
+        const key = ev.target.value;
+        if (!BASEMAPS[key] || !_map) return;
+        if (_currentBaseLayer) _map.removeLayer(_currentBaseLayer);
+        _currentBaseLayer = BASEMAPS[key]().addTo(_map);
+        _currentBaseLayer.bringToBack();   // les couches météo restent au-dessus
+        const el = document.getElementById('regional-map');
+        if (el) el.dataset.baseLayer = key;
+        // Mémorise le choix pour les prochaines sessions.
+        try { localStorage.setItem('mt-basemap', key); } catch (e) { /* localStorage indisponible */ }
+    });
 }
 
 function _mountZoomAirfieldButton(bar) {

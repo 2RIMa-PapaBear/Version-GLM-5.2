@@ -18,7 +18,7 @@
  * en network-first pour récupérer le nouveau index.html.
  * ================================================================ */
 
-const CACHE = 'mt-shell-v29';
+const CACHE = 'mt-shell-v43';
 
 // Hôtes de DONNÉES : jamais mis en cache (sécurité pilote).
 const NO_CACHE_HOSTS = [
@@ -40,6 +40,12 @@ const PRECACHE = [
     'favicon.ico',
     'icon.svg',
     'manifest.webmanifest',
+    // Modules JS critiques (sans ?v= — le PRECACHE est invalidé à chaque CACHE bump).
+    'js/app.js',
+    'js/core.js',
+    'js/regional-map.js',
+    'js/ui-module.js',
+    'css/style.css',
 ];
 
 // ----------------------------------------------------------------
@@ -132,9 +138,10 @@ self.addEventListener('fetch', (event) => {
     }
 
     // 3) Tout le reste du shell (CSS, JS, vendor, airports.json,
-    //    icônes, polices Google, suncalc CDN) : stale-while-revalidate.
+    //    icônes, polices Google, suncalc CDN) : network-first pour garantir
+    //    la fraîcheur du code (les modules ES n'ont pas de ?v= dans les imports).
     //    On n'intercepte que GET (les POST/PUT ne se cachent pas).
     if (req.method === 'GET') {
-        event.respondWith(staleWhileRevalidate(req));
+        event.respondWith(networkFirst(req));
     }
 });

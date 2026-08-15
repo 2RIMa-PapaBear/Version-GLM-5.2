@@ -1,22 +1,15 @@
-/* ================================================================
- * UI — Composants graphiques et manipulateurs DOM isolés
- * ================================================================ */
-
-import { I18N, PALETTE, UNIFIED_RED, REGEX_BLOCKS_PATTERN, parseVisiToMeters, getCeiling, findActiveValueAtHour } from './core.js';
+import { I18N, PALETTE, UNIFIED_RED, REGEX_BLOCKS_PATTERN, parseVisiToMeters, getCeiling, findActiveValueAtHour, CAT_COLORS, catColorRgba } from './core.js';
 import { state, memoGet } from './core.js';
 import { escapeHtml } from './core.js';
 import { dessinerGraphique, updateWindCompass, calculateFlightCategoryRobust, parseWindString, selectBestRunway, getForecastAtHour } from './engine.js';
 import { displayWeatherAlerts } from './weather.js';
+import { updateDecryptedWidgets, showDecryptedWidgets } from './widgets.js';
 import { idbGetAirports, idbPutAirports, AIRPORTS_DB_VERSION } from './db.js';
 
 let AIRPORTS = [];
-// Index O(1) par ICAO (majuscules) pour getAirportByICAO, appelé à chaque rendu.
+
 let AIRPORTS_BY_ICAO = new Map();
 
-/**
- * Reconstruit l'index Map (ICAO → aéroport) à partir du tableau AIRPORTS.
- * Appelé après chaque chargement réussi (cache ou réseau).
- */
 function rebuildIndex() {
     AIRPORTS_BY_ICAO = new Map();
     for (const a of AIRPORTS) {
@@ -24,10 +17,6 @@ function rebuildIndex() {
     }
 }
 
-/**
- * Avertit l'utilisateur si la base d'aéroports n'a pas pu charger
- * (autocomplete et recherche de piste seront désactivés).
- */
 function signalerErreurChargement() {
     AIRPORTS = [];
     rebuildIndex();
@@ -39,10 +28,7 @@ function signalerErreurChargement() {
 }
 
 export async function initAirportsDB() {
-    // 1) Chemin rapide : la base est déjà en cache IndexedDB (version à jour,
-    //    pas trop ancienne). On évite complètement le téléchargement des 4 Mo.
-    //    Une copie chaude reste en mémoire (AIRPORTS) pour conserver un accès
-    //    synchrone via getAirportByICAO (appelé à chaque rendu).
+
     const cached = await idbGetAirports();
     if (cached && cached.length > 0) {
         AIRPORTS = cached;
@@ -50,18 +36,13 @@ export async function initAirportsDB() {
         return;
     }
 
-    // 2) Cache miss (première visite, version obsolète ou IndexedDB absent) :
-    //    on télécharge airports.json puis on le persiste en arrière-plan.
-    //    cache:'reload' force la validation auprès du serveur plutôt que le
-    //    cache HTTP navigateur, pour récupérer la version correspondant à
-    //    AIRPORTS_DB_VERSION.
     try {
         const r = await fetch(`data/airports.json?v=${AIRPORTS_DB_VERSION}`, { cache: 'reload' });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const data = await r.json();
         AIRPORTS = Array.isArray(data) ? data : [];
         rebuildIndex();
-        // Persistance non bloquante : on ne bloque pas l'init sur l'écriture IDB.
+
         idbPutAirports(AIRPORTS).catch(() => {});
     } catch (e) {
         console.warn('Airports DB load failed:', e);
@@ -73,38 +54,21 @@ export function getAirportByICAO(icao) {
     return AIRPORTS_BY_ICAO.get(icao.toUpperCase()) || null;
 }
 
-/**
- * Retourne tous les aérodromes dans un rectangle englobant (bbox).
- * Exclut les ULM/hélistations (piste < 1000 ft / ~300 m).
- * @param {number} minLat Latitude minimale.
- * @param {number} minLon Longitude minimale.
- * @param {number} maxLat Latitude maximale.
- * @param {number} maxLon Longitude maximale.
- * @returns {Array<{icao:string,name:string,lat:number,lon:number}>}
- */
 export function getAirportsInBbox(minLat, minLon, maxLat, maxLon) {
     return AIRPORTS
         .filter(a =>
             a.lat >= minLat && a.lat <= maxLat &&
             a.lon >= minLon && a.lon <= maxLon &&
-            (a.longestRunway || 0) >= 1000  // exclut ULM/hélistations
+            (a.longestRunway || 0) >= 1000
         )
         .map(a => ({ icao: a.icao, name: a.name, lat: a.lat, lon: a.lon }));
 }
 
-/**
- * Enrichit (ou crée) l'entrée d'un terrain dans l'index en mémoire avec
- * des données plus fraîches (OpenAIP). Les champs existants de la base
- * locale sont conservés, les champs OpenAIP les écrasent s'ils sont plus
- * précis (élévation, pistes, revêtements, déclinaison).
- * @param {string} icao Code OACI.
- * @param {Object} enriched Données au format interne (depuis OpenAIP).
- */
 export function enrichAirport(icao, enriched) {
     if (!icao || !enriched) return;
     const key = icao.toUpperCase();
     const existing = AIRPORTS_BY_ICAO.get(key) || {};
-    // Fusion : OpenAIP écrase les champs qu'il fournit, garde les autres.
+
     AIRPORTS_BY_ICAO.set(key, { ...existing, ...enriched, icao: key });
 }
 
@@ -121,9 +85,11 @@ export function sanitizeStorage() {
 
 export function _showDashboard(isMetar) {
     const d = document.getElementById('metar-dashboard'); if (d) d.classList.add('visible');
+    showDecryptedWidgets(true);
 }
 export function _hideDashboard() {
     const d = document.getElementById('metar-dashboard'); if (d) d.classList.remove('visible');
+    showDecryptedWidgets(false);
 }
 
 export function _selectAndFetch(icao) {
@@ -134,8 +100,7 @@ export function _selectAndFetch(icao) {
 export function updateFinalUI(res, raw, forcedId) {
     if (state.rafId) cancelAnimationFrame(state.rafId);
     state.rafId = requestAnimationFrame(() => {
-        // Les pistes proviennent du terrain demandé par l'utilisateur (ex: LFEA),
-        // pas du terrain dont la météo est affichée (ex: LFRH le plus proche).
+
         const aptCode = state.requestedIcao || res.code;
         const apt = getAirportByICAO(aptCode); const runways = apt ? apt.runways : null;
         const memo = memoGet(res.code);
@@ -147,10 +112,9 @@ export function updateFinalUI(res, raw, forcedId) {
             if (apt && (!displayName || displayName === res.code)) {
                 displayName = apt.name;
             }
-            // displayName peut venir de l'API NOAA → échappement XSS avant innerHTML.
+
             let infoHtml = `<strong>${I18N[state.lang].lblAirport}</strong> `;
-            // Quand la météo vient d'un autre terrain que celui demandé, on affiche
-            // le terrain demandé suivi de la provenance de la météo.
+
             if (aptCode !== res.code && state.warningMessage) {
                 const reqApt = getAirportByICAO(aptCode);
                 const reqName = reqApt ? reqApt.name : aptCode;
@@ -169,16 +133,16 @@ export function updateFinalUI(res, raw, forcedId) {
         if (res.isMetar) {
             displayWeatherAlerts(raw, res);
             updateWindCompass(res, null, null, runways, forcedId, apt);
-            
+
             const cat = calculateFlightCategoryRobust(res.base?.visi?.[0]?.val, res.base?.nuage?.[0]?.val);
-            
+
             let tempoCatObj = null;
             let tempoProb = '';
             (res.tempo || []).forEach(b => {
                 const tVisi = b.visi || res.base?.visi?.[0]?.val;
                 const tNuage = b.nuage || res.base?.nuage?.[0]?.val;
                 const tCatObj = calculateFlightCategoryRobust(tVisi, tNuage);
-                
+
                 if (tCatObj.cat !== 'VFR') {
                     const getSev = (c) => c === 'LIFR' ? 4 : (c === 'IFR' ? 3 : (c === 'MVFR' ? 2 : 1));
                     if (!tempoCatObj || getSev(tCatObj.cat) > getSev(tempoCatObj.cat)) {
@@ -190,28 +154,30 @@ export function updateFinalUI(res, raw, forcedId) {
             });
 
             updateFlightCategoryBadge(cat, res.weatherIcon, true, true, false, runways, forcedId, res.base?.vent?.[0]?.val, res.base?.visi?.[0]?.val, res.base?.nuage?.[0]?.val, tempoCatObj, tempoProb.trim());
+            updateDecryptedWidgets(res, null);
         } else {
             let targetH = state.manualTargetHour === null ? (new Date().getUTCHours() + new Date().getUTCMinutes()/60) : state.manualTargetHour;
-            
+
             if (targetH >= res.startH && targetH <= res.endH) {
                 displayWeatherAlerts(raw, res, targetH);
             } else {
                 displayWeatherAlerts(null, null);
             }
-            
+
             let diffH = Math.round(targetH - res.startH);
             let labelTime = diffH === 0 ? "H+0" : (diffH > 0 ? `H+${diffH}h` : `H${diffH}h`);
-            
+
             updateWindCompass(res, targetH, labelTime, runways, forcedId, apt);
             const forecast = getForecastAtHour(res, targetH);
-            
+
             let windStr = findActiveValueAtHour(res.base?.vent, targetH);
             let visiStr = findActiveValueAtHour(res.base?.visi, targetH);
             let nuageStr = findActiveValueAtHour(res.base?.nuage, targetH);
-            
+
             updateFlightCategoryBadge(forecast.catObj, forecast.icon, true, false, false, runways, forcedId, windStr, visiStr, nuageStr, forecast.tempoCatObj, forecast.tempoProb);
+            updateDecryptedWidgets(res, targetH);
         }
-        
+
         let targetHGraph = state.manualTargetHour === null ? (new Date().getUTCHours() + new Date().getUTCMinutes()/60) : state.manualTargetHour;
         dessinerGraphique(res, targetHGraph, tz);
         state.rafId = null;
@@ -228,13 +194,13 @@ function demarrerHorlogeLocale(icao) {
         let hh = String(locD.getUTCHours()).padStart(2, '0'); let mm = String(locD.getUTCMinutes()).padStart(2, '0');
         let tempStr = memo.temperature != null ? memo.temperature : '--';
         let qnhStr = memo.qnh != null ? memo.qnh : '--';
-        
+
         let displayName = memo.name;
         const apt = getAirportByICAO(icao);
         if (apt && (!displayName || displayName === icao)) displayName = apt.name;
 
         let str = I18N[state.lang].localTimeFormat.replace('{time}', `${hh}:${mm}`).replace('{name}', displayName).replace('{temp}', tempStr).replace('{qnh}', qnhStr);
-        // displayName et str contiennent des valeurs issues de l'API → échappement XSS.
+
         infoDiv.innerHTML = state.baseInfoString + `<span style="opacity:0.8;font-size:0.9em;margin-left:8px;">${escapeHtml(str)}</span>`;
     };
     majHorloge(); state.horlogeInterval = setInterval(majHorloge, 60000);
@@ -242,7 +208,7 @@ function demarrerHorlogeLocale(icao) {
 
 export function updateFlightCategoryBadge(catObj, iconName, showAnim, isMetar, isTafFuture, runways, forcedId, windStr, visiStr, nuageStr, tempoCatObj = null, tempoProbLabel = '') {
     const b = document.getElementById('flight-cat-badge'); if (!b) return;
-    
+
     const speed = windStr ? (parseWindString(windStr)?.speed || 0) : 0;
     const visiM = parseVisiToMeters(visiStr || '');
     const ceilFt = getCeiling(nuageStr || '') * 100;
@@ -252,15 +218,9 @@ export function updateFlightCategoryBadge(catObj, iconName, showAnim, isMetar, i
     let ceilLabel = nuageStr ? (ceilFt === 99900 ? (I18N[state.lang].lblCeilingUnlimited || 'Unlimited') : ceilFt+' ft') : '--';
 
     b.className = 'dashboard-cell vfr-card ' + (catObj.class || `cat-${catObj.cat.toLowerCase()}`);
-    
-    let bgCol, borderCol;
-    switch(catObj.cat) {
-        case 'VFR': bgCol = 'rgba(74, 222, 128, 0.2)'; borderCol = '#4ADE80'; break;
-        case 'MVFR': bgCol = 'rgba(56, 189, 248, 0.2)'; borderCol = '#38BDF8'; break;
-        case 'IFR': bgCol = 'rgba(248, 113, 113, 0.2)'; borderCol = '#F87171'; break;
-        case 'LIFR': bgCol = 'rgba(217, 70, 239, 0.2)'; borderCol = '#D946EF'; break;
-        default: bgCol = 'rgba(148, 163, 184, 0.2)'; borderCol = '#94A3B8';
-    }
+
+    const borderCol = CAT_COLORS[catObj.cat] || CAT_COLORS.NONE;
+    const bgCol = catColorRgba(catObj.cat, 0.2);
 
     b.style.background = bgCol;
     b.style.borderColor = borderCol;
@@ -272,13 +232,7 @@ export function updateFlightCategoryBadge(catObj, iconName, showAnim, isMetar, i
 
     let tempoHtml = '';
     if (tempoCatObj && tempoCatObj.cat !== 'VFR') {
-        let tCol;
-        switch(tempoCatObj.cat) {
-            case 'MVFR': tCol = '#38BDF8'; break;
-            case 'IFR': tCol = '#F87171'; break;
-            case 'LIFR': tCol = '#D946EF'; break;
-            default: tCol = '#94A3B8';
-        }
+        const tCol = CAT_COLORS[tempoCatObj.cat] || CAT_COLORS.NONE;
         tempoHtml = `<div style="color:${tCol}; font-size:18px; font-weight:800; margin-top:4px; letter-spacing: 0.5px;">${tempoProbLabel} ${tempoCatObj.cat}</div>`;
     }
 
@@ -306,12 +260,9 @@ export function updateFlightCategoryBadge(catObj, iconName, showAnim, isMetar, i
             </div>
         </div>
     `;
-    
+
     b.innerHTML = html;
-    // L'animation windArrowPulse part de opacity:0/scale:0.5 : si on la relance à
-    // chaque rendu, le badge clignote car genererGraphique est appelé plusieurs
-    // fois par fetch (callbacks Open-Meteo, OpenAIP, etc.). On ne l'anime que
-    // quand la catégorie de vol change réellement.
+
     const prevCat = b.dataset.lastCat;
     if (showAnim && catObj.cat !== prevCat) {
         b.style.animation = 'none'; void b.offsetWidth; b.style.animation = 'windArrowPulse 0.4s ease-out';
@@ -352,22 +303,15 @@ export function isFavorite(icao) {
     try { return (JSON.parse(localStorage.getItem('favorites')) || []).includes(icao); } catch (e) { console.warn('isFavorite failed:', e); return false; }
 }
 
-/**
- * Retourne le favori à charger automatiquement au démarrage, ou null.
- */
 export function getStartupFavorite() {
     try { return localStorage.getItem('startup-favorite') || null; } catch (e) { return null; }
 }
 
-/**
- * Définit ou retire le favori de démarrage.
- * @param {string|null} icao Code OACI, ou null pour désactiver.
- */
 export function setStartupFavorite(icao) {
     try {
         if (icao) localStorage.setItem('startup-favorite', icao);
         else localStorage.removeItem('startup-favorite');
-    } catch (e) { /* quota */ }
+    } catch (e) {   }
 }
 
 export function updateFavoritesUI(onSelect) {
@@ -416,7 +360,7 @@ export function updateFavoritesUI(onSelect) {
         i.addEventListener('click', function(e) {
             e.stopPropagation();
             toggleFavorite(this.dataset.icao);
-            // Si le favori supprimé était le favori de démarrage, on le retire aussi.
+
             if (this.dataset.icao === getStartupFavorite()) setStartupFavorite(null);
             updateFavoritesUI(onSelect);
         });
@@ -437,7 +381,7 @@ export function renderSearchHistory(containerId, onSelect) {
     let h = []; try { h = JSON.parse(localStorage.getItem('search-history')) || []; } catch {}
     const tr = I18N[state.lang];
     if (h.length === 0) { c.innerHTML = `<div class="history-empty">${tr.noRecentSearch || 'Aucune recherche récente.'}</div>`; return; }
-    
+
     let html = '<div class="history-items">';
     h.forEach(icao => {
         let apt = getAirportByICAO(icao);
@@ -453,13 +397,13 @@ export function renderSearchHistory(containerId, onSelect) {
     });
     const clearLabel = tr.clearHistory || (state.lang === 'fr' ? "Vider l'historique" : "Clear History");
     html += `</div><button id="btn-clear-history" class="btn-clear-history">${clearLabel}</button>`;
-    
+
     c.innerHTML = html;
-    
+
     c.querySelectorAll('.history-item').forEach(b => b.addEventListener('click', function() { onSelect(this.dataset.icao); }));
     const clearBtn = document.getElementById('btn-clear-history');
     if (clearBtn) clearBtn.addEventListener('click', () => { localStorage.removeItem('search-history'); renderSearchHistory(containerId, onSelect); });
-    
+
     if (window.lucide) window.lucide.createIcons({ root: c });
 }
 
@@ -477,13 +421,11 @@ export function initAutocomplete(inputId, onSelect) {
         input.parentElement.appendChild(dropdown);
     }
 
-    // Index de navigation clavier dans la liste d'autocomplétion
     let activeIndex = -1;
-    // Debounce pour l'autocomplétion live (évite de spammer l'API à chaque frappe).
+
     let _acDebounce = null;
     let _acRequestId = 0;
 
-    // Nettoyage de l'ancien listener pour éviter la fuite mémoire
     if (_autocompleteClickHandler) {
         document.removeEventListener('click', _autocompleteClickHandler);
     }
@@ -503,10 +445,6 @@ export function initAutocomplete(inputId, onSelect) {
         });
     }
 
-    /**
-     * Affiche les résultats d'autocomplétion.
-     * @param {Array} results Liste de terrains ({icao, name, country}).
-     */
     function _renderAutocomplete(results) {
         dropdown.innerHTML = '';
         activeIndex = -1;
@@ -517,18 +455,35 @@ export function initAutocomplete(inputId, onSelect) {
         results.forEach(apt => {
             const item = document.createElement('button');
             item.className = 'autocomplete-item';
-            // Si l'ICAO est dispo on l'affiche, sinon juste le nom + pays.
+
             const icaoHtml = apt.icao
                 ? `<span class="autocomplete-icao">${escapeHtml(apt.icao)}</span>`
                 : `<span class="autocomplete-icao" style="opacity:0.5;font-size:10px;">${escapeHtml(apt.country || '')}</span>`;
             item.innerHTML = `${icaoHtml}<span class="autocomplete-name">${escapeHtml(apt.name)}</span>`;
             item.addEventListener('click', (e) => {
                 e.preventDefault();
-                // Priorise l'ICAO s'il existe, sinon utilise le nom.
-                input.value = apt.icao || apt.name;
+
+                let value = apt.icao;
+
+                if (!value && apt.name) {
+                    const norm = s => String(s).toUpperCase().replace(/[\s\-_'.]/g, '');
+                    const target = norm(apt.name);
+                    if (target.length >= 4) {
+                        const cands = AIRPORTS.filter(a => a.name && a.icao && norm(a.name).includes(target));
+                        if (cands.length === 1) value = cands[0].icao;
+                        else if (cands.length > 1) {
+                            const exact = cands.find(a => norm(a.name) === target);
+                            value = (exact || cands[0]).icao;
+                        }
+                    }
+                }
+
+                if (!value) value = apt.name;
+
+                input.value = value;
                 dropdown.classList.remove('visible');
                 activeIndex = -1;
-                onSelect(apt.icao || apt.name);
+                onSelect(value);
             });
             dropdown.appendChild(item);
         });
@@ -537,14 +492,12 @@ export function initAutocomplete(inputId, onSelect) {
 
     input.addEventListener('input', () => {
         const val = input.value.trim();
-        // Si moins de 2 caractères : on retombe sur la base locale (instantané)
-        // pour les codes OACI courts et les favoris. Au-delà, recherche live OpenAIP.
+
         if (val.length < 2) {
             dropdown.classList.remove('visible');
             return;
         }
 
-        // 1. D'abord, résultats instantanés depuis la base locale (offline, rapide).
         const valUpper = val.toUpperCase();
         const localMatches = AIRPORTS.filter(a =>
             (a.icao && a.icao.toUpperCase().includes(valUpper)) ||
@@ -552,26 +505,22 @@ export function initAutocomplete(inputId, onSelect) {
         ).slice(0, 6);
         if (localMatches.length > 0) _renderAutocomplete(localMatches);
 
-        // 2. Puis recherche live OpenAIP (plus complète, noms étrangers, etc.).
-        // Debounce 300 ms pour ne pas spammer l'API à chaque frappe.
         clearTimeout(_acDebounce);
         const reqId = ++_acRequestId;
         _acDebounce = setTimeout(async () => {
             try {
                 const { searchAirports } = await import('./openaip.js');
                 const liveResults = await searchAirports(val, 8);
-                // On ne remplace que si c'est toujours la requête la plus récente
-                // (l'utilisateur a pu continuer à taper).
+
                 if (reqId === _acRequestId && liveResults.length > 0) {
-                    // Si on a déjà 6 résultats locaux pertinents, on complète plutôt
-                    // que remplacer (pour ne pas faire clignoter).
+
                     if (localMatches.length >= 6) {
-                        // Les locaux sont déjà bons, on garde.
+
                         return;
                     }
                     _renderAutocomplete(liveResults);
                 }
-            } catch { /* API indisponible → on garde les résultats locaux */ }
+            } catch {   }
         }, 300);
     });
 

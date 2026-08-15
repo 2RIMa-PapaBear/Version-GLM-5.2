@@ -1,12 +1,26 @@
-/* ================================================================
- * CORE — Fondations : constantes, état, utilitaires, fetch
- * ================================================================ */
-
 import { PROXY_URL } from './config.local.js';
 
 export const UNIFIED_RED = "#BF360C";
 export const PALETTE = ["#1976D2", "#F57C00", "#00ACC1", "#5D4037", "#3949AB", "#455A64"];
 export const REGEX_BLOCKS_PATTERN = /(PROB\d{2}\s+TEMPO|PROB\d{2}|TEMPO|BECMG|NOSIG|FM\d{4,6}Z?|TL\d{4}Z?|AT\d{4}Z?)/g;
+
+// Source de vérité unique pour les couleurs de catégorie de vol.
+// DOIT rester synchronisée avec les variables CSS --cat-* dans css/style.css :root.
+export const CAT_COLORS = {
+    VFR:  '#4ADE80',
+    MVFR: '#38BDF8',
+    IFR:  '#F87171',
+    LIFR: '#D946EF',
+    NONE: '#94A3B8',
+};
+// Variante rgba (pour fonds translucides de badges/cartes). alpha = opacité 0..1.
+export function catColorRgba(cat, alpha = 0.2) {
+    const hex = CAT_COLORS[cat] || CAT_COLORS.NONE;
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 export const I18N = {
     fr: {
@@ -25,16 +39,16 @@ export const I18N = {
         footerWarning: "Avertissement : Cet outil est fourni à titre indicatif. Ne pas utiliser pour la préparation des vols.",
         legClr: "Clair", legFew: "Peu", legSct: "Épars",
         legBkn: "Fragmenté", legOvc: "Couvert", legVv: "Invisible",
-        
-        lblCloud: "Plafond", 
-        lblWeather: "Météo", 
+
+        lblCloud: "Plafond",
+        lblWeather: "Météo",
         lblVisi: "Visibilité",
-        lblWind: "Vent moyen\n(KT)", 
+        lblWind: "Vent moyen\n(KT)",
         lblSun: "Soleil",
-        lblTemp: "T° / Rosée", 
-        lblQnh: "QNH", 
+        lblTemp: "T° / Rosée",
+        lblQnh: "QNH",
         lblTafTemp: "Temp°",
-        
+
         txtMax: "Max", txtMin: "Mini", prefixLight: "Faible ", prefixHeavy: "Forte ",
         validFrom: "du", validTo: "au", validAt: "à", validH: "h00",
         lblAirport: "Aéroport :", lblSearching: "(Recherche du nom...)", lblObservation: "Observation :",
@@ -95,7 +109,26 @@ export const I18N = {
             "VA":"Cendres","DU":"Poussière","SA":"Sable",
             "NSW":"Fin Phéno","VV///":"Ciel invisible"
         },
-        // ---- Calques carte régionale (radar / espaces) ----
+
+        // --- Widgets données décryptées (js/widgets.js) ---
+        lblWidgetWind: "Vent",
+        lblWidgetVisi: "Visibilité",
+        lblWidgetCeiling: "Plafond",
+        lblWidgetTemp: "Température",
+        lblWidgetDewpoint: "Point de rosée",
+        lblWidgetSpread: "Écart",
+        lblWidgetQnh: "Pression (QNH)",
+        lblWidgetGust: "Rafales",
+        lblWidgetVariable: "Variable",
+        lblWidgetCalm: "Calme",
+        lblWidgetUnlimited: "Illimité",
+        lblWidgetIcing: "Givrage",
+        lblIcingOk: "Aucun risque",
+        lblIcingCaution: "Risque modéré",
+        lblIcingDanger: "Risque élevé",
+        lblModelCompare: "Modèles",
+        lblModelCompareAt3h: "à H+3",
+
         mapLayerRadar: "Radar",
         mapLayerAirspaces: "Espaces",
         mapRadarPlay: "Lecture",
@@ -104,13 +137,13 @@ export const I18N = {
         mapRadarLayers: "Couches radar",
         mapAirspacesTitle: "Espaces aériens (CTR, TMA, classes...)",
         mapPrecipAnimation: "Animation précipitations",
-        // ---- PIREPs & info terrain (Phase 4) ----
+
         freqsAndAirfieldInfo: "Fréquences & info terrain",
         pirepTitle: "PIREP",
-        // ---- UX Phase 5 (cockpit, share) ----
+
         cockpitModeTitle: "Briefing express (vue cockpit)",
         shareTitle: "Partager ce briefing",
-        // ---- Watchdog Phase 6 ----
+
         watchdogTitle: "Surveillance des favoris"
     },
     en: {
@@ -125,16 +158,16 @@ export const I18N = {
         localTimeFormat: " (Currently at {time} in {name}: {temp}°C, QNH {qnh} hPa [live])",
         footerWarning: "Warning: Informational purposes only. Do not use for flight preparation.",
         legClr: "Clear", legFew: "Few", legSct: "Scattered", legBkn: "Broken", legOvc: "Overcast", legVv: "Invisible",
-        
-        lblCloud: "Ceiling", 
-        lblWeather: "Weather", 
-        lblVisi: "Visibility", 
-        lblWind: "Avg Wind\n(KT)", 
+
+        lblCloud: "Ceiling",
+        lblWeather: "Weather",
+        lblVisi: "Visibility",
+        lblWind: "Avg Wind\n(KT)",
         lblSun: "Sun",
-        lblTemp: "Temp/Dew", 
-        lblQnh: "QNH", 
+        lblTemp: "Temp/Dew",
+        lblQnh: "QNH",
         lblTafTemp: "Temp°",
-        
+
         txtMax: "Max", txtMin: "Min", prefixLight: "Light ", prefixHeavy: "Heavy ",
         validFrom: "from", validTo: "to", validAt: "at", validH: ":00",
         lblAirport: "Airport:", lblSearching: "(Searching name...)", lblObservation: "Observation:",
@@ -195,7 +228,26 @@ export const I18N = {
             "VA":"Volcanic Ash","DU":"Dust","SA":"Sand",
             "NSW":"No Sig Weather","VV///":"Invisible Sky"
         },
-        // ---- Regional map layers (radar / airspaces) ----
+
+        // --- Decoded data widgets (js/widgets.js) ---
+        lblWidgetWind: "Wind",
+        lblWidgetVisi: "Visibility",
+        lblWidgetCeiling: "Ceiling",
+        lblWidgetTemp: "Temperature",
+        lblWidgetDewpoint: "Dew point",
+        lblWidgetSpread: "Spread",
+        lblWidgetQnh: "Pressure (QNH)",
+        lblWidgetGust: "Gusts",
+        lblWidgetVariable: "Variable",
+        lblWidgetCalm: "Calm",
+        lblWidgetUnlimited: "Unlimited",
+        lblWidgetIcing: "Icing",
+        lblIcingOk: "No risk",
+        lblIcingCaution: "Moderate risk",
+        lblIcingDanger: "High risk",
+        lblModelCompare: "Models",
+        lblModelCompareAt3h: "at H+3",
+
         mapLayerRadar: "Radar",
         mapLayerAirspaces: "Airspaces",
         mapRadarPlay: "Play",
@@ -204,74 +256,53 @@ export const I18N = {
         mapRadarLayers: "Radar layers",
         mapAirspacesTitle: "Airspaces (CTR, TMA, classes...)",
         mapPrecipAnimation: "Precipitation animation",
-        // ---- PIREPs & airfield info (Phase 4) ----
+
         freqsAndAirfieldInfo: "Frequencies & airfield info",
         pirepTitle: "PIREP",
-        // ---- UX Phase 5 (cockpit, share) ----
+
         cockpitModeTitle: "Briefing express (cockpit view)",
         shareTitle: "Share this briefing",
-        // ---- Watchdog Phase 6 ----
+
         watchdogTitle: "Favorites watchdog"
     }
 };
 
 export const MEMO_MAX = 50;
 
-// ================================================================
-// Store — État global encapsulé
-// ================================================================
-// L'état est divisé en domaines fonctionnels pour rendre le flux
-// de données traçable. Chaque domaine expose des getters/setters
-// nommés au lieu d'un accès direct aux propriétés.
-// ================================================================
-
 const _state = {
-    // --- Langue & i18n ---
+
     lang: 'fr',
 
-    // --- Requête en cours ---
     isMetar: false,
     warningMessage: '',
     lastCacheKey: null,
     lastParsed: null,
     lastRenderState: null,
-    // Code OACI demandé par l'utilisateur (peut différer de res.code quand on
-    // affiche le terrain le plus proche). Sert à récupérer les pistes du terrain
-    // d'atterrissage réel, pas du terrain dont la météo est affichée.
+
     requestedIcao: null,
 
-    // --- Interaction graphique ---
+    route: null,  // tableau d'OACO pour le multi-waypoints (null = route A→B simple)
+
     manualTargetHour: null,
     forcedRunway: null,
     isDragging: false,
     graphMetrics: null,
     sunLineHitboxes: [],
 
-    // --- Cache (internes, accédés via sunCacheGet/Set & memoGet/Set) ---
     _sunCache: {},
     _sunCacheOrder: [],
     _memo: {},
     _memoOrder: [],
 
-    // --- Timers / RAF ---
     rafId: null,
     horlogeInterval: null,
     debounceTimer: null,
 
-    // --- Callbacks ---
     refreshCallback: null,
 
-    // --- UI transitoire ---
     baseInfoString: '',
 };
 
-/**
- * Store public — seul point d'accès à l'état global.
- * L'objet lui-même est immutable (freeze) ; les propriétés internes
- * sont accessibles en lecture via les getters ci-dessous et en écriture
- * via les setters. Cela permet d'ajouter des logs, de la validation
- * ou de la réactivité ultérieurement sans casser les modules consommateurs.
- */
 export const state = new Proxy(_state, {
     get(target, prop) {
         return target[prop];
@@ -283,8 +314,6 @@ export const state = new Proxy(_state, {
     },
 });
 
-// Pour rétro-compatibilité : `sunCache` et `memo` sont désormais
-// des propriétés virtuelles qui délèguent aux préfixes internes.
 Object.defineProperty(_state, 'sunCache', {
     get() { return _state._sunCache; },
     set(v) { _state._sunCache = v; },
@@ -305,8 +334,6 @@ Object.defineProperty(_state, 'memoOrder', {
     set(v) { _state._memoOrder = v; },
     enumerable: true,
 });
-// Supprime currentLanguage (doublon de lang, jamais lu) — ignoré par le proxy.
-// Supprime lastLoadedICAO et lastFocusedElement (jamais utilisés).
 
 export function sunCacheSet(key, val) {
     if (!state.sunCache[key]) {
@@ -340,11 +367,6 @@ export function parseVisiToMeters(visiStr) {
     return mMatch ? parseInt(mMatch[1], 10) : 10000;
 }
 
-/**
- * Trouve la valeur active d'un bloc de données à une heure cible donnée.
- * Parcourt les blocs du dernier au premier ; retourne la valeur du premier bloc
- * dont la plage [start, end) contient targetHour et dont val est truthy.
- */
 export function findActiveValueAtHour(blocks, targetHour) {
     if (!blocks || !blocks.length) return null;
     for (let i = blocks.length - 1; i >= 0; i--) {
@@ -356,7 +378,7 @@ export function findActiveValueAtHour(blocks, targetHour) {
 
 export function getCeiling(nuageStr) {
     if (!nuageStr || nuageStr.includes('CAVOK') || nuageStr.includes('NSC') || nuageStr.includes('SKC') || nuageStr.includes('NCD')) return 999;
-    if (nuageStr.includes('VV///')) return 0; 
+    if (nuageStr.includes('VV///')) return 0;
 
     let lowest = 999;
     const regexRaw = /(BKN|OVC|VV)(\d{3})(?!ft)/g;
@@ -365,13 +387,13 @@ export function getCeiling(nuageStr) {
         const alt = parseInt(match[2], 10);
         if (alt < lowest) lowest = alt;
     }
-    
+
     const regexParsed = /(BKN|OVC|VV)\s+(\d+)ft/g;
     while ((match = regexParsed.exec(nuageStr)) !== null) {
         const alt = parseInt(match[2], 10) / 100;
         if (alt < lowest) lowest = alt;
     }
-    
+
     return lowest;
 }
 
@@ -435,10 +457,6 @@ export function escapeHtml(text) {
     return _escapeEl.innerHTML;
 }
 
-// ----------------------------------------------------------------
-// Revêtements de piste — traduction des codes (ASP, GRE, CON...)
-// Défini ici (core) pour être réutilisable sans cycle d'import.
-// ----------------------------------------------------------------
 export const SURFACE_LABELS = {
     ASP: { fr: 'Asphalte', en: 'Asphalt' },
     BIT: { fr: 'Bitume traité', en: 'Bituminous' },
@@ -465,14 +483,8 @@ export const SURFACE_LABELS = {
     WAT: { fr: 'Eau (hydravion)', en: 'Water' },
 };
 
-// Codes "mous" (sensibles à l'humidité, roulement allongé).
 export const SOFT_SURFACES = new Set(['GRE', 'GRS', 'GVL', 'CLA', 'SAN', 'LAT']);
 
-/**
- * Traduit un code de revêtement en texte.
- * @param {string} code
- * @param {string} [lang] 'fr'/'en', défaut state.lang.
- */
 export function surfaceLabel(code, lang) {
     const l = lang || (state.lang) || 'fr';
     const info = SURFACE_LABELS[code];
@@ -480,18 +492,8 @@ export function surfaceLabel(code, lang) {
     return l === 'fr' ? info.fr : info.en;
 }
 
-/**
- * Proxy météo.
- *
- * aviationweather.gov ne supporte pas CORS → on passe par un proxy Google
- * Apps Script dont l'URL est définie dans js/config.local.js (fichier séparé,
- * gitignoré). L'URL reste visible côté navigateur (inévitable en 100% statique)
- * mais elle est ainsi centralisée et isolée du code applicatif.
- *
- * Nominatim et Open-Meteo supportent CORS nativement → appel direct.
- */
 export async function fetchAvecRelais(url, type = 'text') {
-    // Nominatim supporte CORS nativement — appel direct.
+
     if (url.includes('nominatim.openstreetmap.org')) {
         try {
             const res = await fetch(url);
@@ -503,45 +505,59 @@ export async function fetchAvecRelais(url, type = 'text') {
     }
 
     const proxyUrl = `${PROXY_URL}?url=${encodeURIComponent(url)}`;
-    try {
+
+    // Tentative unique via le proxy, avec extraction du contenu.
+    async function _oneAttempt() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 25000);
-        const res = await fetch(proxyUrl, { signal: controller.signal });
-        clearTimeout(timeoutId);
-        const rawData = await res.text();
+        try {
+            const res = await fetch(proxyUrl, { signal: controller.signal });
+            const rawData = await res.text();
+            if (rawData.startsWith('PROXY_ERROR:')) throw new Error(`Google n'a pas pu joindre la cible : ${rawData}`);
+            // Détecte une page HTML (AviationWeather renvoie parfois une 502/503 sous charge).
+            if (rawData.trim().startsWith('<') && !rawData.toLowerCase().includes('<?xml')) {
+                throw new Error('__HTML_INATTENDU__');  // marqueur interne pour retry
+            }
+            return rawData;
+        } finally {
+            clearTimeout(timeoutId);
+        }
+    }
 
-        if (rawData.startsWith('PROXY_ERROR:')) throw new Error(`Google n'a pas pu joindre la cible : ${rawData}`);
-        if (rawData.trim().startsWith('<') && !rawData.toLowerCase().includes('<?xml')) throw new Error("HTML inattendu reçu au lieu des données météo.");
+    try {
+        let rawData;
+        try {
+            rawData = await _oneAttempt();
+        } catch (e) {
+            // Retry unique si AviationWeather a renvoyé du HTML (intermittent sous charge).
+            // Attendre 1.5s avant le 2e essai suffit la plupart du temps.
+            if (e.message === '__HTML_INATTENDU__') {
+                await new Promise(r => setTimeout(r, 1500));
+                rawData = await _oneAttempt();
+            } else {
+                throw e;
+            }
+        }
 
         return type === 'json' ? JSON.parse(rawData) : rawData;
     } catch (e) {
         if (e.name === 'AbortError') throw new Error("Délai d'attente dépassé (plus de 25s). Réessayez la recherche.");
+        if (e.message === '__HTML_INATTENDU__') throw new Error("AviationWeather momentanément indisponible (réessayez).");
         throw e;
     }
 }
 
-// ----------------------------------------------------------------
-// File d'attente pour Open-Meteo (évite le rate-limit HTTP 429).
-// L'API gratuite limite le nombre de requêtes par minute. On sérialise
-// les appels avec un délai et un cache session pour éviter les doublons.
-// ----------------------------------------------------------------
 let _omRunning = false;
 const _omCache = new Map();
-const _omPending = new Map(); // url → Promise (pour dédupliquer les appels simultanés)
-const _OM_DELAY = 1500;       // ms entre chaque appel Open-Meteo.
-const _OM_RETRY_BASE = 3000;  // ms délai de base pour retry sur 429.
+const _omPending = new Map();
+const _OM_DELAY = 1500;
+const _OM_RETRY_BASE = 3000;
 
-/**
- * Fetch Open-Meteo avec file d'attente, déduplication et cache session.
- * @param {string} url URL Open-Meteo complète.
- * @returns {Promise<Object|null>} Données JSON, ou null si échec.
- */
 export async function fetchOpenMeteo(url) {
-    // Cache session (5 min) : évite de refetcher la même URL.
+
     const cached = _omCache.get(url);
     if (cached && Date.now() - cached.ts < 5 * 60 * 1000) return cached.data;
 
-    // Déduplication : si la même URL est déjà en cours, on partage le résultat.
     if (_omPending.has(url)) return _omPending.get(url);
 
     const promise = _omFetchQueued(url);
@@ -555,18 +571,17 @@ export async function fetchOpenMeteo(url) {
 }
 
 async function _omFetchQueued(url) {
-    // Attend que les requêtes précédentes soient terminées.
+
     while (_omRunning) {
         await new Promise(r => setTimeout(r, 100));
     }
     _omRunning = true;
 
     try {
-        // Re-vérifie le cache au cas où une requête identique vient de finir.
+
         const cached = _omCache.get(url);
         if (cached && Date.now() - cached.ts < 5 * 60 * 1000) return cached.data;
 
-        // Retry avec backoff exponentiel sur 429.
         for (let attempt = 0; attempt < 3; attempt++) {
             try {
                 const res = await fetch(url);
@@ -591,7 +606,7 @@ async function _omFetchQueued(url) {
         console.warn('Open-Meteo: 3 retries épuisés pour', url.slice(0, 60));
         return null;
     } finally {
-        // Délai avant de libérer pour la prochaine requête.
+
         await new Promise(r => setTimeout(r, _OM_DELAY));
         _omRunning = false;
     }
