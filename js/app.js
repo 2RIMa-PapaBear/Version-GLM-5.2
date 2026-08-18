@@ -117,11 +117,18 @@ export function genererGraphique() {
             fetchOpenMeteo(`https://api.open-meteo.com/v1/forecast?latitude=${memo.lat}&longitude=${memo.lon}&current=temperature_2m,pressure_msl&timezone=auto`)
                 .then(d => {
                     if (d && d.utc_offset_seconds !== undefined) {
+                        // ATTENTION : ce bloc vit DANS genererGraphique. Le cache 5 min
+                        // de fetchOpenMeteo résout instantanément — si le .then relance
+                        // systématiquement le rendu, la page boucle à l'infini en
+                        // microtask et gèle l'onglet. On ne re-rend QUE si une valeur
+                        // affichée (tz / T° / QNH) a réellement changé.
+                        const prev = `${memo.tzOffset}|${memo.temperature}|${memo.qnh}`;
                         memo.tzOffset = d.utc_offset_seconds / 3600;
                         memo.temperature = d.current ? d.current.temperature_2m : null;
                         memo.qnh = d.current ? d.current.pressure_msl : null;
                         tzPut(res.code, { name: memo.name, lat: memo.lat, lon: memo.lon, tzOffset: memo.tzOffset });
-                        state.lastRenderState = null; genererGraphique();
+                        const next = `${memo.tzOffset}|${memo.temperature}|${memo.qnh}`;
+                        if (prev !== next) { state.lastRenderState = null; genererGraphique(); }
                     } else if (memo.tzOffset === 'FETCHING') {
                         memo.tzOffset = -(new Date().getTimezoneOffset() / 60);
                     }
