@@ -129,26 +129,26 @@ function render(container, r, icao) {
         <div class="to-metrics-grid">
             <div>
                 <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px;">${lblRoll}</div>
-                <div style="font-family:'DM Mono',monospace; font-weight:700; color:var(--text-color);">${ftToM(r.groundRoll)} m</div>
+                <div style="font-family:'DM Mono',monospace; font-weight:500; color:var(--text-color);">${ftToM(r.groundRoll)} m</div>
             </div>
             <div>
                 <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px;">${lbl50ft}</div>
-                <div style="font-family:'DM Mono',monospace; font-weight:700; color:var(--text-color);">${ftToM(r.fiftyFt)} m</div>
+                <div style="font-family:'DM Mono',monospace; font-weight:500; color:var(--text-color);">${ftToM(r.fiftyFt)} m</div>
             </div>
             <div>
                 <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px;">${lblDa}</div>
-                <div style="font-family:'DM Mono',monospace; font-weight:700; color:var(--text-color);">${r.da} ft</div>
+                <div style="font-family:'DM Mono',monospace; font-weight:500; color:var(--text-color);">${r.da} ft</div>
             </div>
             <div>
                 <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px;">${lblAcRef}</div>
-                <div style="font-family:'DM Mono',monospace; font-weight:700; color:var(--text-muted); font-size:11px;">${ftToM(ref.groundRoll)}/${ftToM(ref.fiftyFt)} m</div>
+                <div style="font-family:'DM Mono',monospace; font-weight:500; color:var(--text-muted); font-size:11px;">${ftToM(ref.groundRoll)}/${ftToM(ref.fiftyFt)} m</div>
             </div>
             <div>
                 <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px;">${isFr ? 'Revêtement' : 'Surface'}</div>
                 <div style="font-family:'DM Sans',sans-serif; font-weight:700; color:${surfSoft ? '#FBBF24' : 'var(--text-color)'}; font-size:12px; display:flex; align-items:center; gap:4px;">
                     ${surfInfo ? escapeHtml(surfInfo.label) : '—'}
                     ${r.surfaceFactor > 1
-                        ? `<span style="font-size:9px; background:${surfSoft ? 'rgba(251,191,36,0.18)' : 'rgba(56,189,248,0.15)'}; color:${surfSoft ? '#FBBF24' : '#38BDF8'}; padding:1px 5px; border-radius:3px; font-weight:700; font-family:'DM Mono',monospace;">+${Math.round((r.surfaceFactor-1)*100)}%</span>`
+                        ? `<span style="font-size:9px; background:${surfSoft ? 'rgba(251,191,36,0.18)' : 'rgba(56,189,248,0.15)'}; color:${surfSoft ? '#FBBF24' : '#38BDF8'}; padding:1px 5px; border-radius:3px; font-weight:500; font-family:'DM Mono',monospace;">+${Math.round((r.surfaceFactor-1)*100)}%</span>`
                         : ''}
                 </div>
             </div>
@@ -158,16 +158,16 @@ function render(container, r, icao) {
             <label style="font-size:11px; color:var(--text-muted); display:flex; flex-direction:column; gap:3px;">
                 <span style="display:flex; align-items:center; gap:5px;">
                     ${lblRwy}
-                    ${activeRwy ? `<span title="${isFr ? 'Piste sélectionnée dans la rose des vents' : 'Runway selected in wind compass'}" style="font-size:8px; background:rgba(74,222,128,0.15); color:#4ADE80; padding:1px 5px; border-radius:3px; letter-spacing:0.5px; font-weight:700; font-family:'DM Mono',monospace;">RWY ${escapeHtml(activeRwy)}</span>` : ''}
+                    ${activeRwy ? `<span title="${isFr ? 'Piste sélectionnée dans la rose des vents' : 'Runway selected in wind compass'}" style="font-size:8px; background:rgba(74,222,128,0.15); color:#4ADE80; padding:1px 5px; border-radius:3px; letter-spacing:0.5px; font-weight:500; font-family:'DM Mono',monospace;">RWY ${escapeHtml(activeRwy)}</span>` : ''}
                 </span>
-                <div style="width:120px; background:var(--input-bg); border:1px solid var(--border-color); color:var(--primary); border-radius:6px; padding:5px 8px; font-family:'DM Mono',monospace; font-size:13px; font-weight:600;">
+                <div style="width:120px; background:var(--input-bg); border:1px solid var(--border-color); color:var(--primary); border-radius:6px; padding:5px 8px; font-family:'DM Mono',monospace; font-size:13px; font-weight:500;">
                     ${rwyLenM != null ? rwyLenM + ' m' : '—'}
                 </div>
             </label>
             ${r.margin != null ? `
                 <div style="margin-left:auto; text-align:right;">
                     <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px;">${lblMargin}</div>
-                    <div style="font-family:'DM Mono',monospace; font-weight:800; font-size:15px; color:${marginColor};">
+                    <div style="font-family:'DM Mono',monospace; font-weight:500; font-size:15px; color:${marginColor};">
                         ${r.margin >= 0 ? '+' : ''}${ftToM(r.margin)} m
                     </div>
                 </div>

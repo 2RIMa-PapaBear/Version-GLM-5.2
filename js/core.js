@@ -126,6 +126,16 @@ export const I18N = {
         lblIcingOk: "Aucun risque",
         lblIcingCaution: "Risque modéré",
         lblIcingDanger: "Risque élevé",
+        lblWidgetIcingCell: "Givrage cellule",
+        lblWidgetIcingCarb: "Givrage carbu",
+        lblCarbSerious: "Sévère — toutes puissances",
+        lblCarbDescent: "Sévère en descente",
+        lblCarbLight: "Léger — surveiller",
+        lblCarbNone: "Faible ou nul",
+        tipIcingCell: "Givrage de la cellule (structure) : isotherme 0°C vs plafond nuageux + analyse T / point de rosée (zone critique −2 à +2 °C en air humide). Ne concerne pas le carburateur.",
+        tipCarbChart: "Abaque givrage carburateur : T {t} °C / Td {td} °C (écart {s} °C)",
+        tipCarbTemp: "T° carburateur estimée : {min} à {max} °C (OAT −20 à −35 °C par vaporisation). Givrage si T° carbu entre −15 et 0 °C (risque max vers −5 °C) en air humide.",
+        noteCarb: "T° carbu ≈ {min} à {max} °C — givrage carbu si −15 à 0 °C & air humide",
         lblModelCompare: "Modèles",
         lblModelCompareAt3h: "à H+3",
 
@@ -245,6 +255,16 @@ export const I18N = {
         lblIcingOk: "No risk",
         lblIcingCaution: "Moderate risk",
         lblIcingDanger: "High risk",
+        lblWidgetIcingCell: "Airframe icing",
+        lblWidgetIcingCarb: "Carb icing",
+        lblCarbSerious: "Serious — any power",
+        lblCarbDescent: "Serious at descent",
+        lblCarbLight: "Light — monitor",
+        lblCarbNone: "Little or none",
+        tipIcingCell: "Airframe (structural) icing: 0°C isotherm vs cloud ceiling + temperature / dew point analysis (critical band −2 to +2 °C in humid air). Not carburettor icing.",
+        tipCarbChart: "Carburettor icing chart: OAT {t} °C / dew {td} °C (spread {s} °C)",
+        tipCarbTemp: "Estimated carburettor temp: {min} to {max} °C (OAT −20 to −35 °C from vaporization). Icing when carb temp is between −15 and 0 °C (peak risk near −5 °C) in humid air.",
+        noteCarb: "Carb temp ≈ {min} to {max} °C — carb icing if −15 to 0 °C & humid air",
         lblModelCompare: "Models",
         lblModelCompareAt3h: "at H+3",
 
@@ -506,12 +526,20 @@ export async function fetchAvecRelais(url, type = 'text') {
 
     const proxyUrl = `${PROXY_URL}?url=${encodeURIComponent(url)}`;
 
-    // Tentative unique via le proxy, avec extraction du contenu.
+    // Familles d'échec, distinguées par des marqueurs internes :
+    //   '__HTML_INATTENDU__'         → page HTML d'AviationWeather (502/503 sous charge) : transitoire, on retente.
+    //   '__PROXY_INDISPONIBLE__|xxx' → déploiement Apps Script mort/inaccessible (404/401/403) : inutile de retenter.
+    //   TypeError                    → fetch bloqué (hors-ligne, ou réponse du proxy sans en-têtes CORS) : sondage pour trancher.
     async function _oneAttempt() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 25000);
         try {
-            const res = await fetch(proxyUrl, { signal: controller.signal });
+            const res = await fetch(proxyUrl, { signal: controller.signal, cache: 'no-store' });
+            // 404/401/403 = le déploiement n'existe plus ou accès refusé : ce n'est PAS
+            // une surcharge d'AviationWeather, réessayer ne sert à rien.
+            if (res.status === 404 || res.status === 401 || res.status === 403) {
+                throw new Error(`__PROXY_INDISPONIBLE__|HTTP ${res.status}`);
+            }
             const rawData = await res.text();
             if (rawData.startsWith('PROXY_ERROR:')) throw new Error(`Google n'a pas pu joindre la cible : ${rawData}`);
             // Détecte une page HTML (AviationWeather renvoie parfois une 502/503 sous charge).
@@ -524,20 +552,50 @@ export async function fetchAvecRelais(url, type = 'text') {
         }
     }
 
+    // Sondage no-cors du proxy : « true » = le serveur a répondu au niveau réseau
+    // (réponse opaque, statut masqué). Distingue « plus de réseau » (rejet du sondage)
+    // de « le proxy répond mais sa réponse est inutilisable » — typiquement un 404 ou
+    // un 504 servi sans en-têtes CORS, ce qui fait échouer le fetch en TypeError.
+    async function _sondeProxy() {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        try {
+            await fetch(PROXY_URL, { method: 'HEAD', mode: 'no-cors', cache: 'no-store', signal: controller.signal });
+            return true;
+        } catch { return false; } finally { clearTimeout(timeoutId); }
+    }
+
+    const isFr = state.lang === 'fr';
+
     try {
         let rawData = null;
         let lastErr = null;
         // Jusqu'à 3 tentatives avec backoff progressif (1.5s puis 3.5s) :
-        // le proxy Google Apps Script renvoie parfois un 504 (HTML) de quelques
-        // secondes sous charge — un retry unique ne suffit pas toujours.
+        //  - page HTML AviationWeather (502/503) : transitoire, on retente ;
+        //  - 404 echo Google : intermittent (clé user_content_key propre à chaque
+        //    requête, routage edge) — une nouvelle tentative repart d'un /exec
+        //    frais avec une nouvelle clé et réussit souvent ;
+        //  - TypeError avec proxy atteignable : 504 sans CORS (transitoire) ou
+        //    déploiement mort — on retente puis on tranche ;
+        //  - 401/403 (accès refusé au déploiement) ou plus de réseau : arrêt net.
         for (let attempt = 0; attempt < 3; attempt++) {
             try {
                 rawData = await _oneAttempt();
                 lastErr = null;
                 break;
             } catch (e) {
-                if (e.message !== '__HTML_INATTENDU__') throw e;
-                lastErr = e;
+                if (e.name === 'AbortError') throw e;
+                if (e.message?.startsWith('__PROXY_INDISPONIBLE__')) {
+                    if (!e.message.includes('|HTTP 404')) throw e;  // 401/403 : fatal
+                    lastErr = e;                                     // 404 : on retente
+                } else if (e instanceof TypeError) {
+                    if (!await _sondeProxy()) throw new Error(I18N[state.lang].errNetwork);
+                    lastErr = e;
+                } else if (e.message === '__HTML_INATTENDU__') {
+                    lastErr = e;
+                } else {
+                    throw e;
+                }
                 if (attempt < 2) await new Promise(r => setTimeout(r, 1500 + attempt * 2000));
             }
         }
@@ -545,8 +603,21 @@ export async function fetchAvecRelais(url, type = 'text') {
 
         return type === 'json' ? JSON.parse(rawData) : rawData;
     } catch (e) {
-        if (e.name === 'AbortError') throw new Error("Délai d'attente dépassé (plus de 25s). Réessayez la recherche.");
-        if (e.message === '__HTML_INATTENDU__') throw new Error("AviationWeather momentanément indisponible (réessayez).");
+        if (e.name === 'AbortError') throw new Error(isFr ? "Délai d'attente dépassé (plus de 25s). Réessayez la recherche." : "Timeout after 25s. Please retry the search.");
+        if (e.message?.startsWith('__PROXY_INDISPONIBLE__')) {
+            const detail = e.message.split('|')[1] || '';
+            throw new Error(isFr
+                ? `Relai Google Apps Script inaccessible (${detail}) — incident Google passager (réessayez) ou déploiement à vérifier (js/config.local.js).`
+                : `Google Apps Script relay unreachable (${detail}) — transient Google issue (retry) or deployment to check (js/config.local.js).`);
+        }
+        if (e instanceof TypeError) {
+            // Après les retries, le proxy répond (sondage OK) mais ses réponses restent
+            // inutilisables : déploiement probablement mort, pas un souci AviationWeather.
+            throw new Error(isFr
+                ? "Relai Google Apps Script inaccessible (réponse bloquée) — vérifiez le déploiement (js/config.local.js)."
+                : "Google Apps Script relay unreachable (blocked response) — check the deployment (js/config.local.js).");
+        }
+        if (e.message === '__HTML_INATTENDU__') throw new Error(isFr ? "AviationWeather momentanément indisponible (réessayez)." : "AviationWeather temporarily unavailable (please retry).");
         throw e;
     }
 }
