@@ -16,6 +16,8 @@ let _currentBaseLayer = null;
 let _pirepMarkers = [];
 let _airportMarkers = [];
 let _neighborMarkers = [];
+let _metarByIcao = {};   // METARs bruts des voisins (déjà fetchés pour la catégorie VFR).
+let _displayedNeighborsIcao = new Set();  // Anti-doublon : voisins déjà affichés.
 let _currentIcao = null;
 
 let _runwayLayer = null;
@@ -159,6 +161,28 @@ async function _initOrRefresh() {
 
         _runwayLayer = L.layerGroup().addTo(_map);
         _map.on('zoomend', _updateRunwayVisibility);
+
+        // Bouton "Charger ce terrain" des popups METAR : le contenu du popup est
+        // recréé à chaque ouverture, on binde le handler sur l'évènement popupopen.
+        _map.on('popupopen', (e) => {
+            const btn = e.popup?.getElement()?.querySelector('.mp-load-btn');
+            if (!btn) return;
+            btn.addEventListener('click', () => {
+                const icao = btn.dataset.icao;
+                if (!icao) return;
+                _map.closePopup();
+                const input = document.getElementById('icaoInput');
+                if (input) {
+                    input.value = icao;
+                    document.getElementById('btn-fetch-metar')?.click();
+                }
+            });
+        });
+
+        // Déplacement/zoom sur la carte : charge les aérodromes de la nouvelle zone
+        // visible avec leurs pastilles METAR (debounce 1.5 s + seuil de déplacement
+        // pour ne pas spammer le proxy à chaque pixel).
+        _map.on('moveend', _onMapMovedForNeighbors);
     } else {
         _map.setView([lat, lon], 7);
     }
@@ -358,8 +382,31 @@ function _mountZoomAirfieldButton(bar) {
     });
 }
 
+// Détection de fin de déplacement : charge les terrains de la nouvelle zone visible.
+// Debounce 1.5 s ; seuil de 0.8° depuis le dernier centre chargé pour éviter
+// les rechargements redondants (et protéger le proxy AviationWeather).
+let _neighborMoveDebounce = null;
+let _lastNeighborsCenter = null;
+const NEIGHBOR_MOVE_THRESHOLD = 0.8;
+function _onMapMovedForNeighbors() {
+    if (!_map) return;
+    clearTimeout(_neighborMoveDebounce);
+    _neighborMoveDebounce = setTimeout(() => {
+        const c = _map.getCenter();
+        if (_lastNeighborsCenter) {
+            const dLat = Math.abs(c.lat - _lastNeighborsCenter.lat);
+            const dLon = Math.abs(c.lng - _lastNeighborsCenter.lon);
+            if (dLat < NEIGHBOR_MOVE_THRESHOLD && dLon < NEIGHBOR_MOVE_THRESHOLD) return;
+        }
+        _lastNeighborsCenter = { lat: c.lat, lon: c.lng };
+        _loadNeighborCategories(c.lat, c.lng);
+    }, 1500);
+}
+
 async function _loadNeighborCategories(lat, lon) {
     try {
+        // Référence du dernier centre chargé (utilisée par le seuil anti-rechargement).
+        _lastNeighborsCenter = { lat, lon };
         const minLat = lat - 2, maxLat = lat + 2;
         const minLon = lon - 2, maxLon = lon + 2;
 
@@ -390,27 +437,43 @@ async function _loadNeighborCategories(lat, lon) {
             }
         }
 
-        _clearNeighborMarkers();
+        // Conserve les METARs bruts pour le popup "clic sur un aéroport"
+        // (fusion : les zones chargées au fil des déplacements s'accumulent).
+        _metarByIcao = { ..._metarByIcao, ...metarByCode };
 
-        // 3. Affiche tous les aérodromes de la base locale.
-        // Ceux avec METAR → marker coloré ; ceux sans METAR → marker gris.
+        // 3. Affiche les aérodromes de la zone NON ENCORE AFFICHÉS (accumulation :
+        // se déplacer sur la carte ajoute les nouveaux terrains sans effacer les anciens).
         localAirports.forEach(a => {
             if (a.icao === _currentIcao) return;
-            const raw = metarByCode[a.icao];
+            if (_displayedNeighborsIcao.has(a.icao)) return;
+            // Le METAR peut venir de cette zone OU d'une zone précédemment chargée.
+            const raw = metarByCode[a.icao] ?? _metarByIcao[a.icao] ?? null;
             if (raw) {
                 const cat = _categoryFromMetar(raw);
                 if (cat) {
-                    _addAirportMarker(a.lat, a.lon, a.icao, a.name, cat, false);
+                    _addAirportMarker(a.lat, a.lon, a.icao, a.name, cat, false, raw);
+                    _displayedNeighborsIcao.add(a.icao);
                     return;
                 }
             }
             // Pas de METAR ou non catégorisable → marker gris.
-            _addAirportMarker(a.lat, a.lon, a.icao, a.name, null, false);
+            _addAirportMarker(a.lat, a.lon, a.icao, a.name, null, false, raw);
+            _displayedNeighborsIcao.add(a.icao);
         });
+
+        // Filet de sécurité : si aucune donnée n'a été récupérée alors que la zone
+        // contient des terrains (cold-start du proxy, coupure réseau passagère),
+        // on retente une fois après 4 s — les pastilles reprennent alors leur couleur.
+        if (Object.keys(metarByCode).length === 0 && localAirports.length > 1 && !_neighborRetryDone) {
+            _neighborRetryDone = true;
+            console.warn('[voisins] Aucun METAR récupéré — nouvelle tentative dans 4 s');
+            setTimeout(() => { _neighborRetryDone = false; _loadNeighborCategories(lat, lon); }, 4000);
+        }
     } catch (e) {
         console.warn('Neighbor categories load failed:', e);
     }
 }
+let _neighborRetryDone = false;
 
 async function _loadPireps(lat, lon) {
     try {
@@ -475,7 +538,54 @@ const CAT_PIN_COLORS = {
     LIFR: '#D946EF',
 };
 
-function _addAirportMarker(lat, lon, icao, name, cat, isCurrent) {
+// Extrait les valeurs clés d'un METAR brut pour le popup "clic sur un aéroport".
+// Regex locales — indépendantes d'engine.js (évite tout risque d'import cyclique).
+function _decodeMetarForPopup(raw) {
+    if (!raw) return null;
+    const d = { wind: null, visi: null, ceiling: null, temp: null, dew: null, qnh: null };
+
+    const wm = raw.match(/\b(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?KT\b/);
+    if (wm) {
+        const dir = wm[1] === 'VRB' ? 'VRB' : wm[1] + '°';
+        d.wind = `${dir} ${parseInt(wm[2], 10)} kt` + (wm[3] ? ` (G ${parseInt(wm[3], 10)})` : '');
+    }
+
+    if (/\bCAVOK\b/.test(raw)) d.visi = 'CAVOK';
+    else {
+        const vm = raw.match(/KT(?:\s+\d{3}V\d{3})?\s+(\d{4})\b/);
+        if (vm) {
+            const m = parseInt(vm[1], 10);
+            d.visi = m >= 9999 ? '10 km+' : (m >= 1000 ? (m / 1000).toFixed(m % 1000 ? 1 : 0) + ' km' : m + ' m');
+        }
+    }
+
+    if (!/CAVOK|NSC|SKC|NCD/.test(raw)) {
+        let ceil = null;
+        for (const cm of raw.matchAll(/\b(BKN|OVC)(\d{3})\b/g)) {
+            const alt = parseInt(cm[2], 10);
+            if (ceil === null || alt < ceil) ceil = alt;
+        }
+        if (ceil === null) {
+            const vv = raw.match(/\bVV(\d{3})\b/);
+            if (vv) ceil = parseInt(vv[1], 10);
+        }
+        if (ceil !== null) d.ceiling = ceil * 100 + ' ft';
+    }
+
+    const tm = raw.match(/\s(M?\d{2})\/(M?\d{2})?\s/);
+    if (tm) {
+        const parseT = (s) => s == null ? null : (s.startsWith('M') ? '-' + s.slice(1) : s) + '°C';
+        d.temp = parseT(tm[1]);
+        d.dew = parseT(tm[2]);
+    }
+
+    const qm = raw.match(/\bQ(\d{4})\b/);
+    if (qm) d.qnh = parseInt(qm[1], 10) + ' hPa';
+
+    return d;
+}
+
+function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null) {
     if (!_map) return;
 
     const color = isCurrent ? '#FBBF24' : (cat ? CAT_PIN_COLORS[cat.cat] || '#94A3B8' : '#94A3B8');
@@ -497,6 +607,32 @@ function _addAirportMarker(lat, lon, icao, name, cat, isCurrent) {
             : `<strong>${escapeHtml(icao)}</strong>${name ? ' — ' + escapeHtml(name) : ''}<br><span style="color:#94A3B8;font-weight:700;">${state.lang === 'fr' ? 'Sans METAR' : 'No METAR'}</span>`;
 
     marker.bindTooltip(label, { permanent: false, direction: 'top' });
+
+    // Popup détaillé au clic (voisins avec METAR uniquement — le courant est déjà dans l'app).
+    if (!isCurrent && rawMetar) {
+        const isFr = state.lang === 'fr';
+        const dec = _decodeMetarForPopup(rawMetar);
+        const catColor = cat ? (CAT_PIN_COLORS[cat.cat] || '#94A3B8') : '#94A3B8';
+        const rows = dec ? [
+            [isFr ? 'Vent' : 'Wind', dec.wind],
+            [isFr ? 'Visi' : 'Vis', dec.visi],
+            [isFr ? 'Plafond' : 'Ceiling', dec.ceiling],
+            ['T/Td', (dec.temp || dec.dew) ? `${dec.temp ?? '—'} / ${dec.dew ?? '—'}` : null],
+            ['QNH', dec.qnh],
+        ] : [];
+        marker.bindPopup(`
+            <div class="mp-inner">
+                <div class="mp-title"><strong>${escapeHtml(icao)}</strong>${name ? ' · ' + escapeHtml(name) : ''}</div>
+                ${cat ? `<div class="mp-cat" style="background:${catColor};">${cat.cat}</div>` : ''}
+                <div class="mp-rows">
+                    ${rows.map(([k, v]) => v ? `<div class="mp-row"><span class="mp-k">${k}</span><span class="mp-v">${escapeHtml(v)}</span></div>` : '').join('')}
+                </div>
+                <pre class="mp-raw">${escapeHtml(rawMetar)}</pre>
+                <button class="mp-load-btn" data-icao="${escapeHtml(icao)}">${isFr ? 'Charger ce terrain' : 'Load this airport'}</button>
+            </div>
+        `, { maxWidth: 280, className: 'metar-popup' });
+    }
+
     if (isCurrent) _airportMarkers.push(marker);
     else _neighborMarkers.push(marker);
 }
@@ -509,6 +645,8 @@ function _clearAirportMarkers() {
 function _clearNeighborMarkers() {
     _neighborMarkers.forEach(m => _map.removeLayer(m));
     _neighborMarkers = [];
+    _displayedNeighborsIcao.clear();
+    _metarByIcao = {};
 }
 
 function _destinationPoint(lat, lon, bearing, distM) {

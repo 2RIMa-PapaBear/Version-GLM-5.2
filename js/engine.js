@@ -847,7 +847,7 @@ export function renderWindCompass(containerId, windStr, runways = null, forcedId
                 ${ticksSvg}${cardsSvg}${runwaySvg}${arrowSvg}${varRangeSvg}
                 ${gustTextSvg}
             </svg>
-            <div style="color:${color};font-weight:900;font-size:15px;margin-top:2px;font-family:'DM Mono', monospace;background:#1E293B;padding:6px 12px;border-radius:6px;border:1px solid ${color}; text-align: center; letter-spacing: 0.5px;">${windText}</div>
+            <div style="color:${color};font-weight:500;font-size:15px;margin-top:2px;font-family:'DM Mono', monospace;background:#1E293B;padding:6px 12px;border-radius:6px;border:1px solid ${color}; text-align: center; letter-spacing: 0.5px;">${windText}</div>
             ${wind.varFrom != null && wind.varTo != null ? `<div style="color:rgba(255,255,255,0.55);font-size:10px;margin-top:3px;font-family:'DM Mono', monospace;letter-spacing:0.3px;">${isFr ? 'Var.' : 'Var.'} ${wind.varFrom}°–${wind.varTo}°</div>` : ''}
             ${bubblesHtml ? `<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px;max-width:300px;margin-top:8px;">${bubblesHtml}</div>` : ''}
             ${surfHtml}

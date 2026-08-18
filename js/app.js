@@ -111,7 +111,10 @@ export function genererGraphique() {
             // Toujours rafraîchir la température/QNH temps réel. On ne persiste
             // que le tzOffset (immuable) ; les valeurs current sont jetables.
             memo.tzOffset = memo.tzOffset === undefined ? 'FETCHING' : memo.tzOffset;
-            fetchAvecRelais(`https://api.open-meteo.com/v1/forecast?latitude=${memo.lat}&longitude=${memo.lon}&current=temperature_2m,pressure_msl&timezone=auto`, 'json')
+            // Open-Meteo autorise le CORS direct : fetch sans proxy Google (cache 5 min,
+            // file d'attente et retry 429 intégrés dans fetchOpenMeteo). Ne pas passer
+            // par fetchAvecRelais ici — chaque appel inutile charge le relai Apps Script.
+            fetchOpenMeteo(`https://api.open-meteo.com/v1/forecast?latitude=${memo.lat}&longitude=${memo.lon}&current=temperature_2m,pressure_msl&timezone=auto`)
                 .then(d => {
                     if (d && d.utc_offset_seconds !== undefined) {
                         memo.tzOffset = d.utc_offset_seconds / 3600;
@@ -119,6 +122,8 @@ export function genererGraphique() {
                         memo.qnh = d.current ? d.current.pressure_msl : null;
                         tzPut(res.code, { name: memo.name, lat: memo.lat, lon: memo.lon, tzOffset: memo.tzOffset });
                         state.lastRenderState = null; genererGraphique();
+                    } else if (memo.tzOffset === 'FETCHING') {
+                        memo.tzOffset = -(new Date().getTimezoneOffset() / 60);
                     }
                 }).catch(() => { if (memo.tzOffset === 'FETCHING') memo.tzOffset = -(new Date().getTimezoneOffset() / 60); });
         }

@@ -182,15 +182,15 @@ function render(lat, lon) {
             <div class="flight-window-times" style="display:flex; gap:16px; font-size:11px; flex-wrap:wrap;">
                 <div style="text-align:center;">
                     <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px; margin-bottom:2px;">${srLabel}</div>
-                    <div style="font-family:'DM Mono', monospace; font-weight:700; color:var(--text-color); font-size:14px;">${fmt(w.sunrise)}</div>
+                    <div style="font-family:'DM Mono', monospace; font-weight:500; color:var(--text-color); font-size:14px;">${fmt(w.sunrise)}</div>
                 </div>
                 <div style="text-align:center;">
                     <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px; margin-bottom:2px;">${ssLabel}</div>
-                    <div style="font-family:'DM Mono', monospace; font-weight:700; color:var(--text-color); font-size:14px;">${fmt(w.sunset)}</div>
+                    <div style="font-family:'DM Mono', monospace; font-weight:500; color:var(--text-color); font-size:14px;">${fmt(w.sunset)}</div>
                 </div>
                 <div style="text-align:center;">
                     <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px; margin-bottom:2px;">${aeroLabel}</div>
-                    <div style="font-family:'DM Mono', monospace; font-weight:700; color:var(--primary); font-size:14px;">${fmt(w.aeroStart)}<br>${fmt(w.aeroEnd)}</div>
+                    <div style="font-family:'DM Mono', monospace; font-weight:500; color:var(--primary); font-size:14px;">${fmt(w.aeroStart)}<br>${fmt(w.aeroEnd)}</div>
                 </div>
             </div>
         </div>
