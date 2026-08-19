@@ -71,16 +71,14 @@ export function renderElevationChart(containerId, profile, cruiseAltFt, fromIcao
     // premier _draw() (panneau carte fermé), le canvas avait une largeur nulle.
     // requestAnimationFrame + timeout double pour couvrir le délai d'animation CSS.
     requestAnimationFrame(() => { _draw(); setTimeout(_draw, 250); });
+}
 
-    // Met à jour le label de route.
-    const titleEl = container.querySelector('.elev-title');
-    if (titleEl) {
-        const lang = document.documentElement.lang || 'fr';
-        const isFr = lang === 'fr';
-        titleEl.textContent = isFr
-            ? `Profil d'élévation — ${fromIcao} → ${toIcao}`
-            : `Elevation profile — ${fromIcao} → ${toIcao}`;
-    }
+/**
+ * Redessine le graphique avec la langue courante (titre compris) — appelé
+ * sur l'événement 'lang-changed' émis par setLanguage.
+ */
+export function refreshElevationChart() {
+    _draw();
 }
 
 /**
@@ -131,6 +129,15 @@ function _ensureCanvas(container) {
 
 function _draw() {
     if (!_ctx || !_canvas || !_profile) return;
+
+    // Titre re-traduit à chaque dessin (langue courante du document).
+    const titleEl = _canvas.parentElement?.querySelector('.elev-title');
+    if (titleEl) {
+        const isFr = (document.documentElement.lang || 'fr') === 'fr';
+        titleEl.textContent = isFr
+            ? `Profil d'élévation — ${_fromIcao} → ${_toIcao}`
+            : `Elevation profile — ${_fromIcao} → ${_toIcao}`;
+    }
 
     const dpr = window.devicePixelRatio || 1;
     const cw = _canvas.clientWidth;

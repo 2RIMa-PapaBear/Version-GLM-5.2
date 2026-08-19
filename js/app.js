@@ -24,7 +24,7 @@ import { preloadDeclination } from './magvar.js';
 import { showTakeoffWidget } from './takeoff-ui.js';
 import { showFrequenciesWidget } from './frequencies-ui.js';
 import { showFlightPlanner } from './flight-planner-ui.js';
-import { clearElevationChart } from './elevation-chart.js';
+import { clearElevationChart, refreshElevationChart } from './elevation-chart.js';
 import { initCockpitMode, toggleCockpitMode } from './cockpit-mode.js';
 import { openShareModal, hasPermalink, readPermalink } from './permalink.js';
 import { initWatchdog, openWatchdogPanel, getWatchdogSettings } from './watchdog.js';
@@ -537,6 +537,27 @@ document.addEventListener('DOMContentLoaded', async function () {
     document.getElementById('tafInput').addEventListener('input', handleInput);
     document.getElementById('tafInput').addEventListener('scroll', handleScroll);
     document.getElementById('btn-lang-toggle').addEventListener('click', toggleLanguage);
+    // Changement de langue : re-rend les panneaux dont les titres/contenus
+    // dépendent de la langue (widgets repliables, alternates, planificateur,
+    // profil d'élévation) pour le terrain courant.
+    window.addEventListener('lang-changed', () => {
+        const icao = state.requestedIcao;
+        if (icao) {
+            showTakeoffWidget(icao);
+            showFrequenciesWidget(icao);
+            if (getFlightMode() === 'nav') {
+                const depForNav = _viewingDest ? _depIcao : icao;
+                if (depForNav) {
+                    showAlternates(depForNav);
+                    const toIcao = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
+                    if (toIcao && /^[A-Z]{4}$/.test(toIcao) && toIcao !== depForNav.toUpperCase()) {
+                        showFlightPlanner(depForNav, toIcao);
+                    }
+                }
+            }
+            refreshElevationChart();
+        }
+    });
     document.getElementById('btn-night-mode').addEventListener('click', toggleNightMode);
     document.getElementById('btn-cockpit-mode')?.addEventListener('click', toggleCockpitMode);
     document.getElementById('btn-share')?.addEventListener('click', openShareModal);

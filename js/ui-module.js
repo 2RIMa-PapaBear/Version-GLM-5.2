@@ -567,11 +567,43 @@ export function setLanguage(l) {
     const tr = I18N[l];
     const elIcao = document.getElementById('icaoInput'); if (elIcao) elIcao.placeholder = tr.placeholderIcao;
     const elTaf = document.getElementById('tafInput'); if (elTaf) elTaf.placeholder = tr.placeholderTaf;
-    const dict = { 'lbl-source': tr.lblSource, 'lbl-aero-hours': tr.lblAeroHours, 'btn-add-favorite': tr.btnAddFavorite, 'btn-read-metar': tr.btnReadMetar, 'btn-stop-audio': tr.btnStopAudio, 'lbl-favoris-title': tr.favorisTitle, 'footer-warning': tr.footerWarning, 'leg-clr': tr.legClr, 'leg-few': tr.legFew, 'leg-sct': tr.legSct, 'leg-bkn': tr.legBkn, 'leg-ovc': tr.legOvc, 'leg-vv': tr.legVv };
+    // Textes statiques d'index.html (header, panneaux latéraux, légende carte...).
+    const dict = {
+        'lbl-source': tr.lblSource, 'lbl-aero-hours': tr.lblAeroHours,
+        'btn-add-favorite': tr.btnAddFavorite, 'btn-read-metar': tr.btnReadMetar, 'btn-stop-audio': tr.btnStopAudio,
+        'lbl-favoris-title': tr.favorisTitle, 'footer-warning': tr.footerWarning,
+        'leg-clr': tr.legClr, 'leg-few': tr.legFew, 'leg-sct': tr.legSct, 'leg-bkn': tr.legBkn, 'leg-ovc': tr.legOvc, 'leg-vv': tr.legVv,
+        'ui-title': tr.uiTitle, 'lbl-notice': tr.noticeBtn,
+        'seg-local': tr.flightModeLocal, 'seg-nav': tr.flightModeNav,
+        'search-history-title': tr.searchRecentTitle, 'history-title-text': tr.historyTitle,
+        'lbl-alternates': tr.alternatesTitle, 'lbl-regional-map': tr.regionalMapTitle,
+        'lbl-route-from': tr.routeFrom, 'lbl-route-to': tr.routeTo,
+        'lbl-no-metar': tr.mapNoMetar, 'lbl-current-apt': tr.mapCurrentApt,
+        'lbl-dep-btn': tr.depBtn, 'lbl-dest-btn': tr.destBtn,
+    };
     Object.keys(dict).forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = dict[id]; });
+    // Attributs visibles (bulles d'aide au survol, libellés d'accessibilité).
+    const attrs = {
+        'btn-lang-toggle': { 'aria-label': tr.langToggleAria },
+        'btn-notice': { title: tr.noticeBtnTitle },
+        'btn-night-mode': { title: tr.nightModeTitle, 'aria-label': tr.nightModeAria },
+        'flight-mode-toggle': { title: tr.flightModeTitle, 'aria-label': tr.flightModeTitle },
+        'btn-cockpit-mode': { title: tr.cockpitModeTitle, 'aria-label': tr.cockpitModeAria },
+        'btn-share': { title: tr.shareTitle, 'aria-label': tr.shareAria },
+        'btn-watchdog': { title: tr.watchdogTitle, 'aria-label': tr.watchdogAria },
+        'btn-fetch-metar': { 'aria-label': tr.fetchMetarAria },
+        'btn-fetch-taf': { 'aria-label': tr.fetchTafAria },
+    };
+    Object.entries(attrs).forEach(([id, map]) => {
+        const el = document.getElementById(id);
+        if (el) for (const [k, v] of Object.entries(map)) el.setAttribute(k, v);
+    });
     updateFavoritesUI(_selectAndFetch);
     renderSearchHistory('search-history-list', _selectAndFetch);
     if (window.lucide) window.lucide.createIcons();
+    // Les modules à rendu dynamique (titres de widgets repliables, profil
+    // d'élévation...) écoutent cet événement pour se re-traduire.
+    window.dispatchEvent(new CustomEvent('lang-changed'));
 }
 
 export function handleInput() {
