@@ -527,6 +527,16 @@ export function surfaceLabel(code, lang) {
 // périme au rechargement, ce qui suffit pour des données quasi statiques).
 const _relaisCache = new Map();
 
+// File de sérialisation : le relai Apps Script ne supporte PAS la concurrence.
+// À partir de 2 requêtes /exec simultanées, Google perd des clés echo (404) ou
+// gèle la redirection pendant 30-40 s — mesuré au curl 2026-08-19 : 8 requêtes
+// concurrentes → 4 échecs ; en séquentiel, 10/10 en ~1 s. Or traiterSucces
+// (app.js) déclenche une rafale (tendance pression, SIGMET, ATIS, watchdog…).
+// Toutes les requêtes relai passent donc UNE PAR UNE ; les appels simultanés
+// d'une même URL partagent la même promesse (dédup).
+let _relaisQueue = Promise.resolve();
+const _relaisInFlight = new Map();   // url → promesse partagée
+
 export async function fetchAvecRelais(url, type = 'text', ttlSec = null) {
 
     if (url.includes('nominatim.openstreetmap.org')) {
@@ -544,6 +554,27 @@ export async function fetchAvecRelais(url, type = 'text', ttlSec = null) {
         if (hit && Date.now() - hit.ts < ttlSec * 1000) return hit.data;
     }
 
+    // Même URL déjà en cours → on partage son résultat au lieu d'empiler
+    // une requête identique dans la file (ex. fetchAtis appelé 2× de suite).
+    const pending = _relaisInFlight.get(url);
+    if (pending) return pending;
+
+    const task = _relaisQueue.then(() => _viaRelais(url, type, ttlSec));
+    _relaisInFlight.set(url, task);
+    // La file continue même si la requête échoue (l'erreur reste portée par
+    // `task`, le catch ici ne fait qu'empêcher un rejet de bloquer la chaîne).
+    _relaisQueue = task.catch(() => {});
+    try {
+        return await task;
+    } finally {
+        _relaisInFlight.delete(url);
+    }
+}
+
+// Corps réel de l'appel relai : proxy, tentatives, gestion d'erreurs. Toujours
+// invoqué via la file de _fetchAvecRelais (jamais en parallèle d'un autre).
+async function _viaRelais(url, type, ttlSec) {
+
     let proxyUrl = `${PROXY_URL}?url=${encodeURIComponent(url)}`;
     if (ttlSec) proxyUrl += `&ttl=${ttlSec}`;
 
@@ -551,9 +582,13 @@ export async function fetchAvecRelais(url, type = 'text', ttlSec = null) {
     //   '__HTML_INATTENDU__'         → page HTML d'AviationWeather (502/503 sous charge) : transitoire, on retente.
     //   '__PROXY_INDISPONIBLE__|xxx' → déploiement Apps Script mort/inaccessible (404/401/403) : inutile de retenter.
     //   TypeError                    → fetch bloqué (hors-ligne, ou réponse du proxy sans en-têtes CORS) : sondage pour trancher.
-    async function _oneAttempt() {
+    async function _oneAttempt(timeoutMs) {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 25000);
+        // 1re tentative : 25 s de patience (les réponses légitimes du relai
+        // montent à 17-25 s quand Google traverse une phase de surcharge).
+        // Retries : 15 s — la requête est sérialisée dans une file, un délai
+        // long bloquerait toutes les autres derrière.
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
         try {
             const res = await fetch(proxyUrl, { signal: controller.signal, cache: 'no-store' });
             // 404/401/403 = le déploiement n'existe plus ou accès refusé : ce n'est PAS
@@ -603,7 +638,7 @@ export async function fetchAvecRelais(url, type = 'text', ttlSec = null) {
         //  - 401/403 (accès refusé au déploiement) ou plus de réseau : arrêt net.
         for (let attempt = 0; attempt < 3; attempt++) {
             try {
-                rawData = await _oneAttempt();
+                rawData = await _oneAttempt(attempt === 0 ? 25000 : 15000);
                 lastErr = null;
                 break;
             } catch (e) {
@@ -632,7 +667,7 @@ export async function fetchAvecRelais(url, type = 'text', ttlSec = null) {
         if (ttlSec) _relaisCache.set(url, { ts: Date.now(), data });
         return data;
     } catch (e) {
-        if (e.name === 'AbortError') throw new Error(isFr ? "Délai d'attente dépassé (plus de 25s). Réessayez la recherche." : "Timeout after 25s. Please retry the search.");
+        if (e.name === 'AbortError') throw new Error(isFr ? "Délai d'attente dépassé. Le relai météo est surchargé — réessayez." : "Timeout. The weather relay is overloaded — please retry.");
         if (e.message?.startsWith('__PROXY_INDISPONIBLE__')) {
             const detail = e.message.split('|')[1] || '';
             throw new Error(isFr
