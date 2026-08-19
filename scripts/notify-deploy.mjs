@@ -18,7 +18,7 @@
 // sur la scrutation du dépôt distant (moins précise : deployed | timeout).
 // ============================================================================
 
-import { execFile, execFileSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -35,23 +35,21 @@ const hasGh = (() => {
 })();
 
 /**
- * Affiche un toast/ballon Windows (zone de notification) + un bip console.
+ * Affiche une fenêtre de notification Windows qui se ferme seule après 8 s,
+ * + un bip console. (Les toasts/ballons natifs sont bloqués sur la machine
+ * de l'utilisateur — assistant de concentration — seul le popup WScript est
+ * visible, validé par test le 2026-08-19.)
  * @param {string} title ex. « Déploiement FTP Free.fr » (sans apostrophe)
- * @param {string} message texte du toast (sans apostrophe)
+ * @param {string} message texte (sans apostrophe)
+ * @param {'info'|'warn'} kind info = icône information, warn = exclamation
  */
-export function toast(title, message) {
+export function toast(title, message, kind = 'info') {
     process.stdout.write('\x07');   // bip console
-    const ps = [
-        'Add-Type -AssemblyName System.Windows.Forms',
-        'Add-Type -AssemblyName System.Drawing',
-        '$n = New-Object System.Windows.Forms.NotifyIcon',
-        '$n.Icon = [System.Drawing.SystemIcons]::Information',
-        '$n.Visible = $true',
-        `$n.ShowBalloonTip(6000, '${title}', '${message}', 'Info')`,
-        'Start-Sleep -Seconds 7',
-        '$n.Dispose()',
-    ].join('; ');
-    execFile('powershell.exe', ['-NoProfile', '-WindowStyle', 'Hidden', '-Command', ps], () => { });
+    const type = kind === 'warn' ? 48 : 64;   // Popup : 64 = info, 48 = avertissement
+    const ps = `(New-Object -ComObject WScript.Shell).Popup('${message}', 8, '${title}', ${type}) | Out-Null`;
+    try {
+        execFileSync('powershell.exe', ['-NoProfile', '-WindowStyle', 'Hidden', '-Command', ps], { stdio: 'ignore' });
+    } catch { /* notification best-effort */ }
 }
 
 /**
@@ -102,7 +100,7 @@ if (process.argv[1] && process.argv[1].endsWith('notify-deploy.mjs')) {
     const res = await waitForDeploy(BRANCH, baseSha, 240);
     if (res.status === 'deployed') toast('Déploiement FTP Free.fr', 'papabear56.free.fr a été mis à jour ✓');
     else if (res.status === 'nothing') toast('Déploiement FTP Free.fr', 'OK - rien à déployer (fichiers dev uniquement)');
-    else if (res.status === 'failed') toast('Déploiement FTP Free.fr', 'ÉCHEC du déploiement - voir onglet Actions');
-    else toast('Déploiement FTP Free.fr', 'Pas de conclusion après 4 min - voir onglet Actions');
+    else if (res.status === 'failed') toast('Déploiement FTP Free.fr', 'ÉCHEC du déploiement - voir onglet Actions', 'warn');
+    else toast('Déploiement FTP Free.fr', 'Pas de conclusion après 4 min - voir onglet Actions', 'warn');
     process.exit(0);
 }
