@@ -79,6 +79,24 @@ export function getFleet() {
         _writeLs(LS_ACTIVE, def.id);
     }
 
+    // RÉPARATION (bug du 2026-08-19 : updateAircraft écrasait l'id → avion
+    // inéditable et insélectionnable). On réassigne un id aux enregistrements
+    // touchés ; si l'avion actif ne se résout plus, on retombe sur le premier
+    // réparé (c'était généralement l'actif — le planificateur sauvegardait
+    // sa perf dedans à chaque calcul).
+    let firstRepaired = null;
+    for (const a of fleet) {
+        if (typeof a.id !== 'string' || !a.id) {
+            a.id = _uid();
+            if (!firstRepaired) firstRepaired = a;
+        }
+    }
+    if (firstRepaired) {
+        _writeLs(LS_FLEET, fleet);
+        const activeId = _readLs(LS_ACTIVE, null);
+        if (!fleet.some(a => a.id === activeId)) _writeLs(LS_ACTIVE, firstRepaired.id);
+    }
+
     return fleet;
 }
 
@@ -169,6 +187,8 @@ export function deleteAircraft(id) {
  * Nettoie/valide les données d'un avion. cruiseSpeedKt / fuelBurnLph sont
  * OPTIONNELS (null si absents ou invalides → le planificateur retombe sur
  * ses valeurs par défaut) : tous les avions n'ont pas encore ces infos.
+ * L'id, s'il est valide, est CONSERVÉ (le perdre rendrait l'avion
+ * inéditable et insélectionnable).
  */
 function _sanitize(data) {
     const gr = parseInt(data.groundRoll, 10);
@@ -176,7 +196,7 @@ function _sanitize(data) {
     const sm = parseInt(data.safetyMargin, 10);
     const cs = parseInt(data.cruiseSpeedKt, 10);
     const fb = parseInt(data.fuelBurnLph, 10);
-    return {
+    const out = {
         name: String(data.name || 'Avion').slice(0, 40),
         registration: String(data.registration || '').slice(0, 12).toUpperCase(),
         type: String(data.type || '').slice(0, 20),
@@ -186,6 +206,10 @@ function _sanitize(data) {
         cruiseSpeedKt: isNaN(cs) || cs <= 0 ? null : cs,
         fuelBurnLph: isNaN(fb) || fb <= 0 ? null : fb,
     };
+    // Uniquement si valide : ne pas écraser l'{ id: _uid(), ..._sanitize() }
+    // de addAircraft par un id undefined.
+    if (typeof data.id === 'string' && data.id) out.id = data.id;
+    return out;
 }
 
 // ----------------------------------------------------------------

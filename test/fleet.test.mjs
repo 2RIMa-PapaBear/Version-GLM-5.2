@@ -49,3 +49,28 @@ describe('flotte — vitesse/conso de croisière', () => {
         assert.equal(up.fuelBurnLph, null);
     });
 });
+
+describe('flotte — régression id (bug updateAircraft)', () => {
+    test('updateAircraft PRÉSERVE l\'id (sélection/ édition restent possibles)', () => {
+        const ac = fleet.addAircraft({ name: 'DR400', groundRoll: 500, fiftyFt: 1100 });
+        const up = fleet.updateAircraft(ac.id, { cruiseSpeedKt: 115, fuelBurnLph: 24 });
+        assert.equal(up.id, ac.id);
+        fleet.setActiveAircraft(ac.id);
+        assert.equal(fleet.getActiveAircraft().name, 'DR400');
+    });
+
+    test('getFleet RÉPARE les enregistrements sans id et restaure la sélection', () => {
+        // Flotte corrompue par le bug : 1er avion sans id, actif périmé.
+        _store.set('ac-fleet', JSON.stringify([
+            { name: 'Cessna 172 SP', type: 'C172', groundRoll: 830, fiftyFt: 1400, safetyMargin: 20 },
+            { id: 'ac_sain', name: 'DR400', groundRoll: 500, fiftyFt: 1100, safetyMargin: 20 },
+        ]));
+        _store.set('ac-active-id', JSON.stringify('ac_efface'));
+        const repaired = fleet.getFleet();
+        assert.ok(repaired.every(a => typeof a.id === 'string' && a.id.length > 0));
+        // L'actif périmé retombe sur le premier réparé, pas sur le hasard.
+        assert.equal(fleet.getActiveAircraft().name, 'Cessna 172 SP');
+        // La réparation est persistée : un 2e accès est stable.
+        assert.ok(fleet.getFleet().every(a => a.id));
+    });
+});

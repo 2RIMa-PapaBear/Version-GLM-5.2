@@ -13,9 +13,10 @@
  *
  * SOURCE
  * ------
- * API AviationWeather.gov /data/aircraftrep — PIREPs mondiaux.
- * Comme l'endpoint ne renvoie pas les en-têtes CORS, on passe par
- * le proxy Google Apps Script existant (fetchAvecRelais).
+ * API AviationWeather.gov /data/pirep — PIREPs par zone (bbox obligatoire
+ * depuis le renommage d'aircraftrep, constaté 2026-08-19). Comme
+ * l'endpoint ne renvoie pas les en-têtes CORS, on passe par le proxy
+ * Google Apps Script existant (fetchAvecRelais).
  *
  * Les PIREPs sont codés dans un format spécifique (UR PA..., UUA
  * pour urgent). On parse le texte brut pour extraire : localisation,
@@ -50,8 +51,16 @@ export async function fetchPireps(lat, lon, radiusDeg = 3) {
     if (cached && Date.now() - cached.ts < TTL_MS) return cached.pireps;
 
     try {
-        // Endpoint AviationWeather aircraftrep : PIREPs récents (24h).
-        const url = `https://aviationweather.gov/api/data/aircraftrep?format=json`;
+        // Endpoint renommé par AviationWeather (constaté 2026-08-19) :
+        // /data/aircraftrep → /data/pirep, avec bbox OBLIGATOIRE (une requête
+        // mondiale renvoie 400). Fenêtre 24h pour garder les mêmes données
+        // qu'avant le renommage ; zone sans PIREP → 204 corps vide.
+        const r = Math.min(radiusDeg, 5);
+        const bbox = [
+            Math.max(-90, lat - r).toFixed(2), Math.max(-180, lon - r).toFixed(2),
+            Math.min(90, lat + r).toFixed(2), Math.min(180, lon + r).toFixed(2),
+        ].join(',');
+        const url = `https://aviationweather.gov/api/data/pirep?bbox=${bbox}&format=json&hours=24`;
         const data = await fetchAvecRelais(url, 'json');
 
         if (!Array.isArray(data)) return [];
