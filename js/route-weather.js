@@ -52,12 +52,13 @@ export async function showRouteWeather(map, fromIcao, toIcao, opts = {}) {
     }
     if (routePoints.length < 2) { _clearRoute(map); return; }
 
-    // Polyline principale (A→B ou multi-points) — rouge pour trancher sur les
-    // fonds satellite/OSM et se distinguer des pastilles METAR colorées.
+    // Polyline principale (A→B ou multi-points) — même bleu que la ligne
+    // d'altitude de croisière du profil d'élévation (#38BDF8), cohérence
+    // visuelle route ↔ profil.
     _routeLayer = L.polyline(routePoints.map(p => [p[0], p[1]]), {
-        color: '#EF4444',
+        color: '#38BDF8',
         weight: 3,
-        opacity: 0.75,
+        opacity: 0.8,
         dashArray: '8, 6',
     }).addTo(map);
 
