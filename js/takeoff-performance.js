@@ -237,55 +237,28 @@ export function correctedTakeoffDistance(da, opts = {}) {
     };
 }
 
-/**
- * Évalue la performance de décollage pour le terrain courant :
- * calcule la distance corrigée, la compare à la longueur de piste
- * configurée, et retourne un verdict.
- *
- * @param {string} icao Code OACI du terrain.
- * @returns {{
- *   da: number,
- *   groundRoll: number,
- *   fiftyFt: number,
- *   runwayLength: number|null,
- *   margin: number|null,
- *   level: 'ok'|'caution'|'danger'|'unknown',
- *   message: string
- * }|null} null si les données météo sont indisponibles.
- */
-export function evaluateTakeoffPerformance(icao) {
-    const perf = getPerformanceData();
-    if (!perf) return null;
+// Suffixe d'info quand le revêtement/l'humidité a majoré le calcul.
+function _surfaceNote(corr, surfaceCode, isFr) {
+    if (corr.surfaceFactor <= 1) return '';
+    const surfLbl = surfaceCode ? surfaceLabel(surfaceCode) : '';
+    const pct = Math.round((corr.surfaceFactor - 1) * 100);
+    if (isSoftSurface(surfaceCode)) {
+        const wet = corr.surfaceFactor === 1.25, contaminated = corr.surfaceFactor >= 1.30;
+        if (contaminated) return isFr ? ` (revêtement ${surfLbl} contaminé +${pct}%)` : ` (${surfLbl} contaminated +${pct}%)`;
+        if (wet) return isFr ? ` (revêtement ${surfLbl} humide +${pct}%)` : ` (wet ${surfLbl} +${pct}%)`;
+        return isFr ? ` (revêtement ${surfLbl} +${pct}%)` : ` (${surfLbl} +${pct}%)`;
+    }
+    return isFr ? ` (piste humide/contaminée +${pct}%)` : ` (wet/contaminated +${pct}%)`;
+}
 
-    const daResult = densityAltitude(perf.elevationFt, perf.qnh, perf.oat);
-    if (!daResult) return null;
-
+// Verdict commun : compare la distance corrigée à la longueur de piste et
+// construit le message (FR/EN). Partagé par evaluateTakeoffPerformance (état
+// courant de l'app) et evaluateTakeoffFromRaw (METAR brut, ex. log de nav).
+function _takeoffVerdict(icao, daResult, corr, surfaceCode) {
     const acRef = getAircraftRef();
-
-    // ---- Détection du revêtement et de l'humidité ----
-    const surfaceCode = getRunwaySurface(icao);
-    const { wet, contaminated } = _detectWetFromMetar();
-
-    const corr = correctedTakeoffDistance(daResult.da, { surfaceCode, wet, contaminated });
     const rwyLen = getRunwayLength(icao);
     const isFr = state.lang === 'fr';
-
-    // Construit un suffixe d'info si le revêtement a impacté le calcul.
-    let surfaceNote = '';
-    if (corr.surfaceFactor > 1) {
-        const surfLbl = surfaceCode ? surfaceLabel(surfaceCode) : '';
-        if (isSoftSurface(surfaceCode)) {
-            surfaceNote = contaminated
-                ? (isFr ? ` (revêtement ${surfLbl} contaminé +${Math.round((corr.surfaceFactor-1)*100)}%)` : ` (${surfLbl} contaminated +${Math.round((corr.surfaceFactor-1)*100)}%)`)
-                : wet
-                    ? (isFr ? ` (revêtement ${surfLbl} humide +${Math.round((corr.surfaceFactor-1)*100)}%)` : ` (wet ${surfLbl} +${Math.round((corr.surfaceFactor-1)*100)}%)`)
-                    : (isFr ? ` (revêtement ${surfLbl} +${Math.round((corr.surfaceFactor-1)*100)}%)` : ` (${surfLbl} +${Math.round((corr.surfaceFactor-1)*100)}%)`);
-        } else {
-            surfaceNote = isFr
-                ? ` (piste humide/contaminée +${Math.round((corr.surfaceFactor-1)*100)}%)`
-                : ` (wet/contaminated +${Math.round((corr.surfaceFactor-1)*100)}%)`;
-        }
-    }
+    const surfaceNote = _surfaceNote(corr, surfaceCode, isFr);
 
     // Pas de longueur de piste configurée → on donne la distance corrigée
     // brute (informatif) sans verdict de marge.
@@ -345,6 +318,74 @@ export function evaluateTakeoffPerformance(icao) {
         surfaceFactor: corr.surfaceFactor,
         message: messages[level],
     };
+}
+
+/**
+ * Évalue la performance de décollage pour le terrain courant :
+ * calcule la distance corrigée, la compare à la longueur de piste
+ * configurée, et retourne un verdict.
+ *
+ * @param {string} icao Code OACI du terrain.
+ * @returns {{
+ *   da: number,
+ *   groundRoll: number,
+ *   fiftyFt: number,
+ *   runwayLength: number|null,
+ *   margin: number|null,
+ *   level: 'ok'|'caution'|'danger'|'unknown',
+ *   message: string
+ * }|null} null si les données météo sont indisponibles.
+ */
+export function evaluateTakeoffPerformance(icao) {
+    const perf = getPerformanceData();
+    if (!perf) return null;
+
+    const daResult = densityAltitude(perf.elevationFt, perf.qnh, perf.oat);
+    if (!daResult) return null;
+
+    // ---- Détection du revêtement et de l'humidité ----
+    const surfaceCode = getRunwaySurface(icao);
+    const { wet, contaminated } = _detectWetFromMetar();
+
+    const corr = correctedTakeoffDistance(daResult.da, { surfaceCode, wet, contaminated });
+    return _takeoffVerdict(icao, daResult, corr, surfaceCode);
+}
+
+/**
+ * Même calcul qu'evaluateTakeoffPerformance, mais à partir d'un METAR brut
+ * fourni (ex. METAR de départ frais au moment de générer le log de nav PDF)
+ * au lieu de l'état courant de l'app — qui peut être affiché sur un autre
+ * terrain. L'humidité/contamination est détectée par tokens dans le brut.
+ *
+ * @param {string} icao Code OACI du terrain.
+ * @param {{raw:string, qnh:number, oat:number, elevationFt:number|null}} metar
+ * @returns {Object|null} même forme qu'evaluateTakeoffPerformance.
+ */
+export function evaluateTakeoffFromRaw(icao, metar) {
+    if (!icao || !metar || metar.qnh == null || metar.oat == null) return null;
+    const daResult = densityAltitude(metar.elevationFt ?? 0, metar.qnh, metar.oat);
+    if (!daResult) return null;
+
+    const surfaceCode = getRunwaySurface(icao);
+    const { wet, contaminated } = _wetFromTokens(metar.raw || '');
+    const corr = correctedTakeoffDistance(daResult.da, { surfaceCode, wet, contaminated });
+    return _takeoffVerdict(icao, daResult, corr, surfaceCode);
+}
+
+// Détection des phénomènes humides/contaminants par tokens dans un METAR
+// brut (les codes RA/SN/... sont des groupes délimités par des espaces).
+// Équivalent simplifié de _detectWetFromMetar, sans accès au DOM/état.
+// Exporté pour les tests.
+export function _wetFromTokens(raw) {
+    // Ne garde que les groupes plausibles (lettres, préfixe intensité/vicinité)
+    // contenant un code météo connu — écarte KT, Q1013, FEW035, NOSIG...
+    const groups = String(raw || '').toUpperCase().split(/\s+/)
+        .filter(t => /^[-+VC]{0,2}[A-Z]{2,8}$/.test(t))
+        .map(t => t.replace(/^VC/, ''))
+        .filter(t => /RA|SN|SG|PL|GR|GS|DZ|BR|SH|FZ|TS/.test(t));
+    const contaminated = groups.some(g => /\+RA|SH|FZ|TS|SN|SG|PL|GR|GS/.test(g));
+    const wet = !contaminated && groups.some(g => /RA|DZ|BR/.test(g));
+    return { wet, contaminated };
 }
 
 /**

@@ -5,6 +5,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test test/core.test.mjs test/flight-planner.test.mjs test/relais-cache.test.mjs test/fleet.test.mjs"
+    "test": "node --test test/core.test.mjs test/flight-planner.test.mjs test/relais-cache.test.mjs test/fleet.test.mjs test/route-alternates.test.mjs"
   }
 }
