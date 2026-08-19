@@ -177,14 +177,13 @@ function _fmtMin(min) {
     return h > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${m} min`;
 }
 
-// Cap du tronçon → direction d'écran plaçant l'étiquette à droite du sens
-// de vol (0°=nord → droite de l'écran ; 90°=est → dessous ; etc.).
+// Cap du tronçon → direction d'écran de la pilule : à DROITE pour un tronçon
+// vertical (nord/sud), AU-DESSUS pour un tronçon horizontal (est/ouest) —
+// jamais en dessous ni à gauche, et jamais sur la ligne.
 // Exporté pour les tests.
 export function _tooltipDirForTrack(tc) {
-    if (tc >= 315 || tc < 45) return 'right';
-    if (tc >= 45 && tc < 135) return 'bottom';
-    if (tc >= 135 && tc < 225) return 'left';
-    return 'top';
+    const horizontal = (tc >= 45 && tc < 135) || (tc >= 225 && tc < 315);
+    return horizontal ? 'top' : 'right';
 }
 
 // Case à cocher « Cap / Distance / Temps » en bas à gauche de la carte.
