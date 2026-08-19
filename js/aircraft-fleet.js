@@ -13,7 +13,7 @@
  * STOCKAGE
  * --------
  * localStorage :
- *   - 'ac-fleet'      : tableau d'avions [{id, name, registration, type, groundRoll, fiftyFt, safetyMargin}]
+ *   - 'ac-fleet'      : tableau d'avions [{id, name, registration, type, groundRoll, fiftyFt, safetyMargin, cruiseSpeedKt, fuelBurnLph}]
  *   - 'ac-active-id'  : id de l'avion actif
  *
  * MIGRATION
@@ -33,6 +33,8 @@ const DEFAULT_C172 = {
     groundRoll: 830,
     fiftyFt: 1400,
     safetyMargin: 20,
+    cruiseSpeedKt: 110,   // vitesse de croisière TAS (planificateur de nav)
+    fuelBurnLph: 35,      // consommation horaire en croisière (L/h)
 };
 
 /**
@@ -128,7 +130,9 @@ export function addAircraft(data) {
 }
 
 /**
- * Met à jour un avion existant.
+ * Met à jour un avion existant. Accepte les mises à jour PARTIELLES : les
+ * champs absents conservent leur valeur actuelle (sanitize appliqué à
+ * l'enregistrement fusionné, pas aux seules données reçues).
  * @param {string} id
  * @param {Object} data
  * @returns {Object|null} L'avion mis à jour, ou null si introuvable.
@@ -137,7 +141,7 @@ export function updateAircraft(id, data) {
     const fleet = getFleet();
     const idx = fleet.findIndex(a => a.id === id);
     if (idx === -1) return null;
-    fleet[idx] = { ...fleet[idx], ..._sanitize(data), id };
+    fleet[idx] = _sanitize({ ...fleet[idx], ...data, id });
     _writeLs(LS_FLEET, fleet);
     return fleet[idx];
 }
@@ -162,12 +166,16 @@ export function deleteAircraft(id) {
 }
 
 /**
- * Nettoie/valide les données d'un avion.
+ * Nettoie/valide les données d'un avion. cruiseSpeedKt / fuelBurnLph sont
+ * OPTIONNELS (null si absents ou invalides → le planificateur retombe sur
+ * ses valeurs par défaut) : tous les avions n'ont pas encore ces infos.
  */
 function _sanitize(data) {
     const gr = parseInt(data.groundRoll, 10);
     const ft = parseInt(data.fiftyFt, 10);
     const sm = parseInt(data.safetyMargin, 10);
+    const cs = parseInt(data.cruiseSpeedKt, 10);
+    const fb = parseInt(data.fuelBurnLph, 10);
     return {
         name: String(data.name || 'Avion').slice(0, 40),
         registration: String(data.registration || '').slice(0, 12).toUpperCase(),
@@ -175,6 +183,8 @@ function _sanitize(data) {
         groundRoll: isNaN(gr) || gr <= 0 ? DEFAULT_C172.groundRoll : gr,
         fiftyFt: isNaN(ft) || ft <= 0 ? DEFAULT_C172.fiftyFt : ft,
         safetyMargin: isNaN(sm) ? 20 : Math.max(0, Math.min(50, sm)),
+        cruiseSpeedKt: isNaN(cs) || cs <= 0 ? null : cs,
+        fuelBurnLph: isNaN(fb) || fb <= 0 ? null : fb,
     };
 }
 

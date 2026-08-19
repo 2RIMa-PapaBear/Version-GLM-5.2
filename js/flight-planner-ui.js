@@ -1,6 +1,6 @@
 import { state, escapeHtml, fetchAvecRelais } from './core.js';
 import { getAirportByICAO, enrichAirport } from './ui-module.js';
-import { getActiveAircraftId, getActiveAircraft } from './aircraft-fleet.js';
+import { getActiveAircraftId, getActiveAircraft, getFleet, updateAircraft } from './aircraft-fleet.js';
 import { getActiveRunwayNameForIcao } from './takeoff-performance.js';
 import { drawNavLogPdf } from './navlog-pdf.js';
 import { makeCollapsible } from './collapsible.js';
@@ -28,27 +28,36 @@ function _preloadWaypointFreqs(plan, reRenderFn) {
     )).then(() => { if (typeof reRenderFn === 'function') reRenderFn(); });
 }
 
+// Perf nav (TAS, conso) : la FLOTTE est la source de vérité — champs
+// « Vitesse croisière / Conso croisière » des caractéristiques de l'avion.
+// L'ancien stockage ac-perf-<id> (saisies du planificateur) est relu une
+// dernière fois pour les avions qui n'ont pas encore ces champs, puis la
+// première saisie le recopie dans la flotte et vide l'ancienne clé.
 function _readPerf(acId) {
     const def = getDefaultAircraftPerf();
     if (!acId) return def;
-    try {
-        const raw = localStorage.getItem(LS_PERF_PREFIX + acId);
-        if (raw) {
-            const p = JSON.parse(raw);
-            return {
-                tasKt: typeof p.tasKt === 'number' ? p.tasKt : def.tasKt,
-                fuelBurnLph: typeof p.fuelBurnLph === 'number' ? p.fuelBurnLph : def.fuelBurnLph,
-            };
-        }
-    } catch {   }
-    return def;
+    const ac = getFleet().find(a => a.id === acId) || {};
+    let tasKt = typeof ac.cruiseSpeedKt === 'number' ? ac.cruiseSpeedKt : null;
+    let fuelBurnLph = typeof ac.fuelBurnLph === 'number' ? ac.fuelBurnLph : null;
+    if (tasKt == null || fuelBurnLph == null) {
+        try {
+            const raw = localStorage.getItem(LS_PERF_PREFIX + acId);
+            if (raw) {
+                const p = JSON.parse(raw);
+                if (tasKt == null && typeof p.tasKt === 'number') tasKt = p.tasKt;
+                if (fuelBurnLph == null && typeof p.fuelBurnLph === 'number') fuelBurnLph = p.fuelBurnLph;
+            }
+        } catch {   }
+    }
+    return { tasKt: tasKt ?? def.tasKt, fuelBurnLph: fuelBurnLph ?? def.fuelBurnLph };
 }
 
 function _writePerf(acId, tasKt, fuelBurnLph) {
     if (!acId) return;
-    try {
-        localStorage.setItem(LS_PERF_PREFIX + acId, JSON.stringify({ tasKt, fuelBurnLph }));
-    } catch {   }
+    // Persiste dans les caractéristiques de l'avion (flotte) et retire
+    // l'ancienne clé ac-perf (migration effectuée).
+    updateAircraft(acId, { cruiseSpeedKt: tasKt, fuelBurnLph });
+    try { localStorage.removeItem(LS_PERF_PREFIX + acId); } catch {   }
 }
 
 // Garde-fou anti-récursion PARTAGÉ : le callback de _preloadWaypointFreqs (dans
@@ -168,8 +177,14 @@ async function _generateNavLogPdf() {
     } catch { /* hors ligne : champs laissés vides à compléter à la main */ }
 
     const ac = getActiveAircraft() || {};
-    const runway = getActiveRunwayNameForIcao(fromIcao) || '';
     const decl = plan.declination ?? 0;
+    // Piste en service alignée sur le vent RÉEL du METAR de départ (les
+    // numéros de piste sont magnétiques, le vent METAR est vrai → correction
+    // de déclinaison). Sans METAR : comportement historique (rose des vents).
+    const rwyWind = (windKt != null && windDir != null)
+        ? { dir: windDir === 'VRB' ? null : windDir, speed: windKt }
+        : null;
+    const runway = getActiveRunwayNameForIcao(fromIcao, rwyWind, decl) || '';
     const zRet = plan.cruiseAltFt;
 
     // Z sécu par tronçon : les points du profil portent un frac [0..1] sur la
@@ -194,7 +209,8 @@ async function _generateNavLogPdf() {
         const rm = ((Math.round((lg.trueCourse ?? 0) - decl) % 360) + 360) % 360;
         const row = {
             from: lg.from.icao, to: lg.to.icao,
-            distRemain: Math.round(remain), dist: lg.distanceNm,
+            // Distances arrondies au NM entier — lisibilité du log papier.
+            distRemain: Math.round(remain), dist: Math.round(lg.distanceNm),
             zSecu: zSecuFor(i), zRet: zRet ?? '',
             rm: String(rm).padStart(3, '0'), cm: String(lg.magHeading ?? '').padStart(3, '0'),
             tsv: (tas && lg.distanceNm) ? Math.round(lg.distanceNm / tas * 60) : '',
@@ -229,7 +245,8 @@ async function _generateNavLogPdf() {
             ? plan.waypoints.slice(1, -1).map(w => w.icao).join(' ') : '',
         cruiseAltFt: stash.alt ?? plan.cruiseAltFt, tasKt: tas,
         fuelBurnLph: stash.burn ?? '', isNight: !!stash.isNight,
-        distanceNm: totalNm ?? '', distanceKm: (isMulti ? plan.totalDistanceKm : plan.distanceKm) ?? '',
+        distanceNm: totalNm != null ? Math.round(totalNm) : '',
+        distanceKm: (() => { const km = isMulti ? plan.totalDistanceKm : plan.distanceKm; return km != null ? Math.round(km) : ''; })(),
         trueCourse: firstLeg.trueCourse ?? '', magHeading: firstLeg.magHeading ?? '',
         declination: plan.declination ?? 0,
         wind: plan.wind || null, driftDeg: wc.driftDeg,
@@ -245,7 +262,7 @@ async function _generateNavLogPdf() {
         } : null,
         isMultiLeg: isMulti,
         legs: legs.map(lg => ({
-            from: lg.from.icao, to: lg.to.icao, dist: lg.distanceNm,
+            from: lg.from.icao, to: lg.to.icao, dist: Math.round(lg.distanceNm),
             hdg: lg.magHeading, eteLabel: fmtEte(lg.legTimeMin),
             fuelL: lg.fuel?.tripFuelL ?? '', freq: legFreq(lg.to.icao),
         })),
