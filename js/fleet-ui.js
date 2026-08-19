@@ -159,6 +159,7 @@ function _render() {
                     ? 'Distances issues du manuel de vol (POH) au niveau de la mer en atmosphère standard. La vitesse et la consommation de croisière alimentent la feuille de calcul de navigation (temps de vol, carburant).'
                     : 'Distances from the POH at sea level / standard atmosphere. Cruise speed and fuel burn feed the navigation flight plan (ETE, fuel).'}</span>
             </div>
+            <div id="fleet-form-error" style="min-height:0; color:var(--danger); font-size:12px; padding:0 2px;" aria-live="polite"></div>
             <div class="fleet-form-actions">
                 <button id="fleet-save" class="btn-primary"><i data-lucide="save"></i> ${isFr ? 'Enregistrer' : 'Save'}</button>
                 <button id="fleet-cancel-form" class="btn-secondary" style="display:none;">${isFr ? 'Annuler' : 'Cancel'}</button>
@@ -308,7 +309,21 @@ function _resetForm() {
     document.getElementById('fleet-burn').value = '';
     document.getElementById('fleet-form-title').textContent = isFr ? 'Ajouter un avion' : 'Add an aircraft';
     document.getElementById('fleet-cancel-form').style.display = 'none';
+    const errEl = document.getElementById('fleet-form-error');
+    if (errEl) errEl.textContent = '';
     _hideSuggest();
+}
+
+/**
+ * Affiche un message d'erreur de validation DANS le formulaire (non bloquant,
+ * contrairement à alert() qui figeait le handler le temps du popup et
+ * déclenchait un « [Violation] click handler took Xms » dans la console).
+ */
+function _formError(msg) {
+    const el = document.getElementById('fleet-form-error');
+    if (!el) return;
+    el.textContent = msg;
+    document.getElementById('fleet-name')?.focus();
 }
 
 /**
@@ -316,16 +331,17 @@ function _resetForm() {
  */
 function _doSave() {
     const isFr = state.lang === 'fr';
+    document.getElementById('fleet-form-error').textContent = '';
     const name = document.getElementById('fleet-name').value.trim();
     const roll = document.getElementById('fleet-roll').value.trim();
     const ft50 = document.getElementById('fleet-50ft').value.trim();
 
     if (!name) {
-        alert(isFr ? 'Veuillez saisir un nom.' : 'Please enter a name.');
+        _formError(isFr ? 'Veuillez saisir un nom.' : 'Please enter a name.');
         return;
     }
     if (!roll || !ft50) {
-        alert(isFr ? 'Veuillez saisir les distances de référence (roulement et 50ft).' : 'Please enter reference distances (roll and 50ft).');
+        _formError(isFr ? 'Veuillez saisir les distances de référence (roulement et 50ft).' : 'Please enter reference distances (roll and 50ft).');
         return;
     }
 
