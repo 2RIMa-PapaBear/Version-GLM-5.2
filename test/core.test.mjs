@@ -201,3 +201,63 @@ describe('findActiveValueAtHour', () => {
         assert.equal(findActiveValueAtHour(blocks, 18), null);    // 18 ∉ [12,18)
     });
 });
+
+/* ================================================================
+ * fetchAvecRelais — file de sérialisation du relai Apps Script
+ * (le relai ne supporte pas la concurrence : 404 echo / gels 30-40 s.
+ * On vérifie que les requêtes partent UNE PAR UNE et que les appels
+ * simultanés d'une même URL sont dédupliqués — fetch réseau simulé.)
+ * ================================================================ */
+import { fetchAvecRelais } from '../js/core.js';
+
+describe('fetchAvecRelais — sérialisation relai', () => {
+    const _realFetch = globalThis.fetch;
+    test('dédup : 3 appels simultanés de la même URL → 1 seul fetch réseau', async () => {
+        let calls = 0;
+        globalThis.fetch = async () => {
+            calls++;
+            await new Promise(r => setTimeout(r, 40));
+            return { ok: true, status: 200, text: async () => 'METAR LFPZ' };
+        };
+        try {
+            const u = 'https://aviationweather.gov/api/data/metar?ids=LFPZ&format=raw';
+            const res = await Promise.all([fetchAvecRelais(u), fetchAvecRelais(u), fetchAvecRelais(u)]);
+            assert.deepEqual(res, ['METAR LFPZ', 'METAR LFPZ', 'METAR LFPZ']);
+            assert.equal(calls, 1);
+        } finally { globalThis.fetch = _realFetch; }
+    });
+
+    test('sérialisation : 6 URL différentes en parallèle → jamais 2 fetch simultanés', async () => {
+        let active = 0, maxActive = 0;
+        globalThis.fetch = async () => {
+            active++; maxActive = Math.max(maxActive, active);
+            await new Promise(r => setTimeout(r, 30));
+            active--;
+            return { ok: true, status: 200, text: async () => 'OK' };
+        };
+        try {
+            const urls = ['a', 'b', 'c', 'd', 'e', 'f'].map(c =>
+                `https://aviationweather.gov/api/data/metar?ids=LF${c}&format=raw`);
+            const res = await Promise.all(urls.map(u => fetchAvecRelais(u)));
+            assert.equal(res.length, 6);
+            assert.ok(res.every(r => r === 'OK'));
+            assert.equal(maxActive, 1);   // le relai n'a JAMAIS vu 2 requêtes en même temps
+        } finally { globalThis.fetch = _realFetch; }
+    });
+
+    test('la file survit à un échec : la requête suivante passe quand même', async () => {
+        // LFZZ échoue réseau à chaque tentative ; LFYY réussit. Le sondage
+        // no-cors (HEAD) répond : l'échec est classé « réponse bloquée ».
+        globalThis.fetch = async (u, opts) => {
+            if (opts && opts.method === 'HEAD') return {};
+            if (String(u).includes('LFZZ')) throw new TypeError('Failed to fetch');
+            return { ok: true, status: 200, text: async () => 'OK-APRES' };
+        };
+        try {
+            const u1 = 'https://aviationweather.gov/api/data/metar?ids=LFZZ&format=raw';
+            const u2 = 'https://aviationweather.gov/api/data/metar?ids=LFYY&format=raw';
+            await assert.rejects(fetchAvecRelais(u1), /relai Google Apps Script inaccessible/i);
+            assert.equal(await fetchAvecRelais(u2), 'OK-APRES');
+        } finally { globalThis.fetch = _realFetch; }
+    });
+});
