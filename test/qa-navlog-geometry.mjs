@@ -34,6 +34,18 @@ const EXPECT = {
         'Terrain', 'LFPT', 'Pontoise-Cormeilles', '14 NM D', 'LFOB', '3500 ft'],
 };
 
+// Passe ANGLAISE : même fixture avec isFr=false partout → page 1 doit être
+// intégralement traduite (libellés, transpondeur, en-têtes ETA/ATA, checks).
+const EXPECT_EN = {
+    1: ['VFR Flight Log', 'Pilot / Flight details', 'Aircraft', 'Parameters', 'Pilot:', 'Hobbs end:',
+        'Flight time:', 'Reg:', 'Runway:', 'Diversion', 'Radio failure', 'Airfield', 'Distress',
+        'Notes:', 'MSA', 'ETA', 'ATA', 'Cruise check', 'Turning point check', 'Downwind check', 'Fuel'],
+    2: ['Flight plan', 'MAGNETIC HEADING', 'WIND AT 3500 FT', 'TOTAL', 'LEG DETAILS'],
+    3: ['Performance & terrain', 'TAKEOFF PERFORMANCE — LFPB · RWY 28', 'GROUND ROLL', '50 FT OBSTACLE',
+        'DENSITY ALT.', 'ELEVATION PROFILE — LFPB - LFRM', 'EN-ROUTE ALTERNATES (± 50 NM)',
+        'AIRFIELD', '14 NM D', '3500 ft'],
+};
+
 // ---- Constructeur enregistrant les appels text() ----
 function makeRecordingCtor(store) {
     return function RecordingCtor(opts) {
@@ -58,7 +70,7 @@ function makeRecordingCtor(store) {
     };
 }
 
-function runQa(sample, label, extra) {
+function runQa(sample, label, extra, expect = EXPECT) {
     console.log(`\n===== ${label} =====`);
     const calls = [];
     drawNavLogPdf(makeRecordingCtor(calls), sample);
@@ -101,10 +113,10 @@ function runQa(sample, label, extra) {
                         : ko(`p${p} contenu déborde du cadre : ${maxBot.toFixed(1)}`);
 
         // 5. Contenu attendu.
-        for (const s of EXPECT[p] || []) {
+        for (const s of expect[p] || []) {
             if (!byPage(p).map(i => i.s).join(' ').includes(s)) ko(`p${p} texte manquant : ${JSON.stringify(s)}`);
         }
-        ok(`p${p} contenu attendu vérifié (${(EXPECT[p] || []).length} chaînes)`);
+        ok(`p${p} contenu attendu vérifié (${(expect[p] || []).length} chaînes)`);
     }
 
     // 6. Extra : assertions spécifiques à la variante.
@@ -136,6 +148,13 @@ const base = JSON.parse(fs.readFileSync(path.join(root, 'test', 'fixtures-navlog
 const wp10 = JSON.parse(fs.readFileSync(path.join(root, 'test', 'fixtures-navlog-sample-10wp.json'), 'utf8'));
 runQa(base, 'FIXTURE 2 waypoints', null);
 runQa(wp10, 'FIXTURE 10 waypoints', qa10wp);
+
+// Passe EN : même document, isFr=false partout (page 1 comprise).
+const en = JSON.parse(JSON.stringify(base));
+en.isFr = false;
+en.calc.isFr = false;
+en.perf.isFr = false;
+runQa(en, 'FIXTURE 2 waypoints — ANGLAIS', null, EXPECT_EN);
 
 console.log(failures ? `\n${failures} ÉCHEC(S)` : '\nTOUT OK');
 process.exit(failures ? 1 : 0);
