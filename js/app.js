@@ -217,7 +217,7 @@ function _chercherNomAeroport(icao, validityStr) {
 
     // Fallback API : code absent de la base locale.
     memoSet(icao, 'PENDING');
-    fetchAvecRelais(`https://aviationweather.gov/api/data/stationinfo?ids=${icao}&format=json`, 'json')
+    fetchAvecRelais(`https://aviationweather.gov/api/data/stationinfo?ids=${icao}&format=json`, 'json', 3600)
         .then(data => {
             if (data && data.length > 0) {
                 // On capture l'élévation (elev en mètres → convertie en pieds)
@@ -423,7 +423,7 @@ export function telechargerMessage(typeMessage) {
         
         const noaaUrl = `https://aviationweather.gov/api/data/stationinfo?bbox=${minLat},${minLon},${maxLat},${maxLon}&format=json`;
         
-        fetchAvecRelais(noaaUrl, 'json')
+        fetchAvecRelais(noaaUrl, 'json', 3600)
             .then(stations => {
                 if (!Array.isArray(stations)) stations = [];
                 let aerosTries = stations
@@ -451,7 +451,7 @@ export function telechargerMessage(typeMessage) {
     }
 
     if (icao.length === 4 && /^[A-Z]{4}$/.test(icao)) {
-        fetchAvecRelais(`https://aviationweather.gov/api/data/stationinfo?ids=${icao}&format=json`, 'json')
+        fetchAvecRelais(`https://aviationweather.gov/api/data/stationinfo?ids=${icao}&format=json`, 'json', 3600)
             .then(data => {
                 if (data && data.length > 0) lancerRechercheZone(data[0].lat, data[0].lon, icao, data[0].site || data[0].name);
                 else {

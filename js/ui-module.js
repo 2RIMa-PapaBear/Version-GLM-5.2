@@ -38,8 +38,9 @@ export async function initAirportsDB() {
 
     try {
         // Pas de cache:'reload' — l'URL contient déjà la version (?v=AIRPORTS_DB_VERSION),
-        // ce qui suffit au cache-busting. Et cache:'reload' empêchait le navigateur
-        // d'utiliser le <link rel=preload> de index.html (warning console).
+        // ce qui suffit au cache-busting. (Le <link rel=preload> d'airports.json a été
+        // retiré d'index.html : inutilisé dès qu'IndexedDB sert la base, il générait
+        // un warning console « preloaded but not used » à chaque chargement.)
         const r = await fetch(`data/airports.json?v=${AIRPORTS_DB_VERSION}`);
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const data = await r.json();

@@ -415,7 +415,7 @@ async function _loadNeighborCategories(lat, lon) {
 
         // 2. API AviationWeather : METAR des stations de la zone.
         const stationsUrl = `https://aviationweather.gov/api/data/stationinfo?bbox=${minLat},${minLon},${maxLat},${maxLon}&format=json`;
-        const stations = await fetchAvecRelais(stationsUrl, 'json');
+        const stations = await fetchAvecRelais(stationsUrl, 'json', 3600);
 
         const metarByCode = {};
         if (Array.isArray(stations)) {

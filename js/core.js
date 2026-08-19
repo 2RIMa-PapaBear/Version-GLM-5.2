@@ -512,7 +512,22 @@ export function surfaceLabel(code, lang) {
     return l === 'fr' ? info.fr : info.en;
 }
 
-export async function fetchAvecRelais(url, type = 'text') {
+/**
+ * Fetch via le relai Google Apps Script, avec retries et gestion des
+ * pannes Google (404 echo intermittents, gels 25 s, 502/503 AviationWeather).
+ * @param {string} url    cible finale (hébergée sur aviationweather.gov)
+ * @param {string} type   'text' | 'json'
+ * @param {number} ttlSec optionnel : durée du cache. Sert DEUX couches : le
+ *                        relai (cache serveur, 180 s par défaut) ET un micro-
+ *                        cache navigateur — pour les données quasi statiques
+ *                        (stationinfo → 3600), on évite même le trajet
+ *                        /exec → echo, seule source des 404 intermittents.
+ */
+// Micro-cache navigateur : url → { ts, data }. En mémoire (pas de localStorage :
+// périme au rechargement, ce qui suffit pour des données quasi statiques).
+const _relaisCache = new Map();
+
+export async function fetchAvecRelais(url, type = 'text', ttlSec = null) {
 
     if (url.includes('nominatim.openstreetmap.org')) {
         try {
@@ -524,7 +539,13 @@ export async function fetchAvecRelais(url, type = 'text') {
         }
     }
 
-    const proxyUrl = `${PROXY_URL}?url=${encodeURIComponent(url)}`;
+    if (ttlSec) {
+        const hit = _relaisCache.get(url);
+        if (hit && Date.now() - hit.ts < ttlSec * 1000) return hit.data;
+    }
+
+    let proxyUrl = `${PROXY_URL}?url=${encodeURIComponent(url)}`;
+    if (ttlSec) proxyUrl += `&ttl=${ttlSec}`;
 
     // Familles d'échec, distinguées par des marqueurs internes :
     //   '__HTML_INATTENDU__'         → page HTML d'AviationWeather (502/503 sous charge) : transitoire, on retente.
@@ -575,6 +596,8 @@ export async function fetchAvecRelais(url, type = 'text') {
         //  - 404 echo Google : intermittent (clé user_content_key propre à chaque
         //    requête, routage edge) — une nouvelle tentative repart d'un /exec
         //    frais avec une nouvelle clé et réussit souvent ;
+        //  - timeout 25s (gel du /exec, sans même un 302) : transitoire aussi —
+        //    une seconde tentative est accordée, puis on abandonne ;
         //  - TypeError avec proxy atteignable : 504 sans CORS (transitoire) ou
         //    déploiement mort — on retente puis on tranche ;
         //  - 401/403 (accès refusé au déploiement) ou plus de réseau : arrêt net.
@@ -584,8 +607,10 @@ export async function fetchAvecRelais(url, type = 'text') {
                 lastErr = null;
                 break;
             } catch (e) {
-                if (e.name === 'AbortError') throw e;
-                if (e.message?.startsWith('__PROXY_INDISPONIBLE__')) {
+                if (e.name === 'AbortError') {
+                    if (attempt > 0) throw e;  // timeout : un seul retry, puis échec net
+                    lastErr = e;
+                } else if (e.message?.startsWith('__PROXY_INDISPONIBLE__')) {
                     if (!e.message.includes('|HTTP 404')) throw e;  // 401/403 : fatal
                     lastErr = e;                                     // 404 : on retente
                 } else if (e instanceof TypeError) {
@@ -601,7 +626,11 @@ export async function fetchAvecRelais(url, type = 'text') {
         }
         if (lastErr) throw lastErr;
 
-        return type === 'json' ? JSON.parse(rawData) : rawData;
+        const data = type === 'json' ? JSON.parse(rawData) : rawData;
+        // Succès : alimente le micro-cache navigateur (données quasi statiques
+        // uniquement — ttlSec fourni) pour les appels suivants.
+        if (ttlSec) _relaisCache.set(url, { ts: Date.now(), data });
+        return data;
     } catch (e) {
         if (e.name === 'AbortError') throw new Error(isFr ? "Délai d'attente dépassé (plus de 25s). Réessayez la recherche." : "Timeout after 25s. Please retry the search.");
         if (e.message?.startsWith('__PROXY_INDISPONIBLE__')) {
