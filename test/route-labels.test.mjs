@@ -1,28 +1,22 @@
-// Tests des étiquettes de tronçons sur la carte régionale :
-// direction d'écran selon le cap (côté droit du sens de vol) + format du temps.
+// Tests des étiquettes de tronçons sur la carte régionale : direction d'écran
+// de la pilule — à DROITE d'un tronçon vertical, AU-DESSUS d'un tronçon
+// horizontal (jamais dessous, jamais à gauche, jamais sur la ligne).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { _tooltipDirForTrack } from '../js/route-weather.js';
 
-test('cap au nord (000) → étiquette à droite de l\'écran (côté droit du vol)', () => {
+test('tronçon vertical (cap nord/sud) → pilule à droite de la ligne', () => {
     assert.equal(_tooltipDirForTrack(0), 'right');
     assert.equal(_tooltipDirForTrack(10), 'right');
+    assert.equal(_tooltipDirForTrack(180), 'right');
+    assert.equal(_tooltipDirForTrack(190), 'right');
     assert.equal(_tooltipDirForTrack(350), 'right');
 });
 
-test('cap à l\'est (090) → étiquette en dessous (le sud est à droite du vol)', () => {
-    assert.equal(_tooltipDirForTrack(90), 'bottom');
-    assert.equal(_tooltipDirForTrack(45), 'bottom');
-    assert.equal(_tooltipDirForTrack(134), 'bottom');
-});
-
-test('cap au sud (180) → étiquette à gauche (l\'ouest est à droite du vol)', () => {
-    assert.equal(_tooltipDirForTrack(180), 'left');
-    assert.equal(_tooltipDirForTrack(200), 'left');
-    assert.equal(_tooltipDirForTrack(224), 'left');
-});
-
-test('cap à l\'ouest (270) → étiquette au-dessus (le nord est à droite du vol)', () => {
+test('tronçon horizontal (cap est/ouest) → pilule au-dessus de la ligne', () => {
+    assert.equal(_tooltipDirForTrack(90), 'top');
+    assert.equal(_tooltipDirForTrack(45), 'top');
+    assert.equal(_tooltipDirForTrack(134), 'top');
     assert.equal(_tooltipDirForTrack(270), 'top');
     assert.equal(_tooltipDirForTrack(226), 'top');
     assert.equal(_tooltipDirForTrack(314), 'top');
