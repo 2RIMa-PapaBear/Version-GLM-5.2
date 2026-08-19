@@ -95,3 +95,9 @@ test('UrlFetchApp qui lève → PROXY_ERROR', () => {
     const { doGet } = makeEnv({ throwErr: new Error('timeout amont') });
     assert.match(doGet({ parameter: { url: 'https://aviationweather.gov/x' } }).text, /^PROXY_ERROR: /);
 });
+
+test('HTTP 204 amont (zone sans PIREP) : corps vide renvoyé, pas PROXY_ERROR', () => {
+    const { doGet } = makeEnv({ status: 204, body: '' });
+    const r = doGet({ parameter: { url: 'https://aviationweather.gov/api/data/pirep?bbox=45,0,50,5&format=json' } });
+    assert.equal(r.text, '');
+});

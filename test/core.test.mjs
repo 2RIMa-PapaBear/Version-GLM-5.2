@@ -261,3 +261,14 @@ describe('fetchAvecRelais — sérialisation relai', () => {
         } finally { globalThis.fetch = _realFetch; }
     });
 });
+
+describe('fetchAvecRelais — corps vide', () => {
+    const _realFetch = globalThis.fetch;
+    test('réponse 200 à corps vide en json → [] (pas de SyntaxError)', async () => {
+        globalThis.fetch = async () => ({ ok: true, status: 200, text: async () => '' });
+        try {
+            const r = await fetchAvecRelais('https://aviationweather.gov/api/data/pirep?bbox=1,2,3,4&format=json', 'json');
+            assert.deepEqual(r, []);
+        } finally { globalThis.fetch = _realFetch; }
+    });
+});

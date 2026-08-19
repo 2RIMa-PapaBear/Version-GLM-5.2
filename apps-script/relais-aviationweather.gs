@@ -61,7 +61,9 @@ function doGet(e) {
         const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
         const code = res.getResponseCode();
         body = res.getContentText();
-        if (code !== 200) {
+        // 204 No Content est une réponse légitime (ex. zone sans PIREP) :
+        // on renvoie un corps vide, pas une erreur.
+        if (code !== 200 && code !== 204) {
             return ContentService.createTextOutput(
                 'PROXY_ERROR: HTTP ' + code + ' — ' + body.substring(0, 200));
         }

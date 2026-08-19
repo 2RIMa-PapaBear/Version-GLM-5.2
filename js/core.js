@@ -661,7 +661,11 @@ async function _viaRelais(url, type, ttlSec) {
         }
         if (lastErr) throw lastErr;
 
-        const data = type === 'json' ? JSON.parse(rawData) : rawData;
+        // Corps vide (204 No Content, ex. zone sans PIREP) → [] pour du JSON
+        // (JSON.parse('') sinon lève une SyntaxError).
+        const data = type === 'json'
+            ? (rawData.trim() === '' ? [] : JSON.parse(rawData))
+            : rawData;
         // Succès : alimente le micro-cache navigateur (données quasi statiques
         // uniquement — ttlSec fourni) pour les appels suivants.
         if (ttlSec) _relaisCache.set(url, { ts: Date.now(), data });
