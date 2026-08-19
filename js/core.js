@@ -154,7 +154,32 @@ export const I18N = {
         cockpitModeTitle: "Briefing express (vue cockpit)",
         shareTitle: "Partager ce briefing",
 
-        watchdogTitle: "Surveillance des favoris"
+        watchdogTitle: "Surveillance des favoris",
+
+        // --- Interface statique (index.html → setLanguage) ---
+        uiTitle: "Visualiseur METAR/TAF",
+        noticeBtn: "Notice",
+        noticeBtnTitle: "Ouvrir la notice complète",
+        flightModeTitle: "Basculer entre vol local et navigation",
+        flightModeLocal: "Local",
+        flightModeNav: "Navigation",
+        searchRecentTitle: "Recherches récentes",
+        historyTitle: "<i data-lucide='history' class='icon-sm'></i> Historique récent",
+        alternatesTitle: "Alternates viables — terrains de déroutement",
+        regionalMapTitle: "Carte régionale — radar & terrains voisins",
+        routeFrom: "Départ",
+        routeTo: "Destination",
+        mapNoMetar: "Sans METAR",
+        mapCurrentApt: "Terrain courant",
+        depBtn: "Départ",
+        destBtn: "Destination",
+        langToggleAria: "Basculer entre français et anglais",
+        fetchMetarAria: "Télécharger METAR",
+        fetchTafAria: "Télécharger TAF",
+        nightModeAria: "Basculer le mode nuit rouge",
+        cockpitModeAria: "Briefing express",
+        shareAria: "Partager",
+        watchdogAria: "Surveillance favoris"
     },
     en: {
         placeholderIcao: "icao code or city...",
@@ -283,7 +308,32 @@ export const I18N = {
         cockpitModeTitle: "Briefing express (cockpit view)",
         shareTitle: "Share this briefing",
 
-        watchdogTitle: "Favorites watchdog"
+        watchdogTitle: "Favorites watchdog",
+
+        // --- Interface statique (index.html → setLanguage) ---
+        uiTitle: "METAR/TAF Viewer",
+        noticeBtn: "Manual",
+        noticeBtnTitle: "Open the full manual",
+        flightModeTitle: "Switch between local flight and navigation",
+        flightModeLocal: "Local",
+        flightModeNav: "Nav",
+        searchRecentTitle: "Recent searches",
+        historyTitle: "<i data-lucide='history' class='icon-sm'></i> Recent history",
+        alternatesTitle: "Viable alternates — diversion fields",
+        regionalMapTitle: "Regional map — radar & nearby airfields",
+        routeFrom: "From",
+        routeTo: "To",
+        mapNoMetar: "No METAR",
+        mapCurrentApt: "Current airfield",
+        depBtn: "Departure",
+        destBtn: "Destination",
+        langToggleAria: "Switch between French and English",
+        fetchMetarAria: "Download METAR",
+        fetchTafAria: "Download TAF",
+        nightModeAria: "Toggle night vision mode",
+        cockpitModeAria: "Express briefing",
+        shareAria: "Share",
+        watchdogAria: "Favorites watchdog"
     }
 };
 

@@ -83,15 +83,15 @@
                     <div class="flag-line" aria-hidden="true"></div>
                 </button>
                 <button id="btn-notice" class="btn-help" title="Ouvrir la notice complète" onclick="window.location.href = document.documentElement.lang === 'en' ? 'notice-en.html' : 'notice-fr.html'">
-					<i data-lucide="book-open" class="icon-sm"></i> Notice
+					<i data-lucide="book-open" class="icon-sm"></i> <span id="lbl-notice">Notice</span>
 				</button>
                 <button id="btn-night-mode" class="btn-night-mode" title="Mode nuit (vision nocturne)" aria-label="Basculer le mode nuit rouge" aria-pressed="false">
                     <i data-lucide="moon" class="icon-sm"></i>
                 </button>
                 </div>
                 <div id="flight-mode-toggle" class="flight-mode-toggle" role="switch" aria-label="Mode de vol" aria-pressed="false" data-mode="local" title="Basculer entre vol local et navigation">
-                    <span class="seg seg-local">Local</span>
-                    <span class="seg seg-nav">Navigation</span>
+                    <span class="seg seg-local" id="seg-local">Local</span>
+                    <span class="seg seg-nav" id="seg-nav">Navigation</span>
                     <span class="seg-slider"></span>
                 </div>
                 <button id="btn-cockpit-mode" class="btn-cockpit-mode" title="Briefing express (vue cockpit)" aria-label="Briefing express" aria-pressed="false">
@@ -112,7 +112,7 @@
                 <input type="text" id="icaoInput" placeholder="ex: LFPG ou Paris" autocomplete="off" aria-autocomplete="list">
                 <div id="autocomplete-results" class="autocomplete-dropdown" role="listbox"></div>
                 <div id="search-history" class="search-history hidden">
-                    <div class="search-history-title">Recherches récentes</div>
+                    <div class="search-history-title" id="search-history-title">Recherches récentes</div>
                     <div id="history-items" class="history-items"></div>
                 </div>
             </div>
