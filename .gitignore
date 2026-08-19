@@ -30,3 +30,10 @@ src-tauri/target/
 Apercu_*.pdf
 Apercu_*.png
 .edge-*/
+
+# Déploiement FTP (identifiants + état)
+deploy.config.json
+deploy.state.json
+
+# Dépendances npm (projet sans lock tracé)
+package-lock.json

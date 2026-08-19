@@ -1,0 +1,87 @@
+# ============================================================================
+# DEPLOY FTP FREE.FR — déploiement automatique à chaque push sur Version-2.0.
+#
+# Chaîne : push → fichiers prod modifiés depuis le dernier commit marqueur
+# « [deploy] » → bump auto des versions PWA (index.html ?v= + sw.js CACHE)
+# → upload FTP → commit du bump (message « [deploy] … », qui ne re-déclenche
+# PAS ce workflow : les pushes au token GitHub n'amorcent pas de workflow).
+#
+# Secrets à définir une fois (Settings → Secrets and variables → Actions) :
+#   FTP_SERVER   ex. ftpperso.free.fr
+#   FTP_USER     ex. papabear56
+#   FTP_PASSWORD mot de passe Free.fr
+# ============================================================================
+name: Deploy FTP Free.fr
+
+on:
+  push:
+    branches: [Version-2.0]
+  workflow_dispatch:
+    inputs:
+      since:
+        description: 'Réf de base du diff (vide = auto)'
+        required: false
+        default: ''
+
+concurrency:
+  group: deploy-ftp
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    # Le commit de bump posé par ce workflow ne doit pas re-déclencher un run
+    # (double sécurité : GitHub n'amorce déjà pas de workflow pour les pushes
+    # au GITHUB_TOKEN, mais gardons le garde-fou explicite).
+    if: ${{ !startsWith(github.event.head_commit.message, '[deploy]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (historique complet pour trouver le marqueur)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: Version-2.0
+
+      - name: Base du diff (dernier marqueur [deploy])
+        id: base
+        run: |
+          if [ -n "${{ github.event.inputs.since }}" ]; then
+            echo "args=--since=${{ github.event.inputs.since }}" >> "$GITHUB_OUTPUT"
+          else
+            BASE=$(git log -1 --grep='^\[deploy\]' --format=%H || true)
+            if [ -n "$BASE" ]; then
+              echo "args=--since=$BASE" >> "$GITHUB_OUTPUT"
+            else
+              echo "Aucun marqueur [deploy] — premier déploiement : envoi complet."
+              echo "args=--all" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Dépendances (basic-ftp pour l'upload)
+        run: npm install --no-save basic-ftp
+
+      - name: Déploiement FTP + bump versions
+        env:
+          FTP_HOST: ${{ secrets.FTP_SERVER }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: node scripts/deploy-ftp.mjs --bump ${{ steps.base.outputs.args }}
+
+      - name: Commit du bump (pose le marqueur [deploy])
+        run: |
+          git config user.name "deploy-bot"
+          git config user.email "deploy-bot@users.noreply.github.com"
+          git add index.html sw.js
+          if git diff --cached --quiet; then
+            echo "Aucun bump à committer (rien n'a été déployé)."
+          else
+            git commit -m "[deploy] bump versions PWA"
+            git push
+          fi
