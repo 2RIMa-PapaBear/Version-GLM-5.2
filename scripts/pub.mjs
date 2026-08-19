@@ -14,7 +14,7 @@
 // ============================================================================
 
 import { execFileSync } from 'node:child_process';
-import { toast } from './notify-deploy.mjs';
+import { toast, waitForDeploy } from './notify-deploy.mjs';
 
 const args = process.argv.slice(2);
 const msg = args.find(a => !a.startsWith('--')) || null;
@@ -70,21 +70,23 @@ try {
 }
 log('Poussé ✓ — déploiement automatique en cours, attente du bump…');
 
-// ---- 4. Attente du commit [deploy] du bot, puis fusion + notification -------
-// Le workflow met ~45 s ; on scrute toutes les 5 s pendant 3 min max.
-for (let i = 0; i < 36; i++) {
-    await sleep(5000);
-    try {
-        git(['fetch', 'origin', BRANCH]);
-    } catch { /* transit réseau : on retente */ }
-    if (git(['rev-parse', `origin/${BRANCH}`]) !== pushedSha) {
-        git(['merge', '--ff-only', `origin/${BRANCH}`]);
-        const last = git(['log', '-1', '--format=%s']);
-        log(`✓ Bump récupéré et fusionné (${last}) — tout est synchronisé.`);
-        toast('Déploiement FTP Free.fr', 'papabear56.free.fr a été mis à jour ✓');
-        process.exit(0);
-    }
+// ---- 4. Suivi du run Actions, puis fusion du bump + notification ------------
+// Trois issues honnêtes : deployed (upload réel + bump), nothing (commit dev
+// uniquement : rien à uploader), failed (run en échec).
+const res = await waitForDeploy(BRANCH, pushedSha, 240);
+
+if (res.status === 'deployed') {
+    git(['merge', '--ff-only', `origin/${BRANCH}`]);
+    log(`✓ Déployé — bump récupéré et fusionné (${res.subject}) : tout est synchronisé.`);
+    toast('Déploiement FTP Free.fr', 'papabear56.free.fr a été mis à jour ✓');
+} else if (res.status === 'nothing') {
+    log('✓ Run réussi — aucun fichier prod modifié : rien à uploader, pas de bump.');
+    toast('Déploiement FTP Free.fr', 'OK - rien à déployer (fichiers dev uniquement)');
+} else if (res.status === 'failed') {
+    log('⚠ ÉCHEC du déploiement automatique — détails : onglet Actions du dépôt GitHub.');
+    toast('Déploiement FTP Free.fr', 'ÉCHEC du déploiement - voir onglet Actions');
+} else {
+    log('⚠ Pas de conclusion du run après 4 min — onglet Actions du dépôt pour voir.');
+    log('  Faites simplement « git pull » dans une minute.');
+    toast('Déploiement FTP Free.fr', 'Pas de conclusion après 4 min - voir onglet Actions');
 }
-log('⚠ Le bump tarde plus que prévu (onglet Actions du dépôt pour voir le run).');
-log('  Faites simplement « git pull » dans une minute.');
-toast('Déploiement FTP Free.fr', 'Toujours pas terminé après 3 min — voir onglet Actions');
