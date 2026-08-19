@@ -1,10 +1,12 @@
 import { state, escapeHtml, fetchAvecRelais } from './core.js';
 import { getAirportByICAO, enrichAirport } from './ui-module.js';
 import { getActiveAircraftId, getActiveAircraft, getFleet, updateAircraft } from './aircraft-fleet.js';
-import { getActiveRunwayNameForIcao } from './takeoff-performance.js';
+import { getActiveRunwayNameForIcao, evaluateTakeoffFromRaw, getAircraftRef } from './takeoff-performance.js';
 import { drawNavLogPdf } from './navlog-pdf.js';
 import { makeCollapsible } from './collapsible.js';
-import { computeFlightPlan, computeMultiLegFlightPlan, getDefaultAircraftPerf, RESERVES } from './flight-planner.js';
+import { computeFlightPlan, computeMultiLegFlightPlan, getDefaultAircraftPerf, greatCircleDistanceNm, RESERVES } from './flight-planner.js';
+import { getActiveRunwaySurfaceInfo, isSoftSurface } from './runway-surface.js';
+import { getEnRouteAlternates } from './alternates.js';
 import { renderElevationChart, clearElevationChart } from './elevation-chart.js';
 import { fetchAirportByIcao } from './openaip.js';
 
@@ -268,11 +270,91 @@ async function _generateNavLogPdf() {
         })),
     };
 
+    // ---- Page 3 « Performances et terrain » ----
+    const FT_TO_M = ft => Math.round(ft * 0.3048);
+    const isFr3 = state.lang === 'fr';
+
+    // Perfs décollage du DÉPART, calculées sur le METAR frais récupéré
+    // ci-dessus (l'état de l'app peut être affiché sur un autre terrain).
+    // OAT extraite du groupe température/point de rosée (« 18/12 », « M05/… »).
+    let takeoff = null;
+    const mT = metarRaw.match(/\s(M?\d{2})\/M?\d{2}\s/);
+    const oat = mT ? (mT[1].startsWith('M') ? -parseInt(mT[1].slice(1), 10) : parseInt(mT[1], 10)) : null;
+    if (qnh != null && oat != null) {
+        const t = evaluateTakeoffFromRaw(fromIcao, {
+            raw: metarRaw, qnh, oat,
+            elevationFt: getAirportByICAO(fromIcao)?.elevation ?? null,
+        });
+        if (t) {
+            const surf = getActiveRunwaySurfaceInfo(fromIcao);
+            const acRef = getAircraftRef();
+            takeoff = {
+                da: t.da,
+                groundRollM: FT_TO_M(t.groundRoll), fiftyFtM: FT_TO_M(t.fiftyFt),
+                runwayLengthM: t.runwayLength != null ? FT_TO_M(t.runwayLength) : null,
+                marginM: t.margin != null ? FT_TO_M(t.margin) : null,
+                level: t.level, message: t.message,
+                refLabel: `${FT_TO_M(acRef.groundRoll)}/${FT_TO_M(acRef.fiftyFt)}`,
+                surfaceLabel: surf ? surf.label : '—',
+                surfaceSoft: surf ? isSoftSurface(surf.code) : false,
+                surfacePct: t.surfaceFactor > 1 ? Math.round((t.surfaceFactor - 1) * 100) : 0,
+            };
+        }
+    }
+
+    // Profil d'élévation : mêmes points que le graphique écran ; les waypoints
+    // intermédiaires sont localisés par le point de profil le plus proche.
+    let profile = null;
+    if (prof?.points?.length) {
+        const first = prof.points[0], last = prof.points[prof.points.length - 1];
+        profile = {
+            fromIcao, toIcao,
+            distTotalKm: Math.round(greatCircleDistanceNm(first.lat, first.lon, last.lat, last.lon) * 1.852),
+            minFt: prof.minFt, maxFt: prof.maxFt,
+            cruiseAltFt: stash.alt ?? plan.cruiseAltFt,
+            points: prof.points.map(pt => ({ frac: pt.frac, elevFt: pt.elevFt })),
+            waypoints: (isMulti && plan.waypoints?.length > 2)
+                ? plan.waypoints.slice(1, -1).map(w => {
+                    let frac = null, bestD = Infinity;
+                    for (const pt of prof.points) {
+                        if (pt.lat == null || pt.lon == null) continue;
+                        const d = greatCircleDistanceNm(pt.lat, pt.lon, w.lat, w.lon);
+                        if (d < bestD) { bestD = d; frac = pt.frac; }
+                    }
+                    return { icao: w.icao, frac };
+                }).filter(w => w.frac != null)
+                : [],
+        };
+    }
+
+    // Alternates viables à ± 50 NM de la route (départ → waypoints → dest.).
+    const routePts = (isMulti && plan.waypoints?.length)
+        ? plan.waypoints.map(w => ({ icao: w.icao, lat: w.lat, lon: w.lon }))
+        : [plan.from, plan.to].map(a => ({ icao: a.icao, lat: a.lat, lon: a.lon }));
+    const altRows = await getEnRouteAlternates(routePts, 50, 6).catch(() => null);
+    let alternates = null;
+    if (altRows?.length) {
+        alternates = {
+            maxOffsetNm: 50,
+            rows: altRows.map(r => ({
+                code: r.code, name: r.name, cat: r.cat.cat,
+                visiStr: r.cat.visiM >= 10000 ? '>10 km' : `${r.cat.visiM} m`,
+                ceilStr: r.cat.ceilHund === 999 ? '—' : `${r.cat.ceilHund * 100} ft`,
+                windStr: r.cat.wind
+                    ? `${r.cat.wind.dir == null ? 'VRB' : String(r.cat.wind.dir).padStart(3, '0') + '°'} ${r.cat.wind.speed}${r.cat.wind.gust ? 'G' + r.cat.wind.gust : ''} kt`
+                    : '—',
+                offsetNm: Math.round(r.offsetNm),
+                side: r.side >= 0 ? (isFr3 ? 'D' : 'R') : (isFr3 ? 'G' : 'L'),
+            })),
+        };
+    }
+    const perf = { isFr: isFr3, fromIcao, toIcao, runway, takeoff, profile, alternates };
+
     const doc = drawNavLogPdf(window.jspdf.jsPDF, {
         aircraftType: ac.type || '', aircraftReg: ac.registration || '',
         qnh, windDir, windKt, runway,
         distanceNm: totalNm ?? '', timeLabel,
-        metarRaw, rows, calc,
+        metarRaw, rows, calc, perf,
     });
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     doc.save(`Log-nav_${fromIcao}-${toIcao}_${today}.pdf`);
