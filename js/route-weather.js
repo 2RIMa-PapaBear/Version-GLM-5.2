@@ -1,10 +1,19 @@
 import { state, I18N, fetchAvecRelais, memoGet, escapeHtml } from './core.js';
 import { getAirportByICAO } from './ui-module.js';
 import { parseVisiToMeters, CAT_COLORS } from './core.js';
+import { greatCircleDistanceNm, trueCourseDeg } from './flight-planner.js';
+import { getDeclinationForIcao } from './magvar.js';
 
 let _routeLayer = null;
 let _routeMarkers = [];
 let _waypointMarkers = [];
+
+// Étiquettes de tronçons (Cap / Distance / Temps) + case à cocher bas-gauche.
+const ROUTE_LABELS_LS = 'mt-route-labels';
+let _legLabelMarkers = [];
+let _routeLabelsCtl = null;
+let _lastMap = null;
+let _lastRoutePoints = [];
 
 export async function showRouteWeather(map, fromIcao, toIcao, opts = {}) {
     if (!map || !fromIcao || !toIcao || fromIcao === toIcao) {
@@ -43,11 +52,12 @@ export async function showRouteWeather(map, fromIcao, toIcao, opts = {}) {
     }
     if (routePoints.length < 2) { _clearRoute(map); return; }
 
-    // Polyline principale (A→B ou multi-points).
+    // Polyline principale (A→B ou multi-points) — rouge pour trancher sur les
+    // fonds satellite/OSM et se distinguer des pastilles METAR colorées.
     _routeLayer = L.polyline(routePoints.map(p => [p[0], p[1]]), {
-        color: '#FBBF24',
+        color: '#EF4444',
         weight: 3,
-        opacity: 0.7,
+        opacity: 0.75,
         dashArray: '8, 6',
     }).addTo(map);
 
@@ -60,6 +70,12 @@ export async function showRouteWeather(map, fromIcao, toIcao, opts = {}) {
             radius: 5, color: '#FBBF24', weight: 2, fillColor: '#FBBF24', fillOpacity: 0.4,
         }).addTo(map).bindPopup(`<b>${escapeHtml(p[2])}</b>`);
     });
+
+    // Étiquettes Cap / Distance / Temps par tronçon (selon les cases cochées).
+    _lastMap = map;
+    _lastRoutePoints = routePoints;
+    _mountRouteLabelsControl(map);
+    _drawLegLabels(map, routePoints);
 
     if (!opts.skipMetars) {
         await _loadCorridorMetars(map, fromLat, fromLon, toLat, toLon);
@@ -137,6 +153,117 @@ function _addRouteEndpoint(map, lat, lon, icao, isStart) {
     _routeMarkers.push(marker);
 }
 
+// ---------------------------------------------------------------------------
+// Étiquettes de tronçons : Cap / Distance / Temps.
+//
+// Données : plan de vol du planificateur (state._lastNavPlan.plan.legs) quand
+// il est disponible — caps magnétiques et temps AVEC vent exacts ; sinon
+// calcul géographique (cap vrai - déclinaison, distance orthodromique) et
+// pas de temps (il faut le vent et le TAS pour l'estimer).
+// Position : au milieu de chaque tronçon, du CÔTÉ DROIT du sens de vol —
+// la direction écran du tooltip est choisie selon le cap pour ne jamais
+// recouvrir la ligne (ex. tronçon vers l'est → étiquette en dessous).
+// ---------------------------------------------------------------------------
+
+function _readLabelPrefs() {
+    const base = { cap: false, dist: false, time: false };
+    try { return { ...base, ...JSON.parse(localStorage.getItem(ROUTE_LABELS_LS) || '{}') }; }
+    catch { return base; }
+}
+
+function _fmtMin(min) {
+    if (min == null || min < 0) return null;
+    const h = Math.floor(min / 60), m = Math.round(min % 60);
+    return h > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${m} min`;
+}
+
+// Cap du tronçon → direction d'écran plaçant l'étiquette à droite du sens
+// de vol (0°=nord → droite de l'écran ; 90°=est → dessous ; etc.).
+// Exporté pour les tests.
+export function _tooltipDirForTrack(tc) {
+    if (tc >= 315 || tc < 45) return 'right';
+    if (tc >= 45 && tc < 135) return 'bottom';
+    if (tc >= 135 && tc < 225) return 'left';
+    return 'top';
+}
+
+// Case à cocher « Cap / Distance / Temps » en bas à gauche de la carte.
+function _mountRouteLabelsControl(map) {
+    if (_routeLabelsCtl) return;
+    const prefs = _readLabelPrefs();
+    const ctl = L.control({ position: 'bottomleft' });
+    ctl.onAdd = () => {
+        const isFr = state.lang === 'fr';
+        const div = L.DomUtil.create('div', 'route-labels-ctl');
+        const items = [
+            ['cap', isFr ? 'Cap' : 'Hdg'],
+            ['dist', isFr ? 'Distance' : 'Distance'],
+            ['time', isFr ? 'Temps' : 'Time'],
+        ];
+        div.innerHTML = items.map(([k, lbl]) =>
+            `<label><input type="checkbox" data-k="${k}" ${prefs[k] ? 'checked' : ''}><span>${lbl}</span></label>`
+        ).join('');
+        L.DomEvent.disableClickPropagation(div);
+        div.addEventListener('change', (e) => {
+            const k = e.target.dataset?.k;
+            if (!k) return;
+            const p = _readLabelPrefs();
+            p[k] = e.target.checked;
+            try { localStorage.setItem(ROUTE_LABELS_LS, JSON.stringify(p)); } catch { /* quota */ }
+            if (_lastMap && _lastRoutePoints.length) _drawLegLabels(_lastMap, _lastRoutePoints);
+        });
+        return div;
+    };
+    ctl.addTo(map);
+    _routeLabelsCtl = ctl;
+}
+
+function _drawLegLabels(map, routePoints) {
+    _legLabelMarkers.forEach(m => map.removeLayer(m));
+    _legLabelMarkers = [];
+
+    const prefs = _readLabelPrefs();
+    if (!prefs.cap && !prefs.dist && !prefs.time) return;
+
+    const legs = state._lastNavPlan?.plan?.legs;
+    for (let i = 0; i < routePoints.length - 1; i++) {
+        const [aLat, aLon] = routePoints[i];
+        const [bLat, bLon] = routePoints[i + 1];
+        const leg = Array.isArray(legs) ? legs[i] : null;
+        const tc = trueCourseDeg(aLat, aLon, bLat, bLon);
+
+        const lines = [];
+        if (prefs.cap) {
+            const mag = leg?.magHeading != null
+                ? leg.magHeading
+                : Math.round(((tc - (getDeclinationForIcao(routePoints[i][2]) ?? 0)) % 360 + 360) % 360);
+            lines.push(`<span class="rll-cap">${String(mag).padStart(3, '0')}°</span>`);
+        }
+        if (prefs.dist) {
+            const nm = Math.round(leg?.distanceNm ?? greatCircleDistanceNm(aLat, aLon, bLat, bLon));
+            lines.push(`<span class="rll-dist">${nm} NM</span>`);
+        }
+        if (prefs.time) {
+            const t = _fmtMin(leg?.legTimeMin ?? null);
+            if (t) lines.push(`<span class="rll-time">${t}</span>`);
+        }
+        if (!lines.length) continue;
+
+        const marker = L.marker([(aLat + bLat) / 2, (aLon + bLon) / 2], {
+            interactive: false,
+            icon: L.divIcon({ className: 'rll-anchor', iconSize: [0, 0] }),
+        });
+        marker.bindTooltip(lines.join('<br>'), {
+            permanent: true,
+            direction: _tooltipDirForTrack(Math.round(tc)),
+            className: 'route-leg-label',
+            opacity: 1,
+        });
+        marker.addTo(map);
+        _legLabelMarkers.push(marker);
+    }
+}
+
 function _clearRoute(map) {
     if (_routeLayer && map) {
         map.removeLayer(_routeLayer);
@@ -146,6 +273,8 @@ function _clearRoute(map) {
     _routeMarkers = [];
     _waypointMarkers.forEach(m => map.removeLayer(m));
     _waypointMarkers = [];
+    _legLabelMarkers.forEach(m => map.removeLayer(m));
+    _legLabelMarkers = [];
 }
 
 function _pointToSegmentDist(px, py, x1, y1, x2, y2) {

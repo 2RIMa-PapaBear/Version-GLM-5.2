@@ -1454,6 +1454,50 @@ html.night-mode .precip-play-btn {
 }
 
 /* ================================================================
+ * CARTE RÉGIONALE — cases à cocher Cap/Distance/Temps + étiquettes
+ * ================================================================ */
+.route-labels-ctl {
+    background: rgba(15, 23, 42, 0.92);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--text-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+.route-labels-ctl label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+.route-labels-ctl input { accent-color: #38BDF8; margin: 0; }
+
+/* Étiquette d'un tronçon : pilule sombre mono, pas de flèche, positionnée
+   à droite du sens de vol par le code (direction du tooltip). */
+.leaflet-tooltip.route-leg-label {
+    background: rgba(15, 23, 42, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 6px;
+    color: var(--text-color);
+    font-family: 'DM Mono', monospace;
+    font-size: 10.5px;
+    line-height: 1.45;
+    padding: 3px 7px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+    text-align: center;
+}
+.leaflet-tooltip.route-leg-label::before { display: none; }
+.route-leg-label .rll-cap  { color: #38BDF8; font-weight: 700; }
+.route-leg-label .rll-dist { color: #F8FAFC; }
+.route-leg-label .rll-time { color: #2DD4BF; font-weight: 700; }
+
+/* ================================================================
  * FLIGHT PLANNER — Panneau de navigation VFR
  * ================================================================ */
 .flight-planner-panel {
