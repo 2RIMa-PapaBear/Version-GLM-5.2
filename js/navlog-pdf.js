@@ -21,6 +21,14 @@
 //     FROM/TO · Dist restante · Distance · Z sécu · Z retenue · RM/CM · Tsv/Tav · HEA · HRA
 //   - 3 cadres Check (Croisière / Point Tournant / Vent Arrière) + légende
 //     6 mnémoniques par colonne, séparées par des filets verticaux
+//
+// Page 2 — « Calcul de navigation » : reproduction du bloc écran du
+// planificateur (flight-planner-ui.js, _renderResult), sans le bouton
+// « Log de nav PDF » : ligne Départ → Destination, paramètres saisis,
+// cellules Distance/Cap/Déclinaison, sections Vent, GS/Temps de vol,
+// Carburant, Relief, tableau des waypoints et note de bas de page.
+// Les couleurs claires du thème sombre sont assombries d'un cran pour
+// rester lisibles sur papier blanc.
 
 const PAGE = { w: 419.53, h: 595.32 };
 
@@ -33,6 +41,14 @@ const GREEN_BG = [232, 245, 233];
 const GREEN_INK = [27, 94, 32];
 const GREEN_BD = [102, 187, 106];
 const RED = [220, 38, 38];
+
+// Palette page 2 : équivalents « impression » des couleurs du thème écran.
+const BLUE = [2, 132, 199];       // --primary #38BDF8 → sky-600 (valeurs, freq, totaux)
+const TEAL = [13, 148, 136];      // --secondary #2DD4BF → teal-600 (temps de vol)
+const AMBER = [180, 83, 9];       // #F59E0B → amber-700 (dérive forte, marge réduite)
+const GREEN = [5, 150, 105];      // #10B981 → emerald-600 (marge ok)
+const REDTX = [185, 28, 28];      // #EF4444 → red-700 (marge dangereuse)
+const CELL_BG = [243, 244, 246];  // fond fp-cell (#F3F4F6)
 
 // Tailles de police harmonisées.
 const SZ = { body: 9, title: 10, doc: 11, thead: 8 };
@@ -66,7 +82,14 @@ function _wrap(doc, text, maxW) {
  * @param {Object} d  données normalisées :
  *   aircraftType, aircraftReg, qnh, windDir, windKt, runway,
  *   distanceNm, timeLabel, metarRaw,
- *   rows[] { from, to, distRemain, dist, zSecu, zRet, rm, cm, tsv, tav }
+ *   rows[] { from, to, distRemain, dist, zSecu, zRet, rm, cm, tsv, tav },
+ *   calc (optionnel) → ajoute une 2e page « Calcul de navigation » :
+ *   { isFr, fromIcao, fromName, toIcao, toName, waypoints, cruiseAltFt,
+ *     tasKt, fuelBurnLph, isNight, distanceNm, distanceKm, trueCourse,
+ *     magHeading, declination, wind {dir,speedKt}|null, driftDeg,
+ *     groundSpeed, timeLabel, fuel {tripL,reserveL,totalL,reserveMin},
+ *     clearance {maxFt,minClearanceFt,level}|null, isMultiLeg,
+ *     legs[] {from,to,dist,hdg,eteLabel,fuelL,freq} }
  */
 export function drawNavLogPdf(jsPDFCtor, d) {
     const doc = new jsPDFCtor({ unit: 'pt', format: [PAGE.w, PAGE.h], orientation: 'portrait' });
@@ -268,5 +291,230 @@ export function drawNavLogPdf(jsPDFCtor, d) {
         });
     });
 
+    // ---- Page 2 : « Calcul de navigation » (bloc écran du planificateur) ----
+    if (d.calc) _drawCalcPage(doc, d.calc);
+
     return doc;
+}
+
+// ---------------------------------------------------------------------------
+// Page 2 — « Calcul de navigation » : reproduction du bloc écran du
+// planificateur (flight-planner-ui.js, _renderResult), SANS le bouton
+// « Log de nav PDF ». Mêmes bandeau/cadre que la page 1 pour former une
+// paire cohérente ; cellules gris clair façon .fp-cell, valeurs en gras
+// (courier ≈ DM Mono à l'écran), sections séparées par un filet comme les
+// .fp-section (border-top).
+// ---------------------------------------------------------------------------
+function _drawCalcPage(doc, c) {
+    const fr = c.isFr !== false;
+    doc.addPage([PAGE.w, PAGE.h], 'portrait');
+    doc.setFont('helvetica', 'normal');
+
+    const L = 16.4, R = 402.7, W = R - L, MID = (L + R) / 2;
+    const FRAME_BOT = 581.8;                    // bas du cadre extérieur
+    const pad3 = (v) => String(v ?? '').padStart(3, '0');
+
+    // Coupe un texte (nom d'aérodrome, waypoints) à la largeur disponible.
+    const trunc = (text, maxW) => {
+        let t = String(text ?? '');
+        if (doc.getTextWidth(t) <= maxW) return t;
+        while (t.length > 1 && doc.getTextWidth(t + '…') > maxW) t = t.slice(0, -1);
+        return t + '…';
+    };
+
+    // Cellule .fp-cell : fond gris clair arrondi, libellé majuscule grisé,
+    // valeur en gras (couleur/ taille pilotables — surbrillances écran).
+    const cell = (x, yc, w, h, label, value, opt = {}) => {
+        doc.setFillColor(...CELL_BG); doc.setDrawColor(...LINE); doc.setLineWidth(0.5);
+        doc.roundedRect(x, yc, w, h, 2.5, 2.5, 'FD');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); _setInk(doc, MUTED);
+        doc.text(String(label).toUpperCase(), x + 7, yc + 9.5, { charSpace: 0.5 });
+        doc.setFont('courier', 'bold'); doc.setFontSize(opt.size || 10.5);
+        _setInk(doc, opt.color || INK);
+        doc.text(trunc(value ?? '—', w - 14), x + 7, yc + h - 8);
+    };
+
+    // Section .fp-section : filet supérieur + titre majuscule grisé éventuel.
+    // Retourne l'ordonnée de départ du contenu.
+    const section = (title, ys) => {
+        doc.setDrawColor(...LINE); doc.setLineWidth(0.5);
+        doc.line(L, ys, R, ys);
+        if (title) {
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); _setInk(doc, MUTED);
+            doc.text(String(title).toUpperCase(), L + 1.5, ys + 11, { charSpace: 0.6 });
+            return ys + 16;
+        }
+        return ys + 6;
+    };
+
+    // ---- Bandeau titre + cadre extérieur (identiques à la page 1) ----
+    doc.setFillColor(17, 24, 39);
+    doc.rect(16.4, 14.3, 386.3, 16.2, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(SZ.doc); _setInk(doc, [255, 255, 255]);
+    doc.text(fr ? 'Calcul de navigation' : 'Flight plan', MID, 25.2, { align: 'center' });
+    doc.setDrawColor(...INK); doc.setLineWidth(0.8);
+    doc.rect(15, 29.9, 388.6, 551.9, 'S');
+
+    // ---- Ligne mono « LFPB → LFRM » (en-tête du bloc écran) ----
+    doc.setFont('courier', 'normal'); doc.setFontSize(8); _setInk(doc, MUTED);
+    doc.text(`${c.fromIcao} → ${c.toIcao}`.replace('→', '-'), L + 1.5, 45);
+
+    // ---- Ligne Départ → Destination (libellés + noms complets + flèche) ----
+    const RIGHT_X = MID + 12, HALF_W = 180;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); _setInk(doc, MUTED);
+    doc.text(fr ? 'DÉPART' : 'FROM', L + 1.5, 57, { charSpace: 0.6 });
+    doc.text(fr ? 'DESTINATION' : 'TO', RIGHT_X, 57, { charSpace: 0.6 });
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5); _setInk(doc, INK);
+    doc.text(trunc(`${c.fromIcao} · ${c.fromName}`, HALF_W), L + 1.5, 69);
+    doc.text(trunc(`${c.toIcao} · ${c.toName}`, HALF_W), RIGHT_X, 69);
+    // Flèche entre les deux (pas de glyphe → en helvetica standard : tracée).
+    doc.setDrawColor(...MUTED); doc.setLineWidth(0.9);
+    doc.line(MID - 6, 65.5, MID + 7, 65.5);
+    doc.line(MID + 2.5, 61.5, MID + 7, 65.5);
+    doc.line(MID + 2.5, 69.5, MID + 7, 65.5);
+
+    // ---- Paramètres saisis (inputs écran, valeurs en bleu « saisie ») ----
+    let y = 80;
+    cell(L, y, W, 27, fr ? 'Waypoints (optionnel)' : 'Waypoints (optional)',
+         c.waypoints || '—', { color: c.waypoints ? BLUE : MUTED });
+    y += 33;
+    const pw = (W - 3 * 7 - 68) / 3;
+    cell(L, y, pw, 27, fr ? 'Alt. croisière (ft)' : 'Cruise alt (ft)', c.cruiseAltFt ?? '—', { color: BLUE });
+    cell(L + pw + 7, y, pw, 27, fr ? 'Vitesse air (kt)' : 'TAS (kt)', c.tasKt ?? '—', { color: BLUE });
+    cell(L + 2 * (pw + 7), y, pw, 27, fr ? 'Conso (L/h)' : 'Burn (L/h)', c.fuelBurnLph ?? '—', { color: BLUE });
+    cell(L + 3 * (pw + 7), y, 68, 27, fr ? 'Vol de nuit' : 'Night',
+         c.isNight ? (fr ? 'Oui' : 'Yes') : (fr ? 'Non' : 'No'), { color: BLUE });
+    y += 37;
+
+    // ---- Grille Distance / Cap vrai / Cap magnétique / Déclinaison ----
+    const cw = (W - 16) / 2;
+    cell(L, y, cw, 30, fr ? 'Distance' : 'Distance', `${c.distanceNm ?? '—'} NM`);
+    // Suffixe km discret collé après la valeur, comme à l'écran.
+    doc.setFont('courier', 'bold'); doc.setFontSize(10.5);
+    const wMain = doc.getTextWidth(`${c.distanceNm ?? '—'} NM`);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); _setInk(doc, MUTED);
+    doc.text(`(${c.distanceKm ?? '—'} km)`, L + 7 + wMain + 4, y + 22);
+    cell(L + cw + 16, y, cw, 30, fr ? 'Cap vrai (TC)' : 'True course', `${pad3(c.trueCourse)}°`);
+    cell(L, y + 38, cw, 30, fr ? 'Cap magnétique' : 'Magnetic heading', `${pad3(c.magHeading)}°`, { color: BLUE, size: 13 });
+    cell(L + cw + 16, y + 38, cw, 30, fr ? 'Déclinaison' : 'Declination',
+         `${(c.declination ?? 0) > 0 ? '+' : ''}${c.declination ?? 0}°`);
+    y += 38 + 30 + 10;
+
+    // ---- Section Vent à l'altitude de croisière ----
+    y = section(fr ? `Vent à ${c.cruiseAltFt ?? ''} ft` : `Wind at ${c.cruiseAltFt ?? ''} ft`, y);
+    if (c.wind) {
+        cell(L, y, cw, 30, fr ? 'Vent' : 'Wind', `${pad3(c.wind.dir)}° / ${c.wind.speedKt} kt`);
+        const dr = c.driftDeg;
+        cell(L + cw + 16, y, cw, 30, fr ? 'Dérive' : 'Drift', `${(dr ?? 0) > 0 ? '+' : ''}${dr ?? '—'}°`,
+             Math.abs(dr ?? 0) >= 10 ? { color: AMBER } : {});
+        y += 40;
+    } else {
+        doc.setFont('helvetica', 'italic'); doc.setFontSize(8); _setInk(doc, MUTED);
+        doc.text(fr ? 'Vent indisponible' : 'Wind unavailable', L + 1.5, y + 6);
+        y += 12;
+    }
+
+    // ---- Section Vitesse sol / Temps de vol (sans titre, comme à l'écran) ----
+    y = section(null, y);
+    cell(L, y, cw, 30, fr ? 'Vitesse sol (GS)' : 'Ground speed', `${c.groundSpeed ?? '—'} kt`);
+    cell(L + cw + 16, y, cw, 30, fr ? 'Temps de vol' : 'Flight time', c.timeLabel || '—', { color: TEAL, size: 12 });
+    y += 40;
+
+    // ---- Section Carburant ----
+    y = section(fr ? 'Carburant' : 'Fuel', y);
+    const fw = (W - 24) / 3;
+    cell(L, y, fw, 30, fr ? 'Trajet' : 'Trip', `${c.fuel?.tripL ?? '—'} L`);
+    cell(L + fw + 12, y, fw, 30, `${fr ? 'Réserve' : 'Reserve'} (${c.fuel?.reserveMin ?? ''} min)`, `${c.fuel?.reserveL ?? '—'} L`);
+    cell(L + 2 * (fw + 12), y, fw, 30, fr ? 'Total requis' : 'Total req.', `${c.fuel?.totalL ?? '—'} L`, { color: BLUE, size: 12.5 });
+    y += 40;
+
+    // ---- Section Relief sous la route (si disponible) ----
+    const cl = c.clearance;
+    if (cl) {
+        y = section(fr ? 'Relief sous la route' : 'Terrain clearance', y);
+        const clColor = cl.level === 'danger' ? REDTX : (cl.level === 'caution' ? AMBER : GREEN);
+        cell(L, y, cw, 30, fr ? 'Altitude max sol' : 'Max terrain', `${cl.maxFt ?? '—'} ft`);
+        cell(L + cw + 16, y, cw, 30, fr ? 'Marge mini' : 'Min clearance',
+             `${(cl.minClearanceFt ?? 0) >= 0 ? '+' : ''}${cl.minClearanceFt ?? '—'} ft`, { color: clColor });
+        y += 38;
+        if (cl.level !== 'ok') {
+            const danger = cl.level === 'danger';
+            doc.setFillColor(...(danger ? [254, 226, 226] : [254, 243, 199]));
+            doc.setDrawColor(...(danger ? [248, 113, 113] : [245, 158, 11]));
+            doc.setLineWidth(0.5);
+            doc.roundedRect(L, y, W, 15, 2.5, 2.5, 'FD');
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); _setInk(doc, danger ? REDTX : AMBER);
+            doc.text(danger
+                ? (fr ? 'Altitude de croisière SOUS le relief — augmentez l\'altitude' : 'Cruise altitude BELOW terrain — climb higher')
+                : (fr ? 'Marge de franchissement réduite (< 1000 ft)' : 'Reduced terrain clearance (< 1000 ft)'),
+                L + 7, y + 10);
+            y += 23;
+        } else y += 2;
+    }
+
+    // ---- Tableau Détail des waypoints (multi-waypoints uniquement) ----
+    const legs = (c.isMultiLeg && Array.isArray(c.legs)) ? c.legs : [];
+    if (legs.length) {
+        y = section(`${fr ? 'Détail des waypoints' : 'Leg details'} (${legs.length})`, y);
+        // Colonnes : 1re à gauche, les autres alignées à droite (comme .fp-navlog).
+        // Réparties sur toute la largeur : « 26 min » (ETE) et « 120.300 AFIS »
+        // (Fréq) sont larges — des colonnes resserrées à droite se chevauchaient.
+        // La fréquence est tronquée si elle dépasse sa colonne (~86 pt).
+        const COLR = [178, 224, 270, 316, R - 5];
+        const FREQ_W = COLR[4] - COLR[3] - 10;
+        const HEADS = fr ? ['Tronçon', 'Dist', 'Cap', 'ETE', 'Conso', 'Fréq']
+                         : ['Leg', 'Dist', 'Hdg', 'ETE', 'Fuel', 'Freq'];
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); _setInk(doc, MUTED);
+        doc.text(HEADS[0].toUpperCase(), L + 1.5, y + 8, { charSpace: 0.4 });
+        for (let i = 1; i < HEADS.length; i++) {
+            doc.text(HEADS[i].toUpperCase(), COLR[i - 1], y + 8, { align: 'right', charSpace: 0.4 });
+        }
+        const headBot = y + 11;
+        doc.setDrawColor(...LINE); doc.setLineWidth(0.5);
+        doc.line(L, headBot, R, headBot);
+
+        // Hauteur de ligne adaptative : tout faire tenir au-dessus de la note
+        // de bas de page (2 lignes + marge). Filets de séparation discrets.
+        const FOOT_TOP = FRAME_BOT - 24;
+        let rowH = Math.min(13.5, Math.floor((FOOT_TOP - headBot) / (legs.length + 1)));
+        if (rowH < 10) rowH = 10;
+        const rowLine = (row, idx) => {
+            const base = headBot + idx * rowH + rowH - 3.5;
+            doc.setFont('courier', 'bold'); doc.setFontSize(8); _setInk(doc, INK);
+            doc.text(`${row.from} → ${row.to}`.replace('→', '-'), L + 1.5, base);
+            const vals = [`${row.dist} NM`, `${pad3(row.hdg)}°`, row.eteLabel, `${row.fuelL} L`];
+            doc.setFont('courier', 'normal');
+            vals.forEach((v, i) => doc.text(String(v ?? '—'), COLR[i], base, { align: 'right' }));
+            if (row.freq) { _setInk(doc, BLUE); doc.text(trunc(row.freq, FREQ_W), COLR[4], base, { align: 'right' }); }
+        };
+        legs.forEach((lg, i) => {
+            rowLine(lg, i);
+            if (i < legs.length - 1) {
+                doc.setDrawColor(...BANDL); doc.setLineWidth(0.3);
+                doc.line(L, headBot + (i + 1) * rowH, R, headBot + (i + 1) * rowH);
+            }
+        });
+        // Ligne TOTAL (gras, bleu, filet supérieur — comme tr.total à l'écran).
+        const totBase = headBot + (legs.length + 1) * rowH - 3.5;
+        doc.setDrawColor(...LINE); doc.setLineWidth(0.6);
+        doc.line(L, headBot + legs.length * rowH, R, headBot + legs.length * rowH);
+        doc.setFont('courier', 'bold'); doc.setFontSize(8); _setInk(doc, BLUE);
+        doc.text(fr ? 'TOTAL' : 'TOTAL', L + 1.5, totBase);
+        const tots = [`${c.distanceNm ?? '—'} NM`, '—', c.timeLabel || '—', `${c.fuel?.tripL ?? '—'} L`];
+        tots.forEach((v, i) => doc.text(String(v), COLR[i], totBase, { align: 'right' }));
+        doc.text('—', COLR[4], totBase, { align: 'right' });
+        y = headBot + (legs.length + 1) * rowH + 10;
+    }
+
+    // ---- Note de bas de page (référence POH, comme à l'écran) ----
+    const note = fr
+        ? 'Calculs basés sur le vent Open-Meteo à l\'altitude de croisière et l\'élévation du relief. Le POH de l\'avion reste la référence légale.'
+        : 'Computations based on Open-Meteo winds at cruise altitude and terrain elevation. The aircraft POH remains the legal reference.';
+    const fy = Math.min(y + 2, FRAME_BOT - 24);
+    doc.setDrawColor(...MUTED); doc.setLineWidth(0.5);
+    doc.circle(L + 3.5, fy + 1, 3.2, 'S');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); _setInk(doc, MUTED);
+    doc.text('i', L + 3.5, fy + 3.2, { align: 'center' });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); _setInk(doc, MUTED);
+    _wrap(doc, note, W - 13).slice(0, 2).forEach((l, i) => doc.text(l, L + 11, fy + 2.5 + i * 9));
 }

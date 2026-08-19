@@ -207,11 +207,55 @@ async function _generateNavLogPdf() {
     const h = Math.floor((totalMin || 0) / 60), m = Math.round((totalMin || 0) % 60);
     const timeLabel = totalMin ? (h > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${m} min`) : '';
 
+    // ---- Page 2 « Calcul de navigation » : mêmes données que le bloc écran ----
+    const firstLeg = legs[0];
+    const wc = (isMulti ? firstLeg.windCorrection : plan.windCorrection) || {};
+    const fuel = plan.fuel || {};
+    const fmtEte = (min) => {
+        if (!min || min < 0) return '—';
+        const eh = Math.floor(min / 60), em = Math.round(min % 60);
+        return eh > 0 ? `${eh}h${String(em).padStart(2, '0')}` : `${em} min`;
+    };
+    const legFreq = (icao) => {
+        const f = _getMainFreq(icao);
+        return f ? `${f.freq.toFixed(3)} ${f.type}` : '';
+    };
+    const calc = {
+        isFr: state.lang === 'fr',
+        fromIcao, toIcao,
+        fromName: getAirportByICAO(fromIcao)?.name || fromIcao,
+        toName: getAirportByICAO(toIcao)?.name || toIcao,
+        waypoints: (isMulti && plan.waypoints?.length > 2)
+            ? plan.waypoints.slice(1, -1).map(w => w.icao).join(' ') : '',
+        cruiseAltFt: stash.alt ?? plan.cruiseAltFt, tasKt: tas,
+        fuelBurnLph: stash.burn ?? '', isNight: !!stash.isNight,
+        distanceNm: totalNm ?? '', distanceKm: (isMulti ? plan.totalDistanceKm : plan.distanceKm) ?? '',
+        trueCourse: firstLeg.trueCourse ?? '', magHeading: firstLeg.magHeading ?? '',
+        declination: plan.declination ?? 0,
+        wind: plan.wind || null, driftDeg: wc.driftDeg,
+        groundSpeed: firstLeg.groundSpeed ?? '',
+        timeLabel,
+        fuel: {
+            tripL: fuel.tripFuelL, reserveL: fuel.reserveL, totalL: fuel.totalL,
+            reserveMin: stash.isNight ? RESERVES.NIGHT_MIN : RESERVES.DAY_MIN,
+        },
+        clearance: plan.clearance ? {
+            maxFt: plan.elevationProfile?.maxFt ?? '',
+            minClearanceFt: plan.clearance.minClearanceFt, level: plan.clearance.level,
+        } : null,
+        isMultiLeg: isMulti,
+        legs: legs.map(lg => ({
+            from: lg.from.icao, to: lg.to.icao, dist: lg.distanceNm,
+            hdg: lg.magHeading, eteLabel: fmtEte(lg.legTimeMin),
+            fuelL: lg.fuel?.tripFuelL ?? '', freq: legFreq(lg.to.icao),
+        })),
+    };
+
     const doc = drawNavLogPdf(window.jspdf.jsPDF, {
         aircraftType: ac.type || '', aircraftReg: ac.registration || '',
         qnh, windDir, windKt, runway,
         distanceNm: totalNm ?? '', timeLabel,
-        metarRaw, rows,
+        metarRaw, rows, calc,
     });
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     doc.save(`Log-nav_${fromIcao}-${toIcao}_${today}.pdf`);
@@ -257,7 +301,8 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
     const clearColor = cl?.level === 'danger' ? '#EF4444' : (cl?.level === 'caution' ? '#F59E0B' : '#10B981');
 
     // Mémorise le dernier plan rendu pour l'export PDF du log de nav (navlog-pdf.js).
-    state._lastNavPlan = { plan, tas };
+    // alt/burn/isNight/isFr servent à la page 2 « Calcul de navigation ».
+    state._lastNavPlan = { plan, tas, alt, burn, isNight, isFr };
 
     container.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px;">
@@ -408,8 +453,98 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
         </div>
     `;
     if (window.lucide) window.lucide.createIcons({ root: container });
-    container.querySelector('#fp-navlog-pdf')?.addEventListener('click', () => { _generateNavLogPdf(); });
+    container.querySelector('#fp-navlog-pdf')?.addEventListener('click', async () => {
+        if (await _confirmNavLogPdf(isFr)) _generateNavLogPdf();
+    });
     _wireInputs(container, from, to);
+}
+
+// Fenêtre de confirmation avant génération du log de nav PDF : rappelle que le
+// document est calculé automatiquement et liste ce que le pilote doit vérifier
+// avant de l'utiliser en vol. Promesse → true si l'utilisateur confirme.
+function _confirmNavLogPdf(isFr) {
+    return new Promise(resolve => {
+        document.getElementById('navlog-confirm-modal')?.remove();
+        const modal = document.createElement('div');
+        modal.id = 'navlog-confirm-modal';
+        modal.className = 'modal-overlay visible';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+
+        const items = isFr ? [
+            ['compass', '<b>Caps (RM/CM) et dérive</b> — recalculés avec le vent <i>estimé</i> au moment du calcul, pas le vent réel'],
+            ['mountain', '<b>Altitudes</b> — Z sécu (relief + 1000 ft) et altitude retenue, à confronter au relief réel et aux zones réglementées'],
+            ['clock', '<b>Temps de vol (Tsv/Tav) et vitesse sol</b> — dépendants du vent réel rencontré'],
+            ['fuel', '<b>Carburant</b> — trajet et réserve à recouper avec le POH de l\'avion et la consommation réelle'],
+            ['radio', '<b>Fréquences et piste en service</b> — à confirmer sur une carte VAC / NOTAM à jour'],
+            ['gauge', '<b>QNH et vent de départ</b> — METAR capturé à l\'instant de la génération, souvent périmé au décollage'],
+        ] : [
+            ['compass', '<b>Headings (MH/CH) and drift</b> — computed with the <i>estimated</i> wind at calculation time, not the actual wind'],
+            ['mountain', '<b>Altitudes</b> — MSA (terrain + 1000 ft) and chosen level, to be checked against actual terrain and restricted areas'],
+            ['clock', '<b>ETE and ground speed</b> — depend on the actual wind encountered'],
+            ['fuel', '<b>Fuel</b> — trip and reserve to be cross-checked against the aircraft POH and actual consumption'],
+            ['radio', '<b>Frequencies and runway in use</b> — confirm against an up-to-date VAC chart / NOTAM'],
+            ['gauge', '<b>Departure QNH and wind</b> — METAR captured when generated, likely outdated at takeoff'],
+        ];
+
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width:540px;">
+                <div class="modal-header">
+                    <h2 style="display:flex;align-items:center;gap:10px;">
+                        <i data-lucide="alert-triangle" style="width:20px;height:20px;color:#F59E0B;"></i>
+                        ${isFr ? 'À vérifier avant d\'imprimer' : 'Verify before printing'}
+                    </h2>
+                    <button class="btn-close-modal" data-cancel title="${isFr ? 'Annuler' : 'Cancel'}" aria-label="${isFr ? 'Annuler' : 'Cancel'}"><i data-lucide="x"></i></button>
+                </div>
+                <div class="modal-body" style="font-size:12.5px; line-height:1.55; color:var(--text-color);">
+                    <p style="margin:0 0 10px 0;">
+                        ${isFr
+                            ? 'Ce log de nav est <b>généré automatiquement</b> à partir des données du planificateur (vent Open-Meteo estimé à l\'altitude de croisière, relief, performances saisies). Ces valeurs sont une <b>aide à la préparation, pas une garantie</b>. Avant tout usage en vol, vérifiez chaque valeur :'
+                            : 'This nav log is <b>generated automatically</b> from the flight planner data (estimated Open-Meteo wind at cruise altitude, terrain, entered performance). These values are a <b>preparation aid, not a guarantee</b>. Before any in-flight use, verify every value:'}
+                    </p>
+                    <div style="display:flex; flex-direction:column; gap:7px; margin:0 0 10px 0;">
+                        ${items.map(([icon, txt]) => `
+                            <div style="display:flex; gap:9px; align-items:flex-start;">
+                                <i data-lucide="${icon}" style="width:14px;height:14px;color:var(--primary);flex-shrink:0;margin-top:2px;"></i>
+                                <span>${txt}</span>
+                            </div>`).join('')}
+                    </div>
+                    <p style="margin:0 0 10px 0; color:var(--text-muted);">
+                        ${isFr
+                            ? 'Les champs laissés vides (pilote, c/sign, heures, horomètres, HEA/HRA, checks) sont à <b>compléter à la main</b>.'
+                            : 'Empty fields (pilot, c/sign, times, hobbs, ETA/ATA, checks) must be <b>filled in by hand</b>.'}
+                    </p>
+                    <div style="padding:9px 12px; background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.35); border-radius:8px; color:#FBBF24; font-size:12px;">
+                        <i data-lucide="scale" style="width:13px;height:13px;vertical-align:middle;"></i>
+                        ${isFr
+                            ? ' Ce document ne remplace ni le POH de l\'avion, ni les cartes officielles, ni la préparation réglementaire du vol. <b>Le commandant de bord reste seul responsable</b> de la vérification des informations et de ses décisions.'
+                            : ' This document does not replace the aircraft POH, official charts or the regulatory flight preparation. <b>The pilot-in-command remains solely responsible</b> for verifying the information and for their decisions.'}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" data-cancel>${isFr ? 'Annuler' : 'Cancel'}</button>
+                    <button class="btn-primary" data-ok>
+                        <i data-lucide="file-down" style="width:14px;height:14px;"></i>
+                        ${isFr ? 'J\'ai vérifié — générer le PDF' : 'Verified — generate PDF'}
+                    </button>
+                </div>
+            </div>`;
+
+        document.body.appendChild(modal);
+        if (window.lucide) window.lucide.createIcons({ root: modal });
+
+        const onKey = (e) => { if (e.key === 'Escape') done(false); };
+        const done = (val) => {
+            document.removeEventListener('keydown', onKey);
+            modal.remove();
+            resolve(val);
+        };
+        modal.querySelectorAll('[data-cancel]').forEach(b => b.addEventListener('click', () => done(false)));
+        modal.querySelector('[data-ok]').addEventListener('click', () => done(true));
+        modal.addEventListener('click', e => { if (e.target === modal) done(false); });
+        document.addEventListener('keydown', onKey);
+        modal.querySelector('[data-ok]').focus();
+    });
 }
 
 function _renderError(container, from, to, isFr) {

@@ -19,7 +19,7 @@ export async function showAlternates(icao) {
     try {
 
         const stationsUrl = `https://aviationweather.gov/api/data/stationinfo?bbox=${lat - 3},${lon - 3},${lat + 3},${lon + 3}&format=json`;
-        const stations = await fetchAvecRelais(stationsUrl, 'json');
+        const stations = await fetchAvecRelais(stationsUrl, 'json', 3600);
         if (!Array.isArray(stations)) { container.style.display = 'none'; return; }
 
         const nearby = stations

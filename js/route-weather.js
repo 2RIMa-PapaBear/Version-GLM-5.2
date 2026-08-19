@@ -75,7 +75,7 @@ async function _loadCorridorMetars(map, fromLat, fromLon, toLat, toLon) {
         const maxLon = Math.max(fromLon, toLon) + 1;
 
         const stationsUrl = `https://aviationweather.gov/api/data/stationinfo?bbox=${minLat},${minLon},${maxLat},${maxLon}&format=json`;
-        const stations = await fetchAvecRelais(stationsUrl, 'json');
+        const stations = await fetchAvecRelais(stationsUrl, 'json', 3600);
         if (!Array.isArray(stations)) return;
 
         const corridorStations = stations
