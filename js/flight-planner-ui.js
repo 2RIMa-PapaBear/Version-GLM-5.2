@@ -351,6 +351,7 @@ async function _generateNavLogPdf() {
     const perf = { isFr: isFr3, fromIcao, toIcao, runway, takeoff, profile, alternates };
 
     const doc = drawNavLogPdf(window.jspdf.jsPDF, {
+        isFr: state.lang === 'fr',
         aircraftType: ac.type || '', aircraftReg: ac.registration || '',
         qnh, windDir, windKt, runway,
         distanceNm: totalNm ?? '', timeLabel,

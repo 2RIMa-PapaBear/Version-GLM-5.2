@@ -84,7 +84,6 @@ const SZ = { body: 9, title: 10, doc: 11, thead: 8 };
 // Colonnes du tableau de nav : en-têtes « Dist restante » et « Z retenue » sur
 // deux lignes → colonnes compactes, FROM/TO élargie. RM/CM large, HEA = HRA.
 const COLS = [17.8, 114, 146, 184, 214, 248, 290, 327.7, 365.2, 402.7];
-const HEADERS = [['FROM/TO'], ['Dist', 'restante'], ['Distance'], ['Z sécu'], ['Z', 'retenue'], ['RM/CM'], ['Tsv/Tav'], ['HEA'], ['HRA']];
 const ROW_H = 22;
 const N_ROWS = 9;   // lignes du tableau (remplies puis vierges à compléter en vol)
 
@@ -193,6 +192,9 @@ function _alertBanner(doc, L, R, W, y, danger, text) {
 export function drawNavLogPdf(jsPDFCtor, d) {
     const doc = new jsPDFCtor({ unit: 'pt', format: [PAGE.w, PAGE.h], orientation: 'portrait' });
     doc.setFont('helvetica', 'normal');
+    // Page 1 bilingue : la langue vient du niveau document (les pages 2/3 ont
+    // la leur dans d.calc/d.perf, historiquement).
+    const fr = d.isFr !== false;
 
     // Champ « Libellé : valeur » — la valeur (gras) est collée au libellé avec
     // une espace : « Distance : 142 NM ». Retourne l'abscisse de fin de valeur.
@@ -221,12 +223,12 @@ export function drawNavLogPdf(jsPDFCtor, d) {
     doc.setFillColor(...DARK);
     doc.rect(16.4, 35.4, 386.3, 14.3, 'F');
     doc.setFont('helvetica', 'bold'); doc.setFontSize(SZ.title); _setInk(doc, [255, 255, 255]);
-    doc.text('Pilote / Détail vol', 46.1, 45.4);
+    doc.text(fr ? 'Pilote / Détail vol' : 'Pilot / Flight details', 46.1, 45.4);
     // « Avion » et « Paramètres » centrés sur les colonnes du dessous
     // (transpondeur 175-290, fréquences 290-403), elles-mêmes rétrécies pour
     // laisser la largeur au bloc « Pilote / Détail vol » (17,8 → 175).
-    doc.text('Avion', 242.5, 45.4, { align: 'center' });
-    doc.text('Paramètres', 346.3, 45.4, { align: 'center' });
+    doc.text(fr ? 'Avion' : 'Aircraft', 242.5, 45.4, { align: 'center' });
+    doc.text(fr ? 'Paramètres' : 'Parameters', 346.3, 45.4, { align: 'center' });
 
     // ---- Bloc gauche : libellés + valeurs collées / zones à remplir ----
     // Structure : Pilote 17,8→195 (large), Avion = transpondeur (195→290),
@@ -242,29 +244,31 @@ export function drawNavLogPdf(jsPDFCtor, d) {
     const B = i => ROWS_Y[i] + 10.4;
 
     // Colonne 1 (Pilote / détail vol) — champs inconnus : trait à remplir à la main.
-    let vx = _field('Pilote :', '', 17.8, B(0)); _rule(vx + 2, 188, B(0));
-    vx = _field('Hr Départ :', '', 17.8, B(1)); _rule(vx + 2, 188, B(1));
-    vx = _field('Hr Arrivée :', '', 17.8, B(2)); _rule(vx + 2, 188, B(2));
-    vx = _field('Horamètre Départ :', '', 17.8, B(3)); _rule(vx + 2, 188, B(3));
-    vx = _field('Horamètre Arrivée :', '', 17.8, B(4)); _rule(vx + 2, 188, B(4));
-    _field('Distance :', `${d.distanceNm ?? ''} NM`, 17.8, B(5));
-    _field('Temps de vol :', d.timeLabel ?? '', 17.8, B(6));
+    let vx = _field(fr ? 'Pilote :' : 'Pilot:', '', 17.8, B(0)); _rule(vx + 2, 188, B(0));
+    vx = _field(fr ? 'Hr Départ :' : 'Dep time:', '', 17.8, B(1)); _rule(vx + 2, 188, B(1));
+    vx = _field(fr ? 'Hr Arrivée :' : 'Arr time:', '', 17.8, B(2)); _rule(vx + 2, 188, B(2));
+    vx = _field(fr ? 'Horomètre Départ :' : 'Hobbs start:', '', 17.8, B(3)); _rule(vx + 2, 188, B(3));
+    vx = _field(fr ? 'Horamètre Arrivée :' : 'Hobbs end:', '', 17.8, B(4)); _rule(vx + 2, 188, B(4));
+    _field(fr ? 'Distance :' : 'Distance:', `${d.distanceNm ?? ''} NM`, 17.8, B(5));
+    _field(fr ? 'Temps de vol :' : 'Flight time:', d.timeLabel ?? '', 17.8, B(6));
 
     // Colonne 2 (Avion) — alignée sur le bloc transpondeur (x=195), texte à PAD du cadre.
-    _field('Type :', d.aircraftType || '', 195 + PAD, B(0));
-    _field('Immat :', d.aircraftReg || '', 195 + PAD, B(1));
-    vx = _field('C/sign :', '', 195 + PAD, B(2)); _rule(vx + 2, 290 - PAD, B(2));
+    _field(fr ? 'Type :' : 'Type:', d.aircraftType || '', 195 + PAD, B(0));
+    _field(fr ? 'Immat :' : 'Reg:', d.aircraftReg || '', 195 + PAD, B(1));
+    vx = _field('C/sign:', '', 195 + PAD, B(2)); _rule(vx + 2, 290 - PAD, B(2));
 
     // Colonne 3 (Paramètres) — alignée sur le bloc fréquences (x=290).
-    _field('QNH :', d.qnh || '', 290 + PAD, B(0));
-    _field('Vent :', d.windDir != null ? `${d.windDir}/${String(d.windKt ?? '').padStart(2, '0')} Kt` : '', 290 + PAD, B(1));
-    _field('Piste en service :', d.runway || '', 290 + PAD, B(2));
+    _field('QNH:', d.qnh || '', 290 + PAD, B(0));
+    _field(fr ? 'Vent :' : 'Wind:', d.windDir != null ? `${d.windDir}/${String(d.windKt ?? '').padStart(2, '0')} Kt` : '', 290 + PAD, B(1));
+    _field(fr ? 'Piste en service :' : 'Runway:', d.runway || '', 290 + PAD, B(2));
 
     // ---- Bloc transpondeur (fond vert, x=195 aligné sur la colonne Avion) ----
     // Texte aligné à GAUCHE avec marge : « 7500 : Détournement ».
     doc.setFillColor(...GREEN_BG); doc.setDrawColor(...GREEN_BD); doc.setLineWidth(0.6);
     doc.rect(195, 92, 95, 56.8, 'FD');
-    const TSP = [['7500', 'Détournement'], ['7600', 'Panne radio'], ['7700', 'Détresse'], ['7000', 'VFR']];
+    const TSP = fr
+        ? [['7500', 'Détournement'], ['7600', 'Panne radio'], ['7700', 'Détresse'], ['7000', 'VFR']]
+        : [['7500', 'Diversion'], ['7600', 'Radio failure'], ['7700', 'Emergency'], ['7000', 'VFR']];
     TSP.forEach(([code, lab], i) => {
         const y = [93.4, 107.5, 121.2, 135.4][i] + 10.2;
         doc.setFont('helvetica', 'bold'); doc.setFontSize(SZ.body); _setInk(doc, INK);
@@ -277,12 +281,19 @@ export function drawNavLogPdf(jsPDFCtor, d) {
     // ---- Bloc fréquences (121.500 en rouge, x=290 aligné sur Paramètres) ----
     doc.setDrawColor(...LINE); doc.setLineWidth(0.5);
     doc.rect(290, 92, 112.7, 56.8, 'S');
-    const FRQ = [
-        ['123.500', 'Aérodrome', false],
-        ['130.000', 'Fréq. montagne', false],
-        ['123.450', 'Comm/aéronefs', false],
-        ['121.500', 'Fréq. détresse', true],
-    ];
+    const FRQ = fr
+        ? [
+            ['123.500', 'Aérodrome', false],
+            ['130.000', 'Fréq. montagne', false],
+            ['123.450', 'Comm/aéronefs', false],
+            ['121.500', 'Fréq. détresse', true],
+        ]
+        : [
+            ['123.500', 'Airfield', false],
+            ['130.000', 'Mountain', false],
+            ['123.450', 'Air-to-air', false],
+            ['121.500', 'Distress', true],
+        ];
     FRQ.forEach(([f, lab, isRed], i) => {
         const y = [93.4, 108.2, 122.4, 136.5][i] + 10.2;
         doc.setFont('helvetica', 'bold'); doc.setFontSize(SZ.body);
@@ -295,7 +306,7 @@ export function drawNavLogPdf(jsPDFCtor, d) {
 
     // ---- Notes : METAR de départ en 1re ligne, puis lignes vierges ----
     doc.setFont('helvetica', 'bold'); doc.setFontSize(SZ.title); _setInk(doc, INK);
-    doc.text('Notes :', 18.2, 175.4);
+    doc.text(fr ? 'Notes :' : 'Notes:', 18.2, 175.4);
     doc.setFont('courier', 'normal'); doc.setFontSize(7.5); _setInk(doc, INK);
     const noteLines = d.metarRaw ? _wrap(doc, d.metarRaw, 380) : [];
     noteLines.slice(0, 2).forEach((l, i) => doc.text(l, 17.9, 184.5 + i * 13));
@@ -305,10 +316,14 @@ export function drawNavLogPdf(jsPDFCtor, d) {
 
     // ---- Tableau de nav ----
     const T_TOP = 256, T_HEAD_H = 27;
+    // En-têtes bilingues : HEA/HRA → ETA/ATA, Z sécu → MSA (abréviations OACI).
+    const headers = fr
+        ? [['FROM/TO'], ['Dist', 'restante'], ['Distance'], ['Z sécu'], ['Z', 'retenue'], ['RM/CM'], ['Tsv/Tav'], ['HEA'], ['HRA']]
+        : [['FROM/TO'], ['Dist', 'rem.'], ['Distance'], ['MSA'], ['Alt', 'sel'], ['RM/CM'], ['ETE', 'c/w'], ['ETA'], ['ATA']];
     doc.setFillColor(...BANDL);
     doc.rect(COLS[0], T_TOP, COLS[COLS.length - 1] - COLS[0], T_HEAD_H, 'F');
     doc.setFont('helvetica', 'bold'); doc.setFontSize(SZ.thead); _setInk(doc, INK);
-    HEADERS.forEach((lines, i) => {
+    headers.forEach((lines, i) => {
         const cx = (COLS[i] + COLS[i + 1]) / 2;
         if (lines.length === 2) {
             // En-tête sur deux lignes, bloc centré verticalement dans la bande.
@@ -357,11 +372,17 @@ export function drawNavLogPdf(jsPDFCtor, d) {
     doc.rect(COLS[0], T_TOP, COLS[COLS.length - 1] - COLS[0], T_HEAD_H + N_ROWS * ROW_H, 'S');
 
     // ---- Cadres Check ----
-    const CHECKS = [
-        [16.4, 117.8, 'Check Croisière', 41.9],
-        [134.0, 138.0, 'Check Point Tournant', 158.9],
-        [271.9, 130.8, 'Check Vent Arrière', 298.7],
-    ];
+    const CHECKS = fr
+        ? [
+            [16.4, 117.8, 'Check Croisière', 41.9],
+            [134.0, 138.0, 'Check Point Tournant', 158.9],
+            [271.9, 130.8, 'Check Vent Arrière', 298.7],
+        ]
+        : [
+            [16.4, 117.8, 'Cruise check', 41.9],
+            [134.0, 138.0, 'Turning point check', 158.9],
+            [271.9, 130.8, 'Downwind check', 298.7],
+        ];
     for (const [x, w, lab, tx] of CHECKS) {
         doc.setFillColor(...DARK);
         doc.rect(x, 486.7, w, 12.1, 'F');
@@ -374,11 +395,17 @@ export function drawNavLogPdf(jsPDFCtor, d) {
     doc.rect(16.4, 503.8, 386.3, 77.1, 'S');
     doc.line(133.5, 503.8, 133.5, 580.9);
     doc.line(269.5, 503.8, 269.5, 580.9);
-    const LEGEND = [
-        [['P', 'Paramètres'], ['I', 'Instruments'], ['A', 'Altitude'], ['G', 'Gyro / Cap'], ['E', 'Essence'], ['R', 'Radio/Radio Nav']],
-        [['T', 'Top / Estimé Point Suiv.'], ['R', 'Route / Cap'], ['A', 'Altitude'], ['M', 'Moteur / Météo'], ['E', 'Essence'], ['R', 'Radio/Radio Nav']],
-        [['D', 'Dégivrage'], ['R', 'Richesse'], ['A', 'Altitude'], ['G', 'Gyro / Cap'], ['E', 'Essence'], ['R', 'Radio/Radio Nav']],
-    ];
+    const LEGEND = fr
+        ? [
+            [['P', 'Paramètres'], ['I', 'Instruments'], ['A', 'Altitude'], ['G', 'Gyro / Cap'], ['E', 'Essence'], ['R', 'Radio/Radio Nav']],
+            [['T', 'Top / Estimé Point Suiv.'], ['R', 'Route / Cap'], ['A', 'Altitude'], ['M', 'Moteur / Météo'], ['E', 'Essence'], ['R', 'Radio/Radio Nav']],
+            [['D', 'Dégivrage'], ['R', 'Richesse'], ['A', 'Altitude'], ['G', 'Gyro / Cap'], ['E', 'Essence'], ['R', 'Radio/Radio Nav']],
+        ]
+        : [
+            [['P', 'Parameters'], ['I', 'Instruments'], ['A', 'Altitude'], ['G', 'Gyro / Hdg'], ['E', 'Fuel'], ['R', 'Radio/Nav']],
+            [['T', 'ETA next WPT'], ['R', 'Route / Hdg'], ['A', 'Altitude'], ['M', 'Engine / Wx'], ['E', 'Fuel'], ['R', 'Radio/Nav']],
+            [['D', 'De-ice'], ['R', 'Mixture'], ['A', 'Altitude'], ['G', 'Gyro / Hdg'], ['E', 'Fuel'], ['R', 'Radio/Nav']],
+        ];
     const LEG_X = [17.9, 138.5, 274.4];
     LEGEND.forEach((col, c) => {
         col.forEach(([letter, meaning], r) => {
