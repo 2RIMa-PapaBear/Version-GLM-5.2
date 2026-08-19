@@ -84,9 +84,9 @@ if (res.status === 'deployed') {
     toast('Déploiement FTP Free.fr', 'OK - rien à déployer (fichiers dev uniquement)');
 } else if (res.status === 'failed') {
     log('⚠ ÉCHEC du déploiement automatique — détails : onglet Actions du dépôt GitHub.');
-    toast('Déploiement FTP Free.fr', 'ÉCHEC du déploiement - voir onglet Actions');
+    toast('Déploiement FTP Free.fr', 'ÉCHEC du déploiement - voir onglet Actions', 'warn');
 } else {
     log('⚠ Pas de conclusion du run après 4 min — onglet Actions du dépôt pour voir.');
     log('  Faites simplement « git pull » dans une minute.');
-    toast('Déploiement FTP Free.fr', 'Pas de conclusion après 4 min - voir onglet Actions');
+    toast('Déploiement FTP Free.fr', 'Pas de conclusion après 4 min - voir onglet Actions', 'warn');
 }
