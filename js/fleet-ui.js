@@ -109,6 +109,8 @@ function _render() {
                         <span title="${isFr ? 'Franchissement 50ft' : '50ft obstacle'}">${ac.fiftyFt} ft</span>
                         <span>·</span>
                         <span title="${isFr ? 'Marge de sécurité' : 'Safety margin'}">${ac.safetyMargin}%</span>
+                        ${ac.cruiseSpeedKt ? `<span>·</span><span title="${isFr ? 'Vitesse de croisière (TAS)' : 'Cruise speed (TAS)'}">${ac.cruiseSpeedKt} kt</span>` : ''}
+                        ${ac.fuelBurnLph ? `<span>·</span><span title="${isFr ? 'Consommation horaire' : 'Fuel burn'}">${ac.fuelBurnLph} L/h</span>` : ''}
                     </div>
                 </div>
                 <div class="fleet-item-actions">
@@ -147,11 +149,15 @@ function _render() {
                 <label>${isFr ? 'Roulement SL/ISA (ft)' : 'Ground roll SL/ISA (ft)'}<input type="number" id="fleet-roll" placeholder="830" min="0" step="10"></label>
                 <label>${isFr ? 'Franch. 50ft SL/ISA (ft)' : '50ft obstacle SL/ISA (ft)'}<input type="number" id="fleet-50ft" placeholder="1400" min="0" step="10"></label>
             </div>
+            <div class="fleet-form-row">
+                <label>${isFr ? 'Vitesse croisière (kt)' : 'Cruise speed (kt)'}<input type="number" id="fleet-cruise" placeholder="110" min="0" step="5"></label>
+                <label>${isFr ? 'Conso croisière (L/h)' : 'Cruise burn (L/h)'}<input type="number" id="fleet-burn" placeholder="35" min="0" step="1"></label>
+            </div>
             <div class="fleet-form-hint">
                 <i data-lucide="info"></i>
                 <span>${isFr
-                    ? 'Distances issues du manuel de vol (POH) au niveau de la mer en atmosphère standard. Reportez-vous à la section « Performances de décollage ».'
-                    : 'Distances from the POH at sea level / standard atmosphere. See "Takeoff performance" section.'}</span>
+                    ? 'Distances issues du manuel de vol (POH) au niveau de la mer en atmosphère standard. La vitesse et la consommation de croisière alimentent la feuille de calcul de navigation (temps de vol, carburant).'
+                    : 'Distances from the POH at sea level / standard atmosphere. Cruise speed and fuel burn feed the navigation flight plan (ETE, fuel).'}</span>
             </div>
             <div class="fleet-form-actions">
                 <button id="fleet-save" class="btn-primary"><i data-lucide="save"></i> ${isFr ? 'Enregistrer' : 'Save'}</button>
@@ -279,6 +285,8 @@ function _fillForm(id) {
     document.getElementById('fleet-margin').value = ac.safetyMargin ?? 20;
     document.getElementById('fleet-roll').value = ac.groundRoll || '';
     document.getElementById('fleet-50ft').value = ac.fiftyFt || '';
+    document.getElementById('fleet-cruise').value = ac.cruiseSpeedKt || '';
+    document.getElementById('fleet-burn').value = ac.fuelBurnLph || '';
 
     document.getElementById('fleet-form-title').textContent = isFr ? 'Modifier l\'avion' : 'Edit aircraft';
     document.getElementById('fleet-cancel-form').style.display = 'inline-block';
@@ -296,6 +304,8 @@ function _resetForm() {
     document.getElementById('fleet-margin').value = 20;
     document.getElementById('fleet-roll').value = '';
     document.getElementById('fleet-50ft').value = '';
+    document.getElementById('fleet-cruise').value = '';
+    document.getElementById('fleet-burn').value = '';
     document.getElementById('fleet-form-title').textContent = isFr ? 'Ajouter un avion' : 'Add an aircraft';
     document.getElementById('fleet-cancel-form').style.display = 'none';
     _hideSuggest();

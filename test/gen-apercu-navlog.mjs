@@ -22,12 +22,12 @@ const { drawNavLogPdf } = await import(pathToFileURL(path.join(root, 'js', 'navl
 // Exemple : LFPB (Toussus) → LFOB (Beauvais) → LFRM (Le Mans), vent d'ouest.
 const doc = drawNavLogPdf(jsPDF, {
     aircraftType: 'DR400-120', aircraftReg: 'F-GKAZ',
-    qnh: 1013, windDir: 280, windKt: 14, runway: '07L',
+    qnh: 1013, windDir: 280, windKt: 14, runway: '28',
     distanceNm: 151, timeLabel: '1h32',
     metarRaw: 'LFPB 190830Z 28012KT 9999 FEW035 18/12 Q1013 NOSIG',
     rows: [
-        { from: 'LFPB', to: 'LFOB', distRemain: 151, dist: 42.3, zSecu: 1500, zRet: 3500, rm: '331', cm: '329', tsv: 24, tav: 26 },
-        { from: 'LFOB', to: 'LFRM', distRemain: 109, dist: 108.7, zSecu: 1200, zRet: 3500, rm: '264', cm: '261', tsv: 61, tav: 66 },
+        { from: 'LFPB', to: 'LFOB', distRemain: 151, dist: 42, zSecu: 1500, zRet: 3500, rm: '331', cm: '329', tsv: 24, tav: 26 },
+        { from: 'LFOB', to: 'LFRM', distRemain: 109, dist: 109, zSecu: 1200, zRet: 3500, rm: '264', cm: '261', tsv: 61, tav: 66 },
     ],
     calc: {
         isFr: true,
@@ -43,8 +43,8 @@ const doc = drawNavLogPdf(jsPDF, {
         clearance: { maxFt: 660, minClearanceFt: 1840, level: 'ok' },
         isMultiLeg: true,
         legs: [
-            { from: 'LFPB', to: 'LFOB', dist: 42.3, hdg: 329, eteLabel: '26 min', fuelL: 5.8, freq: '120.300 AFIS' },
-            { from: 'LFOB', to: 'LFRM', dist: 108.7, hdg: 261, eteLabel: '1h06', fuelL: 15.6, freq: '121.100 TWR' },
+            { from: 'LFPB', to: 'LFOB', dist: 42, hdg: 329, eteLabel: '26 min', fuelL: 5.8, freq: '120.300 AFIS' },
+            { from: 'LFOB', to: 'LFRM', dist: 109, hdg: 261, eteLabel: '1h06', fuelL: 15.6, freq: '121.100 TWR' },
         ],
     },
 });

@@ -138,9 +138,10 @@ export async function computeFlightPlan(fromIcao, toIcao, params) {
 export function getDefaultAircraftPerf() {
     const ac = getActiveAircraft();
 
+    // Vitesse/conso de croisière des caractéristiques de l'avion (flotte).
     return {
-        tasKt: ac?._tasKt ?? 110,
-        fuelBurnLph: ac?._fuelBurnLph ?? 35,
+        tasKt: ac?.cruiseSpeedKt ?? 110,
+        fuelBurnLph: ac?.fuelBurnLph ?? 35,
     };
 }
 

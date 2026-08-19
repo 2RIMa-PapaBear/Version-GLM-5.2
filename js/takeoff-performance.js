@@ -99,26 +99,34 @@ export function getRunwayLength(icao) {
  * Renvoie le numéro de piste actif (ex: "08L") selon la rose des vents.
  * Exporté pour que l'UI puisse afficher quelle piste est concernée.
  * @param {string} icao
+ * @param {Object|null} [wind] vent {dir (°VRAIS ou null si VRB), speed} —
+ *   si fourni, la piste active est choisie FACE AU VENT (ex. METAR de
+ *   départ pour le log de nav) ; sinon comportement historique (paire
+ *   suggérée/forcée de la rose des vents, sans alignement vent).
+ * @param {number} [magDeclination] déclinaison (°E+) : le vent METAR est
+ *   VRAI, les pistes sont MAGNÉTIQUES.
  * @returns {string|null}
  */
-export function getActiveRunwayNameForIcao(icao) {
+export function getActiveRunwayNameForIcao(icao, wind = null, magDeclination = 0) {
     const apt = getAirportByICAO(icao);
-    return _getActiveRunwayName(apt);
+    return _getActiveRunwayName(apt, wind, magDeclination);
 }
 
 /**
  * Détermine le numéro de piste actif (ex: "08L") selon l'état courant :
  * - Si state.forcedRunway est défini (pilote a cliqué une piste), on résout
  *   via selectBestRunway pour obtenir le nom de la piste active de cette paire.
- * - Sinon, on laisse selectBestRunway choisir la meilleure piste au vent.
+ * - Si un vent est fourni, la piste la plus face au vent est retenue.
  * @param {Object} apt L'objet terrain (avec .runways).
+ * @param {Object|null} [wind] {dir, speed} ou null.
+ * @param {number} [magDeclination]
  * @returns {string|null} Numéro de piste (ex: "08L"), ou null.
  */
-function _getActiveRunwayName(apt) {
+function _getActiveRunwayName(apt, wind = null, magDeclination = 0) {
     if (!apt || !Array.isArray(apt.runways) || apt.runways.length === 0) return null;
     // wind=null : selectBestRunway retourne quand même la paire (et la piste
     // active si forcedRunway est défini). C'est suffisant pour récupérer le nom.
-    const rwyData = selectBestRunway(apt.runways, null, state.forcedRunway);
+    const rwyData = selectBestRunway(apt.runways, wind, state.forcedRunway, magDeclination);
     return rwyData?.active?.name || null;
 }
 
