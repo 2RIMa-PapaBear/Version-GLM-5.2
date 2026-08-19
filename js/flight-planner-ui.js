@@ -1,6 +1,8 @@
-import { state, escapeHtml } from './core.js';
+import { state, escapeHtml, fetchAvecRelais } from './core.js';
 import { getAirportByICAO, enrichAirport } from './ui-module.js';
-import { getActiveAircraftId } from './aircraft-fleet.js';
+import { getActiveAircraftId, getActiveAircraft } from './aircraft-fleet.js';
+import { getActiveRunwayNameForIcao } from './takeoff-performance.js';
+import { drawNavLogPdf } from './navlog-pdf.js';
 import { makeCollapsible } from './collapsible.js';
 import { computeFlightPlan, computeMultiLegFlightPlan, getDefaultAircraftPerf, RESERVES } from './flight-planner.js';
 import { renderElevationChart, clearElevationChart } from './elevation-chart.js';
@@ -48,6 +50,11 @@ function _writePerf(acId, tasKt, fuelBurnLph) {
         localStorage.setItem(LS_PERF_PREFIX + acId, JSON.stringify({ tasKt, fuelBurnLph }));
     } catch {   }
 }
+
+// Garde-fou anti-récursion PARTAGÉ : le callback de _preloadWaypointFreqs (dans
+// showFlightPlanner) et recalc (dans _wireInputs) doivent voir le MÊME flag.
+// Déclaré au niveau module — sinon ReferenceError dans le callback de re-render.
+let _recalculating = false;
 
 export async function showFlightPlanner(fromIcao, toIcao) {
     const container = document.getElementById('flight-planner-panel');
@@ -128,6 +135,88 @@ function _renderLoading(container, from, to, alt, tas, burn, isNight, isFr) {
     _wireInputs(container, from, to);
 }
 
+// Export PDF du log de nav A5 (d'après le modèle papier du pilote).
+// Collecte les données connues de l'app : avion actif de la flotte, METAR de
+// départ frais (QNH + vent pour l'en-tête, code brut pour la 1re ligne des
+// Notes), piste en service, tronçons du plan avec Z sécu calculée (relief max
+// du tronçon + 1000 ft, arrondi aux 500 ft sup). Les champs inconnus (pilote,
+// c/sign, heures, horamètres, HEA/HRA) restent vides à remplir à la main.
+async function _generateNavLogPdf() {
+    const stash = state._lastNavPlan;
+    if (!stash?.plan) return;
+    const { plan, tas } = stash;
+    if (!window.jspdf?.jsPDF) { console.warn('jsPDF indisponible (vendor/jspdf.umd.min.js)'); return; }
+
+    const isMulti = Array.isArray(plan.legs) && plan.legs.length > 0;
+    const legs = isMulti ? plan.legs : [{
+        from: plan.from, to: plan.to, distanceNm: plan.distanceNm,
+        trueCourse: plan.trueCourse, magHeading: plan.magHeading, legTimeMin: plan.legTimeMin,
+    }];
+    const fromIcao = legs[0].from.icao;
+    const toIcao = legs[legs.length - 1].to.icao;
+    const totalNm = isMulti ? plan.totalDistanceNm : plan.distanceNm;
+    const totalMin = isMulti ? plan.totalTimeMin : plan.legTimeMin;
+
+    // METAR de départ frais : QNH + vent pour l'en-tête, code brut pour les Notes.
+    let metarRaw = '', qnh = '', windDir = null, windKt = null;
+    try {
+        metarRaw = String(await fetchAvecRelais(`https://aviationweather.gov/api/data/metar?ids=${fromIcao}&format=raw`) || '').trim().split('\n')[0] || '';
+        const mQ = metarRaw.match(/\bQ(\d{4})\b/);
+        if (mQ) qnh = parseInt(mQ[1], 10);
+        const mW = metarRaw.match(/\b(\d{3}|VRB)(\d{2})(?:G\d{2})?KT\b/);
+        if (mW) { windDir = mW[1] === 'VRB' ? 'VRB' : parseInt(mW[1], 10); windKt = parseInt(mW[2], 10); }
+    } catch { /* hors ligne : champs laissés vides à compléter à la main */ }
+
+    const ac = getActiveAircraft() || {};
+    const runway = getActiveRunwayNameForIcao(fromIcao) || '';
+    const decl = plan.declination ?? 0;
+    const zRet = plan.cruiseAltFt;
+
+    // Z sécu par tronçon : les points du profil portent un frac [0..1] sur la
+    // distance TOTALE du trajet — on regarde ceux qui tombent dans le tronçon.
+    const prof = plan.elevationProfile;
+    let cum = 0;
+    const bounds = legs.map(lg => { const b = [cum, cum + lg.distanceNm]; cum += lg.distanceNm; return b; });
+    const zSecuFor = (i) => {
+        if (!prof?.points?.length || cum <= 0) return '';
+        const [a, b] = bounds[i];
+        let max = -Infinity;
+        for (const p of prof.points) {
+            if (p.frac == null) continue;
+            const f = p.frac * cum;
+            if (f >= a - 1 && f <= b + 1 && p.elevFt > max) max = p.elevFt;
+        }
+        return max === -Infinity ? '' : Math.ceil((max + 1000) / 500) * 500;
+    };
+
+    let remain = totalNm;
+    const rows = legs.map((lg, i) => {
+        const rm = ((Math.round((lg.trueCourse ?? 0) - decl) % 360) + 360) % 360;
+        const row = {
+            from: lg.from.icao, to: lg.to.icao,
+            distRemain: Math.round(remain), dist: lg.distanceNm,
+            zSecu: zSecuFor(i), zRet: zRet ?? '',
+            rm: String(rm).padStart(3, '0'), cm: String(lg.magHeading ?? '').padStart(3, '0'),
+            tsv: (tas && lg.distanceNm) ? Math.round(lg.distanceNm / tas * 60) : '',
+            tav: lg.legTimeMin ?? '',
+        };
+        remain -= lg.distanceNm;
+        return row;
+    });
+
+    const h = Math.floor((totalMin || 0) / 60), m = Math.round((totalMin || 0) % 60);
+    const timeLabel = totalMin ? (h > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${m} min`) : '';
+
+    const doc = drawNavLogPdf(window.jspdf.jsPDF, {
+        aircraftType: ac.type || '', aircraftReg: ac.registration || '',
+        qnh, windDir, windKt, runway,
+        distanceNm: totalNm ?? '', timeLabel,
+        metarRaw, rows,
+    });
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    doc.save(`Log-nav_${fromIcao}-${toIcao}_${today}.pdf`);
+}
+
 function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
     // Gère les deux formats de plan :
     //   - single-leg : { from, to, distanceNm, trueCourse, magHeading, windCorrection, legTimeMin, ... }
@@ -167,8 +256,14 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
 
     const clearColor = cl?.level === 'danger' ? '#EF4444' : (cl?.level === 'caution' ? '#F59E0B' : '#10B981');
 
+    // Mémorise le dernier plan rendu pour l'export PDF du log de nav (navlog-pdf.js).
+    state._lastNavPlan = { plan, tas };
+
     container.innerHTML = `
-        <div style="font-size:11px; color:var(--text-muted); font-family:'DM Mono',monospace; margin-bottom:8px;">${escapeHtml(from)} → ${escapeHtml(to)}</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px;">
+            <div style="font-size:11px; color:var(--text-muted); font-family:'DM Mono',monospace;">${escapeHtml(from)} → ${escapeHtml(to)}</div>
+            <button id="fp-navlog-pdf" class="btn-secondary" style="font-size:11px; padding:4px 10px; white-space:nowrap;" title="${isFr ? 'Log de nav imprimable A5 (plan de vol + METAR de départ)' : 'Printable A5 nav log (flight plan + departure METAR)'}"><i data-lucide="file-down" style="width:12px;height:12px;vertical-align:middle;"></i> ${isFr ? 'Log de nav PDF' : 'Nav log PDF'}</button>
+        </div>
         ${_renderInputs(from, to, fromName, toName, alt, tas, burn, isNight, isFr)}
 
         <div class="fp-grid" style="gap:8px 16px; margin-top:10px;">
@@ -313,6 +408,7 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
         </div>
     `;
     if (window.lucide) window.lucide.createIcons({ root: container });
+    container.querySelector('#fp-navlog-pdf')?.addEventListener('click', () => { _generateNavLogPdf(); });
     _wireInputs(container, from, to);
 }
 
@@ -368,9 +464,8 @@ function _renderInputs(from, to, fromName, toName, alt, tas, burn, isNight, isFr
 
 function _wireInputs(container, from, to) {
     // Garde-fou anti-récursion : showFlightPlanner recrée le DOM et rewire les inputs,
-    // ce qui peut redéclencher 'change' et boucler (OOM). Le flag bloque les recalculs
-    // pendant qu'un recalcul est en cours.
-    let _recalculating = false;
+    // ce qui peut redéclencher 'change' et boucler (OOM). Le flag est module-level
+    // (partagé avec le callback de pré-chargement des fréquences de showFlightPlanner).
     const recalc = () => {
         if (_recalculating) return;   // évite la récursion pendant le re-render
         _recalculating = true;
