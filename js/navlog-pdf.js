@@ -1058,10 +1058,11 @@ function _drawCentroChart(doc, c, xL, xR, yT, CH) {
     doc.line(xL, yT, xL, yB); doc.line(xL, yB, xR, yB);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(7); _setInk(doc, MUTED);
     doc.text(`${fr ? 'Bras de levier' : 'Arm'} (${u.arm})`, (xL + xR) / 2, yB + 19, { align: 'center' });
-    // Titre de l'axe masse VERTICAL, contre le côté gauche de la zone de
-    // tracé (à l'intérieur, juste au bord) — bien rattaché au graphique.
+    // Titre de l'axe masse VERTICAL, collé au bord gauche (le long de l'axe).
+    // La bande des ~13 premiers points est réservée : les étiquettes de
+    // points côté gauche y basculent à droite (aucun chevauchement).
     doc.setFontSize(6.5);
-    doc.text(`${fr ? 'Masse' : 'Weight'} (${u.mass})`, xL + 7, (yT + yB) / 2, { align: 'center', angle: 90 });
+    doc.text(`${fr ? 'Masse' : 'Weight'} (${u.mass})`, xL + 2.5, (yT + yB) / 2, { align: 'center', angle: 90 });
 
     // Enveloppe (polygone rempli + trait bleu).
     const pts = c.wb.envelope.map(([m, a]) => [xOf(a), yOf(m)]);
@@ -1098,7 +1099,7 @@ function _drawCentroChart(doc, c, xL, xR, yT, CH) {
         const w = doc.getTextWidth(q.lab);
         let side = q.side;
         if (side === 'right' && x + 8 + w > xR - 2) side = 'left';
-        else if (side === 'left' && x - 6 - w < xL + 2) side = 'right';
+        else if (side === 'left' && x - 6 - w < xL + 13) side = 'right';   // bande du titre « Masse »
         return { x, y, w, side, lab: q.lab, col: q.col };
     });
     for (const side of ['right', 'left']) {
