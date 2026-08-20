@@ -20,8 +20,20 @@ import {
     addAircraft, updateAircraft, deleteAircraft,
 } from './aircraft-fleet.js';
 import { searchAircraft } from './aircraft-database.js';
+import {
+    defaultStations, computeWb, resolveLoads, mountWbChart,
+    armToMm, armFromMm, massToKg, massFromKg, armDecimals,
+} from './wb-core.js';
 
 let _onCloseCallback = null;
+
+// Brouillon du bloc centrage en cours d'édition (valeurs saisies dans les
+// UNITÉS D'AFFICHAGE de l'avion, converties en kg/mm à l'enregistrement).
+// _wbTouched : la section a été ouverte/modifiée — seules alors les
+// modifications du bloc sont enregistrées (sinon l'existant est préservé).
+let _wbDraft = null;
+let _wbTouched = false;
+let _wbPreviewDispose = null;
 
 /**
  * Ouvre le modal de gestion de la flotte.
@@ -29,6 +41,8 @@ let _onCloseCallback = null;
  */
 export function openFleetManager(onClose) {
     _onCloseCallback = onClose || null;
+    _wbDraft = null;
+    _wbTouched = false;
     _ensureModal();
     _render();
     document.getElementById('fleet-overlay').style.display = 'flex';
@@ -102,7 +116,7 @@ function _render() {
         html += `
             <div class="fleet-item ${isActive ? 'fleet-item-active' : ''}" data-id="${ac.id}">
                 <div class="fleet-item-info">
-                    <div class="fleet-item-name">${_esc(ac.name)} ${ac.registration ? `<span class="fleet-item-reg">(${_esc(ac.registration)})</span>` : ''}</div>
+                    <div class="fleet-item-name">${_esc(ac.name)} ${ac.registration ? `<span class="fleet-item-reg">(${_esc(ac.registration)})</span>` : ''}${ac.wb ? ` <span class="fleet-wb-badge" title="${isFr ? 'Centrage configuré' : 'Weight & balance configured'}">${isFr ? 'centrage' : 'W&B'}</span>` : ''}</div>
                     <div class="fleet-item-stats">
                         <span title="${isFr ? 'Roulement au niveau mer/ISA' : 'Ground roll at SL/ISA'}">${ac.groundRoll} ft</span>
                         <span>·</span>
@@ -153,6 +167,14 @@ function _render() {
                 <label>${isFr ? 'Vitesse croisière (kt)' : 'Cruise speed (kt)'}<input type="number" id="fleet-cruise" placeholder="110" min="0" step="5"></label>
                 <label>${isFr ? 'Conso croisière (L/h)' : 'Cruise burn (L/h)'}<input type="number" id="fleet-burn" placeholder="35" min="0" step="1"></label>
             </div>
+            <details class="fleet-wb" id="fleet-wb-section">
+                <summary>
+                    <i data-lucide="scale" class="icon-sm"></i>
+                    <span>${isFr ? 'Centrage' : 'Weight & balance'}</span>
+                    <span class="fleet-wb-state" id="fleet-wb-state"></span>
+                </summary>
+                <div class="fleet-wb-body" id="fleet-wb-body"></div>
+            </details>
             <div class="fleet-form-hint">
                 <i data-lucide="info"></i>
                 <span>${isFr
@@ -169,6 +191,12 @@ function _render() {
 
     content.innerHTML = html;
     if (window.lucide) window.lucide.createIcons({ root: content });
+
+    // Le re-render complet repart d'un formulaire vierge : le brouillon
+    // centrage repart à défaut (sauf _fillForm juste après, mode édition).
+    if (!_wbDraft) _wbDraft = _defaultWbDraft();
+    _wbTouched = false;
+    _renderWbSection();
 
     // --- Branchement des actions ---
     content.querySelectorAll('[data-action]').forEach(btn => {
@@ -289,6 +317,10 @@ function _fillForm(id) {
     document.getElementById('fleet-cruise').value = ac.cruiseSpeedKt || '';
     document.getElementById('fleet-burn').value = ac.fuelBurnLph || '';
 
+    _wbDraft = ac.wb ? _wbDraftFrom(ac) : _defaultWbDraft();
+    _wbTouched = false;
+    _renderWbSection();
+
     document.getElementById('fleet-form-title').textContent = isFr ? 'Modifier l\'avion' : 'Edit aircraft';
     document.getElementById('fleet-cancel-form').style.display = 'inline-block';
 }
@@ -307,6 +339,9 @@ function _resetForm() {
     document.getElementById('fleet-50ft').value = '';
     document.getElementById('fleet-cruise').value = '';
     document.getElementById('fleet-burn').value = '';
+    _wbDraft = _defaultWbDraft();
+    _wbTouched = false;
+    _renderWbSection();
     document.getElementById('fleet-form-title').textContent = isFr ? 'Ajouter un avion' : 'Add an aircraft';
     document.getElementById('fleet-cancel-form').style.display = 'none';
     const errEl = document.getElementById('fleet-form-error');
@@ -324,6 +359,249 @@ function _formError(msg) {
     if (!el) return;
     el.textContent = msg;
     document.getElementById('fleet-name')?.focus();
+}
+
+/* ----------------------------------------------------------------
+ * Section CENTRAGE du formulaire : brouillon en unités d'affichage
+ * (celles de l'avion), converti en kg/mm à l'enregistrement.
+ * ---------------------------------------------------------------- */
+
+/** Brouillon vierge : unités kg/mm, postes standards, enveloppe vide. */
+function _defaultWbDraft() {
+    return {
+        units: { mass: 'kg', arm: 'mm' },
+        emptyMass: '', emptyArm: '', mtow: '', density: '0.72',
+        stations: defaultStations().map(s => ({ ...s, arm: '', max: '' })),
+        envelope: [],
+    };
+}
+
+/** Brouillon initialisé depuis le bloc wb existant d'un avion (converti). */
+function _wbDraftFrom(ac) {
+    const wb = ac.wb, u = wb.units;
+    const d = _defaultWbDraft();
+    d.units = { mass: u.mass, arm: u.arm };
+    d.emptyMass = String(+massFromKg(wb.emptyMassKg, u.mass).toFixed(1));
+    d.emptyArm = String(+armFromMm(wb.emptyArmMm, u.arm).toFixed(armDecimals(u.arm)));
+    d.mtow = wb.mtowKg ? String(Math.round(massFromKg(wb.mtowKg, u.mass))) : '';
+    d.density = String(wb.fuelDensity);
+    d.stations = wb.stations.map(s => ({
+        name: s.name, fuel: !!s.fuel,
+        arm: String(+armFromMm(s.armMm, u.arm).toFixed(armDecimals(u.arm))),
+        max: s.maxKg ? String(Math.round(massFromKg(s.maxKg, u.mass))) : '',
+    }));
+    d.envelope = wb.envelope.map(([m, a]) => [
+        +massFromKg(m, u.mass).toFixed(1),
+        +armFromMm(a, u.arm).toFixed(armDecimals(u.arm)),
+    ]);
+    return d;
+}
+
+/** Parse un nombre saisi (accepte la virgule décimale). */
+function _num(v) { return parseFloat(String(v ?? '').replace(',', '.')); }
+
+/**
+ * Convertit le brouillon en bloc interne kg/mm. null si le bloc est
+ * incomplet (masse à vide manquante ou enveloppe < 3 points) — le
+ * sanitize de aircraft-fleet.js revalidera à l'enregistrement.
+ */
+function _draftToWb() {
+    const d = _wbDraft;
+    if (!d) return null;
+    const u = d.units;
+    const em = _num(d.emptyMass), ea = _num(d.emptyArm);
+    if (!isFinite(em) || em <= 0 || !isFinite(ea)) return null;
+    const envelope = d.envelope
+        .map(p => [_num(p[0]), _num(p[1])])
+        .filter(p => isFinite(p[0]) && p[0] > 0 && isFinite(p[1]))
+        .map(p => [massToKg(p[0], u.mass), armToMm(p[1], u.arm)]);
+    if (envelope.length < 3) return null;
+    const stations = d.stations
+        .map(s => ({ name: String(s.name || '').trim() || 'Poste', fuel: !!s.fuel,
+                     arm: _num(s.arm), max: _num(s.max) }))
+        .map(s => ({ name: s.name, fuel: s.fuel,
+                     armMm: isFinite(s.arm) ? armToMm(s.arm, u.arm) : NaN,
+                     maxKg: (isFinite(s.max) && s.max > 0) ? massToKg(s.max, u.mass) : null }))
+        .filter(s => isFinite(s.armMm));
+    if (stations.length < 1) return null;
+    const mt = _num(d.mtow), de = _num(d.density);
+    return {
+        units: { mass: u.mass, arm: u.arm },
+        emptyMassKg: massToKg(em, u.mass), emptyArmMm: armToMm(ea, u.arm),
+        mtowKg: (isFinite(mt) && mt > 0) ? massToKg(mt, u.mass) : null,
+        fuelDensity: (isFinite(de) && de > 0.5 && de < 1.2) ? de : 0.72,
+        envelope, stations,
+    };
+}
+
+/** Rend le corps de la section Centrage depuis le brouillon. */
+function _renderWbSection() {
+    const body = document.getElementById('fleet-wb-body');
+    if (!body || !_wbDraft) return;
+    const isFr = state.lang === 'fr';
+    const d = _wbDraft;
+    const u = d.units;
+
+    const stRows = d.stations.map((s, i) => `
+        <div class="wb-tbl-row" data-i="${i}">
+            <input class="wb-st-name" type="text" maxlength="24" value="${_esc(s.name)}" placeholder="${isFr ? 'poste' : 'station'}">
+            <input class="wb-st-arm" type="number" step="any" value="${s.arm}" placeholder="—">
+            <input class="wb-st-max" type="number" step="any" value="${s.max}" placeholder="—">
+            <button class="wb-del" data-del="st" data-i="${i}" title="${isFr ? 'Supprimer' : 'Delete'}">×</button>
+        </div>`).join('');
+    const envRows = d.envelope.map((p, i) => `
+        <div class="wb-tbl-row" data-i="${i}">
+            <input class="wb-env-m" type="number" step="any" value="${p[0]}" placeholder="${isFr ? 'masse' : 'mass'}">
+            <input class="wb-env-a" type="number" step="any" value="${p[1]}" placeholder="${isFr ? 'bras' : 'arm'}">
+            <button class="wb-del" data-del="env" data-i="${i}" title="${isFr ? 'Supprimer' : 'Delete'}">×</button>
+        </div>`).join('');
+
+    body.innerHTML = `
+        <div class="fleet-wb-row fleet-wb-units">
+            <label>${isFr ? 'Unité masse' : 'Mass unit'}
+                <select id="wb-mass-unit">${['kg', 'lbs'].map(v => `<option value="${v}" ${u.mass === v ? 'selected' : ''}>${v}</option>`).join('')}</select>
+            </label>
+            <label>${isFr ? 'Unité bras' : 'Arm unit'}
+                <select id="wb-arm-unit">${['mm', 'm', 'ft', 'in'].map(v => `<option value="${v}" ${u.arm === v ? 'selected' : ''}>${v}</option>`).join('')}</select>
+            </label>
+            <span class="fleet-wb-note">${isFr ? 'stockage interne : kg / mm' : 'internal storage: kg / mm'}</span>
+        </div>
+        <div class="fleet-wb-row fleet-wb-4">
+            <label>${isFr ? 'Masse à vide' : 'Empty weight'} (<span class="wb-mu">${u.mass}</span>)<input type="number" step="any" id="wb-empty-mass" value="${d.emptyMass}" placeholder="628"></label>
+            <label>${isFr ? 'CG à vide' : 'Empty CG'} (<span class="wb-au">${u.arm}</span>)<input type="number" step="any" id="wb-empty-arm" value="${d.emptyArm}" placeholder="295"></label>
+            <label>MTOW (<span class="wb-mu">${u.mass}</span>)<input type="number" step="any" id="wb-mtow" value="${d.mtow}" placeholder="${isFr ? 'option' : 'optional'}"></label>
+            <label>${isFr ? 'Densité carb. (kg/L)' : 'Fuel density (kg/L)'}<input type="number" step="0.01" id="wb-density" value="${d.density}" placeholder="0.72"></label>
+        </div>
+        <div class="fleet-wb-grid">
+            <div>
+                <div class="fleet-wb-sub">${isFr ? 'Postes de chargement' : 'Load stations'}</div>
+                <div class="wb-tbl-head"><span>${isFr ? 'nom' : 'name'}</span><span>${isFr ? 'bras' : 'arm'} (${u.arm})</span><span>max (${u.mass})</span><span></span></div>
+                <div id="wb-stations">${stRows || `<div class="wb-empty-note">${isFr ? 'aucun poste' : 'no station'}</div>`}</div>
+                <button class="wb-add" id="wb-add-station">+ ${isFr ? 'Ajouter un poste' : 'Add station'}</button>
+            </div>
+            <div>
+                <div class="fleet-wb-sub">${isFr ? 'Enveloppe de centrage' : 'CG envelope'}</div>
+                <div class="wb-tbl-head"><span>${isFr ? `masse (${u.mass})` : `mass (${u.mass})`}</span><span>${isFr ? `bras (${u.arm})` : `arm (${u.arm})`}</span><span></span></div>
+                <div id="wb-envelope">${envRows || `<div class="wb-empty-note">${isFr ? 'aucun point' : 'no point'}</div>`}</div>
+                <button class="wb-add" id="wb-add-point">+ ${isFr ? 'Point' : 'Point'}</button>
+                <div class="fleet-wb-note">${isFr ? 'polygone fermé (sens horaire)' : 'closed polygon (clockwise)'}</div>
+            </div>
+        </div>
+        <div class="fleet-wb-sub">${isFr ? 'Aperçu du centrogramme' : 'Centrogram preview'}</div>
+        <div id="wb-preview" class="wb-preview"></div>
+    `;
+
+    // La section dépliée (ou modifiée) marque le brouillon comme touché :
+    // c'est seulement alors que l'enregistrement écrit le bloc wb.
+    const details = document.getElementById('fleet-wb-section');
+    if (details) details.addEventListener('toggle', () => { if (details.open) _wbTouched = true; });
+
+    // Unités : convertit les valeurs du brouillon vers la nouvelle unité.
+    const convertDraftUnits = () => {
+        const oldArm = u.arm, oldMass = u.mass;
+        const newArm = body.querySelector('#wb-arm-unit').value;
+        const newMass = body.querySelector('#wb-mass-unit').value;
+        if (newArm === oldArm && newMass === oldMass) return;
+        const convArm = v => (v === '' || v == null || !isFinite(_num(v))) ? v
+            : String(+armFromMm(armToMm(_num(v), oldArm), newArm).toFixed(armDecimals(newArm)));
+        const convMass = v => (v === '' || v == null || !isFinite(_num(v))) ? v
+            : String(+massFromKg(massToKg(_num(v), oldMass), newMass).toFixed(1));
+        u.arm = newArm; u.mass = newMass;
+        d.emptyMass = convMass(d.emptyMass);
+        d.emptyArm = convArm(d.emptyArm);
+        d.mtow = convMass(d.mtow);
+        for (const s of d.stations) { s.arm = convArm(s.arm); s.max = convMass(s.max); }
+        d.envelope = d.envelope.map(p => [_num(p[0]) || 0, _num(p[1]) || 0])
+            .map(([m, a]) => [+massFromKg(massToKg(m, oldMass), newMass).toFixed(1),
+                              +armFromMm(armToMm(a, oldArm), newArm).toFixed(armDecimals(newArm))]);
+        _wbTouched = true;
+        _renderWbSection();
+    };
+    body.querySelector('#wb-mass-unit').addEventListener('change', convertDraftUnits);
+    body.querySelector('#wb-arm-unit').addEventListener('change', convertDraftUnits);
+
+    // Champs simples : maj du brouillon + aperçu (sans re-render).
+    const bind = (sel, prop) => {
+        const el = body.querySelector(sel);
+        if (el) el.addEventListener('input', () => {
+            d[prop] = el.value;
+            _wbTouched = true;
+            _refreshWbPreview();
+        });
+    };
+    bind('#wb-empty-mass', 'emptyMass');
+    bind('#wb-empty-arm', 'emptyArm');
+    bind('#wb-mtow', 'mtow');
+    bind('#wb-density', 'density');
+
+    // Lignes postes / enveloppe : saisie en place (délégué), suppression.
+    const stationsEl = body.querySelector('#wb-stations');
+    stationsEl.addEventListener('input', (e) => {
+        const row = e.target.closest('.wb-tbl-row');
+        const s = d.stations[parseInt(row?.dataset.i, 10)];
+        if (!s) return;
+        if (e.target.classList.contains('wb-st-name')) s.name = e.target.value;
+        if (e.target.classList.contains('wb-st-arm')) s.arm = e.target.value;
+        if (e.target.classList.contains('wb-st-max')) s.max = e.target.value;
+        _wbTouched = true;
+        _refreshWbPreview();
+    });
+    const envEl = body.querySelector('#wb-envelope');
+    envEl.addEventListener('input', (e) => {
+        const row = e.target.closest('.wb-tbl-row');
+        const p = d.envelope[parseInt(row?.dataset.i, 10)];
+        if (!p) return;
+        if (e.target.classList.contains('wb-env-m')) p[0] = e.target.value;
+        if (e.target.classList.contains('wb-env-a')) p[1] = e.target.value;
+        _wbTouched = true;
+        _refreshWbPreview();
+    });
+    body.addEventListener('click', (e) => {
+        if (!e.target.classList.contains('wb-del')) return;
+        const i = parseInt(e.target.dataset.i, 10);
+        if (e.target.dataset.del === 'st') d.stations.splice(i, 1);
+        else d.envelope.splice(i, 1);
+        _wbTouched = true;
+        _renderWbSection();
+    });
+    body.querySelector('#wb-add-station')?.addEventListener('click', () => {
+        d.stations.push({ name: '', fuel: false, arm: '', max: '' });
+        _wbTouched = true;
+        _renderWbSection();
+    });
+    body.querySelector('#wb-add-point')?.addEventListener('click', () => {
+        d.envelope.push(['', '']);
+        _wbTouched = true;
+        _renderWbSection();
+    });
+
+    _refreshWbPreview();
+}
+
+/** Met à jour l'aperçu du centrogramme et l'état « configuré ». */
+function _refreshWbPreview() {
+    const stateEl = document.getElementById('fleet-wb-state');
+    const host = document.getElementById('wb-preview');
+    const isFr = state.lang === 'fr';
+    const internal = _draftToWb();
+    if (stateEl) {
+        stateEl.textContent = internal
+            ? (isFr ? '· configuré' : '· configured')
+            : (isFr ? '· non configuré' : '· not configured');
+        stateEl.classList.toggle('ok', !!internal);
+    }
+    if (!host) return;
+    if (_wbPreviewDispose) { _wbPreviewDispose(); _wbPreviewDispose = null; }
+    if (!internal) {
+        host.innerHTML = `<div class="wb-preview-empty">${isFr
+            ? 'Complétez la masse à vide, le CG à vide et au moins 3 points d\'enveloppe pour afficher le centrogramme.'
+            : 'Fill in empty weight, empty CG and at least 3 envelope points to display the chart.'}</div>`;
+        return;
+    }
+    const editId = document.getElementById('fleet-edit-id')?.value;
+    const loads = editId ? resolveLoads(editId, state._lastNavPlan?.plan) : { masses: {}, fuelL: 0, burnL: 0 };
+    const calc = computeWb(internal, loads);
+    _wbPreviewDispose = mountWbChart(host, internal, calc, isFr, { hidePointLabels: false });
 }
 
 /**
@@ -345,6 +623,10 @@ function _doSave() {
         return;
     }
 
+    // Champs optionnels : vides → null (retour aux défauts du planificateur).
+    const cruise = document.getElementById('fleet-cruise').value.trim();
+    const burn = document.getElementById('fleet-burn').value.trim();
+
     const data = {
         name,
         registration: document.getElementById('fleet-reg').value.trim(),
@@ -352,7 +634,12 @@ function _doSave() {
         safetyMargin: document.getElementById('fleet-margin').value,
         groundRoll: roll,
         fiftyFt: ft50,
+        cruiseSpeedKt: cruise || null,
+        fuelBurnLph: burn || null,
     };
+    // Bloc centrage : écrit seulement si la section a été touchée — sinon
+    // l'édition d'un autre champ préserve la configuration existante.
+    if (_wbTouched) data.wb = _draftToWb();
 
     const editId = document.getElementById('fleet-edit-id').value;
     if (editId) {

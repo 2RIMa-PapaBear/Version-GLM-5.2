@@ -48,6 +48,26 @@ describe('flotte — vitesse/conso de croisière', () => {
         assert.equal(up.cruiseSpeedKt, 95);
         assert.equal(up.fuelBurnLph, null);
     });
+
+    // Régression _doSave() du modal flotte : les inputs vitesse/conso existaient
+    // mais n'étaient pas lus à l'enregistrement (valeurs perdues en ajout,
+    // modifications ignorées en édition).
+    test('jeu complet du formulaire flotte : strings → nombres, vides → null', () => {
+        // Ajout : .value des inputs (chaînes) converties par _sanitize.
+        const ac = fleet.addAircraft({
+            name: 'DR400', groundRoll: '500', fiftyFt: '1100', safetyMargin: '20',
+            cruiseSpeedKt: '105', fuelBurnLph: '22',
+        });
+        assert.equal(ac.cruiseSpeedKt, 105);
+        assert.equal(ac.fuelBurnLph, 22);
+        // Édition : champ vidé volontairement → null (retour aux défauts).
+        const up = fleet.updateAircraft(ac.id, {
+            name: 'DR400', groundRoll: '500', fiftyFt: '1100', safetyMargin: '20',
+            cruiseSpeedKt: '', fuelBurnLph: null,
+        });
+        assert.equal(up.cruiseSpeedKt, null);
+        assert.equal(up.fuelBurnLph, null);
+    });
 });
 
 describe('flotte — régression id (bug updateAircraft)', () => {

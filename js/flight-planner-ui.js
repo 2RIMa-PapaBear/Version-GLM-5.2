@@ -3,6 +3,7 @@ import { getAirportByICAO, enrichAirport } from './ui-module.js';
 import { getActiveAircraftId, getActiveAircraft, getFleet, updateAircraft } from './aircraft-fleet.js';
 import { getActiveRunwayNameForIcao, evaluateTakeoffFromRaw, getAircraftRef } from './takeoff-performance.js';
 import { drawNavLogPdf } from './navlog-pdf.js';
+import { computeWb, resolveLoads } from './wb-core.js';
 import { makeCollapsible } from './collapsible.js';
 import { computeFlightPlan, computeMultiLegFlightPlan, getDefaultAircraftPerf, greatCircleDistanceNm, RESERVES } from './flight-planner.js';
 import { getActiveRunwaySurfaceInfo, isSoftSurface } from './runway-surface.js';
@@ -350,12 +351,26 @@ async function _generateNavLogPdf() {
     }
     const perf = { isFr: isFr3, fromIcao, toIcao, runway, takeoff, profile, alternates };
 
+    // Centrage : si l'avion actif a un bloc wb configuré (fenêtre Flotte),
+    // la page 4 « Centrage » est ajoutée — chargement mémorisé s'il existe,
+    // sinon carburant embarqué / essence consommée pré-remplis du plan.
+    let centro = null;
+    if (ac?.wb) {
+        const loads = resolveLoads(ac.id, plan);
+        centro = {
+            isFr: isFr3, fromIcao,
+            reg: ac.registration || ac.name, type: ac.type || '',
+            wb: ac.wb, calc: computeWb(ac.wb, loads),
+            fuelL: loads.fuelL, burnL: loads.burnL,
+        };
+    }
+
     const doc = drawNavLogPdf(window.jspdf.jsPDF, {
         isFr: state.lang === 'fr',
         aircraftType: ac.type || '', aircraftReg: ac.registration || '',
         qnh, windDir, windKt, runway,
         distanceNm: totalNm ?? '', timeLabel,
-        metarRaw, rows, calc, perf,
+        metarRaw, rows, calc, perf, centro,
     });
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     doc.save(`Log-nav_${fromIcao}-${toIcao}_${today}.pdf`);

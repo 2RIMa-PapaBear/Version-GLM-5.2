@@ -30,7 +30,8 @@ const EXPECT = {
     2: ['Calcul de navigation', 'CAP MAGNÉTIQUE', 'VENT À 3500 FT', 'TOTAL', 'DÉTAIL DES WAYPOINTS'],
     3: ['Performances et terrain', 'PERFORMANCES DE DÉCOLLAGE — LFPB · RWY 28', 'ROULEMENT', 'FRANCH. 50 FT',
         'DENSITÉ-ALT.', 'RÉF. AVION (M)', 'LONGUEUR PISTE', 'REVÊTEMENT', 'Herbe +15 %', 'MARGE (50 FT)',
-        '+605 m', 'PROFIL D’ÉLÉVATION — LFPB - LFRM'.replace('’', "'"), 'ALTERNATES LE LONG DE LA ROUTE (± 50 NM)',
+        '+605 m', 'Roulement 280 m', 'Franch. 50 ft : 495 m', 'Marge +605 m · piste 1100 m',
+        'PROFIL D’ÉLÉVATION — LFPB - LFRM'.replace('’', "'"), 'ALTERNATES LE LONG DE LA ROUTE (± 50 NM)',
         'Terrain', 'LFPT', 'Pontoise-Cormeilles', '14 NM D', 'LFOB', '3500 ft'],
 };
 
@@ -42,7 +43,8 @@ const EXPECT_EN = {
         'Notes:', 'MSA', 'ETA', 'ATA', 'Cruise check', 'Turning point check', 'Downwind check', 'Fuel'],
     2: ['Flight plan', 'MAGNETIC HEADING', 'WIND AT 3500 FT', 'TOTAL', 'LEG DETAILS'],
     3: ['Performance & terrain', 'TAKEOFF PERFORMANCE — LFPB · RWY 28', 'GROUND ROLL', '50 FT OBSTACLE',
-        'DENSITY ALT.', 'ELEVATION PROFILE — LFPB - LFRM', 'EN-ROUTE ALTERNATES (± 50 NM)',
+        'DENSITY ALT.', 'Roll 280 m', '50 ft obstacle : 495 m', 'Margin +605 m · runway 1100 m',
+        'ELEVATION PROFILE — LFPB - LFRM', 'EN-ROUTE ALTERNATES (± 50 NM)',
         'AIRFIELD', '14 NM D', '3500 ft'],
 };
 
@@ -59,18 +61,28 @@ function makeRecordingCtor(store) {
             let bx = x;
             if (opt?.align === 'right') bx = x - w;
             else if (opt?.align === 'center') bx = x - w / 2;
-            store.push({
-                s, page: doc.internal.getCurrentPageInfo().pageNumber,
-                x: bx, w, size,
-                top: y - size * 0.72, bot: y + size * 0.20,   // boîte approchée autour de la baseline
-            });
+            if (opt?.angle) {
+                // Texte tourné (titre d'axe Y, angle 90) : la largeur devient
+                // verticale — la boîte horizontale se réduit à la hauteur de police.
+                store.push({
+                    s, page: doc.internal.getCurrentPageInfo().pageNumber,
+                    x: x - size * 0.36, w: size * 0.72, size,
+                    top: y - w / 2, bot: y + w / 2,
+                });
+            } else {
+                store.push({
+                    s, page: doc.internal.getCurrentPageInfo().pageNumber,
+                    x: bx, w, size,
+                    top: y - size * 0.72, bot: y + size * 0.20,   // boîte approchée autour de la baseline
+                });
+            }
             return origText(text, x, y, opt);
         };
         return doc;
     };
 }
 
-function runQa(sample, label, extra, expect = EXPECT) {
+function runQa(sample, label, extra, expect = EXPECT, wantPages = '1,2,3') {
     console.log(`\n===== ${label} =====`);
     const calls = [];
     drawNavLogPdf(makeRecordingCtor(calls), sample);
@@ -78,7 +90,7 @@ function runQa(sample, label, extra, expect = EXPECT) {
     const byPage = (p) => calls.filter(c => c.page === p);
     const pages = [...new Set(calls.map(c => c.page))].sort();
     console.log(`pages dessinées : ${pages.join(', ')}`);
-    if (pages.join(',') !== '1,2,3') ko('attendu 3 pages');
+    if (pages.join(',') !== wantPages) ko(`attendu ${wantPages} pages`);
 
     for (const p of pages) {
         const items = byPage(p).filter(i => i.s.trim());
@@ -155,6 +167,20 @@ en.isFr = false;
 en.calc.isFr = false;
 en.perf.isFr = false;
 runQa(en, 'FIXTURE 2 waypoints — ANGLAIS', null, EXPECT_EN);
+
+// Passe CENTRO : avion actif configuré (bloc wb) → 4e page « Centrage ».
+const centro = JSON.parse(fs.readFileSync(path.join(root, 'test', 'fixtures-navlog-sample-centro.json'), 'utf8'));
+const EXPECT_CENTRO = {
+    ...EXPECT,
+    4: ['Centrage', 'CHARGEMENT', 'POSTE', 'BRAS (MM)', 'MASSE (KG)', 'MOMENT',
+        'Masse à vide', 'TOTAL — CG décollage : 428 mm',
+        'Essence consommée estimée (plan de nav) : 41 L',
+        'CENTROGRAMME — ENVELOPPE DE CENTRAGE', 'Bras de levier (mm)', 'Masse (kg)',
+        'Décollage 1 010 · 428', 'Arrivée 980 · 432', 'ZFW 938 · 438', 'Vide 628 · 295',
+        'MTOW 1 100 kg', 'CG DÉCOLLAGE', 'CG ARRIVÉE', 'CG ZÉRO CARBURANT',
+        'MASSE DÉCOLLAGE', 'Dans les limites'],
+};
+runQa(centro, 'FIXTURE 2 waypoints — CENTRAGE (page 4)', null, EXPECT_CENTRO, '1,2,3,4');
 
 console.log(failures ? `\n${failures} ÉCHEC(S)` : '\nTOUT OK');
 process.exit(failures ? 1 : 0);
