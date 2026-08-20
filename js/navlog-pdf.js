@@ -955,7 +955,7 @@ function _drawCentroPage(doc, c) {
 
     // ---- Section 2 : centrogramme ----
     y = _section(doc, L, R, fr ? 'Centrogramme — enveloppe de centrage' : 'Centrogram — CG envelope', y);
-    y = _drawCentroChart(doc, c, L + 40, R - 40, y + 2, 150);
+    y = _drawCentroChart(doc, c, L + 46, R - 40, y + 2, 150);
 
     // ---- Cellules résultats ----
     y = _section(doc, L, R, null, y + 2);
@@ -1052,7 +1052,7 @@ function _drawCentroChart(doc, c, xL, xR, yT, CH) {
         _setInk(doc, MUTED);
         const yLab = fmtM(mMin + (mMax - mMin) * i / 4);
         maxYLabW = Math.max(maxYLabW, doc.getTextWidth(yLab));
-        doc.text(yLab, xL - 12, gy + 2.2, { align: 'right' });   // laisse le couloir du titre
+        doc.text(yLab, xL - 5, gy + 2.2, { align: 'right' });   // comme à l'écran (xL-5)
         const gx = xL + (i / 4) * plotW;
         doc.line(gx, yT, gx, yB);
         doc.text(fmtA(aMin + (aMax - aMin) * i / 4), gx, yB + 8, { align: 'center' });
@@ -1061,11 +1061,11 @@ function _drawCentroChart(doc, c, xL, xR, yT, CH) {
     doc.line(xL, yT, xL, yB); doc.line(xL, yB, xR, yB);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(7); _setInk(doc, MUTED);
     doc.text(`${fr ? 'Bras de levier' : 'Arm'} (${u.arm})`, (xL + xR) / 2, yB + 19, { align: 'center' });
-    // Titre de l'axe masse VERTICAL, CENTRÉ dans le couloir entre le bord
-    // gauche du cadre du graphe (xL) et le début des labels de graduations
-    // (reculés à xL-12 pour lui faire sa place) : à égale distance des deux.
-    doc.setFontSize(6.5);
-    doc.text(`${fr ? 'Masse' : 'Weight'} (${u.mass})`, xL - 6, (yT + yB) / 2, { align: 'center', angle: 90 });
+    // Titre de l'axe masse VERTICAL, À GAUCHE des labels de graduations
+    // — GÉOMÉTRIE UNIFIÉE AVEC L'ÉCRAN (wbChartSvg) : graduations finissant
+    // à xL-5 du graphe, titre à ~10 pt avant leur début, taille 7 pt.
+    doc.setFontSize(7);
+    doc.text(`${fr ? 'Masse' : 'Weight'} (${u.mass})`, xL - 5 - maxYLabW - 10, (yT + yB) / 2, { align: 'center', angle: 90 });
 
     // Enveloppe (polygone rempli + trait bleu).
     const pts = c.wb.envelope.map(([m, a]) => [xOf(a), yOf(m)]);
