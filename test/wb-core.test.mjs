@@ -263,4 +263,16 @@ describe('wb — intégration flotte (sanitize du bloc)', () => {
         assert.equal(r.takeoff.massKg, 600);
         assert.equal(r.zfw.cgMm, 300);
     });
+
+    test('max des postes standards réinjectés quand vides (Pilote/Pax 130, Bagages 40)', () => {
+        const ac = fleet.addAircraft({
+            name: 'W', groundRoll: 500, fiftyFt: 1100,
+            wb: { ...AC_WB, stations: AC_WB.stations.map(s => ({ ...s, maxKg: null })) },
+        });
+        const byName = Object.fromEntries(ac.wb.stations.map(s => [s.name, s]));
+        assert.equal(byName['Pilote'].maxKg, 130);
+        assert.equal(byName['Passager 2'].maxKg, 130);
+        assert.equal(byName['Bagages'].maxKg, 40);
+        assert.equal(byName['Carburant'].maxKg, null);   // pas de défaut carburant
+    });
 });

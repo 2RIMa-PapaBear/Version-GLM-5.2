@@ -40,17 +40,23 @@ export function massFromKg(v, unit) { return unit === 'lbs' ? v * LB_PER_KG : v;
 /** Arrondi d'affichage raisonnable selon l'unité (m et in → 1 décimale). */
 export function armDecimals(unit) { return unit === 'm' || unit === 'in' ? 1 : 0; }
 
+// Masses maximales par défaut des postes standards (kg), réinjectées au
+// sanitize quand le champ est vide : Pilote/Passagers 130 kg, Bagages 40 kg.
+export const DEFAULT_STATION_MAX_KG = {
+    'pilote': 130, 'passager 1': 130, 'passager 2': 130, 'passager 3': 130, 'bagages': 40,
+};
+
 /**
  * Postes de chargement proposés à la création du bloc centrage d'un
  * avion (nom + bras vide à compléter depuis la fiche de pesée).
  */
 export function defaultStations() {
     return [
-        { name: 'Pilote', armMm: null, maxKg: null, fuel: false },
-        { name: 'Passager 1', armMm: null, maxKg: null, fuel: false },
-        { name: 'Passager 2', armMm: null, maxKg: null, fuel: false },
-        { name: 'Passager 3', armMm: null, maxKg: null, fuel: false },
-        { name: 'Bagages', armMm: null, maxKg: null, fuel: false },
+        { name: 'Pilote', armMm: null, maxKg: 130, fuel: false },
+        { name: 'Passager 1', armMm: null, maxKg: 130, fuel: false },
+        { name: 'Passager 2', armMm: null, maxKg: 130, fuel: false },
+        { name: 'Passager 3', armMm: null, maxKg: 130, fuel: false },
+        { name: 'Bagages', armMm: null, maxKg: 40, fuel: false },
         { name: 'Carburant', armMm: null, maxKg: null, fuel: true },
     ];
 }

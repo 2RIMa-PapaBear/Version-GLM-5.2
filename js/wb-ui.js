@@ -106,10 +106,10 @@ function _render(body, ac, isFr) {
                     <input type="number" step="any" min="0" class="wb-load-in" data-st="${escapeHtml(s.name)}" data-max="${s.maxKg || ''}" value="${loads.masses[s.name] ?? ''}" placeholder="0">
                 </label>`).join('')}
             ${fuelSt ? `
-                <label class="wb-load wb-load-fuel">${isFr ? 'Carburant embarqué (L)' : 'Fuel on board (L)'}
+                <label class="wb-load wb-load-fuel" title="${isFr ? 'Quantité totale embarquée au décollage — pré-remplie du plan de nav (trajet + réserve), modifiable.' : 'Total fuel at takeoff — pre-filled from the nav plan (trip + reserve), editable.'}">${isFr ? 'Carburant embarqué (L)' : 'Fuel on board (L)'}
                     <input type="number" step="any" min="0" id="wb-fuel-l" value="${loads.fuelL || ''}" placeholder="0">
                 </label>
-                <label class="wb-load wb-load-fuel">${isFr ? 'Essence consommée (L)' : 'Fuel burned (L)'}
+                <label class="wb-load wb-load-fuel" title="${isFr ? 'Essence brûlée pendant le vol — le point Arrivée est calculé avec le carburant restant (embarqué − consommée). Pré-remplie du plan de nav (trajet, sans la réserve).' : 'Fuel burned during the flight — the landing point uses the remaining fuel (on board − burned). Pre-filled from the nav plan (trip, no reserve).'}">${isFr ? 'Essence consommée en vol (L)' : 'Fuel burned in flight (L)'}
                     <input type="number" step="any" min="0" id="wb-burn-l" value="${loads.burnL || ''}" placeholder="0">
                 </label>` : ''}
         </div>
@@ -117,8 +117,8 @@ function _render(body, ac, isFr) {
         <div class="wb-note">
             <i data-lucide="info" style="width:11px;height:11px;vertical-align:middle;"></i>
             ${isFr
-                ? 'Carburant et essence consommée pré-remplis du plan de nav (modifiables). Enveloppe, postes et masse à vide : fenêtre Flotte.'
-                : 'Fuel and burn pre-filled from the nav plan (editable). Envelope, stations and empty weight: Fleet window.'}
+                ? 'Carburant embarqué et essence consommée en vol pré-remplis du plan de nav (modifiables). Point Arrivée = carburant embarqué − essence consommée. Enveloppe, postes et masse à vide : fenêtre Flotte.'
+                : 'Fuel on board and fuel burned in flight pre-filled from the nav plan (editable). Landing point = fuel on board − fuel burned. Envelope, stations and empty weight: Fleet window.'}
         </div>
     `;
     if (window.lucide) window.lucide.createIcons({ root: body });
@@ -158,20 +158,17 @@ function _recalc(body, ac, isFr) {
     const host = body.querySelector('.wb-chart-host');
     if (host) _chartDispose = mountWbChart(host, wb, calc, isFr);
 
-    // Résultats : Décollage (vert) / Arrivée (orange) / ZFW (rouge).
+    // Résultats : Décollage (vert) / Arrivée (orange) / ZFW (rouge) — masse
+    // et CG seuls (le bandeau verdict ci-dessous porte marges et alertes).
     const burnL = Math.round(calc.burnKg / (wb.fuelDensity || 0.72));
-    const mkLine = (label, p, verdict) => {
+    const mkLine = (label, p) => {
         const cgTxt = p.cgMm == null ? '—' : `${_a(p.cgMm, u.arm)} ${u.arm}`;
-        const massTxt = `${_m(p.massKg, u.mass)} ${u.mass}`;
-        const extra = verdict.inside
-            ? ` · ${isFr ? 'av' : 'fwd'} ${Math.round(armFromMm(verdict.fwdMm, u.arm))} / ${isFr ? 'ar' : 'aft'} ${Math.round(armFromMm(verdict.aftMm, u.arm))} ${u.arm}`
-            : ` — <b class="wb-out">${isFr ? 'HORS ENVELOPPE' : 'OUT OF ENVELOPE'}</b>`;
-        return `<b>${label}</b> ${massTxt} · CG ${cgTxt}${extra}`;
+        return `<b>${label}</b> ${_m(p.massKg, u.mass)} ${u.mass} · CG ${cgTxt}`;
     };
     const set = (sel, html) => { const el = body.querySelector(sel); if (el) el.innerHTML = html; };
-    set('#wb-res-to', mkLine(isFr ? 'Décollage :' : 'Takeoff:', calc.takeoff, calc.points.takeoff));
-    set('#wb-res-ar', mkLine(isFr ? `Arrivée (−${burnL} L) :` : `Landing (−${burnL} L):`, calc.arrival, calc.points.arrival));
-    set('#wb-res-zf', mkLine(isFr ? 'ZFW (zéro carburant) :' : 'ZFW (zero fuel):', calc.zfw, calc.points.zfw));
+    set('#wb-res-to', mkLine(isFr ? 'Décollage :' : 'Takeoff:', calc.takeoff));
+    set('#wb-res-ar', mkLine(isFr ? `Arrivée (−${burnL} L) :` : `Landing (−${burnL} L):`, calc.arrival));
+    set('#wb-res-zf', mkLine(isFr ? 'ZFW (zéro carburant) :' : 'ZFW (zero fuel):', calc.zfw));
 
     // Bandeau verdict.
     const vEl = body.querySelector('#wb-verdict');
