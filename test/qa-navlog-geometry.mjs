@@ -176,7 +176,7 @@ const EXPECT_CENTRO = {
         'Masse à vide', 'TOTAL — CG décollage : 428 mm',
         'Essence consommée estimée (plan de nav) : 41 L',
         'CENTROGRAMME — ENVELOPPE DE CENTRAGE', 'Bras de levier (mm)', 'Masse (kg)',
-        'Décollage 1 010 · 428', 'Arrivée 980 · 432', 'ZFW 938 · 438',
+        'Décollage 1 010 kg', 'Arrivée 980 kg', 'ZFW 938 kg',
         'MTOW 1 100 kg', 'CG DÉCOLLAGE', 'CG ARRIVÉE', 'CG ZÉRO CARBURANT',
         'MASSE DÉCOLLAGE', 'Dans les limites'],
 };

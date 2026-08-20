@@ -53,11 +53,14 @@ describe('wb — conversions d\'unités (facteurs exacts)', () => {
         assert.equal(wb.armDecimals('ft'), 1);
         assert.equal(wb.armDecimals('mm'), 0);
     });
-    test('étiquettes en mètres : millièmes conservés (CG 0,428 m)', () => {
+    test('étiquettes des points : nom + masse avec unité, sans CG', () => {
         const r = wb.computeWb(AC_WB, LOADS);
-        const svg = wb.wbChartSvg({ ...AC_WB, units: { mass: 'kg', arm: 'm' } }, r, true, 340);
-        assert.ok(svg.includes('0,428'));   // CG décollage 428,4 mm
-        assert.ok(svg.includes('Bras de levier (m)'));
+        const svg = wb.wbChartSvg(AC_WB, r, true, 340);
+        assert.ok(svg.includes('Décollage 1010 kg'));
+        assert.ok(svg.includes('Arrivée 980 kg'));
+        assert.ok(svg.includes('ZFW 938 kg'));
+        assert.ok(!svg.includes('· 428'));              // CG non répété sur le graphe
+        assert.ok(svg.includes('Bras de levier (mm)')); // unités d'axes
     });
 });
 

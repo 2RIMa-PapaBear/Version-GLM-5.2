@@ -1086,9 +1086,9 @@ function _drawCentroChart(doc, c, xL, xR, yT, CH) {
     // déborderait du graphe et décalage vertical entre étiquettes d'un même
     // côté (points proches). Le point « à vide » n'est pas tracé.
     const P = [
-        { p: c.calc.takeoff, col: WB_GREEN, r: 3.2, lab: `${fr ? 'Décollage' : 'Takeoff'} ${fmtM(c.calc.takeoff.massKg)} · ${fmtA(c.calc.takeoff.cgMm)}`, side: 'right' },
-        { p: c.calc.arrival, col: WB_AMBER, r: 2.8, lab: `${fr ? 'Arrivée' : 'Landing'} ${fmtM(c.calc.arrival.massKg)} · ${fmtA(c.calc.arrival.cgMm)}`, side: 'left' },
-        { p: c.calc.zfw, col: WB_RED, r: 2.8, lab: `ZFW ${fmtM(c.calc.zfw.massKg)} · ${fmtA(c.calc.zfw.cgMm)}`, side: 'right' },
+        { p: c.calc.takeoff, col: WB_GREEN, r: 3.2, lab: `${fr ? 'Décollage' : 'Takeoff'} ${fmtM(c.calc.takeoff.massKg)} ${u.mass}`, side: 'right' },
+        { p: c.calc.arrival, col: WB_AMBER, r: 2.8, lab: `${fr ? 'Arrivée' : 'Landing'} ${fmtM(c.calc.arrival.massKg)} ${u.mass}`, side: 'left' },
+        { p: c.calc.zfw, col: WB_RED, r: 2.8, lab: `ZFW ${fmtM(c.calc.zfw.massKg)} ${u.mass}`, side: 'right' },
     ].filter(q => q.p.cgMm != null && isFinite(q.p.cgMm));
     for (const q of P) {
         doc.setFillColor(...q.col);

@@ -334,17 +334,16 @@ export function wbChartSvg(wb, calc, isFr = true, width = 340, opts = {}) {
         return isFr ? s.replace('.', ',') : s;
     };
     const val = (kg) => fmt(massFromKg(kg, L.unitMass));
-    const arm = (mm) => fmt(armFromMm(mm, L.unitArm), armDecimals(L.unitArm));
 
-    // Les 3 points (textes courts : valeurs sans unité) : Décollage/ZFW à
-    // droite, Arrivée à gauche (mise en page validée), avec BASCULE de côté
-    // si l'étiquette déborderait du graphe et décalage vertical de 11 px
-    // entre étiquettes d'un même côté (points proches). Le point « à vide »
-    // n'est pas tracé (échelles calées sur enveloppe + points de vol).
+    // Les 3 points : nom + masse AVEC son unité (le CG n'est pas répété sur
+    // le graphe — il est dans les lignes de résultats / cellules du PDF).
+    // Décollage/ZFW à droite, Arrivée à gauche, avec BASCULE de côté si
+    // l'étiquette déborderait du graphe et décalage vertical de 11 px entre
+    // étiquettes d'un même côté (points proches).
     const defs = [
-        { p: calc.takeoff, col: C.ptTakeoff, r: 3.2, text: `${isFr ? 'Décollage' : 'Takeoff'} ${val(calc.takeoff.massKg)} · ${arm(calc.takeoff.cgMm)}`, side: 'right' },
-        { p: calc.arrival, col: C.ptArrival, r: 2.8, text: `${isFr ? 'Arrivée' : 'Landing'} ${val(calc.arrival.massKg)} · ${arm(calc.arrival.cgMm)}`, side: 'left' },
-        { p: calc.zfw, col: C.ptZfw, r: 2.8, text: `ZFW ${val(calc.zfw.massKg)} · ${arm(calc.zfw.cgMm)}`, side: 'right' },
+        { p: calc.takeoff, col: C.ptTakeoff, r: 3.2, text: `${isFr ? 'Décollage' : 'Takeoff'} ${val(calc.takeoff.massKg)} ${L.unitMass}`, side: 'right' },
+        { p: calc.arrival, col: C.ptArrival, r: 2.8, text: `${isFr ? 'Arrivée' : 'Landing'} ${val(calc.arrival.massKg)} ${L.unitMass}`, side: 'left' },
+        { p: calc.zfw, col: C.ptZfw, r: 2.8, text: `ZFW ${val(calc.zfw.massKg)} ${L.unitMass}`, side: 'right' },
     ].filter(d => d.p.cgMm != null && isFinite(d.p.cgMm));
 
     let ptsSvg = defs.map(d =>
