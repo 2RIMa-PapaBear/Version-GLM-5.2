@@ -22,7 +22,7 @@
  * automatiquement vers la flotte lors du premier accès.
  * ================================================================ */
 
-import { normalizeEnvelope } from './wb-core.js';
+import { normalizeEnvelope, DEFAULT_STATION_MAX_KG } from './wb-core.js';
 
 const LS_FLEET = 'ac-fleet';
 const LS_ACTIVE = 'ac-active-id';
@@ -227,10 +227,13 @@ function _sanitizeWb(raw) {
         const fuel = s.fuel === true && !fuelSeen;
         if (s.fuel === true) fuelSeen = true;
         const maxKg = num(s.maxKg);
+        const name = String(s.name || '').slice(0, 24).trim() || 'Poste';
         stations.push({
-            name: String(s.name || '').slice(0, 24).trim() || 'Poste',
+            name,
             armMm: isFinite(armMm) ? armMm : null,
-            maxKg: maxKg > 0 ? maxKg : null,
+            // Max saisi, sinon valeur standard du poste (Pilote/Pax 130 kg,
+            // Bagages 40 kg) — le garde-fou d'affichage reste ainsi rempli.
+            maxKg: maxKg > 0 ? maxKg : (DEFAULT_STATION_MAX_KG[name.toLowerCase()] ?? null),
             fuel,
         });
     }
