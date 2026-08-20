@@ -1058,11 +1058,10 @@ function _drawCentroChart(doc, c, xL, xR, yT, CH) {
     doc.line(xL, yT, xL, yB); doc.line(xL, yB, xR, yB);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(7); _setInk(doc, MUTED);
     doc.text(`${fr ? 'Bras de levier' : 'Arm'} (${u.arm})`, (xL + xR) / 2, yB + 19, { align: 'center' });
-    // Titre de l'axe masse VERTICAL, collé au bord gauche (le long de l'axe).
-    // La bande des ~13 premiers points est réservée : les étiquettes de
-    // points côté gauche y basculent à droite (aucun chevauchement).
+    // Titre de l'axe masse VERTICAL, ~10 pt à gauche du bord de la zone de
+    // tracé (demande utilisateur), juste avant les labels de graduations.
     doc.setFontSize(6.5);
-    doc.text(`${fr ? 'Masse' : 'Weight'} (${u.mass})`, xL + 2.5, (yT + yB) / 2, { align: 'center', angle: 90 });
+    doc.text(`${fr ? 'Masse' : 'Weight'} (${u.mass})`, xL - 8, (yT + yB) / 2, { align: 'center', angle: 90 });
 
     // Enveloppe (polygone rempli + trait bleu).
     const pts = c.wb.envelope.map(([m, a]) => [xOf(a), yOf(m)]);
