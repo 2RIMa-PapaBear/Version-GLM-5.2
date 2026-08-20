@@ -235,8 +235,7 @@ export function resolveLoads(acId, plan) {
 // fonctions pures (layout + svg) et un mount avec ResizeObserver qui
 // re-rend à la largeur réelle pour garder les textes à 10 px.
 // ----------------------------------------------------------------
-const CH_H = 190;        // hauteur utile du graphe
-const PAD_L = 50, PAD_R = 12, PAD_T = 10, PAD_B = 30;
+const PAD_T = 10, PAD_B = 30;
 let _uidSeq = 0;
 
 const CHART_COLORS = {
@@ -280,20 +279,31 @@ export function wbChartLayout(wb, calc, width = 340) {
     const padM = (mMax - mMin) * 0.12 || 50;
     aMin -= padA; aMax += padA; mMin = Math.max(0, mMin - padM); mMax += padM;
 
-    const W = width, H = CH_H + PAD_T + PAD_B;
-    const xL = PAD_L, xR = W - PAD_R, yT = PAD_T, yB = PAD_T + CH_H;
+    // Dimensions ADAPTÉES à la largeur : hauteur ~1/3 de la largeur (bornée)
+    // et marges horizontales SYMÉTRIQUES — à gauche les labels de masse +
+    // titre d'axe, à droite la place des étiquettes de points. Le rectangle
+    // de tracé reste ainsi centré dans le panneau, quelle que soit sa largeur.
+    const W = width;
+    const CH = Math.max(170, Math.min(260, Math.round(W * 0.33)));
+    const yLabels = [];
+    for (let i = 0; i <= 4; i++) {
+        yLabels.push(_fmtTick(massFromKg(mMin + (mMax - mMin) * i / 4, unitMass), unitMass));
+    }
+    const labelW = Math.max(...yLabels.map(s => s.length)) * 5.4;
+    const PAD = Math.max(42, Math.min(64, Math.round(labelW + 22)));
+    const H = CH + PAD_T + PAD_B;
+    const xL = PAD, xR = W - PAD, yT = PAD_T, yB = PAD_T + CH;
     const xOf = a => xL + ((a - aMin) / (aMax - aMin)) * (xR - xL);
-    const yOf = m => yT + (1 - (m - mMin) / (mMax - mMin)) * CH_H;
+    const yOf = m => yT + (1 - (m - mMin) / (mMax - mMin)) * CH;
 
     const ticksX = [], ticksY = [];
     for (let i = 0; i <= 4; i++) {
         const f = i / 4;
         ticksX.push({ px: xL + f * (xR - xL),
                       label: _fmtTick(armFromMm(aMin + f * (aMax - aMin), unitArm), unitArm) });
-        ticksY.push({ px: yT + (1 - f) * CH_H,
-                      label: _fmtTick(massFromKg(mMin + f * (mMax - mMin), unitMass), unitMass) });
+        ticksY.push({ px: yT + (1 - f) * CH, label: yLabels[i] });
     }
-    return { W, H, xL, xR, yT, yB, xOf, yOf, ticksX, ticksY, unitArm, unitMass,
+    return { W, H, CH, xL, xR, yT, yB, xOf, yOf, ticksX, ticksY, unitArm, unitMass, labelW,
              armRange: [aMin, aMax], massRange: [mMin, mMax] };
 }
 
@@ -373,7 +383,7 @@ export function wbChartSvg(wb, calc, isFr = true, width = 340, opts = {}) {
 ${mtowY}
 <g>${ptsSvg}</g>
 <text x="${((L.xL + L.xR) / 2).toFixed(1)}" y="${(L.H - 3).toFixed(1)}" text-anchor="middle" fill="${C.tick}" font-size="10" font-weight="600">${axisTitle}</text>
-<text x="12" y="${((L.yT + L.yB) / 2).toFixed(1)}" text-anchor="middle" fill="${C.tick}" font-size="10" font-weight="600" transform="rotate(-90 12 ${(L.yT + L.yB) / 2})">${massTitle}</text>
+<text x="${Math.max(9, L.xL - 5 - Math.round(L.labelW) - 12).toFixed(1)}" y="${((L.yT + L.yB) / 2).toFixed(1)}" text-anchor="middle" fill="${C.tick}" font-size="10" font-weight="600" transform="rotate(-90 ${Math.max(9, L.xL - 5 - Math.round(L.labelW) - 12).toFixed(1)} ${(L.yT + L.yB) / 2})">${massTitle}</text>
 </svg>`;
 }
 
