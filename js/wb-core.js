@@ -221,19 +221,24 @@ export function writeWbLoads(acId, loads) {
 }
 
 /**
- * Charge utile effective d'un avion : le chargement mémorisé s'il
- * existe, sinon les valeurs du plan de nav courant (carburant embarqué
- * = total requis, essence consommée = trajet), sinon tout à zéro.
+ * Charge utile effective d'un avion : masses des postes et carburant
+ * embarqué mémorisés s'ils existent (sinon défauts du plan), mais
+ * l'ESSENCE CONSOMMÉE suit TOUJOURS le plan de vol courant quand il
+ * existe (conso × temps de vol) — un chargement mémorisé d'un autre vol
+ * ne doit pas figer cette valeur dans le widget ni dans le PDF.
  * @param {Object|null} plan plan de vol (state._lastNavPlan?.plan) avec
  *   fuel { totalL, tripFuelL }, ou null.
  */
 export function resolveLoads(acId, plan) {
     const saved = readWbLoads(acId);
-    if (saved) return saved;
+    const burnL = (plan?.fuel?.tripFuelL > 0)
+        ? Math.round(plan.fuel.tripFuelL)
+        : (saved ? saved.burnL : 0);
+    if (saved) return { masses: saved.masses, fuelL: saved.fuelL, burnL };
     return {
         masses: {},
         fuelL: (plan?.fuel?.totalL > 0) ? Math.round(plan.fuel.totalL) : 0,
-        burnL: (plan?.fuel?.tripFuelL > 0) ? Math.round(plan.fuel.tripFuelL) : 0,
+        burnL,
     };
 }
 
