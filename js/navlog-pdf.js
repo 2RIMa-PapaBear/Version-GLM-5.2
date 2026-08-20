@@ -554,18 +554,17 @@ function _drawCalcPage(doc, c) {
     const legs = (c.isMultiLeg && Array.isArray(c.legs)) ? c.legs : [];
     if (legs.length) {
         y = section(`${fr ? 'Détail des waypoints' : 'Leg details'} (${legs.length})`, y);
-        // Colonnes : 1re à gauche, les autres alignées à droite (comme .fp-navlog).
-        // Réparties sur toute la largeur : « 26 min » (ETE) et « 120.300 AFIS »
-        // (Fréq) sont larges — des colonnes resserrées à droite se chevauchaient.
-        // La fréquence est tronquée si elle dépasse sa colonne (~86 pt).
-        const COLR = [178, 224, 270, 316, R - 5];
-        const FREQ_W = COLR[4] - COLR[3] - 10;
+        // Colonnes compactées à GAUCHE et textes alignés à gauche — même
+        // règle que le tableau « Chargement » de la page Centrage : le blanc
+        // résiduel va à droite, après la dernière colonne (Fréq).
+        const COLR = [L + 95, L + 140, L + 182, L + 230, L + 272];
+        const FREQ_W = R - 5 - COLR[4];
         const HEADS = fr ? ['Tronçon', 'Dist', 'Cap', 'ETE', 'Conso', 'Fréq']
                          : ['Leg', 'Dist', 'Hdg', 'ETE', 'Fuel', 'Freq'];
         doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); _setInk(doc, MUTED);
         doc.text(HEADS[0].toUpperCase(), L + 1.5, y + 8, { charSpace: 0.4 });
         for (let i = 1; i < HEADS.length; i++) {
-            doc.text(HEADS[i].toUpperCase(), COLR[i - 1], y + 8, { align: 'right', charSpace: 0.4 });
+            doc.text(HEADS[i].toUpperCase(), COLR[i - 1], y + 8, { charSpace: 0.4 });
         }
         const headBot = y + 11;
         doc.setDrawColor(...LINE); doc.setLineWidth(0.5);
@@ -582,8 +581,8 @@ function _drawCalcPage(doc, c) {
             doc.text(`${row.from} → ${row.to}`.replace('→', '-'), L + 1.5, base);
             const vals = [`${row.dist} NM`, `${pad3(row.hdg)}°`, row.eteLabel, `${row.fuelL} L`];
             doc.setFont('courier', 'normal');
-            vals.forEach((v, i) => doc.text(String(v ?? '—'), COLR[i], base, { align: 'right' }));
-            if (row.freq) { _setInk(doc, BLUE); doc.text(_trunc(doc, row.freq, FREQ_W), COLR[4], base, { align: 'right' }); }
+            vals.forEach((v, i) => doc.text(String(v ?? '—'), COLR[i], base));
+            if (row.freq) { _setInk(doc, BLUE); doc.text(_trunc(doc, row.freq, FREQ_W), COLR[4], base); }
         };
         legs.forEach((lg, i) => {
             rowLine(lg, i);
@@ -599,8 +598,8 @@ function _drawCalcPage(doc, c) {
         doc.setFont('courier', 'bold'); doc.setFontSize(8); _setInk(doc, BLUE);
         doc.text(fr ? 'TOTAL' : 'TOTAL', L + 1.5, totBase);
         const tots = [`${c.distanceNm ?? '—'} NM`, '—', c.timeLabel || '—', `${c.fuel?.tripL ?? '—'} L`];
-        tots.forEach((v, i) => doc.text(String(v), COLR[i], totBase, { align: 'right' }));
-        doc.text('—', COLR[4], totBase, { align: 'right' });
+        tots.forEach((v, i) => doc.text(String(v), COLR[i], totBase));
+        doc.text('—', COLR[4], totBase);
         y = headBot + (legs.length + 1) * rowH + 10;
     }
 
@@ -716,17 +715,18 @@ function _drawPerfPage(doc, p) {
     y = section(fr ? `Alternates le long de la route (± ${al?.maxOffsetNm ?? 50} NM)`
                    : `En-route alternates (± ${al?.maxOffsetNm ?? 50} NM)`, y);
     if (al?.rows?.length) {
-        // Colonnes : terrain à gauche (code + nom), les autres à droite.
-        // Écartées de ~9 pt : « 320° 10G25 kt » (vent) et « ÉCART ROUTE »
-        // sont larges en courier 7,5 — des colonnes resserrées se chevauchaient.
-        const CX = { cat: 214, visi: 250, ceil: 291, wind: 358, off: R - 5 };
+        // Colonnes compactées à GAUCHE et textes alignés à gauche — même
+        // règle que « Chargement » : le blanc résiduel va à droite, après
+        // la dernière colonne (Écart). Le nom du terrain est tronqué sur
+        // la place qui reste avant la colonne Cat.
+        const CX = { cat: L + 128, visi: L + 172, ceil: L + 216, wind: L + 262, off: L + 345 };
         const HEADS = fr ? ['Terrain', 'Cat.', 'Visi', 'Plafond', 'Vent', 'Écart']
                          : ['Airfield', 'Cat.', 'Vis', 'Ceiling', 'Wind', 'Off rte'];
         doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); _setInk(doc, MUTED);
         doc.text(HEADS[0].toUpperCase(), L + 1.5, y + 8, { charSpace: 0.4 });
         const cols = [CX.cat, CX.visi, CX.ceil, CX.wind, CX.off];
         for (let i = 1; i < HEADS.length; i++) {
-            doc.text(HEADS[i].toUpperCase(), cols[i - 1], y + 8, { align: 'right', charSpace: 0.4 });
+            doc.text(HEADS[i].toUpperCase(), cols[i - 1], y + 8, { charSpace: 0.4 });
         }
         const headBot = y + 11;
         doc.setDrawColor(...LINE); doc.setLineWidth(0.5);
@@ -740,17 +740,17 @@ function _drawPerfPage(doc, p) {
             doc.text(r.code, L + 1.5, base);
             const nameX = L + 1.5 + doc.getTextWidth(r.code) + 5;
             doc.setFont('helvetica', 'normal'); doc.setFontSize(7); _setInk(doc, MUTED);
-            doc.text(_trunc(doc, r.name, CX.cat - 8 - nameX), nameX, base);
+            doc.text(_trunc(doc, r.name, CX.cat - 6 - nameX), nameX, base);
             // Catégorie colorée (palette écran adaptée au papier).
             doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
             _setInk(doc, CAT_PRINT[r.cat] || MUTED);
-            doc.text(r.cat, CX.cat, base, { align: 'right' });
+            doc.text(r.cat, CX.cat, base);
             doc.setFont('courier', 'normal'); doc.setFontSize(7.5); _setInk(doc, INK);
-            doc.text(r.visiStr, CX.visi, base, { align: 'right' });
-            doc.text(r.ceilStr, CX.ceil, base, { align: 'right' });
-            doc.text(r.windStr, CX.wind, base, { align: 'right' });
+            doc.text(r.visiStr, CX.visi, base);
+            doc.text(r.ceilStr, CX.ceil, base);
+            doc.text(r.windStr, CX.wind, base);
             doc.setFont('courier', 'bold');
-            doc.text(`${r.offsetNm} NM ${r.side}`, CX.off, base, { align: 'right' });
+            doc.text(`${r.offsetNm} NM ${r.side}`, CX.off, base);
             if (i < al.rows.length - 1) {
                 doc.setDrawColor(...BANDL); doc.setLineWidth(0.3);
                 doc.line(L, headBot + (i + 1) * ROW_H, R, headBot + (i + 1) * ROW_H);
