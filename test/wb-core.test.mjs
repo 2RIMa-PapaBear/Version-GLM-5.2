@@ -181,12 +181,16 @@ describe('wb — chargement du jour (persistance + plan)', () => {
         wb.writeWbLoads('ac_x', LOADS);
         assert.deepEqual(wb.readWbLoads('ac_x'), LOADS);
     });
-    test('resolveLoads : mémorisé prioritaire, sinon plan, sinon zéro', () => {
+    test('resolveLoads : essence consommée TOUJOURS du plan courant, le reste mémorisé', () => {
         assert.deepEqual(wb.resolveLoads('ac_y', { fuel: { totalL: 96.4, tripFuelL: 58.3 } }),
             { masses: {}, fuelL: 96, burnL: 58 });
         assert.equal(wb.resolveLoads('ac_y', null).fuelL, 0);
         wb.writeWbLoads('ac_y', { masses: { Pilote: 80 }, fuelL: 60, burnL: 20 });
+        // Avec un plan : masses/embarqué mémorisés, mais consommée = trajet du plan.
         assert.deepEqual(wb.resolveLoads('ac_y', { fuel: { totalL: 96.4, tripFuelL: 58.3 } }),
+            { masses: { Pilote: 80 }, fuelL: 60, burnL: 58 });
+        // Sans plan : la consommée mémorisée s'applique.
+        assert.deepEqual(wb.resolveLoads('ac_y', null),
             { masses: { Pilote: 80 }, fuelL: 60, burnL: 20 });
     });
 });
