@@ -1065,8 +1065,6 @@ function _drawCentroChart(doc, c, xL, xR, yT, CH) {
     const segs = pts.slice(1).map((p, i) => [p[0] - pts[i][0], p[1] - pts[i][1]]);
     doc.setFillColor(227, 242, 253); doc.setDrawColor(...BLUE); doc.setLineWidth(1.2);
     doc.lines(segs, pts[0][0], pts[0][1], [1, 1], 'FD', true);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(6); _setInk(doc, BLUE);
-    doc.text('ENV', xOf(aMin + (aMax - aMin) * 0.12) - 2, yOf(c.wb.envelope[0][0]) + 10);
 
     // Ligne MTOW (rouge pointillée).
     if (c.wb.mtowKg > 0 && c.wb.mtowKg >= mMin && c.wb.mtowKg <= mMax) {
