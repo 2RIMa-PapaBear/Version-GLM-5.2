@@ -1310,6 +1310,7 @@ html.night-mode body::before {
     min-width: 0;
 }
 .wb-tbl-row input.wb-st-name { font-family: 'DM Sans', sans-serif; font-weight: 600; }
+.wb-tbl-row input.wb-st-fuel { border-color: rgba(251, 191, 36, 0.45); }
 .wb-tbl-row input:focus { border-color: var(--primary); }
 .wb-del {
     background: none;
