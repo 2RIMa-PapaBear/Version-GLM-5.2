@@ -128,10 +128,10 @@ function _cell(doc, x, yc, w, h, label, value, opt = {}) {
     doc.setFillColor(...CELL_BG); doc.setDrawColor(...LINE); doc.setLineWidth(0.5);
     doc.roundedRect(x, yc, w, h, 2.5, 2.5, 'FD');
     doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); _setInk(doc, MUTED);
-    doc.text(String(label).toUpperCase(), x + 7, yc + 9.5, { charSpace: 0.5 });
+    doc.text(String(label).toUpperCase(), x + 7, yc + 9, { charSpace: 0.5 });
     doc.setFont('courier', 'bold'); doc.setFontSize(opt.size || 10.5);
     _setInk(doc, opt.color || INK);
-    doc.text(_trunc(doc, value ?? '—', w - 14), x + 7, yc + h - 8);
+    doc.text(_trunc(doc, value ?? '—', w - 14), x + 7, yc + h - 7);
 }
 
 // Section .fp-section : filet supérieur + titre majuscule grisé éventuel.
@@ -376,30 +376,27 @@ export function drawNavLogPdf(jsPDFCtor, d) {
     doc.setDrawColor(...INK); doc.setLineWidth(0.6);
     doc.rect(COLS[0], T_TOP, COLS[COLS.length - 1] - COLS[0], T_HEAD_H + N_ROWS * ROW_H, 'S');
 
-    // ---- Cadres Check ----
+    // ---- Cadres Check + légende : GRILLE COMMUNE de 3 colonnes de même
+    // largeur (gouttière 5 pt) — bandes titres et colonnes mnémoniques
+    // (PAGER / TRAMER / DRAGER) alignées verticalement. ----
+    const GUT = 5;
+    const COL_W = (386.3 - 2 * GUT) / 3;
+    const colX = (k) => 16.4 + k * (COL_W + GUT);
     const CHECKS = fr
-        ? [
-            [16.4, 117.8, 'Check Croisière', 41.9],
-            [134.0, 138.0, 'Check Point Tournant', 158.9],
-            [271.9, 130.8, 'Check Vent Arrière', 298.7],
-        ]
-        : [
-            [16.4, 117.8, 'Cruise check', 41.9],
-            [134.0, 138.0, 'Turning point check', 158.9],
-            [271.9, 130.8, 'Downwind check', 298.7],
-        ];
-    for (const [x, w, lab, tx] of CHECKS) {
+        ? ['Check Croisière', 'Check Point Tournant', 'Check Vent Arrière']
+        : ['Cruise check', 'Turning point check', 'Downwind check'];
+    CHECKS.forEach((lab, k) => {
         doc.setFillColor(...DARK);
-        doc.rect(x, 486.7, w, 12.1, 'F');
+        doc.rect(colX(k), 486.7, COL_W, 12.1, 'F');
         doc.setFont('helvetica', 'bold'); doc.setFontSize(SZ.title); _setInk(doc, [255, 255, 255]);
-        doc.text(lab, tx, 496.2);
-    }
+        doc.text(lab, colX(k) + COL_W / 2, 496.2, { align: 'center' });
+    });
 
-    // ---- Légende des mnémoniques (6 lettres par colonne, filets séparateurs) ----
+    // ---- Légende des mnémoniques (6 lettres par colonne, filets séparateurs
+    // placés au milieu des gouttières de la grille) ----
     doc.setDrawColor(...LINE); doc.setLineWidth(0.5);
     doc.rect(16.4, 503.8, 386.3, 77.1, 'S');
-    doc.line(133.5, 503.8, 133.5, 580.9);
-    doc.line(269.5, 503.8, 269.5, 580.9);
+    for (let k = 1; k <= 2; k++) doc.line(colX(k) - GUT / 2, 503.8, colX(k) - GUT / 2, 580.9);
     const LEGEND = fr
         ? [
             [['P', 'Paramètres'], ['I', 'Instruments'], ['A', 'Altitude'], ['G', 'Gyro / Cap'], ['E', 'Essence'], ['R', 'Radio/Radio Nav']],
@@ -411,7 +408,7 @@ export function drawNavLogPdf(jsPDFCtor, d) {
             [['T', 'ETA next WPT'], ['R', 'Route / Hdg'], ['A', 'Altitude'], ['M', 'Engine / Wx'], ['E', 'Fuel'], ['R', 'Radio/Nav']],
             [['D', 'De-ice'], ['R', 'Mixture'], ['A', 'Altitude'], ['G', 'Gyro / Hdg'], ['E', 'Fuel'], ['R', 'Radio/Nav']],
         ];
-    const LEG_X = [17.9, 138.5, 274.4];
+    const LEG_X = [0, 1, 2].map(k => colX(k) + 4);
     LEGEND.forEach((col, c) => {
         col.forEach(([letter, meaning], r) => {
             const y = 512.3 + r * 11.5;
@@ -486,53 +483,53 @@ function _drawCalcPage(doc, c) {
     // lignes de 4 / 3 / 2 (titres de section repliés dans les libellés) pour
     // laisser au tableau des waypoints la place d'afficher 8 à 10 tronçons.
     let y = 80;
-    cell(L, y, W, 27, fr ? 'Waypoints (optionnel)' : 'Waypoints (optional)',
+    cell(L, y, W, 29, fr ? 'Waypoints (optionnel)' : 'Waypoints (optional)',
          c.waypoints || '—', { color: c.waypoints ? BLUE : MUTED });
-    y += 31;
-    const pw = (W - 3 * 7 - 68) / 3;
-    cell(L, y, pw, 27, fr ? 'Alt. croisière (ft)' : 'Cruise alt (ft)', c.cruiseAltFt ?? '—', { color: BLUE });
-    cell(L + pw + 7, y, pw, 27, fr ? 'Vitesse air (kt)' : 'TAS (kt)', c.tasKt ?? '—', { color: BLUE });
-    cell(L + 2 * (pw + 7), y, pw, 27, fr ? 'Conso (L/h)' : 'Burn (L/h)', c.fuelBurnLph ?? '—', { color: BLUE });
-    cell(L + 3 * (pw + 7), y, 68, 27, fr ? 'Vol de nuit' : 'Night',
-         c.isNight ? (fr ? 'Oui' : 'Yes') : (fr ? 'Non' : 'No'), { color: BLUE });
     y += 33;
+    const pw = (W - 3 * 7 - 68) / 3;
+    cell(L, y, pw, 29, fr ? 'Alt. croisière (ft)' : 'Cruise alt (ft)', c.cruiseAltFt ?? '—', { color: BLUE });
+    cell(L + pw + 7, y, pw, 29, fr ? 'Vitesse air (kt)' : 'TAS (kt)', c.tasKt ?? '—', { color: BLUE });
+    cell(L + 2 * (pw + 7), y, pw, 29, fr ? 'Conso (L/h)' : 'Burn (L/h)', c.fuelBurnLph ?? '—', { color: BLUE });
+    cell(L + 3 * (pw + 7), y, 68, 29, fr ? 'Vol de nuit' : 'Night',
+         c.isNight ? (fr ? 'Oui' : 'Yes') : (fr ? 'Non' : 'No'), { color: BLUE });
+    y += 35;
 
     // ---- Ligne résultats : Distance / Cap vrai / Cap magnétique / Déclinaison ----
     const cw4 = (W - 3 * 7) / 4;
     y = section(null, y);
-    cell(L, y, cw4, 27, fr ? 'Distance' : 'Distance', `${c.distanceNm ?? '—'} NM`, { size: 9.5 });
+    cell(L, y, cw4, 29, fr ? 'Distance' : 'Distance', `${c.distanceNm ?? '—'} NM`, { size: 9.5 });
     // Suffixe km discret collé après la valeur, comme à l'écran.
     doc.setFont('courier', 'bold'); doc.setFontSize(9.5);
     const wMain = doc.getTextWidth(`${c.distanceNm ?? '—'} NM`);
     doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); _setInk(doc, MUTED);
     doc.text(`(${c.distanceKm ?? '—'} km)`, L + 7 + wMain + 3, y + 20);
-    cell(L + cw4 + 7, y, cw4, 27, fr ? 'Cap vrai (TC)' : 'True course', `${pad3(c.trueCourse)}°`);
-    cell(L + 2 * (cw4 + 7), y, cw4, 27, fr ? 'Cap magnétique' : 'Magnetic heading',
+    cell(L + cw4 + 7, y, cw4, 29, fr ? 'Cap vrai (TC)' : 'True course', `${pad3(c.trueCourse)}°`);
+    cell(L + 2 * (cw4 + 7), y, cw4, 29, fr ? 'Cap magnétique' : 'Magnetic heading',
          `${pad3(c.magHeading)}°`, { color: BLUE, size: 12 });
-    cell(L + 3 * (cw4 + 7), y, cw4, 27, fr ? 'Déclinaison' : 'Declination',
+    cell(L + 3 * (cw4 + 7), y, cw4, 29, fr ? 'Déclinaison' : 'Declination',
          `${(c.declination ?? 0) > 0 ? '+' : ''}${c.declination ?? 0}°`);
-    y += 31;
+    y += 33;
 
     // ---- Ligne vent / dérive / vitesse sol / temps de vol ----
     y = section(null, y);
-    cell(L, y, cw4, 27, fr ? `Vent à ${c.cruiseAltFt ?? ''} ft` : `Wind at ${c.cruiseAltFt ?? ''} ft`,
+    cell(L, y, cw4, 29, fr ? `Vent à ${c.cruiseAltFt ?? ''} ft` : `Wind at ${c.cruiseAltFt ?? ''} ft`,
          c.wind ? `${pad3(c.wind.dir)}° / ${c.wind.speedKt} kt` : '—', { size: 9.5 });
     const dr = c.driftDeg;
-    cell(L + cw4 + 7, y, cw4, 27, fr ? 'Dérive' : 'Drift',
+    cell(L + cw4 + 7, y, cw4, 29, fr ? 'Dérive' : 'Drift',
          c.wind ? `${(dr ?? 0) > 0 ? '+' : ''}${dr ?? '—'}°` : '—',
          Math.abs(dr ?? 0) >= 10 ? { color: AMBER, size: 9.5 } : { size: 9.5 });
-    cell(L + 2 * (cw4 + 7), y, cw4, 27, fr ? 'Vitesse sol (GS)' : 'Ground speed', `${c.groundSpeed ?? '—'} kt`, { size: 9.5 });
-    cell(L + 3 * (cw4 + 7), y, cw4, 27, fr ? 'Temps de vol' : 'Flight time',
+    cell(L + 2 * (cw4 + 7), y, cw4, 29, fr ? 'Vitesse sol (GS)' : 'Ground speed', `${c.groundSpeed ?? '—'} kt`, { size: 9.5 });
+    cell(L + 3 * (cw4 + 7), y, cw4, 29, fr ? 'Temps de vol' : 'Flight time',
          c.timeLabel || '—', { color: TEAL, size: 11 });
-    y += 31;
+    y += 33;
 
     // ---- Ligne carburant : Trajet / Réserve / Total requis ----
     y = section(null, y);
     const fw = (W - 2 * 12) / 3;
-    cell(L, y, fw, 27, fr ? 'Trajet' : 'Trip', `${c.fuel?.tripL ?? '—'} L`);
-    cell(L + fw + 12, y, fw, 27, `${fr ? 'Réserve' : 'Reserve'} (${c.fuel?.reserveMin ?? ''} min)`, `${c.fuel?.reserveL ?? '—'} L`);
-    cell(L + 2 * (fw + 12), y, fw, 27, fr ? 'Total requis' : 'Total req.', `${c.fuel?.totalL ?? '—'} L`, { color: BLUE, size: 12 });
-    y += 31;
+    cell(L, y, fw, 29, fr ? 'Trajet' : 'Trip', `${c.fuel?.tripL ?? '—'} L`);
+    cell(L + fw + 12, y, fw, 29, `${fr ? 'Réserve' : 'Reserve'} (${c.fuel?.reserveMin ?? ''} min)`, `${c.fuel?.reserveL ?? '—'} L`);
+    cell(L + 2 * (fw + 12), y, fw, 29, fr ? 'Total requis' : 'Total req.', `${c.fuel?.totalL ?? '—'} L`, { color: BLUE, size: 12 });
+    y += 33;
 
     // ---- Ligne relief (si disponible) : Altitude max sol / Marge mini ----
     const cl = c.clearance;
@@ -540,10 +537,10 @@ function _drawCalcPage(doc, c) {
         const clColor = cl.level === 'danger' ? REDTX : (cl.level === 'caution' ? AMBER : GREEN);
         const cw = (W - 16) / 2;
         y = section(null, y);
-        cell(L, y, cw, 27, fr ? 'Altitude max sol' : 'Max terrain', `${cl.maxFt ?? '—'} ft`);
-        cell(L + cw + 16, y, cw, 27, fr ? 'Marge mini' : 'Min clearance',
+        cell(L, y, cw, 29, fr ? 'Altitude max sol' : 'Max terrain', `${cl.maxFt ?? '—'} ft`);
+        cell(L + cw + 16, y, cw, 29, fr ? 'Marge mini' : 'Min clearance',
              `${(cl.minClearanceFt ?? 0) >= 0 ? '+' : ''}${cl.minClearanceFt ?? '—'} ft`, { color: clColor });
-        y += 31;
+        y += 33;
         if (cl.level !== 'ok') {
             const danger = cl.level === 'danger';
             y = _alertBanner(doc, L, R, W, y, danger,
@@ -662,22 +659,22 @@ function _drawPerfPage(doc, p) {
         const lvlColor = lvl === 'danger' ? REDTX : (lvl === 'caution' ? AMBER : GREEN);
 
         const cw4 = (W - 3 * 7) / 4;
-        cell(L, y, cw4, 27, fr ? 'Roulement' : 'Ground roll', `${t.groundRollM} m`);
-        cell(L + cw4 + 7, y, cw4, 27, fr ? 'Franch. 50 ft' : '50 ft obstacle', `${t.fiftyFtM} m`);
-        cell(L + 2 * (cw4 + 7), y, cw4, 27, fr ? 'Densité-alt.' : 'Density alt.', `${t.da} ft`);
-        cell(L + 3 * (cw4 + 7), y, cw4, 27, fr ? 'Réf. avion (m)' : 'A/C ref (m)', t.refLabel, { size: 9.5 });
-        y += 33;
+        cell(L, y, cw4, 29, fr ? 'Roulement' : 'Ground roll', `${t.groundRollM} m`);
+        cell(L + cw4 + 7, y, cw4, 29, fr ? 'Franch. 50 ft' : '50 ft obstacle', `${t.fiftyFtM} m`);
+        cell(L + 2 * (cw4 + 7), y, cw4, 29, fr ? 'Densité-alt.' : 'Density alt.', `${t.da} ft`);
+        cell(L + 3 * (cw4 + 7), y, cw4, 29, fr ? 'Réf. avion (m)' : 'A/C ref (m)', t.refLabel, { size: 9.5 });
+        y += 35;
 
         const cw3 = (W - 2 * 7) / 3;
-        cell(L, y, cw3, 27, fr ? 'Longueur piste' : 'Runway length',
+        cell(L, y, cw3, 29, fr ? 'Longueur piste' : 'Runway length',
              t.runwayLengthM != null ? `${t.runwayLengthM} m` : '—');
         const surfTxt = t.surfacePct ? `${t.surfaceLabel} +${t.surfacePct} %` : (t.surfaceLabel || '—');
-        cell(L + cw3 + 7, y, cw3, 27, fr ? 'Revêtement' : 'Surface', surfTxt,
+        cell(L + cw3 + 7, y, cw3, 29, fr ? 'Revêtement' : 'Surface', surfTxt,
              { color: t.surfaceSoft ? AMBER : INK, size: surfTxt.length > 13 ? 9 : 10.5 });
-        cell(L + 2 * (cw3 + 7), y, cw3, 27, fr ? 'Marge (50 ft)' : 'Margin (50 ft)',
+        cell(L + 2 * (cw3 + 7), y, cw3, 29, fr ? 'Marge (50 ft)' : 'Margin (50 ft)',
              t.marginM != null ? `${t.marginM >= 0 ? '+' : ''}${t.marginM} m` : '—',
              { color: t.marginM != null ? lvlColor : MUTED, size: 12 });
-        y += 33;
+        y += 35;
 
         // Coupe de la piste (avion au seuil, roulement, montée au 50 ft,
         // marge/manque) — plus visuelle que la barre en plan qu'elle remplace.
@@ -963,17 +960,17 @@ function _drawCentroPage(doc, c) {
     // ---- Cellules résultats ----
     y = _section(doc, L, R, null, y + 2);
     const cw3 = (W - 2 * 7) / 3;
-    _cell(doc, L, y, cw3, 27, fr ? 'CG décollage' : 'Takeoff CG', `${fmtA(c.calc.takeoff.cgMm)} ${u.arm}`,
+    _cell(doc, L, y, cw3, 29, fr ? 'CG décollage' : 'Takeoff CG', `${fmtA(c.calc.takeoff.cgMm)} ${u.arm}`,
         { color: WB_GREEN, size: 12 });
-    _cell(doc, L + cw3 + 7, y, cw3, 27, fr ? 'CG arrivée' : 'Landing CG', `${fmtA(c.calc.arrival.cgMm)} ${u.arm}`,
+    _cell(doc, L + cw3 + 7, y, cw3, 29, fr ? 'CG arrivée' : 'Landing CG', `${fmtA(c.calc.arrival.cgMm)} ${u.arm}`,
         { color: WB_AMBER, size: 12 });
-    _cell(doc, L + 2 * (cw3 + 7), y, cw3, 27, fr ? 'CG zéro carburant' : 'Zero fuel CG', `${fmtA(c.calc.zfw.cgMm)} ${u.arm}`,
+    _cell(doc, L + 2 * (cw3 + 7), y, cw3, 29, fr ? 'CG zéro carburant' : 'Zero fuel CG', `${fmtA(c.calc.zfw.cgMm)} ${u.arm}`,
         { color: WB_RED, size: 12 });
-    y += 31;
+    y += 33;
     const mtow = c.wb.mtowKg > 0 ? c.wb.mtowKg : null;
-    _cell(doc, L, y, cw3, 27, fr ? 'Masse décollage' : 'Takeoff weight', `${fmtM(c.calc.takeoff.massKg)} ${u.mass}`);
-    _cell(doc, L + cw3 + 7, y, cw3, 27, 'MTOW', mtow ? `${fmtM(mtow)} ${u.mass}` : '—');
-    _cell(doc, L + 2 * (cw3 + 7), y, cw3, 27, fr ? 'Enveloppe' : 'Envelope',
+    _cell(doc, L, y, cw3, 29, fr ? 'Masse décollage' : 'Takeoff weight', `${fmtM(c.calc.takeoff.massKg)} ${u.mass}`);
+    _cell(doc, L + cw3 + 7, y, cw3, 29, 'MTOW', mtow ? `${fmtM(mtow)} ${u.mass}` : '—');
+    _cell(doc, L + 2 * (cw3 + 7), y, cw3, 29, fr ? 'Enveloppe' : 'Envelope',
         c.calc.level === 'ok' ? (fr ? 'Dans les limites' : 'In limits') : (fr ? 'HORS LIMITES' : 'OUT OF LIMITS'),
         { color: c.calc.level === 'ok' ? WB_GREEN : WB_RED, size: 9.5 });
     y += 37;
