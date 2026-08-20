@@ -47,6 +47,18 @@ describe('wb — conversions d\'unités (facteurs exacts)', () => {
         assert.ok(Math.abs(wb.massFromKg(wb.massToKg(890, 'lbs'), 'lbs') - 890) < 1e-9);
         assert.equal(wb.massToKg(890, 'kg'), 890);
     });
+    test('décimales de bras : m → 3 (millièmes), in → 2, ft → 1, mm → 0', () => {
+        assert.equal(wb.armDecimals('m'), 3);
+        assert.equal(wb.armDecimals('in'), 2);
+        assert.equal(wb.armDecimals('ft'), 1);
+        assert.equal(wb.armDecimals('mm'), 0);
+    });
+    test('étiquettes en mètres : millièmes conservés (CG 0,428 m)', () => {
+        const r = wb.computeWb(AC_WB, LOADS);
+        const svg = wb.wbChartSvg({ ...AC_WB, units: { mass: 'kg', arm: 'm' } }, r, true, 340);
+        assert.ok(svg.includes('0,428'));   // CG décollage 428,4 mm
+        assert.ok(svg.includes('Bras de levier (m)'));
+    });
 });
 
 describe('wb — géométrie de l\'enveloppe', () => {
