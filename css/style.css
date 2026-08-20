@@ -1362,7 +1362,10 @@ html.night-mode body::before {
 }
 
 /* --- Widget dashboard « Centrage » --- */
-.wb-panel .collapsible-body { display: flex; flex-direction: column; gap: 10px; }
+/* display:flex UNIQUEMENT en .open : ne doit pas écraser le display:none
+   du repli (.collapsible-body, spécificité moindre). */
+.wb-panel .collapsible-body { flex-direction: column; gap: 10px; }
+.wb-panel.open .collapsible-body { display: flex; }
 
 .wb-ac-line {
     display: flex;
