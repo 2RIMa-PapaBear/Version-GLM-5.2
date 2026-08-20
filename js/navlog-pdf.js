@@ -1044,12 +1044,15 @@ function _drawCentroChart(doc, c, xL, xR, yT, CH) {
     doc.setFillColor(...PLOT_BG);
     doc.rect(xL, yT, plotW, CH, 'F');
     doc.setFont('courier', 'normal'); doc.setFontSize(6.5);
+    let maxYLabW = 0;   // largeur du plus long label de graduation masse
     for (let i = 0; i <= 4; i++) {
         const gy = yT + (1 - i / 4) * CH;
         doc.setDrawColor(...BANDL); doc.setLineWidth(0.4);
         doc.line(xL, gy, xR, gy);
         _setInk(doc, MUTED);
-        doc.text(fmtM(mMin + (mMax - mMin) * i / 4), xL - 4, gy + 2.2, { align: 'right' });
+        const yLab = fmtM(mMin + (mMax - mMin) * i / 4);
+        maxYLabW = Math.max(maxYLabW, doc.getTextWidth(yLab));
+        doc.text(yLab, xL - 4, gy + 2.2, { align: 'right' });
         const gx = xL + (i / 4) * plotW;
         doc.line(gx, yT, gx, yB);
         doc.text(fmtA(aMin + (aMax - aMin) * i / 4), gx, yB + 8, { align: 'center' });
@@ -1058,10 +1061,10 @@ function _drawCentroChart(doc, c, xL, xR, yT, CH) {
     doc.line(xL, yT, xL, yB); doc.line(xL, yB, xR, yB);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(7); _setInk(doc, MUTED);
     doc.text(`${fr ? 'Bras de levier' : 'Arm'} (${u.arm})`, (xL + xR) / 2, yB + 19, { align: 'center' });
-    // Titre de l'axe masse VERTICAL, ~10 pt à gauche du bord de la zone de
-    // tracé (demande utilisateur), juste avant les labels de graduations.
+    // Titre de l'axe masse VERTICAL, À GAUCHE des labels de graduations
+    // (seule position ≥ 10 pt hors du graphe sans les chevaucher).
     doc.setFontSize(6.5);
-    doc.text(`${fr ? 'Masse' : 'Weight'} (${u.mass})`, xL - 8, (yT + yB) / 2, { align: 'center', angle: 90 });
+    doc.text(`${fr ? 'Masse' : 'Weight'} (${u.mass})`, xL - 4 - maxYLabW - 5, (yT + yB) / 2, { align: 'center', angle: 90 });
 
     // Enveloppe (polygone rempli + trait bleu).
     const pts = c.wb.envelope.map(([m, a]) => [xOf(a), yOf(m)]);
