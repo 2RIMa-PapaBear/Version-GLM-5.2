@@ -89,6 +89,30 @@ export function armLimitsAt(envelope, mass) {
     return { fwdMm: fwd, aftMm: aft };
 }
 
+/**
+ * Réordonne les points d'une enveloppe en polygone SIMPLE (tri angulaire
+ * autour du centroïde). Neutralise les saisies « ligne à ligne » du tableau
+ * du manuel de vol (masse par masse : avant, arrière, avant, arrière…)
+ * qui traceraient un polygone en zigzag auto-croisé — dessin aberrant et
+ * limites avant/arrière trompeuses. Sans effet sur une enveloppe déjà
+ * parcourue en périmètre.
+ */
+export function normalizeEnvelope(points) {
+    if (!Array.isArray(points) || points.length < 3) return points ? points.slice() : [];
+    const pts = points.slice();
+    const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+    const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+    // Départ stable : sommet le plus bas-gauche, puis parcours angulaire.
+    pts.sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]));
+    const p0 = pts[0];
+    const ref = Math.atan2(p0[1] - cy, p0[0] - cx);
+    const rel = (p) => {
+        const a = Math.atan2(p[1] - cy, p[0] - cx) - ref;
+        return ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    };
+    return pts.slice().sort((a, b) => rel(a) - rel(b));
+}
+
 // ----------------------------------------------------------------
 // Calcul du centrage
 // ----------------------------------------------------------------
@@ -290,31 +314,41 @@ export function wbChartSvg(wb, calc, isFr = true, width = 340, opts = {}) {
     const val = (kg) => fmt(massFromKg(kg, L.unitMass));
     const arm = (mm) => fmt(armFromMm(mm, L.unitArm), armDecimals(L.unitArm));
 
-    // Étiquettes des 4 points (textes courts : valeurs sans unité).
-    const pt = (p, col, name, dxAnchor) => {
-        if (p.cgMm == null || !isFinite(p.cgMm)) return '';
-        const x = L.xOf(p.cgMm), y = L.yOf(p.massKg);
-        const anchor = dxAnchor === 'left' ? 'end' : 'start';
-        const tx = x + (dxAnchor === 'left' ? -8 : 8);
-        return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.2" fill="${col}"/>` +
-            `<text x="${tx.toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="${anchor}" fill="${col}" font-size="10">${name}</text>`;
-    };
-    let ptsSvg = '';
+    // Les 4 points (textes courts : valeurs sans unité). Étiquettes :
+    // Décollage/ZFW/À vide à droite, Arrivée à gauche (mise en page validée),
+    // avec BASCULE de côté si l'étiquette déborderait du graphe et décalage
+    // vertical de 11 px entre étiquettes d'un même côté (points proches).
+    const defs = [
+        { p: calc.takeoff, col: C.ptTakeoff, r: 3.2, text: `${isFr ? 'Décollage' : 'Takeoff'} ${val(calc.takeoff.massKg)} · ${arm(calc.takeoff.cgMm)}`, side: 'right' },
+        { p: calc.arrival, col: C.ptArrival, r: 2.8, text: `${isFr ? 'Arrivée' : 'Landing'} ${val(calc.arrival.massKg)} · ${arm(calc.arrival.cgMm)}`, side: 'left' },
+        { p: calc.zfw, col: C.ptZfw, r: 2.8, text: `ZFW ${val(calc.zfw.massKg)} · ${arm(calc.zfw.cgMm)}`, side: 'right' },
+        { p: calc.empty, col: C.ptEmpty, r: 2.4, text: `${isFr ? 'Vide' : 'Empty'} ${val(calc.empty.massKg)} · ${arm(calc.empty.cgMm)}`, side: 'right' },
+    ].filter(d => d.p.cgMm != null && isFinite(d.p.cgMm));
+
+    let ptsSvg = defs.map(d =>
+        `<circle cx="${L.xOf(d.p.cgMm).toFixed(1)}" cy="${L.yOf(d.p.massKg).toFixed(1)}" r="${d.r}" fill="${d.col}"/>`).join('');
     if (!opts.hidePointLabels) {
-        ptsSvg = pt(calc.takeoff, C.ptTakeoff, `${isFr ? 'Décollage' : 'Takeoff'} ${val(calc.takeoff.massKg)} · ${arm(calc.takeoff.cgMm)}`)
-            + pt(calc.arrival, C.ptArrival, `${isFr ? 'Arrivée' : 'Landing'} ${val(calc.arrival.massKg)} · ${arm(calc.arrival.cgMm)}`, 'left')
-            + pt(calc.zfw, C.ptZfw, `ZFW ${val(calc.zfw.massKg)} · ${arm(calc.zfw.cgMm)}`)
-            + pt(calc.empty, C.ptEmpty, `${isFr ? 'Vide' : 'Empty'} ${val(calc.empty.massKg)} · ${arm(calc.empty.cgMm)}`);
-    } else {
-        for (const [p, col] of [[calc.takeoff, C.ptTakeoff], [calc.arrival, C.ptArrival],
-                                 [calc.zfw, C.ptZfw], [calc.empty, C.ptEmpty]]) {
-            if (p.cgMm == null || !isFinite(p.cgMm)) continue;
-            ptsSvg += `<circle cx="${L.xOf(p.cgMm).toFixed(1)}" cy="${L.yOf(p.massKg).toFixed(1)}" r="3.2" fill="${col}"/>`;
+        const labs = defs.map(d => {
+            const x = L.xOf(d.p.cgMm), y = L.yOf(d.p.massKg);
+            const w = d.text.length * 5.9 + 2;
+            let side = d.side;
+            if (side === 'right' && x + 8 + w > L.xR - 2) side = 'left';
+            else if (side === 'left' && x - 8 - w < L.xL + 2) side = 'right';
+            return { x, y, w, side, text: d.text, col: d.col };
+        });
+        for (const side of ['right', 'left']) {
+            const group = labs.filter(l => l.side === side).sort((a, b) => a.y - b.y);
+            for (let i = 1; i < group.length; i++) {
+                if (Math.abs(group[i].y - group[i - 1].y) < 11) group[i].y = group[i - 1].y + 11;
+            }
         }
+        ptsSvg += labs.map(l =>
+            `<text x="${(l.x + (l.side === 'left' ? -8 : 8)).toFixed(1)}" y="${(l.y + 3).toFixed(1)}" text-anchor="${l.side === 'left' ? 'end' : 'start'}" fill="${l.col}" font-size="10">${l.text}</text>`).join('');
     }
 
-    // Enveloppe (polygone fermé).
-    const envPts = wb.envelope.map(([m, a]) => `${L.xOf(a).toFixed(1)},${L.yOf(m).toFixed(1)}`).join(' ');
+    // Enveloppe (polygone fermé) — points réordonnés en polygone simple.
+    const envPts = normalizeEnvelope(wb.envelope)
+        .map(([m, a]) => `${L.xOf(a).toFixed(1)},${L.yOf(m).toFixed(1)}`).join(' ');
     // Ligne MTOW (rouge pointillée).
     const mtowY = (wb.mtowKg > 0 && wb.mtowKg >= L.massRange[0] && wb.mtowKg <= L.massRange[1])
         ? `<line x1="${L.xL}" y1="${L.yOf(wb.mtowKg).toFixed(1)}" x2="${L.xR}" y2="${L.yOf(wb.mtowKg).toFixed(1)}" stroke="${C.mtow}" stroke-width="1" stroke-dasharray="5 3" opacity="0.9"/>` +

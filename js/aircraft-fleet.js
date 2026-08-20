@@ -22,6 +22,8 @@
  * automatiquement vers la flotte lors du premier accès.
  * ================================================================ */
 
+import { normalizeEnvelope } from './wb-core.js';
+
 const LS_FLEET = 'ac-fleet';
 const LS_ACTIVE = 'ac-active-id';
 
@@ -205,11 +207,14 @@ function _sanitizeWb(raw) {
     const emptyArmMm = num(raw.emptyArmMm);
     if (!(emptyMassKg > 0) || !isFinite(emptyArmMm)) return null;
 
-    // Enveloppe : 3 à 16 points [masse kg, bras mm] tous finis.
-    const envelope = (Array.isArray(raw.envelope) ? raw.envelope : [])
-        .map(p => (Array.isArray(p) ? [num(p[0]), num(p[1])] : [NaN, NaN]))
-        .filter(p => p[0] > 0 && isFinite(p[1]))
-        .slice(0, 16);
+    // Enveloppe : 3 à 16 points [masse kg, bras mm] tous finis, RÉORDONNÉS
+    // en polygone simple (une saisie « ligne à ligne » du POH tracerait un
+    // zigzag auto-croisé — dessin aberrant et limites trompeuses).
+    const envelope = normalizeEnvelope(
+        (Array.isArray(raw.envelope) ? raw.envelope : [])
+            .map(p => (Array.isArray(p) ? [num(p[0]), num(p[1])] : [NaN, NaN]))
+            .filter(p => p[0] > 0 && isFinite(p[1]))
+            .slice(0, 16));
     if (envelope.length < 3) return null;
 
     // Postes : 0 à 12 ; bras FACULTATIF (poste en cours de saisie, ignoré au

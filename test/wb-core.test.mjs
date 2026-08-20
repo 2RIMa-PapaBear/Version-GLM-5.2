@@ -65,6 +65,46 @@ describe('wb — géométrie de l\'enveloppe', () => {
     });
 });
 
+describe('wb — normalisation de l\'enveloppe (saisie « ligne à ligne »)', () => {
+    // Saisie naturelle du tableau POH : pour chaque masse, [avant, arrière].
+    const ZIG = [[740, 180], [740, 520], [1000, 228], [1000, 505], [1100, 245], [1100, 490]];
+    const orient = (a, b, c) => Math.sign((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
+    const segCross = (p1, p2, p3, p4) =>
+        orient(p1, p2, p3) !== orient(p1, p2, p4) && orient(p3, p4, p1) !== orient(p3, p4, p2);
+    const selfCrossings = (pts) => {
+        let n = 0;
+        for (let i = 0; i < pts.length; i++)
+            for (let j = i + 2; j < pts.length; j++) {
+                if (i === 0 && j === pts.length - 1) continue;
+                if (segCross(pts[i], pts[(i + 1) % pts.length], pts[j], pts[(j + 1) % pts.length])) n++;
+            }
+        return n;
+    };
+
+    test('le zigzag brut s\'auto-croise ; normalisé, plus aucun croisement', () => {
+        assert.ok(selfCrossings(ZIG) > 0);          // le problème est réel
+        const norm = wb.normalizeEnvelope(ZIG);
+        assert.equal(norm.length, ZIG.length);
+        assert.deepEqual(norm.map(p => p.join(',')).sort(), ZIG.map(p => p.join(',')).sort());
+        assert.equal(selfCrossings(norm), 0);
+    });
+    test('une enveloppe déjà parcourue en périmètre reste identique', () => {
+        const norm = wb.normalizeEnvelope(AC_WB.envelope);
+        assert.deepEqual(norm, AC_WB.envelope);
+    });
+    test('la flotte STOCKE l\'enveloppe normalisée (idem aperçu et PDF)', () => {
+        const ac = fleet.addAircraft({
+            name: 'Z', groundRoll: 500, fiftyFt: 1100,
+            wb: { ...AC_WB, envelope: ZIG },
+        });
+        assert.equal(selfCrossings(ac.wb.envelope), 0);
+        assert.deepEqual(ac.wb.envelope[0], [740, 180]);   // départ coin bas-avant
+        // Verdicts cohérents sur l'enveloppe réparée.
+        const r = wb.computeWb(ac.wb, LOADS);
+        assert.equal(r.level, 'ok');
+    });
+});
+
 describe('wb — calcul des points (jeu de la maquette)', () => {
     test('décollage / arrivée / ZFW : masses et CG attendus', () => {
         const r = wb.computeWb(AC_WB, LOADS);

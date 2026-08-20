@@ -3,7 +3,7 @@ import { getAirportByICAO, enrichAirport } from './ui-module.js';
 import { getActiveAircraftId, getActiveAircraft, getFleet, updateAircraft } from './aircraft-fleet.js';
 import { getActiveRunwayNameForIcao, evaluateTakeoffFromRaw, getAircraftRef } from './takeoff-performance.js';
 import { drawNavLogPdf } from './navlog-pdf.js';
-import { computeWb, resolveLoads } from './wb-core.js';
+import { computeWb, resolveLoads, normalizeEnvelope } from './wb-core.js';
 import { makeCollapsible } from './collapsible.js';
 import { computeFlightPlan, computeMultiLegFlightPlan, getDefaultAircraftPerf, greatCircleDistanceNm, RESERVES } from './flight-planner.js';
 import { getActiveRunwaySurfaceInfo, isSoftSurface } from './runway-surface.js';
@@ -360,7 +360,8 @@ async function _generateNavLogPdf() {
         centro = {
             isFr: isFr3, fromIcao,
             reg: ac.registration || ac.name, type: ac.type || '',
-            wb: ac.wb, calc: computeWb(ac.wb, loads),
+            wb: { ...ac.wb, envelope: normalizeEnvelope(ac.wb.envelope) },
+            calc: computeWb(ac.wb, loads),
             fuelL: loads.fuelL, burnL: loads.burnL,
         };
     }
