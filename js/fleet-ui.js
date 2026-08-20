@@ -22,7 +22,7 @@ import {
 import { searchAircraft } from './aircraft-database.js';
 import {
     defaultStations, computeWb, resolveLoads, mountWbChart,
-    armToMm, armFromMm, massToKg, massFromKg, armDecimals,
+    armToMm, armFromMm, massToKg, massFromKg, armDecimals, normalizeEnvelope,
 } from './wb-core.js';
 
 let _onCloseCallback = null;
@@ -416,10 +416,10 @@ function _draftToWb() {
     const u = d.units;
     const em = _num(d.emptyMass), ea = _num(d.emptyArm);
     if (!isFinite(em) || em <= 0 || !isFinite(ea)) return null;
-    const envelope = d.envelope
+    const envelope = normalizeEnvelope(d.envelope
         .map(p => [_num(p[0]), _num(p[1])])
         .filter(p => isFinite(p[0]) && p[0] > 0 && isFinite(p[1]))
-        .map(p => [massToKg(p[0], u.mass), armToMm(p[1], u.arm)]);
+        .map(p => [massToKg(p[0], u.mass), armToMm(p[1], u.arm)]));
     if (envelope.length < 3) return null;
     // Les postes sans bras sont conservés (armMm null) : ignorés au calcul
     // par wb-core, la saisie partielle n'est jamais perdue.

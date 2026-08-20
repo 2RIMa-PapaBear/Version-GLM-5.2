@@ -1081,23 +1081,37 @@ function _drawCentroChart(doc, c, xL, xR, yT, CH) {
     }
 
     // Points : Décollage (vert) / Arrivée (orange, étiquette à GAUCHE) /
-    // ZFW (rouge) / À vide (gris discret) — mise en page validée en maquette.
+    // ZFW (rouge) / À vide (gris discret) — mise en page validée en maquette,
+    // avec bascule de côté si l'étiquette déborderait du graphe et décalage
+    // vertical entre étiquettes d'un même côté (points proches).
     const P = [
-        { p: c.calc.takeoff, col: WB_GREEN, r: 3.2, lab: `${fr ? 'Décollage' : 'Takeoff'} ${fmtM(c.calc.takeoff.massKg)} · ${fmtA(c.calc.takeoff.cgMm)}`, dx: 9, right: false },
-        { p: c.calc.arrival, col: WB_AMBER, r: 2.8, lab: `${fr ? 'Arrivée' : 'Landing'} ${fmtM(c.calc.arrival.massKg)} · ${fmtA(c.calc.arrival.cgMm)}`, dx: -6, right: true },
-        { p: c.calc.zfw, col: WB_RED, r: 2.8, lab: `ZFW ${fmtM(c.calc.zfw.massKg)} · ${fmtA(c.calc.zfw.cgMm)}`, dx: 6, right: false },
-        { p: c.calc.empty, col: MUTED, r: 2.4, lab: `${fr ? 'Vide' : 'Empty'} ${fmtM(c.calc.empty.massKg)} · ${fmtA(c.calc.empty.cgMm)}`, dx: 8, right: false },
-    ];
+        { p: c.calc.takeoff, col: WB_GREEN, r: 3.2, lab: `${fr ? 'Décollage' : 'Takeoff'} ${fmtM(c.calc.takeoff.massKg)} · ${fmtA(c.calc.takeoff.cgMm)}`, side: 'right' },
+        { p: c.calc.arrival, col: WB_AMBER, r: 2.8, lab: `${fr ? 'Arrivée' : 'Landing'} ${fmtM(c.calc.arrival.massKg)} · ${fmtA(c.calc.arrival.cgMm)}`, side: 'left' },
+        { p: c.calc.zfw, col: WB_RED, r: 2.8, lab: `ZFW ${fmtM(c.calc.zfw.massKg)} · ${fmtA(c.calc.zfw.cgMm)}`, side: 'right' },
+        { p: c.calc.empty, col: MUTED, r: 2.4, lab: `${fr ? 'Vide' : 'Empty'} ${fmtM(c.calc.empty.massKg)} · ${fmtA(c.calc.empty.cgMm)}`, side: 'right' },
+    ].filter(q => q.p.cgMm != null && isFinite(q.p.cgMm));
     for (const q of P) {
-        if (q.p.cgMm == null || !isFinite(q.p.cgMm)) continue;
         doc.setFillColor(...q.col);
         doc.circle(xOf(q.p.cgMm), yOf(q.p.massKg), q.r, 'F');
     }
     doc.setFont('courier', 'bold'); doc.setFontSize(7);
-    for (const q of P) {
-        if (q.p.cgMm == null || !isFinite(q.p.cgMm)) continue;
-        _setInk(doc, q.col === MUTED ? MUTED : q.col);
-        doc.text(q.lab, xOf(q.p.cgMm) + q.dx, yOf(q.p.massKg) + 2, q.right ? { align: 'right' } : undefined);
+    const labs = P.map(q => {
+        const x = xOf(q.p.cgMm), y = yOf(q.p.massKg);
+        const w = doc.getTextWidth(q.lab);
+        let side = q.side;
+        if (side === 'right' && x + 8 + w > xR - 2) side = 'left';
+        else if (side === 'left' && x - 6 - w < xL + 2) side = 'right';
+        return { x, y, w, side, lab: q.lab, col: q.col };
+    });
+    for (const side of ['right', 'left']) {
+        const group = labs.filter(l => l.side === side).sort((a, b) => a.y - b.y);
+        for (let i = 1; i < group.length; i++) {
+            if (Math.abs(group[i].y - group[i - 1].y) < 9) group[i].y = group[i - 1].y + 9;
+        }
+    }
+    for (const l of labs) {
+        _setInk(doc, l.col === MUTED ? MUTED : l.col);
+        doc.text(l.lab, l.x + (l.side === 'left' ? -6 : 8), l.y + 2, l.side === 'left' ? { align: 'right' } : undefined);
     }
 
     return yB + 24;
