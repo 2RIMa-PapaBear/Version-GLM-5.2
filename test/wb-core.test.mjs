@@ -188,4 +188,38 @@ describe('wb — intégration flotte (sanitize du bloc)', () => {
         assert.equal(ac.wb.stations[4].name, 'Bagages');
         assert.equal(ac.wb.stations[4].maxKg, 40);
     });
+
+    // Régression « le centrage ne s'enregistre pas » : un bloc avec des postes
+    // sans bras (saisie partielle) doit rester VALIDE (postes conservés,
+    // ignorés au calcul) au lieu d'être silencieusement effacé.
+    test('postes sans bras : conservés (armMm null), bloc valide, ignorés au calcul', () => {
+        const partial = {
+            ...AC_WB,
+            stations: [
+                { name: 'Pilote', armMm: null, fuel: false },
+                { name: 'Bagages', armMm: 1600, maxKg: 40, fuel: false },
+                { name: 'Carburant', armMm: null, fuel: true },
+            ],
+        };
+        const ac = fleet.addAircraft({ name: 'X', groundRoll: 500, fiftyFt: 1100, wb: partial });
+        assert.equal(ac.wb.emptyMassKg, 628);
+        assert.equal(ac.wb.stations.length, 3);
+        assert.equal(ac.wb.stations[0].armMm, null);
+        // Calcul : seuls la masse à vide et les bagages comptent.
+        const r = wb.computeWb(ac.wb, { masses: { 'Pilote': 82, 'Bagages': 15 }, fuelL: 100, burnL: 41 });
+        assert.equal(r.rows.length, 2);                 // vide + bagages seulement
+        assert.equal(r.takeoff.massKg, 628 + 15);       // pilote sans bras + carburant ignorés
+        assert.equal(r.fuelKg, 0);
+    });
+
+    test('aucun poste : bloc valide, chargement = masse à vide', () => {
+        const ac = fleet.addAircraft({
+            name: 'Y', groundRoll: 500, fiftyFt: 1100,
+            wb: { emptyMassKg: 600, emptyArmMm: 300, envelope: AC_WB.envelope, stations: [] },
+        });
+        assert.equal(ac.wb.stations.length, 0);
+        const r = wb.computeWb(ac.wb, { masses: {}, fuelL: 50, burnL: 10 });
+        assert.equal(r.takeoff.massKg, 600);
+        assert.equal(r.zfw.cgMm, 300);
+    });
 });

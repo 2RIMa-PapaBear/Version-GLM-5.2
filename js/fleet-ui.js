@@ -33,7 +33,11 @@ let _onCloseCallback = null;
 // modifications du bloc sont enregistrées (sinon l'existant est préservé).
 let _wbDraft = null;
 let _wbTouched = false;
+let _wbRemove = false;      // retrait explicite de la configuration (bouton)
 let _wbPreviewDispose = null;
+
+/** Marque la section comme modifiée (annule un retrait demandé). */
+function _wbTouch() { _wbTouched = true; _wbRemove = false; }
 
 /**
  * Ouvre le modal de gestion de la flotte.
@@ -42,7 +46,7 @@ let _wbPreviewDispose = null;
 export function openFleetManager(onClose) {
     _onCloseCallback = onClose || null;
     _wbDraft = null;
-    _wbTouched = false;
+    _wbTouched = false; _wbRemove = false;
     _ensureModal();
     _render();
     document.getElementById('fleet-overlay').style.display = 'flex';
@@ -195,7 +199,7 @@ function _render() {
     // Le re-render complet repart d'un formulaire vierge : le brouillon
     // centrage repart à défaut (sauf _fillForm juste après, mode édition).
     if (!_wbDraft) _wbDraft = _defaultWbDraft();
-    _wbTouched = false;
+    _wbTouched = false; _wbRemove = false;
     _renderWbSection();
 
     // --- Branchement des actions ---
@@ -318,7 +322,7 @@ function _fillForm(id) {
     document.getElementById('fleet-burn').value = ac.fuelBurnLph || '';
 
     _wbDraft = ac.wb ? _wbDraftFrom(ac) : _defaultWbDraft();
-    _wbTouched = false;
+    _wbTouched = false; _wbRemove = false;
     _renderWbSection();
 
     document.getElementById('fleet-form-title').textContent = isFr ? 'Modifier l\'avion' : 'Edit aircraft';
@@ -340,7 +344,7 @@ function _resetForm() {
     document.getElementById('fleet-cruise').value = '';
     document.getElementById('fleet-burn').value = '';
     _wbDraft = _defaultWbDraft();
-    _wbTouched = false;
+    _wbTouched = false; _wbRemove = false;
     _renderWbSection();
     document.getElementById('fleet-form-title').textContent = isFr ? 'Ajouter un avion' : 'Add an aircraft';
     document.getElementById('fleet-cancel-form').style.display = 'none';
@@ -387,7 +391,8 @@ function _wbDraftFrom(ac) {
     d.density = String(wb.fuelDensity);
     d.stations = wb.stations.map(s => ({
         name: s.name, fuel: !!s.fuel,
-        arm: String(+armFromMm(s.armMm, u.arm).toFixed(armDecimals(u.arm))),
+        arm: (s.armMm != null && isFinite(s.armMm))
+            ? String(+armFromMm(s.armMm, u.arm).toFixed(armDecimals(u.arm))) : '',
         max: s.maxKg ? String(Math.round(massFromKg(s.maxKg, u.mass))) : '',
     }));
     d.envelope = wb.envelope.map(([m, a]) => [
@@ -416,14 +421,14 @@ function _draftToWb() {
         .filter(p => isFinite(p[0]) && p[0] > 0 && isFinite(p[1]))
         .map(p => [massToKg(p[0], u.mass), armToMm(p[1], u.arm)]);
     if (envelope.length < 3) return null;
+    // Les postes sans bras sont conservés (armMm null) : ignorés au calcul
+    // par wb-core, la saisie partielle n'est jamais perdue.
     const stations = d.stations
         .map(s => ({ name: String(s.name || '').trim() || 'Poste', fuel: !!s.fuel,
                      arm: _num(s.arm), max: _num(s.max) }))
         .map(s => ({ name: s.name, fuel: s.fuel,
-                     armMm: isFinite(s.arm) ? armToMm(s.arm, u.arm) : NaN,
-                     maxKg: (isFinite(s.max) && s.max > 0) ? massToKg(s.max, u.mass) : null }))
-        .filter(s => isFinite(s.armMm));
-    if (stations.length < 1) return null;
+                     armMm: isFinite(s.arm) ? armToMm(s.arm, u.arm) : null,
+                     maxKg: (isFinite(s.max) && s.max > 0) ? massToKg(s.max, u.mass) : null }));
     const mt = _num(d.mtow), de = _num(d.density);
     return {
         units: { mass: u.mass, arm: u.arm },
@@ -489,12 +494,29 @@ function _renderWbSection() {
         </div>
         <div class="fleet-wb-sub">${isFr ? 'Aperçu du centrogramme' : 'Centrogram preview'}</div>
         <div id="wb-preview" class="wb-preview"></div>
+        <button class="wb-remove-btn" id="wb-remove-btn">
+            <i data-lucide="trash-2" style="width:11px;height:11px;"></i>
+            ${isFr ? 'Retirer le centrage de cet avion' : 'Remove this aircraft W&B'}
+        </button>
     `;
+
+    if (window.lucide) window.lucide.createIcons({ root: body });
+
+    // Retrait explicite de la configuration (wb = null à l'enregistrement).
+    const rmBtn = body.querySelector('#wb-remove-btn');
+    if (rmBtn) rmBtn.addEventListener('click', () => {
+        if (!confirm(isFr ? 'Retirer la configuration de centrage de cet avion ?'
+                          : 'Remove this aircraft\'s weight & balance configuration?')) return;
+        _wbDraft = _defaultWbDraft();
+        _wbRemove = true;
+        _wbTouched = true;
+        _renderWbSection();
+    });
 
     // La section dépliée (ou modifiée) marque le brouillon comme touché :
     // c'est seulement alors que l'enregistrement écrit le bloc wb.
     const details = document.getElementById('fleet-wb-section');
-    if (details) details.addEventListener('toggle', () => { if (details.open) _wbTouched = true; });
+    if (details) details.addEventListener('toggle', () => { if (details.open) _wbTouch(); });
 
     // Unités : convertit les valeurs du brouillon vers la nouvelle unité.
     const convertDraftUnits = () => {
@@ -514,7 +536,7 @@ function _renderWbSection() {
         d.envelope = d.envelope.map(p => [_num(p[0]) || 0, _num(p[1]) || 0])
             .map(([m, a]) => [+massFromKg(massToKg(m, oldMass), newMass).toFixed(1),
                               +armFromMm(armToMm(a, oldArm), newArm).toFixed(armDecimals(newArm))]);
-        _wbTouched = true;
+        _wbTouch();
         _renderWbSection();
     };
     body.querySelector('#wb-mass-unit').addEventListener('change', convertDraftUnits);
@@ -525,7 +547,7 @@ function _renderWbSection() {
         const el = body.querySelector(sel);
         if (el) el.addEventListener('input', () => {
             d[prop] = el.value;
-            _wbTouched = true;
+            _wbTouch();
             _refreshWbPreview();
         });
     };
@@ -543,7 +565,7 @@ function _renderWbSection() {
         if (e.target.classList.contains('wb-st-name')) s.name = e.target.value;
         if (e.target.classList.contains('wb-st-arm')) s.arm = e.target.value;
         if (e.target.classList.contains('wb-st-max')) s.max = e.target.value;
-        _wbTouched = true;
+        _wbTouch();
         _refreshWbPreview();
     });
     const envEl = body.querySelector('#wb-envelope');
@@ -553,7 +575,7 @@ function _renderWbSection() {
         if (!p) return;
         if (e.target.classList.contains('wb-env-m')) p[0] = e.target.value;
         if (e.target.classList.contains('wb-env-a')) p[1] = e.target.value;
-        _wbTouched = true;
+        _wbTouch();
         _refreshWbPreview();
     });
     body.addEventListener('click', (e) => {
@@ -561,17 +583,17 @@ function _renderWbSection() {
         const i = parseInt(e.target.dataset.i, 10);
         if (e.target.dataset.del === 'st') d.stations.splice(i, 1);
         else d.envelope.splice(i, 1);
-        _wbTouched = true;
+        _wbTouch();
         _renderWbSection();
     });
     body.querySelector('#wb-add-station')?.addEventListener('click', () => {
         d.stations.push({ name: '', fuel: false, arm: '', max: '' });
-        _wbTouched = true;
+        _wbTouch();
         _renderWbSection();
     });
     body.querySelector('#wb-add-point')?.addEventListener('click', () => {
         d.envelope.push(['', '']);
-        _wbTouched = true;
+        _wbTouch();
         _renderWbSection();
     });
 
@@ -638,8 +660,21 @@ function _doSave() {
         fuelBurnLph: burn || null,
     };
     // Bloc centrage : écrit seulement si la section a été touchée — sinon
-    // l'édition d'un autre champ préserve la configuration existante.
-    if (_wbTouched) data.wb = _draftToWb();
+    // l'édition d'un autre champ préserve la configuration existante. Un
+    // centrage incomplet BLOQUE l'enregistrement avec un message (plus
+    // jamais d'effacement silencieux).
+    if (_wbRemove) {
+        data.wb = null;
+    } else if (_wbTouched) {
+        const wbBlock = _draftToWb();
+        if (!wbBlock) {
+            _formError(isFr
+                ? 'Centrage incomplet : la masse à vide, le CG à vide et au moins 3 points d\'enveloppe sont obligatoires (les postes sans bras sont simplement ignorés).'
+                : 'Incomplete weight & balance: empty weight, empty CG and at least 3 envelope points are required (stations without arm are ignored).');
+            return;
+        }
+        data.wb = wbBlock;
+    }
 
     const editId = document.getElementById('fleet-edit-id').value;
     if (editId) {

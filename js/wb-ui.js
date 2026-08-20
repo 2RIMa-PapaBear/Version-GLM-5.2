@@ -83,8 +83,10 @@ function _render(body, ac, isFr) {
     const plan = state._lastNavPlan?.plan;
     const loads = resolveLoads(ac.id, plan);
 
-    const stations = wb.stations.filter(s => !s.fuel);
-    const fuelSt = wb.stations.find(s => s.fuel);
+    // Postes sans bras (saisie incomplète côté flotte) : ignorés ici.
+    const usable = (s) => s.armMm != null && isFinite(s.armMm);
+    const stations = wb.stations.filter(s => !s.fuel && usable(s));
+    const fuelSt = wb.stations.find(s => s.fuel && usable(s));
 
     body.innerHTML = `
         <div class="wb-ac-line">
