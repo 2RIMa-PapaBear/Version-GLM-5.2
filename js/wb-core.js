@@ -266,8 +266,12 @@ function _fmtTick(v, unit) {
 export function wbChartLayout(wb, calc, width = 340) {
     const unitArm = wb.units?.arm || 'mm';
     const unitMass = wb.units?.mass || 'kg';
-    const arms = [wb.emptyArmMm, ...wb.envelope.map(p => p[1])];
-    const masses = [wb.emptyMassKg, ...wb.envelope.map(p => p[0])];
+    // Échelles calées sur les données UTILES : enveloppe + points
+    // décollage/arrivée/ZFW + MTOW. Le point « à vide » n'est plus tracé
+    // ni inclus (il tirait les axes sous la masse mini de l'enveloppe et
+    // écrasait le dessin).
+    const arms = [...wb.envelope.map(p => p[1])];
+    const masses = [...wb.envelope.map(p => p[0])];
     for (const p of [calc.takeoff, calc.arrival, calc.zfw]) {
         if (p.cgMm != null && isFinite(p.cgMm)) arms.push(p.cgMm);
         masses.push(p.massKg);
@@ -275,8 +279,9 @@ export function wbChartLayout(wb, calc, width = 340) {
     let aMin = Math.min(...arms), aMax = Math.max(...arms);
     let mMin = Math.min(...masses), mMax = Math.max(...masses);
     if (wb.mtowKg > 0) mMax = Math.max(mMax, wb.mtowKg);
-    const padA = (aMax - aMin) * 0.1 || 50;
-    const padM = (mMax - mMin) * 0.12 || 50;
+    // Marge minimale de respiration (5 %) autour des min/max réels.
+    const padA = (aMax - aMin) * 0.05 || 20;
+    const padM = (mMax - mMin) * 0.05 || 20;
     aMin -= padA; aMax += padA; mMin = Math.max(0, mMin - padM); mMax += padM;
 
     // Dimensions ADAPTÉES à la largeur : hauteur ~1/3 de la largeur (bornée)
@@ -324,15 +329,15 @@ export function wbChartSvg(wb, calc, isFr = true, width = 340, opts = {}) {
     const val = (kg) => fmt(massFromKg(kg, L.unitMass));
     const arm = (mm) => fmt(armFromMm(mm, L.unitArm), armDecimals(L.unitArm));
 
-    // Les 4 points (textes courts : valeurs sans unité). Étiquettes :
-    // Décollage/ZFW/À vide à droite, Arrivée à gauche (mise en page validée),
-    // avec BASCULE de côté si l'étiquette déborderait du graphe et décalage
-    // vertical de 11 px entre étiquettes d'un même côté (points proches).
+    // Les 3 points (textes courts : valeurs sans unité) : Décollage/ZFW à
+    // droite, Arrivée à gauche (mise en page validée), avec BASCULE de côté
+    // si l'étiquette déborderait du graphe et décalage vertical de 11 px
+    // entre étiquettes d'un même côté (points proches). Le point « à vide »
+    // n'est pas tracé (échelles calées sur enveloppe + points de vol).
     const defs = [
         { p: calc.takeoff, col: C.ptTakeoff, r: 3.2, text: `${isFr ? 'Décollage' : 'Takeoff'} ${val(calc.takeoff.massKg)} · ${arm(calc.takeoff.cgMm)}`, side: 'right' },
         { p: calc.arrival, col: C.ptArrival, r: 2.8, text: `${isFr ? 'Arrivée' : 'Landing'} ${val(calc.arrival.massKg)} · ${arm(calc.arrival.cgMm)}`, side: 'left' },
         { p: calc.zfw, col: C.ptZfw, r: 2.8, text: `ZFW ${val(calc.zfw.massKg)} · ${arm(calc.zfw.cgMm)}`, side: 'right' },
-        { p: calc.empty, col: C.ptEmpty, r: 2.4, text: `${isFr ? 'Vide' : 'Empty'} ${val(calc.empty.massKg)} · ${arm(calc.empty.cgMm)}`, side: 'right' },
     ].filter(d => d.p.cgMm != null && isFinite(d.p.cgMm));
 
     let ptsSvg = defs.map(d =>

@@ -983,7 +983,7 @@ function _drawCentroPage(doc, c) {
     let lx = L + 1;
     const LEG = [
         [WB_GREEN, fr ? 'Décollage' : 'Takeoff'], [WB_AMBER, fr ? 'Arrivée' : 'Landing'],
-        [WB_RED, 'ZFW'], [MUTED, fr ? 'À vide' : 'Empty'], [BLUE, fr ? 'Enveloppe' : 'Envelope'],
+        [WB_RED, 'ZFW'], [BLUE, fr ? 'Enveloppe' : 'Envelope'],
         [[220, 38, 38], 'MTOW'],
     ];
     for (const [col, lab] of LEG) {
@@ -1025,9 +1025,10 @@ function _drawCentroChart(doc, c, xL, xR, yT, CH) {
     };
     const fmtM = (kg) => th(u.mass === 'lbs' ? kg * WB_LB_PER_KG : kg);
 
-    // Plage : enveloppe ∪ 4 points ∪ MTOW, avec marge.
-    const arms = [c.wb.emptyArmMm, ...c.wb.envelope.map(p => p[1])];
-    const masses = [c.wb.emptyMassKg, ...c.wb.envelope.map(p => p[0])];
+    // Plage : enveloppe ∪ 3 points de vol ∪ MTOW (point « à vide » exclu),
+    // avec marge minimale de respiration (5 %) autour des min/max réels.
+    const arms = [...c.wb.envelope.map(p => p[1])];
+    const masses = [...c.wb.envelope.map(p => p[0])];
     for (const p of [c.calc.takeoff, c.calc.arrival, c.calc.zfw]) {
         if (p.cgMm != null && isFinite(p.cgMm)) arms.push(p.cgMm);
         masses.push(p.massKg);
@@ -1035,7 +1036,7 @@ function _drawCentroChart(doc, c, xL, xR, yT, CH) {
     if (c.wb.mtowKg > 0) masses.push(c.wb.mtowKg);
     let aMin = Math.min(...arms), aMax = Math.max(...arms);
     let mMin = Math.min(...masses), mMax = Math.max(...masses);
-    const padA = (aMax - aMin) * 0.1 || 50, padM = (mMax - mMin) * 0.12 || 50;
+    const padA = (aMax - aMin) * 0.05 || 12, padM = (mMax - mMin) * 0.05 || 12;
     aMin -= padA; aMax += padA; mMin = Math.max(0, mMin - padM); mMax += padM;
 
     const yB = yT + CH, plotW = xR - xL;
@@ -1081,14 +1082,13 @@ function _drawCentroChart(doc, c, xL, xR, yT, CH) {
     }
 
     // Points : Décollage (vert) / Arrivée (orange, étiquette à GAUCHE) /
-    // ZFW (rouge) / À vide (gris discret) — mise en page validée en maquette,
-    // avec bascule de côté si l'étiquette déborderait du graphe et décalage
-    // vertical entre étiquettes d'un même côté (points proches).
+    // ZFW (rouge) — mise en page validée, avec bascule de côté si l'étiquette
+    // déborderait du graphe et décalage vertical entre étiquettes d'un même
+    // côté (points proches). Le point « à vide » n'est pas tracé.
     const P = [
         { p: c.calc.takeoff, col: WB_GREEN, r: 3.2, lab: `${fr ? 'Décollage' : 'Takeoff'} ${fmtM(c.calc.takeoff.massKg)} · ${fmtA(c.calc.takeoff.cgMm)}`, side: 'right' },
         { p: c.calc.arrival, col: WB_AMBER, r: 2.8, lab: `${fr ? 'Arrivée' : 'Landing'} ${fmtM(c.calc.arrival.massKg)} · ${fmtA(c.calc.arrival.cgMm)}`, side: 'left' },
         { p: c.calc.zfw, col: WB_RED, r: 2.8, lab: `ZFW ${fmtM(c.calc.zfw.massKg)} · ${fmtA(c.calc.zfw.cgMm)}`, side: 'right' },
-        { p: c.calc.empty, col: MUTED, r: 2.4, lab: `${fr ? 'Vide' : 'Empty'} ${fmtM(c.calc.empty.massKg)} · ${fmtA(c.calc.empty.cgMm)}`, side: 'right' },
     ].filter(q => q.p.cgMm != null && isFinite(q.p.cgMm));
     for (const q of P) {
         doc.setFillColor(...q.col);
