@@ -178,18 +178,19 @@ describe('wb — chargement du jour (persistance + plan)', () => {
 
 describe('wb — SVG du centrogramme', () => {
     const r = wb.computeWb(AC_WB, LOADS);
-    test('contient enveloppe, 4 points, axes, MTOW ; pas de NaN', () => {
+    test('contient enveloppe, 3 points, axes, MTOW ; pas de NaN, point vide absent', () => {
         const svg = wb.wbChartSvg(AC_WB, r, true, 340);
         assert.ok(svg.includes('<polygon'));
         assert.ok(svg.includes('MTOW'));
         assert.ok(!svg.includes('NaN') && !svg.includes('undefined'));
-        assert.equal((svg.match(/<circle/g) || []).length, 4);
+        assert.equal((svg.match(/<circle/g) || []).length, 3);
+        assert.ok(!svg.includes('Vide'));
         assert.ok(svg.includes('Bras de levier (mm)'));
         assert.ok(svg.includes('Masse (kg)'));
     });
     test('hidePointLabels : points sans étiquettes textuelles', () => {
         const svg = wb.wbChartSvg(AC_WB, r, true, 340, { hidePointLabels: true });
-        assert.equal((svg.match(/<circle/g) || []).length, 4);
+        assert.equal((svg.match(/<circle/g) || []).length, 3);
         assert.ok(!svg.includes('Décollage'));
     });
     test('unités lbs/in : axes et enveloppe convertis', () => {
