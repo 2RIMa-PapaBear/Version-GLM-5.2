@@ -14,6 +14,7 @@
 
 import { state, escapeHtml } from './core.js';
 import { makeCollapsible } from './collapsible.js';
+import { takeoffProfileSvg } from './takeoff-profile.js';
 import {
     evaluateTakeoffPerformance, getRunwayLength,
     getAircraftRef, getActiveRunwayNameForIcao,
@@ -152,6 +153,9 @@ function render(container, r, icao) {
                         : ''}
                 </div>
             </div>
+        </div>
+        <div style="margin-top:10px;">
+            ${takeoffProfileSvg(r, isFr)}
         </div>
         ${barHtml}
         <div style="display:flex; align-items:flex-end; gap:8px; margin-top:10px; flex-wrap:wrap;">
