@@ -74,10 +74,6 @@ const PLOT_BG = [248, 250, 252];     // fond du graphique
 const CAT_PRINT = {                  // CAT_COLORS écran → équivalents papier
     VFR: [5, 150, 105], MVFR: [2, 132, 199], IFR: [185, 28, 28], LIFR: [146, 22, 138],
 };
-const LVL_FILL = {                   // fonds clairs de la barre de marge décollage
-    ok: [209, 250, 229], caution: [254, 243, 199], danger: [254, 226, 226],
-};
-
 // Tailles de police harmonisées.
 const SZ = { body: 9, title: 10, doc: 11, thead: 8 };
 
@@ -187,7 +183,16 @@ function _alertBanner(doc, L, R, W, y, danger, text) {
  *     profile { fromIcao, toIcao, distTotalKm, minFt, maxFt, cruiseAltFt,
  *               points[{frac,elevFt}], waypoints[{icao,frac}] } | null,
  *     alternates { maxOffsetNm, rows[{code,name,cat,visiStr,ceilStr,
- *                 windStr,offsetNm,side}] } | null }
+ *                 windStr,offsetNm,side}] } | null },
+ *   centro (optionnel) → ajoute une 4e page « Centrage » (avion actif
+ *   configuré dans la flotte) : { isFr, fromIcao, reg, type,
+ *     wb { units{mass,arm}, emptyMassKg, emptyArmMm, mtowKg, fuelDensity,
+ *          envelope[[massKg,armMm]], ... },
+ *     calc { rows[{name,armMm,massKg,fuel,empty}], zfw/takeoff/arrival
+ *            {massKg,cgMm}, fuelKg, burnKg, points{...}, mtowOk, level },
+ *     fuelL, burnL }
+ *   Les valeurs sont reçues en kg/mm (brutes de wb-core.js) et converties
+ *   localement dans les unités d'affichage de l'avion.
  */
 export function drawNavLogPdf(jsPDFCtor, d) {
     const doc = new jsPDFCtor({ unit: 'pt', format: [PAGE.w, PAGE.h], orientation: 'portrait' });
@@ -424,6 +429,9 @@ export function drawNavLogPdf(jsPDFCtor, d) {
 
     // ---- Page 3 : « Performances et terrain » ----
     if (d.perf) _drawPerfPage(doc, d.perf);
+
+    // ---- Page 4 : « Centrage » (avion actif configuré dans la flotte) ----
+    if (d.centro) _drawCentroPage(doc, d.centro);
 
     return doc;
 }
@@ -671,35 +679,10 @@ function _drawPerfPage(doc, p) {
              { color: t.marginM != null ? lvlColor : MUTED, size: 12 });
         y += 33;
 
-        // Barre visuelle marge (reproduction du widget écran) : roulement plein,
-        // franchissement 50 ft en teinte claire, sur la piste disponible.
+        // Coupe de la piste (avion au seuil, roulement, montée au 50 ft,
+        // marge/manque) — plus visuelle que la barre en plan qu'elle remplace.
         if (t.runwayLengthM != null && t.runwayLengthM > 0) {
-            const BH = 20;
-            doc.setFillColor(...CELL_BG); doc.setDrawColor(...LINE); doc.setLineWidth(0.5);
-            doc.rect(L, y, W, BH, 'FD');
-            const fiftyW = W * Math.min(1, t.fiftyFtM / t.runwayLengthM);
-            const rollW = W * Math.min(1, t.groundRollM / t.runwayLengthM);
-            doc.setFillColor(...LVL_FILL[lvl]);
-            doc.rect(L, y, fiftyW, BH, 'F');
-            doc.setFillColor(...lvlColor);
-            doc.rect(L, y, rollW, BH, 'F');
-            // Petite légende sous la barre (pastilles couleur + échelle).
-            doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); _setInk(doc, MUTED);
-            let lx = L + 1;
-            const legend = [
-                [lvlColor, fr ? 'Roulement' : 'Roll'],
-                [LVL_FILL[lvl], fr ? 'Franch. 50 ft' : '50 ft'],
-                [CELL_BG, fr ? 'Piste disponible' : 'Runway'],
-            ];
-            for (const [bg, lab] of legend) {
-                doc.setFillColor(...bg); doc.setDrawColor(...LINE); doc.setLineWidth(0.4);
-                doc.rect(lx, y + BH + 5, 5, 5, 'FD');
-    doc.text(lab, lx + 8, y + BH + 9.5);
-                lx += 8 + doc.getTextWidth(lab) + 10;
-            }
-            // Échelle à droite de la légende : longueur totale de piste.
-            doc.text(`${t.runwayLengthM} m`, R, y + BH + 9.5, { align: 'right' });
-            y += BH + 20;
+            y = _drawTakeoffProfile(doc, t, L, R, y + 2, fr);
         } else {
             y += 4;
         }
@@ -792,6 +775,332 @@ function _drawPerfPage(doc, p) {
     }
 
     _footer(doc, fr);
+}
+
+// ---------------------------------------------------------------------------
+// Coupe de la piste (page 3) — avion au seuil, roulement, montée au 50 ft
+// et marge/manque, même langage visuel que le schéma écran du widget
+// (takeoff-profile.js) : piste pleine largeur, hauteur du 50 ft
+// schématique, montée tronquée au bord en danger. Retourne l'ordonnée Y
+// après le schéma.
+// ---------------------------------------------------------------------------
+// Silhouette d'avion de profil (polygones remplis), en unités locales avec
+// y vers le HAUT et l'origine au niveau du train principal — le même avion
+// est posé au seuil et en montée au point 50 ft (tourné de la pente).
+const PLANE_BODY = [[-8, 1.1], [6, 0.9], [7.6, 2.1], [7.2, 3.6], [4.6, 4.5], [-1, 4.3], [-4.2, 3.1], [-8, 2.7]];
+const PLANE_FIN = [[-8, 2.8], [-6, 3], [-8.4, 7.2], [-10.6, 6.8]];
+const PLANE_WING = [[-1.6, 4.6], [3.6, 4.8], [3.6, 5.5], [-1.6, 5.3]];
+
+function _planeProfile(doc, cx, cy, scale, climbDeg) {
+    const th = (climbDeg || 0) * Math.PI / 180;
+    const cos = Math.cos(th), sin = Math.sin(th);
+    // Repère écran (y vers le bas) : silhouette définie y vers le haut.
+    const tx = (x, y) => [cx + (x * cos - y * sin) * scale, cy - (x * sin + y * cos) * scale];
+    const poly = (pts) => {
+        const p = pts.map(([x, y]) => tx(x, y));
+        const segs = p.slice(1).map((q, i) => [q[0] - p[i][0], q[1] - p[i][1]]);
+        doc.lines(segs, p[0][0], p[0][1], [1, 1], 'F', true);
+    };
+    doc.setFillColor(...INK);
+    poly(PLANE_BODY); poly(PLANE_FIN); poly(PLANE_WING);
+    // Train principal + roulette avant (traits + roues pleines).
+    doc.setDrawColor(...INK); doc.setLineWidth(0.7);
+    const [ax1, ay1] = tx(0.5, 1), [ax2, ay2] = tx(0.5, -1.2);
+    doc.line(ax1, ay1, ax2, ay2);
+    doc.circle(ax2, ay2, 0.9 * scale, 'F');
+    const [bx1, by1] = tx(5.2, 1), [bx2, by2] = tx(5.2, -0.4);
+    doc.line(bx1, by1, bx2, by2);
+    doc.circle(bx2, by2, 0.55 * scale, 'F');
+}
+
+function _drawTakeoffProfile(doc, t, L, R, yTop, fr) {
+    const lvl = t.level === 'danger' ? 'danger' : (t.level === 'caution' ? 'caution' : 'ok');
+    const lvlColor = lvl === 'danger' ? REDTX : (lvl === 'caution' ? AMBER : GREEN);
+    const W = R - L;
+    const yBase = yTop + 44;                    // ligne de piste
+    const TOP50 = yTop + 6;                     // hauteur schématique du 50 ft
+    const pxPerM = W / t.runwayLengthM;
+    const rollX = L + t.groundRollM * pxPerM;
+    const fiftyDrawX = Math.min(L + t.fiftyFtM * pxPerM, R - 6);   // tronquée au bord en danger
+
+    // Sol hachuré sous la ligne de piste (coupe).
+    doc.setDrawColor(...BANDL); doc.setLineWidth(0.4);
+    for (let x = L + 3; x < R - 4; x += 7) doc.line(x, yBase + 6, x + 4, yBase + 2);
+    doc.setDrawColor(...LINE); doc.setLineWidth(0.7);
+    doc.line(L, yBase, R, yBase);
+
+    // Roulement (double trait en couleur du verdict) puis montée au 50 ft.
+    doc.setDrawColor(...lvlColor); doc.setLineWidth(2.4);
+    doc.line(L, yBase + 1.2, Math.min(rollX, R), yBase + 1.2);
+    doc.setLineWidth(1.3);
+    doc.line(rollX, yBase, fiftyDrawX, TOP50);
+    // Repère du point 50 ft : filet pointillé jusqu'à la piste.
+    doc.setDrawColor(...LINE); doc.setLineWidth(0.4);
+    doc.setLineDashPattern([2, 2], 0);
+    doc.line(fiftyDrawX, TOP50 + 3, fiftyDrawX, yBase);
+    doc.setLineDashPattern([], 0);
+
+    // Avions : posé au seuil, puis en montée au point 50 ft (tourné de la
+    // pente réelle du tracé, décalé pour ne pas mordre le bord droit).
+    _planeProfile(doc, L + 16, yBase - 1.4, 1, 0);
+    const climbDeg = Math.atan2(yBase - TOP50, Math.max(10, fiftyDrawX - rollX)) * 180 / Math.PI;
+    _planeProfile(doc, Math.min(fiftyDrawX - 5, R - 18), TOP50 + 2.5, 0.9, climbDeg);
+
+    // Étiquettes : roulement sous la piste à gauche, 50 ft près du point
+    // (bascule à gauche si elle déborderait du cadre), marge à droite.
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); _setInk(doc, INK);
+    doc.text(`${fr ? 'Roulement' : 'Roll'} ${t.groundRollM} m`, L + 1.5, yBase + 14);
+    const lbl50 = `${fr ? 'Franch. 50 ft' : '50 ft obstacle'} : ${t.fiftyFtM} m`;
+    if (fiftyDrawX + 6 + doc.getTextWidth(lbl50) <= R - 2) {
+        doc.text(lbl50, fiftyDrawX + 6, TOP50 + 2.5);
+    } else {
+        doc.text(lbl50, fiftyDrawX - 5, TOP50 + 2.5, { align: 'right' });
+    }
+    if (t.marginM != null) {
+        const marge = `${fr ? 'Marge' : 'Margin'} ${t.marginM >= 0 ? '+' : ''}${t.marginM} m · ${fr ? 'piste' : 'runway'} ${t.runwayLengthM} m`;
+        _setInk(doc, t.marginM >= 0 ? lvlColor : REDTX);
+        doc.text(marge, R - 2, yBase + 14, { align: 'right' });
+    }
+
+    return yBase + 20;
+}
+
+// ---------------------------------------------------------------------------
+// Page 4 — « Centrage » : chargement du jour + centrogramme de l'avion actif
+// (bloc wb de la flotte). Valeurs reçues en kg/mm (brutes de wb-core.js) et
+// converties localement dans les unités d'affichage de l'avion — facteurs
+// miroir de wb-core.js, le module restant volontairement sans import.
+// ---------------------------------------------------------------------------
+const WB_MM_PER_ARM = { mm: 1, m: 1000, ft: 304.8, in: 25.4 };
+const WB_LB_PER_KG = 2.2046226218;
+const WB_GREEN = [5, 150, 105], WB_AMBER = [180, 83, 9], WB_RED = [185, 28, 28];
+
+function _drawCentroPage(doc, c) {
+    const fr = c.isFr !== false;
+    doc.addPage([PAGE.w, PAGE.h], 'portrait');
+    doc.setFont('helvetica', 'normal');
+
+    const L = 16.4, R = 402.7, W = R - L, MID = (L + R) / 2;
+    const FRAME_BOT = 581.8;
+    const u = c.wb.units || { mass: 'kg', arm: 'mm' };
+    const dec = (u.arm === 'm' || u.arm === 'in') ? 1 : 0;
+    const th = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    const fmtA = (mm) => {
+        let s = (mm / WB_MM_PER_ARM[u.arm]).toFixed(dec);
+        if (s.endsWith('.0')) s = s.slice(0, -2);
+        return s;
+    };
+    const fmtM = (kg) => th(u.mass === 'lbs' ? kg * WB_LB_PER_KG : kg);
+
+    // ---- Bandeau titre + cadre extérieur (identiques aux pages 1-3) ----
+    doc.setFillColor(17, 24, 39);
+    doc.rect(16.4, 14.3, 386.3, 16.2, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(SZ.doc); _setInk(doc, [255, 255, 255]);
+    doc.text(fr ? 'Centrage' : 'Weight & balance', MID, 25.2, { align: 'center' });
+    doc.setDrawColor(...INK); doc.setLineWidth(0.8);
+    doc.rect(15, 29.9, 388.6, 551.9, 'S');
+
+    doc.setFont('courier', 'normal'); doc.setFontSize(8); _setInk(doc, MUTED);
+    doc.text(`${c.fromIcao} · ${c.reg}${c.type ? ' · ' + c.type : ''}`, L + 1.5, 45);
+
+    // ---- Section 1 : tableau de chargement (décollage) ----
+    // Colonnes alignées à GAUCHE et compactées (POSTE, BRAS, MASSE, MOMENT) :
+    // l'espace vide reste à droite, après la colonne Moment.
+    const rows = c.calc.rows || [];
+    let y = _section(doc, L, R, fr ? 'Chargement' : 'Loading', 54);
+    const CX = { arm: L + 135, mass: L + 195, mom: L + 255 };
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); _setInk(doc, MUTED);
+    doc.text(fr ? 'POSTE' : 'STATION', L + 1.5, y + 8, { charSpace: 0.4 });
+    doc.text(`${fr ? 'BRAS' : 'ARM'} (${u.arm.toUpperCase()})`, CX.arm, y + 8, { charSpace: 0.4 });
+    doc.text(`${fr ? 'MASSE' : 'WEIGHT'} (${u.mass.toUpperCase()})`, CX.mass, y + 8, { charSpace: 0.4 });
+    doc.text(`${fr ? 'MOMENT' : 'MOMENT'} (${u.mass.toUpperCase()}·${u.arm.toUpperCase()})`, CX.mom, y + 8, { charSpace: 0.4 });
+    const headBot = y + 11;
+    doc.setDrawColor(...LINE); doc.setLineWidth(0.5);
+    doc.line(L, headBot, R, headBot);
+    const RH = rows.length > 8 ? 10 : 12.6;
+    rows.forEach((r, i) => {
+        const base = headBot + i * RH + RH - 3;
+        const name = r.empty ? (fr ? 'Masse à vide' : 'Empty weight')
+            : (r.fuel ? `${r.name} (${c.fuelL} L)` : r.name);
+        doc.setFont('helvetica', r.empty ? 'bold' : 'normal'); doc.setFontSize(RH > 10 ? 7.5 : 7);
+        _setInk(doc, r.empty ? INK : MUTED);
+        doc.text(_trunc(doc, name, 245), L + 1.5, base);
+        doc.setFont('courier', r.empty ? 'bold' : 'normal'); _setInk(doc, INK);
+        doc.text(fmtA(r.armMm), CX.arm, base);
+        doc.text(fmtM(r.massKg), CX.mass, base);
+        doc.text(th((u.mass === 'lbs' ? r.massKg * WB_LB_PER_KG : r.massKg) * (r.armMm / WB_MM_PER_ARM[u.arm])),
+            CX.mom, base);
+        doc.setDrawColor(...BANDL); doc.setLineWidth(0.3);
+        doc.line(L, headBot + (i + 1) * RH, R, headBot + (i + 1) * RH);
+    });
+    const totBase = headBot + rows.length * RH + RH - 3;
+    doc.setDrawColor(...LINE); doc.setLineWidth(0.6);
+    doc.line(L, headBot + rows.length * RH, R, headBot + rows.length * RH);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); _setInk(doc, INK);
+    doc.text(fr ? `TOTAL — CG décollage : ${fmtA(c.calc.takeoff.cgMm)} ${u.arm}`
+                : `TOTAL — takeoff CG: ${fmtA(c.calc.takeoff.cgMm)} ${u.arm}`, L + 1.5, totBase);
+    doc.setFont('courier', 'bold'); _setInk(doc, BLUE);
+    doc.text(fmtM(c.calc.takeoff.massKg), CX.mass, totBase);
+    doc.text(th((u.mass === 'lbs' ? c.calc.takeoff.massKg * WB_LB_PER_KG : c.calc.takeoff.massKg)
+        * (c.calc.takeoff.cgMm / WB_MM_PER_ARM[u.arm])), CX.mom, totBase);
+
+    // Essence consommée (plan de nav) → point arrivée.
+    if (c.fuelL > 0 && c.burnL > 0) {
+        doc.setFont('courier', 'normal'); doc.setFontSize(6.5); _setInk(doc, MUTED);
+        const bk = u.mass === 'lbs'
+            ? th(c.calc.burnKg * WB_LB_PER_KG)
+            : (c.calc.burnKg < 100 ? c.calc.burnKg.toFixed(1).replace('.', ',') : th(c.calc.burnKg));
+        doc.text(fr ? `Essence consommée estimée (plan de nav) : ${c.burnL} L · ${bk} ${u.mass} — carburant à l'arrivée : ${Math.max(0, c.fuelL - c.burnL)} L`
+                    : `Estimated fuel burned (nav plan): ${c.burnL} L · ${bk} ${u.mass} — fuel at landing: ${Math.max(0, c.fuelL - c.burnL)} L`,
+            L + 1.5, totBase + 11);
+    }
+    y = totBase + 18;
+
+    // ---- Section 2 : centrogramme ----
+    y = _section(doc, L, R, fr ? 'Centrogramme — enveloppe de centrage' : 'Centrogram — CG envelope', y);
+    y = _drawCentroChart(doc, c, L + 42, R - 6, y + 2, 150);
+
+    // ---- Cellules résultats ----
+    y = _section(doc, L, R, null, y + 2);
+    const cw3 = (W - 2 * 7) / 3;
+    _cell(doc, L, y, cw3, 27, fr ? 'CG décollage' : 'Takeoff CG', `${fmtA(c.calc.takeoff.cgMm)} ${u.arm}`,
+        { color: WB_GREEN, size: 12 });
+    _cell(doc, L + cw3 + 7, y, cw3, 27, fr ? 'CG arrivée' : 'Landing CG', `${fmtA(c.calc.arrival.cgMm)} ${u.arm}`,
+        { color: WB_AMBER, size: 12 });
+    _cell(doc, L + 2 * (cw3 + 7), y, cw3, 27, fr ? 'CG zéro carburant' : 'Zero fuel CG', `${fmtA(c.calc.zfw.cgMm)} ${u.arm}`,
+        { color: WB_RED, size: 12 });
+    y += 31;
+    const mtow = c.wb.mtowKg > 0 ? c.wb.mtowKg : null;
+    _cell(doc, L, y, cw3, 27, fr ? 'Masse décollage' : 'Takeoff weight', `${fmtM(c.calc.takeoff.massKg)} ${u.mass}`);
+    _cell(doc, L + cw3 + 7, y, cw3, 27, 'MTOW', mtow ? `${fmtM(mtow)} ${u.mass}` : '—');
+    _cell(doc, L + 2 * (cw3 + 7), y, cw3, 27, fr ? 'Enveloppe' : 'Envelope',
+        c.calc.level === 'ok' ? (fr ? 'Dans les limites' : 'In limits') : (fr ? 'HORS LIMITES' : 'OUT OF LIMITS'),
+        { color: c.calc.level === 'ok' ? WB_GREEN : WB_RED, size: 9.5 });
+    y += 37;
+
+    // Légende (pastilles couleur, comme la barre de marge décollage p3).
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); _setInk(doc, MUTED);
+    let lx = L + 1;
+    const LEG = [
+        [WB_GREEN, fr ? 'Décollage' : 'Takeoff'], [WB_AMBER, fr ? 'Arrivée' : 'Landing'],
+        [WB_RED, 'ZFW'], [MUTED, fr ? 'À vide' : 'Empty'], [BLUE, fr ? 'Enveloppe' : 'Envelope'],
+        [[220, 38, 38], 'MTOW'],
+    ];
+    for (const [col, lab] of LEG) {
+        doc.setFillColor(...col); doc.setDrawColor(...LINE); doc.setLineWidth(0.4);
+        doc.circle(lx + 2.5, y - 5, 2.5, 'F');
+        doc.text(lab, lx + 9, y - 2.6);
+        lx += 11 + doc.getTextWidth(lab) + 9;
+    }
+
+    // Note POH ancrée en bas du cadre.
+    const fy = FRAME_BOT - 24;
+    doc.setDrawColor(...MUTED); doc.setLineWidth(0.5);
+    doc.circle(L + 3.5, fy + 1, 3.2, 'S');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); _setInk(doc, MUTED);
+    doc.text('i', L + 3.5, fy + 3.2, { align: 'center' });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); _setInk(doc, MUTED);
+    const note = fr
+        ? 'Centrogramme établi à partir des données de la flotte (masse à vide, enveloppe, postes) et du chargement saisi. La fiche de pesée et le manuel de vol restent la référence légale.'
+        : 'Centrogram built from fleet data (empty weight, envelope, stations) and the entered loading. The weighing sheet and POH remain the legal reference.';
+    _wrap(doc, note, W - 13).slice(0, 2).forEach((l, i) => doc.text(l, L + 11, fy + 2.5 + i * 9));
+
+    _footer(doc, fr);
+}
+
+// ---------------------------------------------------------------------------
+// Centrogramme vectoriel A5 — X = bras (unité de l'avion), Y = masse.
+// Échelles automatiques (enveloppe ∪ points ∪ masse à vide ∪ MTOW) comme le
+// widget écran wb-core.js. Retourne l'ordonnée Y après le graphique.
+// ---------------------------------------------------------------------------
+function _drawCentroChart(doc, c, xL, xR, yT, CH) {
+    const fr = c.isFr !== false;
+    const u = c.wb.units || { mass: 'kg', arm: 'mm' };
+    const dec = (u.arm === 'm' || u.arm === 'in') ? 1 : 0;
+    const th = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    const fmtA = (mm) => {
+        let s = (mm / WB_MM_PER_ARM[u.arm]).toFixed(dec);
+        if (s.endsWith('.0')) s = s.slice(0, -2);
+        return s;
+    };
+    const fmtM = (kg) => th(u.mass === 'lbs' ? kg * WB_LB_PER_KG : kg);
+
+    // Plage : enveloppe ∪ 4 points ∪ MTOW, avec marge.
+    const arms = [c.wb.emptyArmMm, ...c.wb.envelope.map(p => p[1])];
+    const masses = [c.wb.emptyMassKg, ...c.wb.envelope.map(p => p[0])];
+    for (const p of [c.calc.takeoff, c.calc.arrival, c.calc.zfw]) {
+        if (p.cgMm != null && isFinite(p.cgMm)) arms.push(p.cgMm);
+        masses.push(p.massKg);
+    }
+    if (c.wb.mtowKg > 0) masses.push(c.wb.mtowKg);
+    let aMin = Math.min(...arms), aMax = Math.max(...arms);
+    let mMin = Math.min(...masses), mMax = Math.max(...masses);
+    const padA = (aMax - aMin) * 0.1 || 50, padM = (mMax - mMin) * 0.12 || 50;
+    aMin -= padA; aMax += padA; mMin = Math.max(0, mMin - padM); mMax += padM;
+
+    const yB = yT + CH, plotW = xR - xL;
+    const xOf = a => xL + ((a - aMin) / (aMax - aMin)) * plotW;
+    const yOf = m => yT + (1 - (m - mMin) / (mMax - mMin)) * CH;
+
+    // Fond + grille (5 lignes × 5 colonnes) avec labels convertis.
+    doc.setFillColor(...PLOT_BG);
+    doc.rect(xL, yT, plotW, CH, 'F');
+    doc.setFont('courier', 'normal'); doc.setFontSize(6.5);
+    for (let i = 0; i <= 4; i++) {
+        const gy = yT + (1 - i / 4) * CH;
+        doc.setDrawColor(...BANDL); doc.setLineWidth(0.4);
+        doc.line(xL, gy, xR, gy);
+        _setInk(doc, MUTED);
+        doc.text(fmtM(mMin + (mMax - mMin) * i / 4), xL - 4, gy + 2.2, { align: 'right' });
+        const gx = xL + (i / 4) * plotW;
+        doc.line(gx, yT, gx, yB);
+        doc.text(fmtA(aMin + (aMax - aMin) * i / 4), gx, yB + 8, { align: 'center' });
+    }
+    doc.setDrawColor(...LINE); doc.setLineWidth(0.5);
+    doc.line(xL, yT, xL, yB); doc.line(xL, yB, xR, yB);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); _setInk(doc, MUTED);
+    doc.text(`${fr ? 'Bras de levier' : 'Arm'} (${u.arm})`, (xL + xR) / 2, yB + 19, { align: 'center' });
+    doc.text(`${fr ? 'Masse' : 'Weight'} (${u.mass})`, xL - 30, (yT + yB) / 2, { align: 'center', angle: 90 });
+
+    // Enveloppe (polygone rempli + trait bleu).
+    const pts = c.wb.envelope.map(([m, a]) => [xOf(a), yOf(m)]);
+    const segs = pts.slice(1).map((p, i) => [p[0] - pts[i][0], p[1] - pts[i][1]]);
+    doc.setFillColor(227, 242, 253); doc.setDrawColor(...BLUE); doc.setLineWidth(1.2);
+    doc.lines(segs, pts[0][0], pts[0][1], [1, 1], 'FD', true);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6); _setInk(doc, BLUE);
+    doc.text('ENV', xOf(aMin + (aMax - aMin) * 0.12) - 2, yOf(c.wb.envelope[0][0]) + 10);
+
+    // Ligne MTOW (rouge pointillée).
+    if (c.wb.mtowKg > 0 && c.wb.mtowKg >= mMin && c.wb.mtowKg <= mMax) {
+        doc.setDrawColor(220, 38, 38); doc.setLineWidth(0.9);
+        doc.setLineDashPattern([5, 3], 0);
+        doc.line(xL, yOf(c.wb.mtowKg), xR, yOf(c.wb.mtowKg));
+        doc.setLineDashPattern([], 0);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); _setInk(doc, [220, 38, 38]);
+        doc.text(`MTOW ${fmtM(c.wb.mtowKg)} ${u.mass}`, xR - 3, yOf(c.wb.mtowKg) - 3, { align: 'right' });
+    }
+
+    // Points : Décollage (vert) / Arrivée (orange, étiquette à GAUCHE) /
+    // ZFW (rouge) / À vide (gris discret) — mise en page validée en maquette.
+    const P = [
+        { p: c.calc.takeoff, col: WB_GREEN, r: 3.2, lab: `${fr ? 'Décollage' : 'Takeoff'} ${fmtM(c.calc.takeoff.massKg)} · ${fmtA(c.calc.takeoff.cgMm)}`, dx: 9, right: false },
+        { p: c.calc.arrival, col: WB_AMBER, r: 2.8, lab: `${fr ? 'Arrivée' : 'Landing'} ${fmtM(c.calc.arrival.massKg)} · ${fmtA(c.calc.arrival.cgMm)}`, dx: -6, right: true },
+        { p: c.calc.zfw, col: WB_RED, r: 2.8, lab: `ZFW ${fmtM(c.calc.zfw.massKg)} · ${fmtA(c.calc.zfw.cgMm)}`, dx: 6, right: false },
+        { p: c.calc.empty, col: MUTED, r: 2.4, lab: `${fr ? 'Vide' : 'Empty'} ${fmtM(c.calc.empty.massKg)} · ${fmtA(c.calc.empty.cgMm)}`, dx: 8, right: false },
+    ];
+    for (const q of P) {
+        if (q.p.cgMm == null || !isFinite(q.p.cgMm)) continue;
+        doc.setFillColor(...q.col);
+        doc.circle(xOf(q.p.cgMm), yOf(q.p.massKg), q.r, 'F');
+    }
+    doc.setFont('courier', 'bold'); doc.setFontSize(7);
+    for (const q of P) {
+        if (q.p.cgMm == null || !isFinite(q.p.cgMm)) continue;
+        _setInk(doc, q.col === MUTED ? MUTED : q.col);
+        doc.text(q.lab, xOf(q.p.cgMm) + q.dx, yOf(q.p.massKg) + 2, q.right ? { align: 'right' } : undefined);
+    }
+
+    return yB + 24;
 }
 
 // ---------------------------------------------------------------------------

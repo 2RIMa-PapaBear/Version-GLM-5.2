@@ -183,12 +183,76 @@ export function deleteAircraft(id) {
     return true;
 }
 
+/* ----------------------------------------------------------------
+ * Bloc centrage (wb = weight & balance), OPTIONNEL par avion.
+ * Stockage interne TOUJOURS en kg et mm (conversions à la saisie /
+ * l'affichage, voir wb-core.js) ; enveloppe = polygone [masse kg,
+ * bras mm] ; stations = postes de chargement (une seule de type
+ * carburant, saisie en litres via fuelDensity).
+ * ---------------------------------------------------------------- */
+const WB_MASS_UNITS = ['kg', 'lbs'];
+const WB_ARM_UNITS = ['mm', 'm', 'ft', 'in'];
+
+/**
+ * Valide/normalise le bloc centrage. Retourne null si le bloc est
+ * absent ou inutilisable (masse à vide ou enveloppe manquante) —
+ * la section Centrage reste alors masquée pour cet avion.
+ */
+function _sanitizeWb(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const num = (v) => (typeof v === 'number' && isFinite(v) ? v : NaN);
+    const emptyMassKg = num(raw.emptyMassKg);
+    const emptyArmMm = num(raw.emptyArmMm);
+    if (!(emptyMassKg > 0) || !isFinite(emptyArmMm)) return null;
+
+    // Enveloppe : 3 à 16 points [masse kg, bras mm] tous finis.
+    const envelope = (Array.isArray(raw.envelope) ? raw.envelope : [])
+        .map(p => (Array.isArray(p) ? [num(p[0]), num(p[1])] : [NaN, NaN]))
+        .filter(p => p[0] > 0 && isFinite(p[1]))
+        .slice(0, 16);
+    if (envelope.length < 3) return null;
+
+    // Postes : 1 à 12 ; un seul poste carburant conservé.
+    const stations = [];
+    let fuelSeen = false;
+    for (const s of (Array.isArray(raw.stations) ? raw.stations : []).slice(0, 12)) {
+        if (!s || typeof s !== 'object') continue;
+        const armMm = num(s.armMm);
+        if (!isFinite(armMm)) continue;
+        const fuel = s.fuel === true && !fuelSeen;
+        if (s.fuel === true) fuelSeen = true;
+        const maxKg = num(s.maxKg);
+        stations.push({
+            name: String(s.name || '').slice(0, 24).trim() || 'Poste',
+            armMm,
+            maxKg: maxKg > 0 ? maxKg : null,
+            fuel,
+        });
+    }
+    if (stations.length < 1) return null;
+
+    const mtowKg = num(raw.mtowKg);
+    const density = num(raw.fuelDensity);
+    return {
+        units: {
+            mass: WB_MASS_UNITS.includes(raw.units?.mass) ? raw.units.mass : 'kg',
+            arm: WB_ARM_UNITS.includes(raw.units?.arm) ? raw.units.arm : 'mm',
+        },
+        emptyMassKg,
+        emptyArmMm,
+        mtowKg: mtowKg > 0 ? mtowKg : null,
+        fuelDensity: density > 0.5 && density < 1.2 ? density : 0.72,
+        envelope,
+        stations,
+    };
+}
+
 /**
  * Nettoie/valide les données d'un avion. cruiseSpeedKt / fuelBurnLph sont
  * OPTIONNELS (null si absents ou invalides → le planificateur retombe sur
  * ses valeurs par défaut) : tous les avions n'ont pas encore ces infos.
- * L'id, s'il est valide, est CONSERVÉ (le perdre rendrait l'avion
- * inéditable et insélectionnable).
+ * wb (centrage) est optionnel de la même façon. L'id, s'il est valide, est
+ * CONSERVÉ (le perdre rendrait l'avion inéditable et insélectionnable).
  */
 function _sanitize(data) {
     const gr = parseInt(data.groundRoll, 10);
@@ -205,6 +269,7 @@ function _sanitize(data) {
         safetyMargin: isNaN(sm) ? 20 : Math.max(0, Math.min(50, sm)),
         cruiseSpeedKt: isNaN(cs) || cs <= 0 ? null : cs,
         fuelBurnLph: isNaN(fb) || fb <= 0 ? null : fb,
+        wb: _sanitizeWb(data.wb),
     };
     // Uniquement si valide : ne pas écraser l'{ id: _uid(), ..._sanitize() }
     // de addAircraft par un id undefined.

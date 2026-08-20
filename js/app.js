@@ -22,6 +22,7 @@ import { toggleRegionalMap, showRegionalMapFor } from './regional-map.js';
 import { showAlternates } from './alternates.js';
 import { preloadDeclination } from './magvar.js';
 import { showTakeoffWidget } from './takeoff-ui.js';
+import { refreshWbWidget } from './wb-ui.js';
 import { showFrequenciesWidget } from './frequencies-ui.js';
 import { showFlightPlanner } from './flight-planner-ui.js';
 import { clearElevationChart, refreshElevationChart } from './elevation-chart.js';
@@ -49,6 +50,7 @@ export function genererGraphique() {
         displayWeatherAlerts(null);
         renderGoNoGo(); // masque la bannière (state.lastParsed est null ou invalide)
         showTakeoffWidget(null); // masque le widget décollage
+        refreshWbWidget(null); // masque le widget centrage
         showFrequenciesWidget(null); // masque le widget fréquences
         const fpPanel = document.getElementById('flight-planner-panel');
         if (fpPanel) fpPanel.style.display = 'none'; // masque le flight planner
@@ -142,6 +144,7 @@ export function genererGraphique() {
     // message affiché, qu'il soit départ ou destination).
     renderGoNoGo();
     showTakeoffWidget(state.requestedIcao || res.code);
+    refreshWbWidget(state.requestedIcao || res.code);
 
     // Met à jour le label du bouton lecture audio selon le type de message.
     const readBtn = document.getElementById('btn-read-metar');
@@ -333,6 +336,7 @@ export function telechargerMessage(typeMessage) {
         _enrichFromOpenAIP(state.requestedIcao);
         // Affiche le widget de performance décollage (densité-altitude vs piste).
         showTakeoffWidget(state.requestedIcao);
+        refreshWbWidget(state.requestedIcao);
         // Affiche les fréquences radio du terrain (alimenté par OpenAIP).
         showFrequenciesWidget(state.requestedIcao);
         // Quand on consulte la destination via le toggle, on ne touche PAS à la
@@ -544,6 +548,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         const icao = state.requestedIcao;
         if (icao) {
             showTakeoffWidget(icao);
+            refreshWbWidget(icao);
             showFrequenciesWidget(icao);
             if (getFlightMode() === 'nav') {
                 const depForNav = _viewingDest ? _depIcao : icao;

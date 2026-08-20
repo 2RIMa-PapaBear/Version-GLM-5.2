@@ -1,0 +1,466 @@
+{
+  "aircraftType": "DR400-120",
+  "aircraftReg": "F-GKAZ",
+  "qnh": 1013,
+  "windDir": 280,
+  "windKt": 14,
+  "runway": "28",
+  "distanceNm": 151,
+  "timeLabel": "1h32",
+  "metarRaw": "LFPB 190830Z 28012KT 9999 FEW035 18/12 Q1013 NOSIG",
+  "rows": [
+    {
+      "from": "LFPB",
+      "to": "LFOB",
+      "distRemain": 151,
+      "dist": 42,
+      "zSecu": 1500,
+      "zRet": 3500,
+      "rm": "331",
+      "cm": "329",
+      "tsv": 24,
+      "tav": 26
+    },
+    {
+      "from": "LFOB",
+      "to": "LFRM",
+      "distRemain": 109,
+      "dist": 109,
+      "zSecu": 1200,
+      "zRet": 3500,
+      "rm": "264",
+      "cm": "261",
+      "tsv": 61,
+      "tav": 66
+    }
+  ],
+  "calc": {
+    "isFr": true,
+    "fromIcao": "LFPB",
+    "fromName": "Toussus-le-Noble",
+    "toIcao": "LFRM",
+    "toName": "Le Mans-Arnage",
+    "waypoints": "LFOB",
+    "cruiseAltFt": 3500,
+    "tasKt": 110,
+    "fuelBurnLph": 25,
+    "isNight": false,
+    "distanceNm": 151,
+    "distanceKm": 280,
+    "trueCourse": 332,
+    "magHeading": 329,
+    "declination": 1,
+    "wind": {
+      "dir": 280,
+      "speedKt": 22
+    },
+    "driftDeg": -6,
+    "groundSpeed": 104,
+    "timeLabel": "1h32",
+    "fuel": {
+      "tripL": 21.4,
+      "reserveL": 8,
+      "totalL": 29.4,
+      "reserveMin": 30
+    },
+    "clearance": {
+      "maxFt": 660,
+      "minClearanceFt": 1840,
+      "level": "ok"
+    },
+    "isMultiLeg": true,
+    "legs": [
+      {
+        "from": "LFPB",
+        "to": "LFOB",
+        "dist": 42,
+        "hdg": 329,
+        "eteLabel": "26 min",
+        "fuelL": 5.8,
+        "freq": "120.300 AFIS"
+      },
+      {
+        "from": "LFOB",
+        "to": "LFRM",
+        "dist": 109,
+        "hdg": 261,
+        "eteLabel": "1h06",
+        "fuelL": 15.6,
+        "freq": "121.100 TWR"
+      }
+    ]
+  },
+  "perf": {
+    "isFr": true,
+    "fromIcao": "LFPB",
+    "toIcao": "LFRM",
+    "runway": "28",
+    "takeoff": {
+      "da": 1850,
+      "groundRollM": 280,
+      "fiftyFtM": 495,
+      "runwayLengthM": 1100,
+      "marginM": 605,
+      "level": "ok",
+      "message": "Décollage OK — DR400-120 : roulement 280 m, piste 1100 m (marge 605 m) (revêtement Herbe +15 %)",
+      "refLabel": "253/427",
+      "surfaceLabel": "Herbe",
+      "surfaceSoft": true,
+      "surfacePct": 15
+    },
+    "profile": {
+      "fromIcao": "LFPB",
+      "toIcao": "LFRM",
+      "distTotalKm": 280,
+      "minFt": 220,
+      "maxFt": 660,
+      "cruiseAltFt": 3500,
+      "points": [
+        {
+          "frac": 0,
+          "elevFt": 530
+        },
+        {
+          "frac": 0.05,
+          "elevFt": 480
+        },
+        {
+          "frac": 0.09,
+          "elevFt": 420
+        },
+        {
+          "frac": 0.13,
+          "elevFt": 460
+        },
+        {
+          "frac": 0.17,
+          "elevFt": 520
+        },
+        {
+          "frac": 0.21,
+          "elevFt": 560
+        },
+        {
+          "frac": 0.25,
+          "elevFt": 610
+        },
+        {
+          "frac": 0.28,
+          "elevFt": 660
+        },
+        {
+          "frac": 0.32,
+          "elevFt": 590
+        },
+        {
+          "frac": 0.36,
+          "elevFt": 540
+        },
+        {
+          "frac": 0.4,
+          "elevFt": 500
+        },
+        {
+          "frac": 0.44,
+          "elevFt": 470
+        },
+        {
+          "frac": 0.48,
+          "elevFt": 440
+        },
+        {
+          "frac": 0.52,
+          "elevFt": 420
+        },
+        {
+          "frac": 0.56,
+          "elevFt": 400
+        },
+        {
+          "frac": 0.6,
+          "elevFt": 380
+        },
+        {
+          "frac": 0.64,
+          "elevFt": 360
+        },
+        {
+          "frac": 0.68,
+          "elevFt": 340
+        },
+        {
+          "frac": 0.72,
+          "elevFt": 330
+        },
+        {
+          "frac": 0.76,
+          "elevFt": 310
+        },
+        {
+          "frac": 0.8,
+          "elevFt": 300
+        },
+        {
+          "frac": 0.84,
+          "elevFt": 290
+        },
+        {
+          "frac": 0.88,
+          "elevFt": 280
+        },
+        {
+          "frac": 0.92,
+          "elevFt": 270
+        },
+        {
+          "frac": 0.96,
+          "elevFt": 260
+        },
+        {
+          "frac": 1,
+          "elevFt": 250
+        }
+      ],
+      "waypoints": [
+        {
+          "icao": "LFOB",
+          "frac": 0.28
+        }
+      ]
+    },
+    "alternates": {
+      "maxOffsetNm": 50,
+      "rows": [
+        {
+          "code": "LFPT",
+          "name": "Pontoise-Cormeilles",
+          "cat": "VFR",
+          "visiStr": ">10 km",
+          "ceilStr": "—",
+          "windStr": "310° 8 kt",
+          "offsetNm": 14,
+          "side": "D"
+        },
+        {
+          "code": "LFPK",
+          "name": "Coulommiers-Voisins",
+          "cat": "VFR",
+          "visiStr": ">10 km",
+          "ceilStr": "—",
+          "windStr": "290° 6 kt",
+          "offsetNm": 21,
+          "side": "D"
+        },
+        {
+          "code": "LFPO",
+          "name": "Paris-Orly",
+          "cat": "VFR",
+          "visiStr": ">10 km",
+          "ceilStr": "—",
+          "windStr": "320° 10 kt",
+          "offsetNm": 24,
+          "side": "G"
+        },
+        {
+          "code": "LFOJ",
+          "name": "Ancenis",
+          "cat": "VFR",
+          "visiStr": "9999 m",
+          "ceilStr": "3500 ft",
+          "windStr": "280° 9 kt",
+          "offsetNm": 27,
+          "side": "G"
+        },
+        {
+          "code": "LFPX",
+          "name": "Chavenay-Villepreux",
+          "cat": "MVFR",
+          "visiStr": "8000 m",
+          "ceilStr": "2500 ft",
+          "windStr": "VRB 4 kt",
+          "offsetNm": 9,
+          "side": "D"
+        },
+        {
+          "code": "LFAR",
+          "name": "Mayenne",
+          "cat": "VFR",
+          "visiStr": ">10 km",
+          "ceilStr": "—",
+          "windStr": "270° 7 kt",
+          "offsetNm": 38,
+          "side": "G"
+        }
+      ]
+    }
+  },
+  "centro": {
+    "isFr": true,
+    "fromIcao": "LFPB",
+    "reg": "F-GKQA",
+    "type": "DR400/180",
+    "wb": {
+      "units": {
+        "mass": "kg",
+        "arm": "mm"
+      },
+      "emptyMassKg": 628,
+      "emptyArmMm": 295,
+      "mtowKg": 1100,
+      "fuelDensity": 0.72,
+      "envelope": [
+        [
+          740,
+          180
+        ],
+        [
+          1000,
+          228
+        ],
+        [
+          1100,
+          245
+        ],
+        [
+          1100,
+          490
+        ],
+        [
+          740,
+          520
+        ]
+      ],
+      "stations": [
+        {
+          "name": "Pilote",
+          "armMm": 340,
+          "maxKg": null,
+          "fuel": false
+        },
+        {
+          "name": "Passager 1",
+          "armMm": 340,
+          "maxKg": null,
+          "fuel": false
+        },
+        {
+          "name": "Passager 2",
+          "armMm": 1050,
+          "maxKg": null,
+          "fuel": false
+        },
+        {
+          "name": "Passager 3",
+          "armMm": 1050,
+          "maxKg": null,
+          "fuel": false
+        },
+        {
+          "name": "Bagages",
+          "armMm": 1600,
+          "maxKg": 40,
+          "fuel": false
+        },
+        {
+          "name": "Carburant",
+          "armMm": 300,
+          "maxKg": null,
+          "fuel": true
+        }
+      ]
+    },
+    "calc": {
+      "rows": [
+        {
+          "name": "empty",
+          "armMm": 295,
+          "massKg": 628,
+          "empty": true,
+          "fuel": false
+        },
+        {
+          "name": "Pilote",
+          "armMm": 340,
+          "maxKg": null,
+          "fuel": false,
+          "massKg": 82
+        },
+        {
+          "name": "Passager 1",
+          "armMm": 340,
+          "maxKg": null,
+          "fuel": false,
+          "massKg": 70
+        },
+        {
+          "name": "Passager 2",
+          "armMm": 1050,
+          "maxKg": null,
+          "fuel": false,
+          "massKg": 78
+        },
+        {
+          "name": "Passager 3",
+          "armMm": 1050,
+          "maxKg": null,
+          "fuel": false,
+          "massKg": 65
+        },
+        {
+          "name": "Bagages",
+          "armMm": 1600,
+          "maxKg": 40,
+          "fuel": false,
+          "massKg": 15
+        },
+        {
+          "name": "Carburant",
+          "armMm": 300,
+          "maxKg": null,
+          "fuel": true,
+          "massKg": 72
+        }
+      ],
+      "empty": {
+        "massKg": 628,
+        "cgMm": 295
+      },
+      "zfw": {
+        "massKg": 938,
+        "cgMm": 438.26226012793177
+      },
+      "takeoff": {
+        "massKg": 1010,
+        "cgMm": 428.4059405940594
+      },
+      "arrival": {
+        "massKg": 980.48,
+        "cgMm": 432.27194843342033
+      },
+      "fuelKg": 72,
+      "burnKg": 29.52,
+      "arrivalFuelKg": 42.480000000000004,
+      "points": {
+        "takeoff": {
+          "inside": true,
+          "fwdMm": 198.70594059405943,
+          "aftMm": 69.09405940594058
+        },
+        "arrival": {
+          "inside": true,
+          "fwdMm": 207.87564074111265,
+          "aftMm": 67.68805156657965
+        },
+        "zfw": {
+          "inside": true,
+          "fwdMm": 221.7084139740856,
+          "aftMm": 65.23773987206823
+        }
+      },
+      "mtowOk": true,
+      "level": "ok"
+    },
+    "fuelL": 100,
+    "burnL": 41
+  }
+}
