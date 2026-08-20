@@ -20,55 +20,72 @@ const CASES = {
     unknown: { groundRoll: 950, fiftyFt: 1680, runwayLength: null, margin: null, level: 'unknown' },
 };
 
-test('layout : ordre seuil < rotation < 50ft dans le cadre', () => {
-    for (const [name, r] of Object.entries(CASES)) {
-        const L = takeoffProfileLayout(r);
-        assert.ok(L.x0 < L.liftX, `${name}: rotation après le seuil`);
-        assert.ok(L.liftX < L.fiftyX, `${name}: 50ft après la rotation`);
-        assert.ok(L.fiftyX <= L.xR + 0.5, `${name}: 50ft dans le cadre (${L.fiftyX} ≤ ${L.xR})`);
-        if (L.rwyEndX != null) {
-            assert.ok(L.x0 < L.rwyEndX && L.rwyEndX <= L.xR + 0.5, `${name}: fin de piste dans le cadre`);
+test('layout : piste pleine largeur = même longueur que la barre « plan »', () => {
+    for (const name of ['ok', 'caution', 'danger']) {
+        for (const width of [340, 770]) {
+            const L = takeoffProfileLayout(CASES[name], width);
+            assert.equal(L.x0, 0, `${name}@${width}: départ au bord gauche`);
+            assert.equal(L.rwyEndX, L.xR, `${name}@${width}: fin de piste au bord droit`);
+            assert.equal(L.xR, width, `${name}@${width}: largeur = conteneur`);
         }
     }
 });
 
-test('layout : position relative piste vs 50ft selon le verdict', () => {
+test('layout : ordre seuil < rotation < 50ft', () => {
+    for (const [name, r] of Object.entries(CASES)) {
+        const L = takeoffProfileLayout(r);
+        assert.ok(L.liftX > 2, `${name}: rotation après le seuil`);
+        assert.ok(L.liftX < L.fiftyDrawX, `${name}: 50ft (dessiné) après la rotation`);
+        assert.ok(L.fiftyDrawX <= L.xR - 1.5, `${name}: point dessiné dans le cadre`);
+    }
+});
+
+test('layout : position du 50ft selon le verdict', () => {
     const ok = takeoffProfileLayout(CASES.ok);
-    assert.ok(ok.fiftyX < ok.rwyEndX, 'ok : 50ft atteint avant la fin de piste');
+    assert.ok(ok.fiftyX < ok.xR, 'ok : 50ft atteint avant le bord (fin de piste)');
+    const caution = takeoffProfileLayout(CASES.caution);
+    assert.ok(caution.fiftyX < caution.xR, 'caution : 50ft encore dans le cadre');
     const danger = takeoffProfileLayout(CASES.danger);
-    assert.ok(danger.fiftyX > danger.rwyEndX, 'danger : 50ft au-delà de la fin de piste');
+    assert.ok(danger.fiftyX > danger.xR, 'danger : 50ft au-delà du cadre');
+    assert.ok(Math.abs(danger.fiftyDrawX - (danger.xR - 2)) < 0.01, 'danger : montée tronquée au bord');
     assert.equal(takeoffProfileLayout(CASES.unknown).rwyEndX, null, 'unknown : pas de fin de piste');
 });
 
-test('layout : étiquette de rotation bornée (pas de chevauchement)', () => {
-    for (const [name, r] of Object.entries(CASES)) {
-        const L = takeoffProfileLayout(r);
-        const rightBound = (L.rwyEndX != null ? Math.min(L.rwyEndX, L.xR) : L.xR) - 26;
-        assert.ok(L.labelLiftX >= L.x0 + 20, `${name}: étiquette pas sur le « 0 »`);
-        assert.ok(L.labelLiftX <= rightBound, `${name}: étiquette pas sur la fin de piste`);
+test('layout : échelle identique à la barre du widget', () => {
+    // La barre place le 50ft à (fiftyFt/runwayLength)*100 % de la
+    // largeur ; le schéma doit retomber sur la même position.
+    const W = 770;
+    for (const name of ['ok', 'caution', 'danger']) {
+        const r = CASES[name];
+        const L = takeoffProfileLayout(r, W);
+        const expected = (r.fiftyFt / r.runwayLength) * W;
+        assert.ok(Math.abs(L.fiftyX - expected) < 0.5, `${name}: position 50ft = barre`);
+        const expectedRoll = Math.min(r.groundRoll / r.runwayLength * W, W - 30);
+        assert.ok(Math.abs(L.liftX - expectedRoll) < 0.5, `${name}: position rotation = barre`);
     }
 });
 
-test('layout : étiquette de longueur de piste bornée au cadre', () => {
+test('layout : étiquettes et assiette', () => {
     for (const [name, r] of Object.entries(CASES)) {
         const L = takeoffProfileLayout(r);
-        if (L.labelLenX == null) continue;
-        assert.ok(L.labelLenX <= L.xR, `${name}: ancre « end » dans le cadre`);
-        assert.ok(L.labelLenX >= L.labelLiftX + 20, `${name}: séparée de l'étiquette de rotation`);
+        assert.ok(L.labelLiftX >= 24, `${name}: étiquette pas sur le bord gauche`);
+        assert.ok(L.labelLiftX <= L.xR - 46, `${name}: étiquette dans le cadre`);
+        assert.ok(L.climbAngle > 0 && L.climbAngle < 45, `${name}: pente de montée plausible (${L.climbAngle.toFixed(1)}°)`);
+        assert.ok(L.planeScale >= 1.18 && L.planeScale <= 1.18 * 1.5, `${name}: taille avion bornée`);
     }
 });
 
-test('layout : garde-fou roulement > 50ft (données incohérentes)', () => {
+test('layout : garde-fou roulement ≥ 50ft ou ≥ piste (données incohérentes)', () => {
     const L = takeoffProfileLayout({ groundRoll: 2000, fiftyFt: 1500, runwayLength: 3000, margin: 1500, level: 'ok' });
-    assert.ok(L.liftX <= L.fiftyX, 'rotation clampée au point 50ft');
+    assert.ok(L.liftX <= L.fiftyDrawX, 'rotation clampée avant le point 50ft');
+    const X = takeoffProfileLayout({ groundRoll: 1100, fiftyFt: 1680, runwayLength: 1000, margin: -680, level: 'danger' });
+    assert.ok(X.liftX <= X.xR - 30, 'rotation clampée avant le bord droit');
 });
 
 test('svg : distances attendues présentes, pas de NaN/undefined', () => {
     for (const [name, r] of Object.entries(CASES)) {
         for (const isFr of [true, false]) {
             const svg = takeoffProfileSvg(r, isFr);
-            assert.match(svg, new RegExp(`${ftToM(r.fiftyFt)} m`), `${name}/fr=${isFr}: distance 50ft`);
-            assert.match(svg, /50 ft/, `${name}/fr=${isFr}: repère 50 ft`);
             assert.match(svg, new RegExp(`${ftToM(Math.min(r.groundRoll, r.fiftyFt))} m`), `${name}/fr=${isFr}: distance roulement`);
             assert.doesNotMatch(svg, /NaN|undefined/, `${name}/fr=${isFr}: pas de valeurs invalides`);
             assert.match(svg, /role="img"/, `${name}/fr=${isFr}: aria`);
@@ -76,10 +93,27 @@ test('svg : distances attendues présentes, pas de NaN/undefined', () => {
     }
 });
 
-test('svg : longueur de piste / demande de saisie selon le cas', () => {
-    assert.match(takeoffProfileSvg(CASES.ok, true), new RegExp(`${ftToM(3300)} m`), 'longueur affichée si connue');
-    assert.match(takeoffProfileSvg(CASES.unknown, true), /longueur piste \?/, 'invite FR si inconnue');
-    assert.match(takeoffProfileSvg(CASES.unknown, false), /runway length \?/, 'invite EN si inconnue');
+test('svg : étiquette 50 ft affichée seulement si le point est dans le cadre', () => {
+    for (const name of ['ok', 'caution']) {
+        assert.match(takeoffProfileSvg(CASES[name], true), /50 ft ·/, `${name}: étiquette 50ft`);
+    }
+    assert.doesNotMatch(takeoffProfileSvg(CASES.danger, true), /50 ft ·/, 'danger : pas d\'étiquette 50ft (hors cadre)');
+});
+
+test('layout : étiquette 50 ft bascule à gauche si elle déborderait', () => {
+    // Cas nominal : point 50ft assez loin du seuil → ancre à droite.
+    const nom = takeoffProfileLayout(CASES.ok, 354);
+    assert.equal(nom.fiftyLblAnchor, 'end');
+    // Piste très longue, point 50ft proche du seuil → ancre à gauche.
+    const far = takeoffProfileLayout({ groundRoll: 700, fiftyFt: 1250, runwayLength: 8000, margin: 6750, level: 'ok' }, 354);
+    assert.equal(far.fiftyLblAnchor, 'start', 'bascule d ancrage');
+    assert.equal(far.fiftyLblX, 2, 'collée au bord gauche');
+    assert.ok(far.fiftyLblX >= 0 && far.fiftyLblX < far.fiftyX, 'à gauche du point 50ft');
+});
+
+test('svg : invite de saisie si piste inconnue', () => {
+    assert.match(takeoffProfileSvg(CASES.unknown, true), /longueur piste \?/, 'invite FR');
+    assert.match(takeoffProfileSvg(CASES.unknown, false), /runway length \?/, 'invite EN');
 });
 
 test('svg : verdicts danger et marge', () => {
