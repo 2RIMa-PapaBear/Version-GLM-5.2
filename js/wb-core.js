@@ -119,6 +119,9 @@ export function computeWb(wb, loads = {}) {
     let zfM = wb.emptyMassKg, zfMom = wb.emptyMassKg * wb.emptyArmMm;
     let fuelKg = 0, fuelMom = 0;
     for (const st of wb.stations) {
+        // Poste sans bras (saisie incomplète) : conservé dans la flotte mais
+        // ignoré par le calcul et les tableaux d'affichage.
+        if (st.armMm == null || !isFinite(st.armMm)) continue;
         let massKg;
         if (st.fuel) {
             massKg = fuelL * density;

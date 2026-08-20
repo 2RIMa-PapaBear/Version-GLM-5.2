@@ -212,24 +212,23 @@ function _sanitizeWb(raw) {
         .slice(0, 16);
     if (envelope.length < 3) return null;
 
-    // Postes : 1 à 12 ; un seul poste carburant conservé.
+    // Postes : 0 à 12 ; bras FACULTATIF (poste en cours de saisie, ignoré au
+    // calcul par wb-core) ; un seul poste carburant conservé.
     const stations = [];
     let fuelSeen = false;
     for (const s of (Array.isArray(raw.stations) ? raw.stations : []).slice(0, 12)) {
         if (!s || typeof s !== 'object') continue;
         const armMm = num(s.armMm);
-        if (!isFinite(armMm)) continue;
         const fuel = s.fuel === true && !fuelSeen;
         if (s.fuel === true) fuelSeen = true;
         const maxKg = num(s.maxKg);
         stations.push({
             name: String(s.name || '').slice(0, 24).trim() || 'Poste',
-            armMm,
+            armMm: isFinite(armMm) ? armMm : null,
             maxKg: maxKg > 0 ? maxKg : null,
             fuel,
         });
     }
-    if (stations.length < 1) return null;
 
     const mtowKg = num(raw.mtowKg);
     const density = num(raw.fuelDensity);
