@@ -958,7 +958,7 @@ function _drawCentroPage(doc, c) {
 
     // ---- Section 2 : centrogramme ----
     y = _section(doc, L, R, fr ? 'Centrogramme — enveloppe de centrage' : 'Centrogram — CG envelope', y);
-    y = _drawCentroChart(doc, c, L + 42, R - 6, y + 2, 150);
+    y = _drawCentroChart(doc, c, L + 40, R - 40, y + 2, 150);
 
     // ---- Cellules résultats ----
     y = _section(doc, L, R, null, y + 2);
