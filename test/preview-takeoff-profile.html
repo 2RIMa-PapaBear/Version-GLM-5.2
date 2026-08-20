@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- Aperçu autonome du schéma de décollage en coupe (js/takeoff-profile.js).
-     Servi en HTTP local (modules ES) : sert de QA visuelle + géométrique
-     (les <text> et avions doivent rester dans le viewBox). -->
+     Servi en HTTP local (modules ES) : QA visuelle + géométrique.
+     Chaque cas affiche la COUPE puis la BARRE « plan » (réplique exacte
+     du widget) : les deux doivent faire la même longueur et s'aligner. -->
 <html lang="fr">
 <head>
 <meta charset="utf-8">
@@ -14,8 +15,12 @@
         --input-bg: #0F172A;
     }
     body { background:#0B1220; color:var(--text-color); font-family:'DM Sans',sans-serif; margin:0; padding:14px; }
-    .panel { max-width:380px; background:#0F172A; border:1px solid var(--border-color); border-radius:10px; padding:12px; margin-bottom:14px; }
+    .row { display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; }
+    .panel { background:#0F172A; border:1px solid var(--border-color); border-radius:10px; padding:12px; margin-bottom:14px; }
+    .narrow { width:380px; }
+    .wide { width:796px; } /* card 826 - 2*15 padding ≈ colonne centrale desktop */
     .panel h3 { margin:0 0 8px; font-size:12px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; }
+    .ref { font-size:10px; color:var(--text-muted); font-family:'DM Mono',monospace; margin:6px 0 0; }
     #qa-result { font-family:monospace; font-size:11px; white-space:pre-wrap; color:#4ADE80; }
     #qa-result.err { color:#F87171; }
 </style>
@@ -25,48 +30,102 @@
 <pre id="qa-result">QA en cours…</pre>
 
 <script type="module">
-import { takeoffProfileSvg } from '../js/takeoff-profile.js';
+import { mountTakeoffProfile } from '../js/takeoff-profile.js';
 
-// Mêmes formes que evaluateTakeoffPerformance.
 const CASES = [
     { title: 'OK — marge confortable (piste 1005 m)', r: { groundRoll: 950, fiftyFt: 1680, runwayLength: 3300, margin: 1620, level: 'ok' } },
     { title: 'Caution — marge faible (piste 579 m)', r: { groundRoll: 950, fiftyFt: 1680, runwayLength: 1900, margin: 220, level: 'caution' } },
     { title: 'Danger — 50 ft au-delà de la piste (piste 457 m)', r: { groundRoll: 950, fiftyFt: 1680, runwayLength: 1500, margin: -180, level: 'danger' } },
-    { title: 'Piste inconnue', r: { groundRoll: 950, fiftyFt: 1680, runwayLength: null, margin: null, level: 'unknown' } },
+    { title: 'Piste inconnue (pas de barre)', r: { groundRoll: 950, fiftyFt: 1680, runwayLength: null, margin: null, level: 'unknown' } },
     { title: 'Extrême — très longue piste (2438 m)', r: { groundRoll: 700, fiftyFt: 1250, runwayLength: 8000, margin: 6750, level: 'ok' } },
     { title: 'Extrême — roulement avant la fin, 50 ft bien après', r: { groundRoll: 900, fiftyFt: 1680, runwayLength: 1000, margin: -680, level: 'danger' } },
     { title: 'Version anglaise (OK)', r: { groundRoll: 950, fiftyFt: 1680, runwayLength: 3300, margin: 1620, level: 'ok' }, en: true },
 ];
 
-const host = document.getElementById('cases');
-for (const c of CASES) {
-    const div = document.createElement('div');
-    div.className = 'panel';
-    div.innerHTML = `<h3>${c.title}</h3>` + takeoffProfileSvg(c.r, !c.en);
-    host.appendChild(div);
+// Réplique exacte de la barre du widget (takeoff-ui.js, barHtml).
+function barReplica(r) {
+    if (r.runwayLength == null) return '';
+    const col = r.level === 'danger' ? '#EF4444' : (r.level === 'caution' ? '#F59E0B' : '#10B981');
+    const rollPct = Math.min(100, (r.groundRoll / r.runwayLength) * 100);
+    const fiftyPct = Math.min(100, (r.fiftyFt / r.runwayLength) * 100);
+    const m = Math.round(r.runwayLength * 0.3048);
+    return `
+        <div class="to-bar" style="margin-top:2px;">
+            <div class="bar-track" style="position:relative; height:22px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden;">
+                <div style="position:absolute; left:0; top:0; height:100%; width:${fiftyPct}%; background:${col}33; border-right:2px solid ${col};"></div>
+                <div style="position:absolute; left:0; top:0; height:100%; width:${rollPct}%; background:${col}99; border-right:2px solid #fff;"></div>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); margin-top:3px;">
+                <span>0</span><span>${m} m</span>
+            </div>
+        </div>`;
 }
 
-// ---- QA géométrique post-rendu : tout doit rester dans le cadre du SVG ----
-// getBoundingClientRect (écran) tient compte des transform des <g>,
-// contrairement à getBBox ; on compare au rect écran du <svg> lui-même.
-const problems = [];
-for (const svg of document.querySelectorAll('svg')) {
-    const sb = svg.getBoundingClientRect();
-    const label = svg.closest('.panel')?.querySelector('h3')?.textContent || '?';
-    for (const el of svg.querySelectorAll('text, g')) {
-        const b = el.getBoundingClientRect();
-        if (b.width === 0 && b.height === 0) continue;
-        if (b.left < sb.left - 1 || b.top < sb.top - 1 || b.right > sb.right + 1 || b.bottom > sb.bottom + 1) {
-            problems.push(`${label} : <${el.tagName}> hors cadre `
-                + `(left=${(b.left - sb.left).toFixed(1)}, top=${(b.top - sb.top).toFixed(1)}, `
-                + `right=${(b.right - sb.left).toFixed(1)}, bottom=${(b.bottom - sb.top).toFixed(1)} vs ${sb.width.toFixed(0)}x${sb.height.toFixed(0)})`);
-        }
+const host = document.getElementById('cases');
+for (const c of CASES) {
+    for (const cls of ['narrow', 'wide']) {
+        const div = document.createElement('div');
+        div.className = 'panel ' + cls;
+        div.innerHTML = `<h3>${c.title} — ${cls === 'narrow' ? '354 px' : '770 px'}</h3>`
+            + `<div class="tp"></div>`
+            + barReplica(c.r)
+            + `<p class="ref">réf. 10 px : 0123456789 m</p>`;
+        host.appendChild(div);
+        mountTakeoffProfile(div.querySelector('.tp'), c.r, !c.en);
     }
 }
+
+// ---- QA après stabilisation (ResizeObserver asynchrone) ----
+const check = () => {
+    const problems = [];
+    for (const panel of document.querySelectorAll('.panel')) {
+        const label = panel.querySelector('h3')?.textContent || '?';
+        const svg = panel.querySelector('svg');
+        if (!svg) continue;
+        const sb = svg.getBoundingClientRect();
+
+        // Échelle 1:1 : hauteur rendue ≈ 108 (sinon le viewBox est étiré).
+        const scale = sb.height / 108;
+        if (Math.abs(scale - 1) > 0.03) problems.push(`${label} : échelle ${scale.toFixed(2)} ≠ 1`);
+
+        // Rien hors cadre.
+        for (const el of svg.querySelectorAll('text, g')) {
+            const b = el.getBoundingClientRect();
+            if (b.width === 0 && b.height === 0) continue;
+            if (b.left < sb.left - 1 || b.top < sb.top - 1 || b.right > sb.right + 1 || b.bottom > sb.bottom + 1) {
+                problems.push(`${label} : <${el.tagName}> hors cadre`);
+            }
+        }
+        // Typo : tous les textes à 10 px calculés (taille du widget).
+        for (const t of svg.querySelectorAll('text')) {
+            const fs = getComputedStyle(t).fontSize;
+            if (fs !== '10px') problems.push(`${label} : texte à ${fs} au lieu de 10px`);
+        }
+
+        // Même longueur que la barre « plan » : la ligne de piste doit
+        // coïncider avec la piste du widget (gauche/droite/étendue).
+        const track = panel.querySelector('.bar-track');
+        const rwy = svg.querySelector('line[data-rwy]');
+        if (track && rwy) {
+            const t = track.getBoundingClientRect();
+            const l = rwy.getBoundingClientRect();
+            const dLeft = Math.abs(t.left - l.left);
+            const dRight = Math.abs(t.right - l.right);
+            if (dLeft > 2 || dRight > 2) {
+                problems.push(`${label} : coupe et plan désalignées (Δgauche ${dLeft.toFixed(1)} px, Δdroite ${dRight.toFixed(1)} px)`);
+            }
+        }
+    }
+    return problems;
+};
+
+await new Promise(r => setTimeout(r, 300)); // laisse le ResizeObserver re-rendre
+const problems = check();
+
 const out = document.getElementById('qa-result');
 const qaText = problems.length
     ? 'QA: KO\n' + problems.join('\n')
-    : `QA: OK — ${document.querySelectorAll('svg').length} schémas, tous les éléments dans le viewBox`;
+    : `QA: OK — ${document.querySelectorAll('svg').length} schémas : échelle 1:1, textes 10 px, rien hors cadre, coupe alignée sur la barre « plan »`;
 out.className = problems.length ? 'err' : '';
 out.textContent = qaText;
 document.title = problems.length ? 'QA KO' : 'QA OK';

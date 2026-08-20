@@ -14,7 +14,7 @@
 
 import { state, escapeHtml } from './core.js';
 import { makeCollapsible } from './collapsible.js';
-import { takeoffProfileSvg } from './takeoff-profile.js';
+import { mountTakeoffProfile } from './takeoff-profile.js';
 import {
     evaluateTakeoffPerformance, getRunwayLength,
     getAircraftRef, getActiveRunwayNameForIcao,
@@ -154,9 +154,7 @@ function render(container, r, icao) {
                 </div>
             </div>
         </div>
-        <div style="margin-top:10px;">
-            ${takeoffProfileSvg(r, isFr)}
-        </div>
+        <div class="to-profile" style="margin-top:10px;"></div>
         ${barHtml}
         <div style="display:flex; align-items:flex-end; gap:8px; margin-top:10px; flex-wrap:wrap;">
             <label style="font-size:11px; color:var(--text-muted); display:flex; flex-direction:column; gap:3px;">
@@ -184,6 +182,11 @@ function render(container, r, icao) {
                 : `Distances corrected for density altitude (POH ref. at SL/ISA). "Fleet" to manage your aircraft.`}
         </div>
     `;
+
+    // Schéma en coupe : monté après injection (mesure la largeur
+    // réelle du panneau pour garder les textes à 10 px).
+    const profileHost = container.querySelector('.to-profile');
+    if (profileHost) mountTakeoffProfile(profileHost, r, isFr);
 
     // Sélecteur d'avion : change l'avion actif et rafraîchit.
     const acSelect = container.querySelector('#to-aircraft-select');
