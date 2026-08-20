@@ -393,7 +393,7 @@ function _wbDraftFrom(ac) {
         name: s.name, fuel: !!s.fuel,
         arm: (s.armMm != null && isFinite(s.armMm))
             ? String(+armFromMm(s.armMm, u.arm).toFixed(armDecimals(u.arm))) : '',
-        max: s.maxKg ? String(Math.round(massFromKg(s.maxKg, u.mass))) : '',
+        max: s.maxKg ? (s.fuel ? String(s.maxKg) : String(Math.round(massFromKg(s.maxKg, u.mass)))) : '',
     }));
     d.envelope = wb.envelope.map(([m, a]) => [
         +massFromKg(m, u.mass).toFixed(1),
@@ -422,13 +422,16 @@ function _draftToWb() {
         .map(p => [massToKg(p[0], u.mass), armToMm(p[1], u.arm)]));
     if (envelope.length < 3) return null;
     // Les postes sans bras sont conservés (armMm null) : ignorés au calcul
-    // par wb-core, la saisie partielle n'est jamais perdue.
+    // par wb-core, la saisie partielle n'est jamais perdue. Le max du poste
+    // CARBURANT est en LITRES (capacité, stocké brut) — les autres en masse
+    // (convertie en kg).
     const stations = d.stations
         .map(s => ({ name: String(s.name || '').trim() || 'Poste', fuel: !!s.fuel,
                      arm: _num(s.arm), max: _num(s.max) }))
         .map(s => ({ name: s.name, fuel: s.fuel,
                      armMm: isFinite(s.arm) ? armToMm(s.arm, u.arm) : null,
-                     maxKg: (isFinite(s.max) && s.max > 0) ? massToKg(s.max, u.mass) : null }));
+                     maxKg: (isFinite(s.max) && s.max > 0)
+                         ? (s.fuel ? s.max : massToKg(s.max, u.mass)) : null }));
     const mt = _num(d.mtow), de = _num(d.density);
     return {
         units: { mass: u.mass, arm: u.arm },
@@ -449,9 +452,9 @@ function _renderWbSection() {
 
     const stRows = d.stations.map((s, i) => `
         <div class="wb-tbl-row" data-i="${i}">
-            <input class="wb-st-name" type="text" maxlength="24" value="${_esc(s.name)}" placeholder="${isFr ? 'poste' : 'station'}">
+            <input class="wb-st-name${s.fuel ? ' wb-st-fuel' : ''}" type="text" maxlength="24" value="${_esc(s.name)}" placeholder="${isFr ? 'poste' : 'station'}"${s.fuel ? ` title="${isFr ? 'Poste carburant : saisie en litres dans le widget (densité appliquée)' : 'Fuel station: entered in litres in the widget (density applied)'}"` : ''}>
             <input class="wb-st-arm" type="number" step="any" value="${s.arm}" placeholder="—">
-            <input class="wb-st-max" type="number" step="any" value="${s.max}" placeholder="—">
+            <input class="wb-st-max" type="number" step="any" value="${s.max}" placeholder="${s.fuel ? 'L' : u.mass}"${s.fuel ? ` title="${isFr ? 'Capacité en litres' : 'Capacity in litres'}"` : ''}>
             <button class="wb-del" data-del="st" data-i="${i}" title="${isFr ? 'Supprimer' : 'Delete'}">×</button>
         </div>`).join('');
     const envRows = d.envelope.map((p, i) => `
@@ -480,9 +483,10 @@ function _renderWbSection() {
         <div class="fleet-wb-grid">
             <div>
                 <div class="fleet-wb-sub">${isFr ? 'Postes de chargement' : 'Load stations'}</div>
-                <div class="wb-tbl-head"><span>${isFr ? 'nom' : 'name'}</span><span>${isFr ? 'bras' : 'arm'} (${u.arm})</span><span>max (${u.mass})</span><span></span></div>
+                <div class="wb-tbl-head"><span>${isFr ? 'nom' : 'name'}</span><span>${isFr ? 'bras' : 'arm'} (${u.arm})</span><span>max (${u.mass} / L)</span><span></span></div>
                 <div id="wb-stations">${stRows || `<div class="wb-empty-note">${isFr ? 'aucun poste' : 'no station'}</div>`}</div>
                 <button class="wb-add" id="wb-add-station">+ ${isFr ? 'Ajouter un poste' : 'Add station'}</button>
+                <div class="fleet-wb-note">${isFr ? `max en ${u.mass} — carburant : litres (capacité)` : `max in ${u.mass} — fuel: litres (capacity)`}</div>
             </div>
             <div>
                 <div class="fleet-wb-sub">${isFr ? 'Enveloppe de centrage' : 'CG envelope'}</div>

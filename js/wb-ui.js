@@ -106,8 +106,8 @@ function _render(body, ac, isFr) {
                     <input type="number" step="any" min="0" class="wb-load-in" data-st="${escapeHtml(s.name)}" data-max="${s.maxKg || ''}" value="${loads.masses[s.name] ?? ''}" placeholder="0">
                 </label>`).join('')}
             ${fuelSt ? `
-                <label class="wb-load wb-load-fuel" title="${isFr ? 'Quantité totale embarquée au décollage — pré-remplie du plan de nav (trajet + réserve), modifiable.' : 'Total fuel at takeoff — pre-filled from the nav plan (trip + reserve), editable.'}">${isFr ? 'Carburant embarqué (L)' : 'Fuel on board (L)'}
-                    <input type="number" step="any" min="0" id="wb-fuel-l" value="${loads.fuelL || ''}" placeholder="0">
+                <label class="wb-load wb-load-fuel" title="${isFr ? 'Quantité totale embarquée au décollage — pré-remplie du plan de nav (trajet + réserve), modifiable.' : 'Total fuel at takeoff — pre-filled from the nav plan (trip + reserve), editable.'}">${isFr ? 'Carburant embarqué (L)' : 'Fuel on board (L)'}${fuelSt.maxKg ? ` <span class="wb-load-max">max ${fuelSt.maxKg} L</span>` : ''}
+                    <input type="number" step="any" min="0" id="wb-fuel-l" data-max="${fuelSt.maxKg || ''}" value="${loads.fuelL || ''}" placeholder="0">
                 </label>
                 <label class="wb-load wb-load-fuel" title="${isFr ? 'Essence brûlée pendant le vol — le point Arrivée est calculé avec le carburant restant (embarqué − consommée). Pré-remplie du plan de nav (trajet, sans la réserve).' : 'Fuel burned during the flight — the landing point uses the remaining fuel (on board − burned). Pre-filled from the nav plan (trip, no reserve).'}">${isFr ? 'Essence consommée en vol (L)' : 'Fuel burned in flight (L)'}
                     <input type="number" step="any" min="0" id="wb-burn-l" value="${loads.burnL || ''}" placeholder="0">
@@ -149,6 +149,12 @@ function _recalc(body, ac, isFr) {
     const bl = _num(body.querySelector('#wb-burn-l')?.value);
     loads.fuelL = (isFinite(fl) && fl > 0) ? fl : 0;
     loads.burnL = (isFinite(bl) && bl > 0) ? bl : 0;
+    // Carburant : pastille ambre si la capacité (max du poste, en litres) est dépassée.
+    const fuelIn = body.querySelector('#wb-fuel-l');
+    if (fuelIn) {
+        const maxL = _num(fuelIn.dataset.max);
+        fuelIn.classList.toggle('wb-over', maxL > 0 && isFinite(fl) && fl > maxL + 1e-9);
+    }
     writeWbLoads(ac.id, loads);
 
     const calc = computeWb(wb, loads);
