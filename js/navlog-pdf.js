@@ -1052,7 +1052,7 @@ function _drawCentroChart(doc, c, xL, xR, yT, CH) {
         _setInk(doc, MUTED);
         const yLab = fmtM(mMin + (mMax - mMin) * i / 4);
         maxYLabW = Math.max(maxYLabW, doc.getTextWidth(yLab));
-        doc.text(yLab, xL - 4, gy + 2.2, { align: 'right' });
+        doc.text(yLab, xL - 12, gy + 2.2, { align: 'right' });   // laisse le couloir du titre
         const gx = xL + (i / 4) * plotW;
         doc.line(gx, yT, gx, yB);
         doc.text(fmtA(aMin + (aMax - aMin) * i / 4), gx, yB + 8, { align: 'center' });
@@ -1061,10 +1061,11 @@ function _drawCentroChart(doc, c, xL, xR, yT, CH) {
     doc.line(xL, yT, xL, yB); doc.line(xL, yB, xR, yB);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(7); _setInk(doc, MUTED);
     doc.text(`${fr ? 'Bras de levier' : 'Arm'} (${u.arm})`, (xL + xR) / 2, yB + 19, { align: 'center' });
-    // Titre de l'axe masse VERTICAL, CENTRÉ dans la bande libre entre le
-    // bord gauche du cadre et le début des labels de graduations.
+    // Titre de l'axe masse VERTICAL, CENTRÉ dans le couloir entre le bord
+    // gauche du cadre du graphe (xL) et le début des labels de graduations
+    // (reculés à xL-12 pour lui faire sa place) : à égale distance des deux.
     doc.setFontSize(6.5);
-    doc.text(`${fr ? 'Masse' : 'Weight'} (${u.mass})`, (15 + xL - 4 - maxYLabW) / 2, (yT + yB) / 2, { align: 'center', angle: 90 });
+    doc.text(`${fr ? 'Masse' : 'Weight'} (${u.mass})`, xL - 6, (yT + yB) / 2, { align: 'center', angle: 90 });
 
     // Enveloppe (polygone rempli + trait bleu).
     const pts = c.wb.envelope.map(([m, a]) => [xOf(a), yOf(m)]);
