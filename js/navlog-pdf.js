@@ -883,7 +883,7 @@ function _drawCentroPage(doc, c) {
     const L = 16.4, R = 402.7, W = R - L, MID = (L + R) / 2;
     const FRAME_BOT = 581.8;
     const u = c.wb.units || { mass: 'kg', arm: 'mm' };
-    const dec = (u.arm === 'm' || u.arm === 'in') ? 1 : 0;
+    const dec = u.arm === 'm' ? 3 : (u.arm === 'in' ? 2 : (u.arm === 'ft' ? 1 : 0));
     const th = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
     const fmtA = (mm) => {
         let s = (mm / WB_MM_PER_ARM[u.arm]).toFixed(dec);
@@ -1016,7 +1016,7 @@ function _drawCentroPage(doc, c) {
 function _drawCentroChart(doc, c, xL, xR, yT, CH) {
     const fr = c.isFr !== false;
     const u = c.wb.units || { mass: 'kg', arm: 'mm' };
-    const dec = (u.arm === 'm' || u.arm === 'in') ? 1 : 0;
+    const dec = u.arm === 'm' ? 3 : (u.arm === 'in' ? 2 : (u.arm === 'ft' ? 1 : 0));
     const th = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
     const fmtA = (mm) => {
         let s = (mm / WB_MM_PER_ARM[u.arm]).toFixed(dec);

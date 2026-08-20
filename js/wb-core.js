@@ -37,8 +37,9 @@ export function massToKg(v, unit) { return unit === 'lbs' ? v / LB_PER_KG : v; }
 /** Masse : kg → kg|lbs. */
 export function massFromKg(v, unit) { return unit === 'lbs' ? v * LB_PER_KG : v; }
 
-/** Arrondi d'affichage raisonnable selon l'unité (m et in → 1 décimale). */
-export function armDecimals(unit) { return unit === 'm' || unit === 'in' ? 1 : 0; }
+/** Décimales d'affichage/édition d'un bras selon l'unité (m → millièmes,
+ * in → centièmes, ft → dixièmes : granularité ≈ millimétrique partout). */
+export function armDecimals(unit) { return { m: 3, in: 2, ft: 1 }[unit] || 0; }
 
 // Masses maximales par défaut des postes standards (kg), réinjectées au
 // sanitize quand le champ est vide : Pilote/Passagers 130 kg, Bagages 40 kg.
