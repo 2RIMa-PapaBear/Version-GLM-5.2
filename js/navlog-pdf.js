@@ -1058,7 +1058,10 @@ function _drawCentroChart(doc, c, xL, xR, yT, CH) {
     doc.line(xL, yT, xL, yB); doc.line(xL, yB, xR, yB);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(7); _setInk(doc, MUTED);
     doc.text(`${fr ? 'Bras de levier' : 'Arm'} (${u.arm})`, (xL + xR) / 2, yB + 19, { align: 'center' });
-    doc.text(`${fr ? 'Masse' : 'Weight'} (${u.mass})`, xL - 30, (yT + yB) / 2, { align: 'center', angle: 90 });
+    // Titre de l'axe masse DANS la zone de tracé (coin haut-gauche, discret) :
+    // vertical dans la marge, il semblait détaché du graphique.
+    doc.setFontSize(6.5);
+    doc.text(`${fr ? 'Masse' : 'Weight'} (${u.mass})`, xL + 4, yT + 8);
 
     // Enveloppe (polygone rempli + trait bleu).
     const pts = c.wb.envelope.map(([m, a]) => [xOf(a), yOf(m)]);
