@@ -971,10 +971,6 @@ html.night-mode body::before {
 @media (max-width: 500px) {
     .to-metrics-grid { grid-template-columns: 1fr 1fr; }
 }
-.takeoff-panel .to-bar input[type="number"] {
-    -moz-appearance: textfield;
-}
-.takeoff-panel .to-bar input[type="number"]::-webkit-outer-spin-button,
 .takeoff-panel input[type="number"]::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;

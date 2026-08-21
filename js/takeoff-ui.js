@@ -5,7 +5,8 @@
  * Affiche un panneau compact sous le GO/NO-GO qui présente :
  *   - la distance de décollage corrigée (roulement + franchissement 50ft),
  *   - un champ pour saisir la longueur de piste du terrain (persistée),
- *   - une barre de marge visuelle (roulement / 50ft vs piste disponible).
+ *   - le schéma en coupe de la piste (roulement, montée au 50ft, marge) —
+ *     la barre « plan » historique a été supprimée (redondante avec la coupe).
  *
  * Le widget n'apparaît que si la densité-altitude est calculable
  * (i.e. on a l'élévation + QNH + OAT). La saisie de la longueur de piste
@@ -96,26 +97,6 @@ function render(container, r, icao) {
     const lblManage = isFr ? 'Gérer la flotte' : 'Manage fleet';
     const lblAircraft = isFr ? 'Avion' : 'Aircraft';
 
-    // Barre visuelle de marge (si longueur de piste connue).
-    // Les pourcentages restent en unités internes (ft) — c'est un ratio.
-    let barHtml = '';
-    if (r.runwayLength != null) {
-        const rollPct = Math.min(100, (r.groundRoll / r.runwayLength) * 100);
-        const fiftyPct = Math.min(100, (r.fiftyFt / r.runwayLength) * 100);
-        barHtml = `
-            <div class="to-bar" style="margin-top:10px;">
-                <div style="position:relative; height:22px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden;">
-                    <div style="position:absolute; left:0; top:0; height:100%; width:${fiftyPct}%; background:${r.level === 'danger' ? '#EF4444' : (r.level === 'caution' ? '#F59E0B' : '#10B981')}33; border-right:2px solid ${r.level === 'danger' ? '#EF4444' : (r.level === 'caution' ? '#F59E0B' : '#10B981')};"></div>
-                    <div style="position:absolute; left:0; top:0; height:100%; width:${rollPct}%; background:${r.level === 'danger' ? '#EF4444' : (r.level === 'caution' ? '#F59E0B' : '#10B981')}99; border-right:2px solid #fff;"></div>
-                </div>
-                <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); margin-top:3px;">
-                    <span>0</span>
-                    <span>${ftToM(r.runwayLength)} m</span>
-                </div>
-            </div>
-        `;
-    }
-
     const marginColor = r.level === 'danger' ? '#EF4444' : (r.level === 'caution' ? '#F59E0B' : '#10B981');
     // Longueur de piste affichée en mètres (conversion depuis le stockage en ft).
     const rwyLenM = r.runwayLength != null ? ftToM(r.runwayLength) : null;
@@ -155,7 +136,6 @@ function render(container, r, icao) {
             </div>
         </div>
         <div class="to-profile" style="margin-top:10px;"></div>
-        ${barHtml}
         <div style="display:flex; align-items:flex-end; gap:8px; margin-top:10px; flex-wrap:wrap;">
             <label style="font-size:11px; color:var(--text-muted); display:flex; flex-direction:column; gap:3px;">
                 <span style="display:flex; align-items:center; gap:5px;">
