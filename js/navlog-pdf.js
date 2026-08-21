@@ -498,11 +498,6 @@ function _drawCalcPage(doc, c) {
     const cw4 = (W - 3 * 7) / 4;
     y = section(null, y);
     cell(L, y, cw4, 29, fr ? 'Distance' : 'Distance', `${c.distanceNm ?? '—'} NM`, { size: 9.5 });
-    // Suffixe km discret collé après la valeur, comme à l'écran.
-    doc.setFont('courier', 'bold'); doc.setFontSize(9.5);
-    const wMain = doc.getTextWidth(`${c.distanceNm ?? '—'} NM`);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); _setInk(doc, MUTED);
-    doc.text(`(${c.distanceKm ?? '—'} km)`, L + 7 + wMain + 3, y + 20);
     cell(L + cw4 + 7, y, cw4, 29, fr ? 'Cap vrai (TC)' : 'True course', `${pad3(c.trueCourse)}°`);
     cell(L + 2 * (cw4 + 7), y, cw4, 29, fr ? 'Cap magnétique' : 'Magnetic heading',
          `${pad3(c.magHeading)}°`, { color: BLUE, size: 12 });
@@ -1174,17 +1169,26 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr) {
     doc.setDrawColor(...ORANGE); doc.setLineWidth(1.4);
     doc.lines(lineSegs, xOf(pts[0].frac), yOf(pts[0].elevFt), [1, 1], 'S', false);
 
-    // Axe X bas + labels distance (km) — bornés dans le graphe pour ne pas
-    // déborder du cadre (le 1er/dernier label sont décalés vers l'intérieur).
+    // Axe X bas + labels distance : NM PAR TRONÇON entre waypoints (même
+    // langage que l'écran — plus de graduations km), centrés sous chaque
+    // segment et bornés dans le graphe pour ne pas déborder du cadre.
     doc.setDrawColor(...LINE); doc.setLineWidth(0.5);
     doc.line(xL, yB, xR, yB);
     doc.setFont('courier', 'normal'); doc.setFontSize(6.5); _setInk(doc, MUTED);
-    const xSteps = 5;
-    for (let i = 0; i <= xSteps; i++) {
-        const frac = i / xSteps;
-        const lab = `${Math.round(frac * pr.distTotalKm)} km`;
+    const bornes = [0];
+    if (pr.waypoints?.length) {
+        for (const w of pr.waypoints) {
+            if (typeof w.frac === 'number' && w.frac > 0 && w.frac < 1) bornes.push(w.frac);
+        }
+        bornes.sort((a, b) => a - b);
+    }
+    bornes.push(1);
+    for (let i = 0; i < bornes.length - 1; i++) {
+        const nm = Math.round((bornes[i + 1] - bornes[i]) * pr.distTotalKm / 1.852);
+        const lab = `${nm} NM`;
         const w = doc.getTextWidth(lab);
-        const lx = Math.max(xL + w / 2 + 1, Math.min(xOf(frac), xR - w / 2 - 1));
+        const mid = (bornes[i] + bornes[i + 1]) / 2;
+        const lx = Math.max(xL + w / 2 + 1, Math.min(xOf(mid), xR - w / 2 - 1));
         doc.text(lab, lx, yB + 10, { align: 'center' });
     }
 
