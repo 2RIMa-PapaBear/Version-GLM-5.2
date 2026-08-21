@@ -135,8 +135,8 @@ function render(container, r, icao) {
             <span><span class="lab">${lblRoll} :</span> <span class="val">${ftToM(r.groundRoll)} m</span></span>
             <span><span class="lab">${lbl50ft} :</span> <span class="val">${ftToM(r.fiftyFt)} m</span></span>
             <span><span class="lab">${lblDa} :</span> <span class="val">${r.da} ft</span></span>
-            <span><span class="lab">${isFr ? 'Revêtement' : 'Surface'} :</span> <span class="val">${surfInfo ? escapeHtml(surfInfo.label) : '—'}${surfState
-                ? ` · ${surfState} <span style="color:${surfSoft ? '#FBBF24' : '#38BDF8'};">+${Math.round((r.surfaceFactor - 1) * 100)}%</span>` : ''}</span></span>
+            <span><span class="lab">${isFr ? 'Revêtement' : 'Surface'} :</span> <span class="val">${surfInfo ? escapeHtml(surfInfo.label) : '—'}${r.surfaceFactor > 1
+                ? `${surfState ? ' · ' + surfState : ''} <span style="color:${surfSoft ? '#FBBF24' : '#38BDF8'};">+${Math.round((r.surfaceFactor - 1) * 100)}%</span>` : ''}</span></span>
             <span><span class="lab">${lblAcRef} :</span> <span class="val">${ftToM(ref.groundRoll)}/${ftToM(ref.fiftyFt)} m</span></span>
         </div>
         <div class="to-profile" style="margin-top:10px;"></div>
