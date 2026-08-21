@@ -122,10 +122,6 @@ function render(container, r, icao) {
                 <div style="font-family:'DM Mono',monospace; font-weight:500; color:var(--text-color);">${r.da} ft</div>
             </div>
             <div>
-                <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px;">${lblAcRef}</div>
-                <div style="font-family:'DM Mono',monospace; font-weight:500; color:var(--text-muted); font-size:11px;">${ftToM(ref.groundRoll)}/${ftToM(ref.fiftyFt)} m</div>
-            </div>
-            <div>
                 <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px;">${isFr ? 'Revêtement' : 'Surface'}</div>
                 <div style="font-family:'DM Sans',sans-serif; font-weight:700; color:${surfSoft ? '#FBBF24' : 'var(--text-color)'}; font-size:12px; display:flex; align-items:center; gap:4px;">
                     ${surfInfo ? escapeHtml(surfInfo.label) : '—'}
@@ -133,6 +129,10 @@ function render(container, r, icao) {
                         ? `<span style="font-size:9px; background:${surfSoft ? 'rgba(251,191,36,0.18)' : 'rgba(56,189,248,0.15)'}; color:${surfSoft ? '#FBBF24' : '#38BDF8'}; padding:1px 5px; border-radius:3px; font-weight:500; font-family:'DM Mono',monospace;">+${Math.round((r.surfaceFactor-1)*100)}%</span>`
                         : ''}
                 </div>
+            </div>
+            <div>
+                <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px;">${lblAcRef}</div>
+                <div style="font-family:'DM Mono',monospace; font-weight:500; color:var(--text-muted); font-size:11px;">${ftToM(ref.groundRoll)}/${ftToM(ref.fiftyFt)} m</div>
             </div>
         </div>
         <div class="to-profile" style="margin-top:10px;"></div>
