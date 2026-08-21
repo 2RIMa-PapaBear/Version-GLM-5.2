@@ -683,6 +683,10 @@ export function renderWindCompass(containerId, windStr, runways = null, forcedId
     const bestRwy = rwyData.active;
     const rwyList = rwyData.list;
 
+    // Publie la piste active (source de vérité unique : la rose) pour les
+    // widgets qui l'affichent (Performance décollage…). null sans données.
+    state.activeRunwayName = bestRwy?.name || null;
+
     // Revêtement de la piste active (si l'objet terrain est passé par l'appelant).
     let surfHtml = '';
     if (bestRwy && apt && apt.runwaySurfaces) {
