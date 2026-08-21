@@ -69,6 +69,17 @@ export function showTakeoffWidget(icao) {
 // Facteur de conversion pied → mètre.
 const FT_TO_M = 0.3048;
 
+/** État de piste déduit du facteur de majoration (mêmes seuils que
+ *  takeoff-performance). Herbe sèche (+15 %) : rien à préciser. */
+function _surfaceState(factor, isFr) {
+    if (Math.abs(factor - 1.15) < 1e-9) return '';            // herbe sèche
+    if (factor >= 1.30) return isFr ? 'contaminée' : 'contaminated';
+    if (factor >= 1.25) return isFr ? 'humide' : 'wet';
+    if (factor >= 1.10) return isFr ? 'piste contaminée' : 'contaminated rwy';
+    if (factor > 1) return isFr ? 'piste humide' : 'wet rwy';
+    return '';
+}
+
 /** Convertit pieds en mètres, arrondi à l'entier. */
 function ftToM(ft) { return Math.round(ft * FT_TO_M); }
 
@@ -85,9 +96,11 @@ function render(container, r, icao) {
     const ref = getAircraftRef();
     // Piste active selon la rose des vents (null si non définie).
     const activeRwy = getActiveRunwayNameForIcao(icao);
-    // Revêtement de la piste active.
+    // Revêtement de la piste active + état (humide/contaminée) quand le
+    // facteur majoré ne s'explique pas par le seul revêtement (herbe sèche).
     const surfInfo = getActiveRunwaySurfaceInfo(icao);
     const surfSoft = surfInfo ? isSoftSurface(surfInfo.code) : false;
+    const surfState = r.surfaceFactor > 1 ? _surfaceState(r.surfaceFactor, isFr) : '';
 
     // Liste des avions pour le sélecteur.
     const fleet = getFleet();
@@ -110,8 +123,8 @@ function render(container, r, icao) {
             <span><span class="lab">${lblRoll} :</span> <span class="val">${ftToM(r.groundRoll)} m</span></span>
             <span><span class="lab">${lbl50ft} :</span> <span class="val">${ftToM(r.fiftyFt)} m</span></span>
             <span><span class="lab">${lblDa} :</span> <span class="val">${r.da} ft</span></span>
-            <span><span class="lab">${isFr ? 'Revêtement' : 'Surface'} :</span> <span class="val">${surfInfo ? escapeHtml(surfInfo.label) : '—'}${r.surfaceFactor > 1
-                ? ` <span style="color:${surfSoft ? '#FBBF24' : '#38BDF8'};">+${Math.round((r.surfaceFactor - 1) * 100)}%</span>` : ''}</span></span>
+            <span><span class="lab">${isFr ? 'Revêtement' : 'Surface'} :</span> <span class="val">${surfInfo ? escapeHtml(surfInfo.label) : '—'}${surfState
+                ? ` · ${surfState} <span style="color:${surfSoft ? '#FBBF24' : '#38BDF8'};">+${Math.round((r.surfaceFactor - 1) * 100)}%</span>` : ''}</span></span>
             <span><span class="lab">${lblAcRef} :</span> <span class="val">${ftToM(ref.groundRoll)}/${ftToM(ref.fiftyFt)} m</span></span>
         </div>
         <div class="to-profile" style="margin-top:10px;"></div>

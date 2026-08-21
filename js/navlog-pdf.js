@@ -667,7 +667,13 @@ function _drawPerfPage(doc, p) {
         const cw3 = (W - 2 * 7) / 3;
         cell(L, y, cw3, 29, fr ? 'Longueur piste' : 'Runway length',
              t.runwayLengthM != null ? `${t.runwayLengthM} m` : '—');
-        const surfTxt = t.surfacePct ? `${t.surfaceLabel} +${t.surfacePct} %` : (t.surfaceLabel || '—');
+        // État de piste explicite quand la majoration ne s'explique pas par
+        // le seul revêtement (piste dure humide/contaminée, herbe mouillée).
+        const surfStateMap = fr
+            ? { 5: 'piste humide', 10: 'piste contaminée', 25: 'humide', 30: 'contaminée' }
+            : { 5: 'wet runway', 10: 'contaminated runway', 25: 'wet', 30: 'contaminated' };
+        const surfState = t.surfacePct && surfStateMap[t.surfacePct] ? ' · ' + surfStateMap[t.surfacePct] : '';
+        const surfTxt = t.surfacePct ? `${t.surfaceLabel}${surfState} +${t.surfacePct} %` : (t.surfaceLabel || '—');
         cell(L + cw3 + 7, y, cw3, 29, fr ? 'Revêtement' : 'Surface', surfTxt,
              { color: t.surfaceSoft ? AMBER : INK, size: surfTxt.length > 13 ? 9 : 10.5 });
         cell(L + 2 * (cw3 + 7), y, cw3, 29, fr ? 'Marge (50 ft)' : 'Margin (50 ft)',
