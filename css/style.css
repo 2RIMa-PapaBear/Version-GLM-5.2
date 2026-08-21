@@ -964,12 +964,14 @@ html.night-mode body::before {
 }
 .to-metrics-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 8px 16px;
+    grid-template-columns: repeat(5, 1fr);   /* une seule ligne, dans l'ordre */
+    gap: 8px 10px;
     font-size: 12px;
 }
 @media (max-width: 500px) {
-    .to-metrics-grid { grid-template-columns: 1fr 1fr; }
+    /* Toujours une seule ligne : on compacte plutôt que de passer en 2 colonnes. */
+    .to-metrics-grid { gap: 6px; font-size: 10px; }
+    .to-metrics-grid > div > div:first-child { font-size: 7.5px; letter-spacing: 0.5px; }
 }
 .takeoff-panel input[type="number"]::-webkit-inner-spin-button {
     -webkit-appearance: none;
