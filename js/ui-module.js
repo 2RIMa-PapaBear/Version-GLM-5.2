@@ -411,16 +411,18 @@ export function renderSearchHistory(containerId, onSelect) {
     if (window.lucide) window.lucide.createIcons({ root: c });
 }
 
-let _autocompleteClickHandler = null;
-export function initAutocomplete(inputId, onSelect) {
+let _acInstances = [];
+export function initAutocomplete(inputId, onSelect, opts = {}) {
     const input = document.getElementById(inputId); if (!input) return;
 
     input.parentElement.classList.add('autocomplete-wrapper');
 
-    let dropdown = document.getElementById('autocomplete-dropdown');
+    // Une dropdown par champ (recherche principale ET destination de nav).
+    const dropdownId = opts.dropdownId || `autocomplete-dropdown-${inputId}`;
+    let dropdown = document.getElementById(dropdownId);
     if (!dropdown) {
         dropdown = document.createElement('div');
-        dropdown.id = 'autocomplete-dropdown';
+        dropdown.id = dropdownId;
         dropdown.className = 'autocomplete-dropdown';
         input.parentElement.appendChild(dropdown);
     }
@@ -430,16 +432,12 @@ export function initAutocomplete(inputId, onSelect) {
     let _acDebounce = null;
     let _acRequestId = 0;
 
-    if (_autocompleteClickHandler) {
-        document.removeEventListener('click', _autocompleteClickHandler);
-    }
-    _autocompleteClickHandler = (e) => {
-        if (e.target !== input && !dropdown.contains(e.target)) {
-            dropdown.classList.remove('visible');
-            activeIndex = -1;
-        }
-    };
-    document.addEventListener('click', _autocompleteClickHandler);
+    // Fermeture au clic extérieur : un seul handler global pour toutes les
+    // instances (chaque instance enregistre sa paire input/dropdown).
+    _acInstances = _acInstances.filter(i => i.input !== input);
+    _acInstances.push({ input, dropdown, close() { dropdown.classList.remove('visible'); activeIndex = -1; } });
+    document.removeEventListener('click', _acGlobalClickHandler);
+    document.addEventListener('click', _acGlobalClickHandler);
 
     function highlightActiveItem() {
         const items = dropdown.querySelectorAll('.autocomplete-item');
@@ -460,10 +458,14 @@ export function initAutocomplete(inputId, onSelect) {
             const item = document.createElement('button');
             item.className = 'autocomplete-item';
 
-            const icaoHtml = apt.icao
-                ? `<span class="autocomplete-icao">${escapeHtml(apt.icao)}</span>`
-                : `<span class="autocomplete-icao" style="opacity:0.5;font-size:10px;">${escapeHtml(apt.country || '')}</span>`;
-            item.innerHTML = `${icaoHtml}<span class="autocomplete-name">${escapeHtml(apt.name)}</span>`;
+            if (opts.formatItem) {
+                item.innerHTML = opts.formatItem(apt);
+            } else {
+                const icaoHtml = apt.icao
+                    ? `<span class="autocomplete-icao">${escapeHtml(apt.icao)}</span>`
+                    : `<span class="autocomplete-icao" style="opacity:0.5;font-size:10px;">${escapeHtml(apt.country || '')}</span>`;
+                item.innerHTML = `${icaoHtml}<span class="autocomplete-name">${escapeHtml(apt.name)}</span>`;
+            }
             item.addEventListener('click', (e) => {
                 e.preventDefault();
 
@@ -503,10 +505,12 @@ export function initAutocomplete(inputId, onSelect) {
         }
 
         const valUpper = val.toUpperCase();
-        const localMatches = AIRPORTS.filter(a =>
+        let localMatches = AIRPORTS.filter(a =>
             (a.icao && a.icao.toUpperCase().includes(valUpper)) ||
             (a.name && a.name.toUpperCase().includes(valUpper))
-        ).slice(0, 6);
+        );
+        if (opts.filterList) localMatches = opts.filterList(localMatches, valUpper);
+        else localMatches = localMatches.slice(0, 6);
         if (localMatches.length > 0) _renderAutocomplete(localMatches);
 
         clearTimeout(_acDebounce);
@@ -514,12 +518,15 @@ export function initAutocomplete(inputId, onSelect) {
         _acDebounce = setTimeout(async () => {
             try {
                 const { searchAirports } = await import('./openaip.js');
-                const liveResults = await searchAirports(val, 8);
+                let liveResults = await searchAirports(val, 8);
+                // Champ Destination : seuls les codes OACI sont exploitables.
+                if (opts.requireIcao) liveResults = liveResults.filter(a => a.icao && /^[A-Z]{4}$/.test(a.icao));
 
                 if (reqId === _acRequestId && liveResults.length > 0) {
-
-                    if (localMatches.length >= 6) {
-
+                    // Destination : la base locale (codes + distance depuis le
+                    // départ) prime sur les résultats live — la liste ne doit
+                    // pas changer sous le pointeur au moment du clic.
+                    if (localMatches.length >= 6 || (opts.preferLocal && localMatches.length > 0)) {
                         return;
                     }
                     _renderAutocomplete(liveResults);
@@ -551,6 +558,12 @@ export function initAutocomplete(inputId, onSelect) {
             dropdown.classList.remove('visible');
             activeIndex = -1;
         }
+    });
+}
+
+function _acGlobalClickHandler(e) {
+    _acInstances.forEach(inst => {
+        if (e.target !== inst.input && !inst.dropdown.contains(e.target)) inst.close();
     });
 }
 
@@ -593,6 +606,7 @@ export function setLanguage(l) {
         'btn-watchdog': { title: tr.watchdogTitle, 'aria-label': tr.watchdogAria },
         'btn-fetch-metar': { 'aria-label': tr.fetchMetarAria },
         'btn-fetch-taf': { 'aria-label': tr.fetchTafAria },
+        'route-to-input': { placeholder: tr.routeToPlaceholder },
     };
     Object.entries(attrs).forEach(([id, map]) => {
         const el = document.getElementById(id);

@@ -154,6 +154,20 @@ function _renderLoading(container, from, to, alt, tas, burn, isNight, isFr) {
 // du tronçon + 1000 ft, arrondi aux 500 ft sup). Les champs inconnus (pilote,
 // c/sign, heures, horamètres, HEA/HRA) restent vides à remplir à la main.
 async function _generateNavLogPdf() {
+    // L'onglet est ouvert immédiatement, pendant que le geste utilisateur est
+    // encore actif (la génération attend un METAR : un window.open tardif serait
+    // bloqué comme popup). Le PDF s'y chargera une fois généré ; en cas
+    // d'échec, l'onglet est refermé.
+    const tab = window.open('', '_blank');
+    try {
+        await _generateNavLogPdfInto(tab);
+    } catch (err) {
+        console.error('Nav log PDF generation failed:', err);
+        try { tab?.close(); } catch { /* déjà fermé */ }
+    }
+}
+
+async function _generateNavLogPdfInto(tab) {
     const stash = state._lastNavPlan;
     if (!stash?.plan) return;
     const { plan, tas } = stash;
@@ -374,7 +388,18 @@ async function _generateNavLogPdf() {
         metarRaw, rows, calc, perf, centro,
     });
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    doc.save(`Log-nav_${fromIcao}-${toIcao}_${today}.pdf`);
+    const filename = `Log-nav_${fromIcao}-${toIcao}_${today}.pdf`;
+    // Le PDF s'ouvre dans un onglet : le visualiseur du navigateur offre le
+    // bouton Imprimer (Ctrl+P). Fallback téléchargement si l'onglet a été bloqué.
+    if (tab && !tab.closed) {
+        try {
+            tab.location.href = doc.output('bloburl');
+            return;
+        } catch (e) {
+            try { tab.close(); } catch { /* déjà fermé */ }
+        }
+    }
+    doc.save(filename);
 }
 
 function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
@@ -426,7 +451,7 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
     container.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px;">
             <div style="font-size:11px; color:var(--text-muted); font-family:'DM Mono',monospace;">${escapeHtml(from)} → ${escapeHtml(to)}</div>
-            <button id="fp-navlog-pdf" class="btn-secondary" style="font-size:11px; padding:4px 10px; white-space:nowrap;" title="${isFr ? 'Log de nav imprimable A5 (plan de vol + METAR de départ)' : 'Printable A5 nav log (flight plan + departure METAR)'}"><i data-lucide="file-down" style="width:12px;height:12px;vertical-align:middle;"></i> ${isFr ? 'Log de nav PDF' : 'Nav log PDF'}</button>
+            <button id="fp-navlog-pdf" class="fp-print-btn" title="${isFr ? 'Génère et ouvre le log A5 à imprimer (plan de vol + METAR de départ)' : 'Generates and opens the printable A5 nav log (flight plan + departure METAR)'}"><i data-lucide="printer"></i> ${isFr ? 'Imprimer le log de nav' : 'Print nav log'}</button>
         </div>
         ${_renderInputs(from, to, fromName, toName, alt, tas, burn, isNight, isFr)}
 
@@ -643,8 +668,8 @@ function _confirmNavLogPdf(isFr) {
                 <div class="modal-footer">
                     <button class="btn-secondary" data-cancel>${isFr ? 'Annuler' : 'Cancel'}</button>
                     <button class="btn-primary" data-ok>
-                        <i data-lucide="file-down" style="width:14px;height:14px;"></i>
-                        ${isFr ? 'J\'ai vérifié — générer le PDF' : 'Verified — generate PDF'}
+                        <i data-lucide="printer" style="width:14px;height:14px;"></i>
+                        ${isFr ? 'J\'ai vérifié — générer et ouvrir' : 'Verified — generate & open'}
                     </button>
                 </div>
             </div>`;
@@ -679,6 +704,24 @@ function _renderError(container, from, to, isFr) {
 function _renderInputs(from, to, fromName, toName, alt, tas, burn, isNight, isFr) {
     const waypointsValue = (state.route && state.route.length > 2)
         ? state.route.slice(1, -1).join(' ') : '';
+    // Liste lisible des étapes : code + nom de l'aérodrome (ou nom du repère),
+    // avec crayon de renommage pour les repères libres (pseudo-codes ZZxx).
+    const wps = (state.route && state.route.length > 2) ? state.route.slice(1, -1) : [];
+    const wpListHtml = wps.length ? `
+        <div id="fp-waypoint-list" class="fp-waypoint-list">
+            ${wps.map((code, i) => {
+                const apt = getAirportByICAO(code);
+                const name = apt?.name || code;
+                const renamable = /^ZZ[A-Z]{2}$/.test(code);
+                return `<div class="fp-wp-row">
+                    <span class="fp-wp-num">${i + 1}.</span>
+                    <span class="fp-wp-code">${escapeHtml(code)}</span>
+                    <span class="fp-wp-name">${escapeHtml(name)}</span>
+                    ${renamable ? `<button class="fp-wp-rename" data-icao="${escapeHtml(code)}" title="${isFr ? 'Renommer ce repère' : 'Rename this waypoint'}"><i data-lucide="pencil" style="width:12px;height:12px;"></i></button>` : ''}
+                    <button class="fp-wp-del" data-icao="${escapeHtml(code)}" title="${isFr ? 'Retirer ce waypoint du plan' : 'Remove this waypoint from the plan'}"><i data-lucide="x" style="width:12px;height:12px;"></i></button>
+                </div>`;
+            }).join('')}
+        </div>` : '';
     return `
         <div class="fp-route" style="display:flex; align-items:center; gap:8px; margin-bottom:10px; font-size:12px;">
             <div style="flex:1; min-width:0;">
@@ -713,6 +756,7 @@ function _renderInputs(from, to, fromName, toName, alt, tas, burn, isNight, isFr
                 <span>${isFr ? 'Nuit' : 'Night'}</span>
             </label>
         </div>
+        ${wpListHtml}
     `;
 }
 
@@ -748,4 +792,85 @@ function _wireInputs(container, from, to) {
     // jamais 'input' (frappe clavier). Sinon showFlightPlanner recrée le DOM et
     // détruit le champ en cours de saisie → l'utilisateur ne peut pas taper ses waypoints.
     container.querySelector('#fp-waypoints')?.addEventListener('change', recalc);
+
+    // Renommage d'un repère (ZZxx) depuis la liste des étapes du plan.
+    container.querySelectorAll('.fp-wp-rename').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const icao = btn.dataset.icao;
+            const apt = getAirportByICAO(icao);
+            const name = await _promptRenameWaypoint(icao, apt?.name || icao);
+            if (name) {
+                // regional-map met à jour le registre, l'étiquette carte et
+                // re-rend le plan (dispatch 'change') pour afficher le nouveau nom.
+                document.dispatchEvent(new CustomEvent('rename-free-waypoint', { detail: { icao, name } }));
+            }
+        });
+    });
+
+    // Retrait d'un waypoint du plan (croix de la liste des étapes) : retire
+    // le code du champ Waypoints et relance le calcul (les repères libres
+    // restent sur la carte, réutilisables via leur popup « + Plan »).
+    container.querySelectorAll('.fp-wp-del').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const icao = btn.dataset.icao;
+            const wpInput = container.querySelector('#fp-waypoints');
+            if (!icao || !wpInput) return;
+            const wps = wpInput.value.trim().toUpperCase().split(/\s+/).filter(w => /^[A-Z]{4}$/.test(w) && w !== icao);
+            wpInput.value = wps.join(' ');
+            wpInput.dispatchEvent(new Event('change'));
+        });
+    });
+}
+
+// Petite modale de renommage d'un waypoint libre (promise → nouveau nom ou null).
+function _promptRenameWaypoint(icao, currentName) {
+    return new Promise(resolve => {
+        document.getElementById('wp-rename-modal')?.remove();
+        const modal = document.createElement('div');
+        modal.id = 'wp-rename-modal';
+        modal.className = 'modal-overlay visible';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        const isFr = state.lang === 'fr';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width:360px;">
+                <div class="modal-header">
+                    <h2 style="display:flex;align-items:center;gap:8px;font-size:15px;">
+                        <i data-lucide="pencil" style="width:16px;height:16px;color:var(--primary);"></i>
+                        ${isFr ? 'Renommer le waypoint' : 'Rename waypoint'}
+                    </h2>
+                    <button class="btn-close-modal" data-cancel aria-label="${isFr ? 'Annuler' : 'Cancel'}"><i data-lucide="x"></i></button>
+                </div>
+                <div class="modal-body">
+                    <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--text-muted);">
+                        <span><span style="font-family:'DM Mono',monospace;color:var(--primary);font-weight:600;">${escapeHtml(icao)}</span> — ${isFr ? 'nouveau nom' : 'new name'}</span>
+                        <input type="text" id="wp-rename-input" maxlength="24" value="${escapeHtml(currentName)}" style="background:var(--input-bg);border:1px solid var(--border-color);color:var(--text-color);border-radius:6px;padding:8px 10px;font-size:13px;outline:none;">
+                    </label>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" data-cancel>${isFr ? 'Annuler' : 'Cancel'}</button>
+                    <button class="btn-primary" data-ok>${isFr ? 'Renommer' : 'Rename'}</button>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+        if (window.lucide) window.lucide.createIcons({ root: modal });
+
+        const input = modal.querySelector('#wp-rename-input');
+        input?.focus();
+        input?.select();
+
+        const onKey = (e) => {
+            if (e.key === 'Escape') done(null);
+            if (e.key === 'Enter') { e.preventDefault(); done(input.value.trim().slice(0, 24) || null); }
+        };
+        const done = (val) => {
+            document.removeEventListener('keydown', onKey);
+            modal.remove();
+            resolve(val);
+        };
+        modal.querySelectorAll('[data-cancel]').forEach(b => b.addEventListener('click', () => done(null)));
+        modal.querySelector('[data-ok]').addEventListener('click', () => done(input.value.trim().slice(0, 24) || null));
+        modal.addEventListener('click', e => { if (e.target === modal) done(null); });
+        document.addEventListener('keydown', onKey);
+    });
 }

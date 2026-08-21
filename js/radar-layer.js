@@ -110,7 +110,7 @@ export function createPrecipController(map) {
     // ---- État interne ----
     let radarFrames = [];
     let radarLayer = null;
-    let radarVisible = true;     // radar activé par défaut
+    let radarVisible = false;    // radar DÉSACTIVÉ par défaut (choix du pilote)
     let frameIdx = 0;            // index courant dans radarFrames
     let playing = false;
     let playTimer = null;
@@ -219,7 +219,10 @@ export function createPrecipController(map) {
         const label = controlsEl.querySelector('.precip-time-label');
         if (!label) return;
         const f = radarFrames[frameIdx];
-        if (!f) { label.textContent = '—'; return; }
+        // Pas de trame (radar éteint/vides) : le « — » est masqué pour que la
+        // barre d'outils de la carte tienne sur une seule ligne.
+        if (!f) { label.style.display = 'none'; label.textContent = '—'; return; }
+        label.style.display = '';
         const d = new Date(f.time * 1000);
         const pad = n => String(n).padStart(2, '0');
         const hhmm = `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
@@ -239,7 +242,7 @@ export function createPrecipController(map) {
 
         el.innerHTML = `
             <div class="precip-control-group">
-                <button class="precip-toggle precip-toggle-radar active" data-layer="radar" aria-pressed="true" title="${isFr ? 'Couches radar' : 'Radar layers'}">
+                <button class="precip-toggle precip-toggle-radar" data-layer="radar" aria-pressed="false" title="${isFr ? 'Couches radar' : 'Radar layers'}">
                     <i data-lucide="cloud-rain" style="width:14px;height:14px;"></i>
                     <span>${isFr ? 'Radar' : 'Radar'}</span>
                 </button>

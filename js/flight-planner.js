@@ -32,6 +32,46 @@ export function trueCourseDeg(lat1, lon1, lat2, lon2) {
     return (toDeg(Math.atan2(y, x)) + 360) % 360;
 }
 
+/**
+ * Index d'insertion (0..wps.length) d'un nouveau waypoint qui minimise la
+ * distance totale de la route (insertion la moins coûteuse) : on teste chaque
+ * slot de la chaîne Départ → étapes existantes → Destination et on garde le
+ * plus court trajet. L'ordre des étapes déjà saisies est préservé.
+ *
+ * @param {string} depIcao   code du départ
+ * @param {string[]} wps     étapes existantes (codes OACI, ordre conservé)
+ * @param {string} destIcao  code de la destination
+ * @param {string} newIcao   waypoint à insérer
+ * @param {(code:string)=>{lat:number,lon:number}|null} coordsOf
+ *   résolveur de coordonnées (base locale + mémo).
+ * @returns {number|null} index d'insertion optimal, ou null si une
+ *   coordonnée manque (l'appelant ajoutera alors en fin de liste).
+ */
+export function cheapestWaypointInsertion(depIcao, wps, destIcao, newIcao, coordsOf) {
+    const dep = coordsOf(depIcao);
+    const dest = coordsOf(destIcao);
+    const x = coordsOf(newIcao);
+    const legCoords = wps.map(coordsOf);
+    if (!dep || !dest || !x || legCoords.some(c => !c)) return null;
+
+    const legLen = (seq) => {
+        let s = 0;
+        for (let i = 0; i < seq.length - 1; i++) {
+            s += greatCircleDistanceNm(seq[i].lat, seq[i].lon, seq[i + 1].lat, seq[i + 1].lon);
+        }
+        return s;
+    };
+
+    let bestIdx = null;
+    let bestLen = Infinity;
+    for (let i = 0; i <= wps.length; i++) {
+        const seq = [dep, ...legCoords.slice(0, i), x, ...legCoords.slice(i), dest];
+        const len = legLen(seq);
+        if (len < bestLen) { bestLen = len; bestIdx = i; }
+    }
+    return bestIdx;
+}
+
 export function windCorrection(tcTrueCap, tasKt, wind) {
     if (!wind || tasKt <= 0) {
         return { wcaDeg: 0, driftDeg: 0, gsKt: tasKt, headwindKt: 0, crosswindKt: 0 };

@@ -1,8 +1,8 @@
-import { state, I18N, fetchAvecRelais, memoGet, surfaceLabel } from './core.js';
-import { getAirportByICAO, getAirportsInBbox } from './ui-module.js';
+import { state, I18N, fetchAvecRelais, memoGet, memoSet, surfaceLabel } from './core.js';
+import { getAirportByICAO, getAirportsInBbox, enrichAirport } from './ui-module.js';
 import { parseVisiToMeters, getCeiling } from './core.js';
 import { HAZARD_COLORS } from './sigmet.js';
-import { showRouteWeather } from './route-weather.js';
+import { showRouteWeather, resetRouteFit } from './route-weather.js';
 import { createPrecipController } from './radar-layer.js';
 import { createAirspaceController } from './airspaces.js';
 import { fetchPireps, pirepDisplayMeta } from './pireps.js';
@@ -22,6 +22,12 @@ let _currentIcao = null;
 
 let _runwayLayer = null;
 const RUNWAY_MIN_ZOOM = 11;
+
+// Anti-doublon pastilles : un aérodrome déjà affiché comme voisin (base locale,
+// position station) ne reçoit pas de seconde pastille corridor météo.
+function _skipDisplayedIcao(icao) {
+    return _displayedNeighborsIcao.has(icao);
+}
 
 let _refreshToken = 0;
 let _lastLoadedIcao = null;
@@ -105,6 +111,15 @@ export function toggleRegionalMap() {
     }
 }
 
+// Ouvre le panneau carte s'il est fermé (guidage à l'activation du mode
+// Navigation — sans effet s'il est déjà ouvert).
+export function openRegionalMap() {
+    const panel = document.getElementById('regional-map-panel');
+    if (!panel || panel.classList.contains('open')) return;
+    panel.classList.add('open');
+    setTimeout(() => _initOrRefresh(), 100);
+}
+
 export function showRegionalMapFor(icao, force = false) {
     _currentIcao = icao;
     const panel = document.getElementById('regional-map-panel');
@@ -162,21 +177,92 @@ async function _initOrRefresh() {
         _runwayLayer = L.layerGroup().addTo(_map);
         _map.on('zoomend', _updateRunwayVisibility);
 
-        // Bouton "Charger ce terrain" des popups METAR : le contenu du popup est
-        // recréé à chaque ouverture, on binde le handler sur l'évènement popupopen.
+        // Boutons des popups METAR : le contenu du popup est recréé à chaque
+        // ouverture, on binde les handlers sur l'évènement popupopen.
         _map.on('popupopen', (e) => {
-            const btn = e.popup?.getElement()?.querySelector('.mp-load-btn');
-            if (!btn) return;
-            btn.addEventListener('click', () => {
-                const icao = btn.dataset.icao;
-                if (!icao) return;
-                _map.closePopup();
-                const input = document.getElementById('icaoInput');
-                if (input) {
-                    input.value = icao;
-                    document.getElementById('btn-fetch-metar')?.click();
-                }
-            });
+            const el = e.popup?.getElement();
+            const btn = el?.querySelector('.mp-load-btn');
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    const icao = btn.dataset.icao;
+                    if (!icao) return;
+                    _map.closePopup();
+                    const input = document.getElementById('icaoInput');
+                    if (input) {
+                        input.value = icao;
+                        document.getElementById('btn-fetch-metar')?.click();
+                    }
+                });
+            }
+            // « Définir comme destination » (mode Navigation uniquement) :
+            // app.js remplit la barre Départ → Destination et recalcule la nav.
+            const destBtn = el?.querySelector('.mp-dest-btn');
+            if (destBtn) {
+                destBtn.addEventListener('click', () => {
+                    const icao = destBtn.dataset.icao;
+                    if (!icao) return;
+                    _map.closePopup();
+                    document.dispatchEvent(new CustomEvent('set-destination', { detail: { icao } }));
+                });
+            }
+            // « + Waypoint » : app.js ajoute le terrain au champ Waypoints du
+            // planificateur et relance le calcul multi-tronçons.
+            const wpBtn = el?.querySelector('.mp-waypoint-btn');
+            if (wpBtn) {
+                wpBtn.addEventListener('click', () => {
+                    const icao = wpBtn.dataset.icao;
+                    if (!icao) return;
+                    _map.closePopup();
+                    document.dispatchEvent(new CustomEvent('add-waypoint', { detail: { icao } }));
+                });
+            }
+            // Éditeur de waypoint libre : Valider (création) / Renommer.
+            const fwOk = el?.querySelector('.fw-ok-btn');
+            if (fwOk) {
+                const readName = () => {
+                    const raw = el.querySelector('.fw-name-input')?.value?.trim() || '';
+                    return raw.slice(0, 24) || null;
+                };
+                const validate = () => {
+                    const code = fwOk.dataset.code;
+                    const lat = parseFloat(fwOk.dataset.lat);
+                    const lon = parseFloat(fwOk.dataset.lon);
+                    _map.closePopup();
+                    if (code) {
+                        const name = readName();
+                        if (name) _renameFreeWaypoint(code, name);
+                    } else if (isFinite(lat) && isFinite(lon)) {
+                        _createFreeWaypoint(lat, lon, readName() || _formatDmCoords(lat, lon));
+                    }
+                };
+                fwOk.addEventListener('click', validate);
+                // Entrée = valider.
+                el.querySelector('.fw-name-input')?.addEventListener('keydown', (ev) => {
+                    if (ev.key === 'Enter') { ev.preventDefault(); validate(); }
+                });
+                el.querySelector('.fw-name-input')?.focus();
+                el.querySelector('.fw-name-input')?.select();
+            }
+            // « + Plan » : ajoute un repère existant à la navigation courante.
+            const fwAdd = el?.querySelector('.fw-add-btn');
+            if (fwAdd) {
+                fwAdd.addEventListener('click', () => {
+                    const code = fwAdd.dataset.code;
+                    if (!code) return;
+                    _map.closePopup();
+                    document.dispatchEvent(new CustomEvent('add-waypoint', { detail: { icao: code } }));
+                });
+            }
+            // « Supprimer » : retire le repère de la carte et du plan.
+            const fwDel = el?.querySelector('.fw-del-btn');
+            if (fwDel) {
+                fwDel.addEventListener('click', () => {
+                    const code = fwDel.dataset.code;
+                    if (!code) return;
+                    _map.closePopup();
+                    _deleteFreeWaypoint(code);
+                });
+            }
         });
 
         // Déplacement/zoom sur la carte : charge les aérodromes de la nouvelle zone
@@ -190,10 +276,11 @@ async function _initOrRefresh() {
     _clearAirportMarkers();
     _clearNeighborMarkers();
     _clearPirepMarkers();
+    // (Ré)initialisation : la route qui suivra sera re-cadrée sur départ →
+    // destination même si c'est la même qu'avant (panneau rouvert…).
+    resetRouteFit();
     _addAirportMarker(lat, lon, _currentIcao, apt?.name || _currentIcao, null, true);
     await _drawRunways(lat, lon, apt);
-
-    if (_precip) _precip.preload();
 
     await _loadNeighborCategories(lat, lon);
     if (myToken !== _refreshToken) return;
@@ -204,7 +291,7 @@ async function _initOrRefresh() {
     const toInput = document.getElementById('route-to-input');
     const toIcao = toInput?.value?.trim().toUpperCase();
     if (toIcao && /^[A-Z]{4}$/.test(toIcao) && toIcao !== _currentIcao.toUpperCase()) {
-        await showRouteWeather(_map, _currentIcao, toIcao);
+        await showRouteWeather(_map, _currentIcao, toIcao, { skipIcao: _skipDisplayedIcao });
         if (myToken !== _refreshToken) return;
     }
 
@@ -230,12 +317,15 @@ function _initLayerControls() {
     _sigmetLayer = createSigmetController(_map);
     _sigmetLayer.mountControls(bar);
 
-    _mountZoomAirfieldButton(bar);
-
-    _precip.toggleRadar(true);
-
-    // Basemap switcher AJOUTÉ EN DERNIER (les autres contrôleurs pouvaient réorganiser la barre).
+    // Ordre de la barre (une ligne) : Radar+lecture+horloge — Espaces — SIGMET —
+    // Satellite (fond de carte) — Terrain — + Waypoint.
     try { _mountBasemapSwitcher(bar); } catch (e) { console.error('basemap switcher failed:', e.message); }
+
+    _mountZoomAirfieldButton(bar);
+    _mountFreeWaypointButton(bar);
+
+    // Radar et SIGMET ne sont PLUS activés d'office : le pilote les allume
+    // d'un clic (état initial OFF dans leurs contrôleurs respectifs).
 
     // Écoute les mises à jour SIGMET émises par go-nogo.js (event custom 'sigmets-updated').
     document.addEventListener('sigmets-updated', (e) => {
@@ -250,7 +340,7 @@ function _initLayerControls() {
         const toInput = document.getElementById('route-to-input');
         const toIcao = toInput?.value?.trim().toUpperCase();
         if (toIcao && /^[A-Z]{4}$/.test(toIcao) && toIcao !== _currentIcao.toUpperCase()) {
-            showRouteWeather(_map, _currentIcao, toIcao, { skipMetars: true });
+            showRouteWeather(_map, _currentIcao, toIcao, { skipMetars: true, skipIcao: _skipDisplayedIcao });
         }
     });
 }
@@ -258,7 +348,7 @@ function _initLayerControls() {
 // Contrôleur SIGMET/AIRMET : trace les polygones de hazard sur la carte.
 function createSigmetController(map) {
     let layer = null;
-    let visible = true;
+    let visible = false;   // DÉSACTIVÉ par défaut (choix du pilote)
     let sigmets = [];
 
     function _redraw() {
@@ -382,6 +472,238 @@ function _mountZoomAirfieldButton(bar) {
     });
 }
 
+/* ================================================================
+ * WAYPOINTS LIBRES — repères nommés posés au pointeur
+ * ----------------------------------------------------------------
+ * Un clic droit sur la carte (ou le bouton « + Waypoint » puis un
+ * clic) ouvre un mini-éditeur au point : le pilote nomme son repère
+ * (« Pont de Tancarville »…) et le valide. Chaque repère reçoit un
+ * pseudo-code ZZ01…ZZ99 « enrichi » dans la base locale via
+ * enrichAirport() : planificateur, insertion intelligente, déclinaison,
+ * carte et log PDF le traitent alors comme un terrain ordinaire.
+ * Clic sur le repère → Renommer / + Plan / Supprimer.
+ * ================================================================ */
+
+let _freeWaypoints = new Map();   // 'ZZAA' → { lat, lon, name, marker }
+let _freeWpInsertMode = false;
+let _freeWpSeq = 1;
+
+// Coordonnées en degrés-minutes aviation (ex. « 4851N 00221W ») — nom par
+// défaut d'un repère posé hors zone connue.
+function _formatDmCoords(lat, lon) {
+    const fmt = (v, pad, pos, neg) => {
+        const a = Math.abs(v);
+        let d = Math.floor(a);
+        let m = Math.round((a - d) * 60);
+        if (m === 60) { d += 1; m = 0; }
+        return String(d).padStart(pad, '0') + String(m).padStart(2, '0') + (v >= 0 ? pos : neg);
+    };
+    return fmt(lat, 2, 'N', 'S') + ' ' + fmt(lon, 3, 'E', 'W');
+}
+
+// Aérodrome connu de la base locale à ~1,5 NM du point cliqué (si présent,
+// le waypoint posé sera CET aérodrome, nommé comme lui — pas un repère).
+function _nearestKnownAirport(lat, lon) {
+    const R = 0.025;   // degrés (~1,5 NM)
+    let best = null, bestD = Infinity;
+    for (const a of getAirportsInBbox(lat - R, lon - R, lat + R, lon + R)) {
+        const d = Math.hypot(a.lat - lat, a.lon - lon);
+        if (d < bestD) { bestD = d; best = a; }
+    }
+    return bestD <= R ? best : null;
+}
+
+// Pseudo-codes en LETTRES uniquement (ZZAA, ZZAB…) : ils passent ainsi tous
+// les filtres /^[A-Z]{4}$/ du pipeline (planner, recalcul, route), contrairement
+// à des codes chiffrés qui seraient silencieusement rejetés. Aucun ZZ** réel
+// dans airports.json → pas de collision.
+function _nextFreeWpCode() {
+    const letters = (n) => {
+        let s = '';
+        n = n - 1;
+        for (let i = 0; i < 2; i++) { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26); }
+        return s;   // 1 → 'AA' … 676 → 'ZZ'
+    };
+    let code;
+    do { code = 'ZZ' + letters(_freeWpSeq++); }
+    while (_freeWaypoints.has(code) || getAirportByICAO(code));
+    return code;
+}
+
+function _freeWpInPlan(code) {
+    const wpInput = document.getElementById('fp-waypoints');
+    return (wpInput?.value || '').toUpperCase().split(/\s+/).includes(code);
+}
+
+// Popup d'édition d'un repère existant (renommage).
+function _freeWpPopupHtml(code) {
+    const wp = _freeWaypoints.get(code);
+    if (!wp) return '';
+    const isFr = state.lang === 'fr';
+    const inPlan = _freeWpInPlan(code);
+    return `
+        <div class="fw-inner">
+            <div class="fw-title"><strong>${escapeHtml(wp.name)}</strong> <span class="fw-code">${escapeHtml(code)}</span></div>
+            <input type="text" class="fw-name-input" maxlength="24" value="${escapeHtml(wp.name)}" placeholder="${isFr ? 'Nom du waypoint' : 'Waypoint name'}">
+            <div class="mp-btns">
+                <button class="fw-ok-btn" data-code="${escapeHtml(code)}">${isFr ? 'Renommer' : 'Rename'}</button>
+                ${!inPlan ? `<button class="fw-add-btn" data-code="${escapeHtml(code)}">+ ${isFr ? 'Plan' : 'Plan'}</button>` : ''}
+            </div>
+            <div class="mp-btns"><button class="fw-del-btn" data-code="${escapeHtml(code)}">${isFr ? 'Supprimer' : 'Delete'}</button></div>
+        </div>`;
+}
+
+// Popup de création d'un nouveau repère au point cliqué (hors zone connue) :
+// nom par défaut = coordonnées géographiques du point.
+function _freeWpCreatePopupHtml(lat, lon) {
+    const isFr = state.lang === 'fr';
+    return `
+        <div class="fw-inner">
+            <div class="fw-title">${isFr ? 'Nouveau waypoint' : 'New waypoint'}</div>
+            <input type="text" class="fw-name-input" maxlength="24" value="${escapeHtml(_formatDmCoords(lat, lon))}" placeholder="${isFr ? 'Nom du waypoint' : 'Waypoint name'}">
+            <div class="mp-btns"><button class="fw-ok-btn" data-lat="${lat}" data-lon="${lon}">${isFr ? 'Valider' : 'OK'}</button></div>
+        </div>`;
+}
+
+// Pose d'un waypoint au pointeur : si un aérodrome connu est à ~1,5 NM, le
+// waypoint EST cet aérodrome (nommé comme lui, ajout direct au plan) ; sinon
+// ouverture de l'éditeur pour nommer le repère (défaut : ses coordonnées).
+function _dropFreeWaypoint(latlng) {
+    const known = _nearestKnownAirport(latlng.lat, latlng.lng);
+    if (known) {
+        document.dispatchEvent(new CustomEvent('add-waypoint', { detail: { icao: known.icao } }));
+        return;
+    }
+    _openFreeWpEditor(latlng, null);
+}
+
+function _openFreeWpEditor(latlng, code = null) {
+    if (!_map) return;
+    L.popup({ maxWidth: 250, keepInView: true, className: 'free-wp-popup' })
+        .setLatLng(latlng)
+        .setContent(code ? _freeWpPopupHtml(code) : _freeWpCreatePopupHtml(latlng.lat, latlng.lng))
+        .openOn(_map);
+}
+
+function _createFreeWaypoint(lat, lon, name) {
+    const code = _nextFreeWpCode();
+    // Enregistre le repère comme un « terrain » : tout le pipeline de nav
+    // (planner, insertion intelligente, magvar, route, PDF) le résoudra.
+    enrichAirport(code, { lat, lon, name });
+    memoSet(code, { name, lat, lon });
+
+    const marker = L.circleMarker([lat, lon], {
+        radius: 7, fillColor: '#FBBF24', color: '#fff',
+        weight: 2, opacity: 1, fillOpacity: 0.9,
+    }).addTo(_map);
+    marker.bindTooltip(escapeHtml(name), { permanent: true, direction: 'right', className: 'free-wp-label' });
+    marker.bindPopup(() => _freeWpPopupHtml(code), { maxWidth: 250, keepInView: true });
+    _freeWaypoints.set(code, { lat, lon, name, marker });
+
+    // Insertion intelligente + recalcul du plan (handler add-waypoint d'app.js).
+    document.dispatchEvent(new CustomEvent('add-waypoint', { detail: { icao: code } }));
+}
+
+function _renameFreeWaypoint(code, name) {
+    const wp = _freeWaypoints.get(code);
+    if (!wp) return;
+    wp.name = name;
+    enrichAirport(code, { name });
+    memoSet(code, { name, lat: wp.lat, lon: wp.lon });
+    wp.marker.setTooltipContent(escapeHtml(name));
+    // (le popup est bindé avec une fonction : il se re-rendra à la prochaine ouverture)
+    // Re-rend le plan de navigation pour afficher le nouveau nom (liste des étapes).
+    const wpInput = document.getElementById('fp-waypoints');
+    if (wpInput) wpInput.dispatchEvent(new Event('change'));
+}
+
+function _deleteFreeWaypoint(code) {
+    const wp = _freeWaypoints.get(code);
+    if (!wp) return;
+    _map?.removeLayer(wp.marker);
+    _freeWaypoints.delete(code);
+    const wpInput = document.getElementById('fp-waypoints');
+    if (wpInput && wpInput.value.trim()) {
+        const wps = wpInput.value.trim().toUpperCase().split(/\s+/).filter(w => /^[A-Z]{4}$/.test(w) && w !== code);
+        wpInput.value = wps.join(' ');
+        wpInput.dispatchEvent(new Event('change'));
+    }
+}
+
+// Renommage d'un repère depuis le plan de vol (flight-planner-ui émet l'événement).
+if (typeof document !== 'undefined') {
+    document.addEventListener('rename-free-waypoint', (e) => {
+        const icao = e.detail?.icao;
+        const name = (e.detail?.name || '').trim().slice(0, 24);
+        if (icao && name) _renameFreeWaypoint(icao.toUpperCase(), name);
+    });
+}
+
+function _setFreeWpInsertMode(on) {
+    _freeWpInsertMode = on;
+    document.getElementById('regional-map')?.classList.toggle('inserting-wp', on);
+    const hint = document.getElementById('wp-insert-hint');
+    if (hint) hint.hidden = !on;
+    if (!on) {
+        document.querySelectorAll('.free-wp-btn').forEach(b => {
+            b.classList.remove('active');
+            b.setAttribute('aria-pressed', 'false');
+        });
+    }
+}
+
+function _mountFreeWaypointButton(bar) {
+    const isFr = state.lang === 'fr';
+    const group = document.createElement('div');
+    group.className = 'precip-control-group';
+    group.innerHTML = `
+        <button class="precip-toggle free-wp-btn" aria-pressed="false" title="${isFr ? 'Poser un waypoint libre, puis cliquer sur la carte (ou clic droit direct sur la carte)' : 'Drop a free waypoint, then click the map (or right-click the map)'}">
+            <i data-lucide="map-pin-plus" style="width:14px;height:14px;"></i>
+            <span>${isFr ? '+ Waypoint' : '+ Waypoint'}</span>
+        </button>`;
+    bar.appendChild(group);
+    if (window.lucide) window.lucide.createIcons({ root: group });
+
+    group.querySelector('.free-wp-btn')?.addEventListener('click', (ev) => {
+        const on = !_freeWpInsertMode;
+        _setFreeWpInsertMode(on);
+        if (on) {
+            ev.currentTarget.classList.add('active');
+            ev.currentTarget.setAttribute('aria-pressed', 'true');
+        }
+    });
+
+    // Bandeau d'aide affiché pendant le mode insertion.
+    if (!document.getElementById('wp-insert-hint')) {
+        const hint = document.createElement('div');
+        hint.id = 'wp-insert-hint';
+        hint.className = 'wp-insert-hint';
+        hint.hidden = true;
+        hint.textContent = isFr
+            ? 'Cliquez sur la carte pour poser le waypoint — Échap pour annuler'
+            : 'Click the map to drop the waypoint — Esc to cancel';
+        document.getElementById('regional-map-body')?.appendChild(hint);
+    }
+
+    // Échap quitte le mode insertion.
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && _freeWpInsertMode) _setFreeWpInsertMode(false);
+    });
+
+    // Mode insertion : le prochain clic sur la carte pose le waypoint.
+    _map.on('click', (e) => {
+        if (!_freeWpInsertMode) return;
+        _setFreeWpInsertMode(false);
+        _dropFreeWaypoint(e.latlng);
+    });
+
+    // Raccourci : clic droit = création directe, sans passer par le mode.
+    _map.on('contextmenu', (e) => {
+        _setFreeWpInsertMode(false);
+        _dropFreeWaypoint(e.latlng);
+    });
+}
+
 // Détection de fin de déplacement : charge les terrains de la nouvelle zone visible.
 // Debounce 1.5 s ; seuil de 0.8° depuis le dernier centre chargé pour éviter
 // les rechargements redondants (et protéger le proxy AviationWeather).
@@ -418,11 +740,22 @@ async function _loadNeighborCategories(lat, lon) {
         const stations = await fetchAvecRelais(stationsUrl, 'json', 3600);
 
         const metarByCode = {};
+        // Position OFFICIELLE de chaque station (généralement le milieu de la
+        // piste en service) : la pastille du terrain s'y aligne pour coïncider
+        // avec la pastille météo du corridor — sinon DEUX points décalés par
+        // aérodrome (ARP de la base locale vs station AviationWeather).
+        const stationPos = {};
         if (Array.isArray(stations)) {
             const nearby = stations
                 .map(s => ({ code: s.icaoId || s.id }))
                 .filter(s => s.code && /^[A-Z]{4}$/.test(s.code))
                 .slice(0, 50);
+            stations.forEach(s => {
+                const code = s.icaoId || s.id;
+                if (code && /^[A-Z]{4}$/.test(code) && typeof s.lat === 'number' && typeof s.lon === 'number') {
+                    stationPos[code] = { lat: s.lat, lon: s.lon };
+                }
+            });
 
             if (nearby.length > 0) {
                 const idsStr = nearby.map(s => s.code).join(',');
@@ -446,18 +779,19 @@ async function _loadNeighborCategories(lat, lon) {
         localAirports.forEach(a => {
             if (a.icao === _currentIcao) return;
             if (_displayedNeighborsIcao.has(a.icao)) return;
+            const pos = stationPos[a.icao] || { lat: a.lat, lon: a.lon };
             // Le METAR peut venir de cette zone OU d'une zone précédemment chargée.
             const raw = metarByCode[a.icao] ?? _metarByIcao[a.icao] ?? null;
             if (raw) {
                 const cat = _categoryFromMetar(raw);
                 if (cat) {
-                    _addAirportMarker(a.lat, a.lon, a.icao, a.name, cat, false, raw);
+                    _addAirportMarker(pos.lat, pos.lon, a.icao, a.name, cat, false, raw);
                     _displayedNeighborsIcao.add(a.icao);
                     return;
                 }
             }
             // Pas de METAR ou non catégorisable → marker gris.
-            _addAirportMarker(a.lat, a.lon, a.icao, a.name, null, false, raw);
+            _addAirportMarker(pos.lat, pos.lon, a.icao, a.name, null, false, raw);
             _displayedNeighborsIcao.add(a.icao);
         });
 
@@ -608,29 +942,55 @@ function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null
 
     marker.bindTooltip(label, { permanent: false, direction: 'top' });
 
-    // Popup détaillé au clic (voisins avec METAR uniquement — le courant est déjà dans l'app).
-    if (!isCurrent && rawMetar) {
+    // Popup au clic (voisins — le terrain courant est déjà dans l'app).
+    // Avec METAR : détail décodé + message brut. Sans METAR : popup réduit,
+    // mais mêmes boutons — un terrain sans station peut servir de waypoint
+    // ou de destination : seules ses coordonnées sont requises.
+    if (!isCurrent) {
         const isFr = state.lang === 'fr';
-        const dec = _decodeMetarForPopup(rawMetar);
-        const catColor = cat ? (CAT_PIN_COLORS[cat.cat] || '#94A3B8') : '#94A3B8';
-        const rows = dec ? [
-            [isFr ? 'Vent' : 'Wind', dec.wind],
-            [isFr ? 'Visi' : 'Vis', dec.visi],
-            [isFr ? 'Plafond' : 'Ceiling', dec.ceiling],
-            ['T/Td', (dec.temp || dec.dew) ? `${dec.temp ?? '—'} / ${dec.dew ?? '—'}` : null],
-            ['QNH', dec.qnh],
-        ] : [];
-        marker.bindPopup(`
-            <div class="mp-inner">
-                <div class="mp-title"><strong>${escapeHtml(icao)}</strong>${name ? ' · ' + escapeHtml(name) : ''}</div>
-                ${cat ? `<div class="mp-cat" style="background:${catColor};">${cat.cat}</div>` : ''}
-                <div class="mp-rows">
-                    ${rows.map(([k, v]) => v ? `<div class="mp-row"><span class="mp-k">${k}</span><span class="mp-v">${escapeHtml(v)}</span></div>` : '').join('')}
-                </div>
-                <pre class="mp-raw">${escapeHtml(rawMetar)}</pre>
+        // Boutons de navigation : « Définir comme destination » dès le mode
+        // nav ; « + Waypoint » seulement si une navigation existe déjà (une
+        // étape intermédiaire n'a de sens qu'entre un départ et une arrivée).
+        const isNav = document.body.classList.contains('mode-nav');
+        const toInputVal = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
+        const hasDest = isNav && /^[A-Z]{4}$/.test(toInputVal) && toInputVal !== icao.toUpperCase();
+        const btnsHtml = `
+            <div class="mp-btns">
                 <button class="mp-load-btn" data-icao="${escapeHtml(icao)}">${isFr ? 'Charger ce terrain' : 'Load this airport'}</button>
+                ${isNav ? `<button class="mp-dest-btn" data-icao="${escapeHtml(icao)}" title="${isFr ? 'Définir ce terrain comme destination de la navigation' : 'Set this airfield as the navigation destination'}">${isFr ? 'Définir comme destination' : 'Set as destination'}</button>` : ''}
             </div>
-        `, { maxWidth: 280, className: 'metar-popup' });
+            ${hasDest ? `<div class="mp-btns"><button class="mp-waypoint-btn" data-icao="${escapeHtml(icao)}" title="${isFr ? 'Ajouter ce terrain comme waypoint intermédiaire du plan de navigation' : 'Add this airfield as a waypoint to the flight plan'}">+ Waypoint</button></div>` : ''}`;
+
+        if (rawMetar) {
+            const dec = _decodeMetarForPopup(rawMetar);
+            const catColor = cat ? (CAT_PIN_COLORS[cat.cat] || '#94A3B8') : '#94A3B8';
+            const rows = dec ? [
+                [isFr ? 'Vent' : 'Wind', dec.wind],
+                [isFr ? 'Visi' : 'Vis', dec.visi],
+                [isFr ? 'Plafond' : 'Ceiling', dec.ceiling],
+                ['T/Td', (dec.temp || dec.dew) ? `${dec.temp ?? '—'} / ${dec.dew ?? '—'}` : null],
+                ['QNH', dec.qnh],
+            ] : [];
+            marker.bindPopup(`
+                <div class="mp-inner">
+                    <div class="mp-title"><strong>${escapeHtml(icao)}</strong>${name ? ' · ' + escapeHtml(name) : ''}</div>
+                    ${cat ? `<div class="mp-cat" style="background:${catColor};">${cat.cat}</div>` : ''}
+                    <div class="mp-rows">
+                        ${rows.map(([k, v]) => v ? `<div class="mp-row"><span class="mp-k">${k}</span><span class="mp-v">${escapeHtml(v)}</span></div>` : '').join('')}
+                    </div>
+                    <pre class="mp-raw">${escapeHtml(rawMetar)}</pre>
+                    ${btnsHtml}
+                </div>
+            `, { maxWidth: 280, className: 'metar-popup', keepInView: true });
+        } else {
+            marker.bindPopup(`
+                <div class="mp-inner">
+                    <div class="mp-title"><strong>${escapeHtml(icao)}</strong>${name ? ' · ' + escapeHtml(name) : ''}</div>
+                    <div class="mp-cat" style="background:#94A3B8;">${isFr ? 'Sans METAR' : 'No METAR'}</div>
+                    ${btnsHtml}
+                </div>
+            `, { maxWidth: 280, className: 'metar-popup', keepInView: true });
+        }
     }
 
     if (isCurrent) _airportMarkers.push(marker);

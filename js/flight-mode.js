@@ -32,6 +32,7 @@
 import { state } from './core.js';
 import { showAlternates } from './alternates.js';
 import { clearElevationChart } from './elevation-chart.js';
+import { openRegionalMap } from './regional-map.js';
 
 const STORAGE_KEY = 'flight-mode';
 
@@ -80,6 +81,8 @@ export function setFlightMode(mode) {
         // et la route sur la carte (retour au vol local pur).
         const toInput = document.getElementById('route-to-input');
         if (toInput) toInput.value = '';
+        const toName = document.getElementById('route-to-name');
+        if (toName) toName.textContent = '';
         const fpPanel = document.getElementById('flight-planner-panel');
         if (fpPanel) fpPanel.style.display = 'none';
         clearElevationChart('elevation-profile-container');
@@ -97,6 +100,10 @@ export function setFlightMode(mode) {
     const altC = document.getElementById('alternates-container');
     if (mode === 'nav' && state.requestedIcao) {
         showAlternates(state.requestedIcao);
+        // Guide le pilote : ouvre la carte régionale et place le curseur dans
+        // le champ Destination de la barre de navigation (sans faire défiler).
+        openRegionalMap();
+        setTimeout(() => document.getElementById('route-to-input')?.focus({ preventScroll: true }), 120);
     } else if (altC) {
         altC.style.display = 'none';
     }
