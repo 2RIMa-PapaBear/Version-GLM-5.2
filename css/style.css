@@ -963,14 +963,15 @@ html.night-mode body::before {
     padding: 14px 18px;
 }
 /* Indicateurs de décollage : UNE ligne de texte « Libellé : valeur »,
-   typographie homogène (12 px), répartie sur la largeur du panneau. */
+   typographie homogène, répartie sur la largeur — JAMAIS de retour à la
+   ligne (compactage 11 px si nécessaire pour tenir). */
 .to-metrics-grid {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: space-between;
     align-items: baseline;
-    gap: 4px 12px;
-    font-size: 12px;
+    gap: 4px 10px;
+    font-size: 11px;
     line-height: 1.6;
 }
 .to-metrics-grid > span { white-space: nowrap; }
