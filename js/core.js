@@ -355,6 +355,10 @@ const _state = {
 
     manualTargetHour: null,
     forcedRunway: null,
+    // Piste active calculée par la ROSE DES VENTS (choix auto selon le vent
+    // de la vue courante, ou paire forcée au clic sur une bulle). Source de
+    // vérité unique pour les widgets qui affichent la piste en service.
+    activeRunwayName: null,
     isDragging: false,
     graphMetrics: null,
     sunLineHitboxes: [],
