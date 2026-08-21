@@ -164,6 +164,17 @@
         <div class="route-to-wrapper">
             <input type="text" id="route-to-input" placeholder="ex : LFPO ou Poitiers" autocomplete="off" aria-autocomplete="list" style="text-transform:uppercase;font-family:'DM Mono',monospace;font-size:14px;font-weight:600;background:var(--input-bg);border:1px solid var(--border-color);color:var(--primary);border-radius:6px;padding:6px 10px;width:100%;outline:none;">
         </div>
+        <div class="plan-io-wrapper">
+            <button id="plan-io-btn" class="plan-io-btn" title="Sauvegarder / importer le plan de vol (JSON, GPX, KML)" aria-haspopup="menu" aria-expanded="false">
+                <i data-lucide="folder-open" style="width:16px;height:16px;"></i>
+            </button>
+            <div id="plan-io-menu" class="plan-io-menu" role="menu">
+                <button data-act="save-json" role="menuitem"><i data-lucide="save" style="width:13px;height:13px;"></i> Sauvegarder (JSON)</button>
+                <button data-act="save-gpx" role="menuitem"><i data-lucide="download" style="width:13px;height:13px;"></i> Exporter GPX</button>
+                <button data-act="save-kml" role="menuitem"><i data-lucide="download" style="width:13px;height:13px;"></i> Exporter KML</button>
+                <button data-act="import" role="menuitem"><i data-lucide="folder-open" style="width:13px;height:13px;"></i> Importer un plan…</button>
+            </div>
+        </div>
         <div id="route-to-name" class="route-to-name"></div>
     </aside>
 
