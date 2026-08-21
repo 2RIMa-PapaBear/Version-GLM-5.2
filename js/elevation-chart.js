@@ -61,9 +61,9 @@ export function renderElevationChart(containerId, profile, cruiseAltFt, fromIcao
     const pts = profile.points;
     _distTotalKm = _haversineKm(pts[0].lat, pts[0].lon, pts[pts.length - 1].lat, pts[pts.length - 1].lon);
 
-    // Met à jour le label de route.
+    // Met à jour le label de route (distance totale en NM, unité aviation).
     const label = document.getElementById('elev-route-label');
-    if (label) label.textContent = `${fromIcao} → ${toIcao} · ${Math.round(_distTotalKm)} km`;
+    if (label) label.textContent = `${fromIcao} → ${toIcao} · ${Math.round(_distTotalKm / 1.852)} NM`;
 
     _ensureCanvas(container);
     _draw();
@@ -220,16 +220,25 @@ function _draw() {
         _ctx.fillText(Math.round(_cruiseFt) + ' ft', PAD.left + 4, yc - 4);
     }
 
-    // --- Axe X : distance ---
-    _ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    // --- Axe X : distance de chaque tronçon (entre waypoints), en NM ---
+    // Remplace les graduations km : le pilote veut la distance de chaque
+    // segment de route, alignée sous celui-ci (bornes = départ, étapes, arrivée).
+    _ctx.fillStyle = 'rgba(255,255,255,0.55)';
     _ctx.font = '9px "DM Mono", monospace';
     _ctx.textAlign = 'center';
-    const xSteps = 5;
-    for (let i = 0; i <= xSteps; i++) {
-        const frac = i / xSteps;
-        const x = xOf(frac);
-        const km = Math.round(frac * _distTotalKm);
-        _ctx.fillText(km + ' km', x, ch - PAD.bottom + 16);
+    const distTotalNm = _distTotalKm / 1.852;
+    const bornes = [0];
+    if (_waypoints && _waypoints.length > 2) {
+        for (let i = 1; i < _waypoints.length - 1; i++) {
+            const f = _findWaypointFrac(_waypoints[i]);
+            if (f != null) bornes.push(f);
+        }
+        bornes.sort((a, b) => a - b);
+    }
+    bornes.push(1);
+    for (let i = 0; i < bornes.length - 1; i++) {
+        const nm = Math.round((bornes[i + 1] - bornes[i]) * distTotalNm);
+        _ctx.fillText(nm + ' NM', xOf((bornes[i] + bornes[i + 1]) / 2), ch - PAD.bottom + 16);
     }
 
     // --- Labels départ / arrivée ---
@@ -297,12 +306,12 @@ function _draw() {
             _ctx.lineWidth = 1.5;
             _ctx.stroke();
 
-            // Tooltip.
-            const km = Math.round(pt.frac * _distTotalKm);
+            // Tooltip (distance cumulée en NM, unité aviation).
+            const nm = Math.round(pt.frac * _distTotalKm / 1.852);
             const clearance = Math.round(_cruiseFt - pt.elevFt);
             const lines = [
                 `${Math.round(pt.elevFt)} ft`,
-                `${km} km`,
+                `${nm} NM`,
                 clearance >= 0 ? `+${clearance} ft` : `${clearance} ft`,
             ];
             const tipW = 76, tipH = 40;
