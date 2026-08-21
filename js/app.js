@@ -563,6 +563,13 @@ document.addEventListener('DOMContentLoaded', async function () {
             refreshElevationChart();
         }
     });
+    // Nouveau plan de vol calculé : le widget centrage recharge sa
+    // consommation (lecture seule, trajet du plan) — sans ça, il gardait
+    // la valeur de son dernier rendu.
+    window.addEventListener('navplan-changed', () => {
+        const icao = state.requestedIcao;
+        if (icao) refreshWbWidget(icao);
+    });
     document.getElementById('btn-night-mode').addEventListener('click', toggleNightMode);
     document.getElementById('btn-cockpit-mode')?.addEventListener('click', toggleCockpitMode);
     document.getElementById('btn-share')?.addEventListener('click', openShareModal);

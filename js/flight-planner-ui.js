@@ -419,6 +419,9 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
     // Mémorise le dernier plan rendu pour l'export PDF du log de nav (navlog-pdf.js).
     // alt/burn/isNight/isFr servent à la page 2 « Calcul de navigation ».
     state._lastNavPlan = { plan, tas, alt, burn, isNight, isFr };
+    // Le widget centrage suit la consommation du plan (lecture seule en
+    // navigation) : on lui signale qu'un plan vient d'être (re)calculé.
+    window.dispatchEvent(new CustomEvent('navplan-changed'));
 
     container.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px;">

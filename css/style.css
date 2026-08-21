@@ -1423,16 +1423,24 @@ html.night-mode body::before {
 .wb-dot-zf { background: #F87171; }
 .wb-out { color: #F87171; }
 
-/* Chargement du jour : ligne 1 = postes (autant de colonnes que nécessaire),
-   ligne 2 = les deux champs carburant ; chaque champ = saisie + slider. */
+/* Chargement du jour : 4 postes MAX par ligne ; le carburant (et la
+   consommée en navigation) ouvre toujours la ligne suivante, accompagné
+   des postes restants (ex. Bagages 1/2). Écran étroit : 2 colonnes. */
 .wb-load-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 8px 12px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px 10px;
 }
-.wb-load-grid-fuel { grid-template-columns: 1fr 1fr; }
-/* Vol local : pas d'essence consommée → le carburant embarqué occupe toute la largeur. */
-.wb-load-grid-fuel.wb-fuel-solo { grid-template-columns: 1fr; }
+@media (max-width: 700px) {
+    .wb-load-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* Sécurité libellés : jamais de retour à la ligne, ellipse si trop long. */
+.wb-load-grid .wb-load-lab .lab {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 /* Essence consommée (mode navigation) : lecture seule, issue du plan de vol —
    même gabarit visuel que le champ carburant, bordure en pointillés. */
 .wb-burn-ro {
@@ -1488,6 +1496,12 @@ html.night-mode body::before {
 .wb-load input.wb-over {
     border-color: #F59E0B;
     background: rgba(251, 191, 36, 0.08);
+}
+/* Sécurité carburant (navigation) : embarqué insuffisant vs requis du plan. */
+.wb-load input.wb-under {
+    border-color: var(--danger, #EF4444);
+    color: var(--danger, #EF4444);
+    background: rgba(239, 68, 68, 0.08);
 }
 
 .wb-verdict {

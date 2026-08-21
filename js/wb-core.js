@@ -345,9 +345,11 @@ export function wbChartSvg(wb, calc, isFr = true, width = 340, opts = {}) {
     // Décollage/ZFW à droite, Arrivée à gauche, avec BASCULE de côté si
     // l'étiquette déborderait du graphe et décalage vertical de 11 px entre
     // étiquettes d'un même côté (points proches).
+    // opts.hideArrival (vol local) : pas de point Arrivée — confondu avec
+    // le Décollage, on ne le trace pas.
     const defs = [
         { p: calc.takeoff, col: C.ptTakeoff, r: 3.2, text: `${isFr ? 'Décollage' : 'Takeoff'} ${val(calc.takeoff.massKg)} ${L.unitMass}`, side: 'right' },
-        { p: calc.arrival, col: C.ptArrival, r: 2.8, text: `${isFr ? 'Arrivée' : 'Landing'} ${val(calc.arrival.massKg)} ${L.unitMass}`, side: 'left' },
+        ...(opts.hideArrival ? [] : [{ p: calc.arrival, col: C.ptArrival, r: 2.8, text: `${isFr ? 'Arrivée' : 'Landing'} ${val(calc.arrival.massKg)} ${L.unitMass}`, side: 'left' }]),
         { p: calc.zfw, col: C.ptZfw, r: 2.8, text: `ZFW ${val(calc.zfw.massKg)} ${L.unitMass}`, side: 'right' },
     ].filter(d => d.p.cgMm != null && isFinite(d.p.cgMm));
 
