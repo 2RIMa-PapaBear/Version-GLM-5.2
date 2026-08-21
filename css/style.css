@@ -706,6 +706,18 @@ body.mode-local #alternates-container { display: none !important; }
     padding: 2px 7px; border-radius: 5px; box-shadow: none;
 }
 .leaflet-tooltip.free-wp-label::before { display: none; }
+/* Étiquettes des extrémités de route : code OACI vert (départ) / rouge (arrivée). */
+.leaflet-tooltip.route-dep-label,
+.leaflet-tooltip.route-arr-label {
+    background: rgba(15,23,42,0.92);
+    color: #F8FAFC; font-size: 11px; font-weight: 700;
+    font-family: 'DM Mono', monospace;
+    padding: 2px 7px; border-radius: 5px; box-shadow: none;
+}
+.leaflet-tooltip.route-dep-label { border: 1px solid rgba(74,222,128,0.7); color: #4ADE80; }
+.leaflet-tooltip.route-arr-label { border: 1px solid rgba(239,68,68,0.7); color: #F87171; }
+.leaflet-tooltip.route-dep-label::before,
+.leaflet-tooltip.route-arr-label::before { display: none; }
 /* Éditeur de nom (création / renommage). */
 .fw-inner { min-width: 200px; display: flex; flex-direction: column; gap: 8px; }
 .fw-inner .fw-title { font-size: 12px; color: #F8FAFC; }
@@ -734,6 +746,20 @@ body.mode-local #alternates-container { display: none !important; }
     border: 1px solid rgba(239,68,68,0.35); transition: background 0.15s; white-space: nowrap;
 }
 .fw-inner .fw-del-btn:hover { background: rgba(239,68,68,0.25); }
+
+/* Popup d'un waypoint de route (étape du plan vue sur la carte). */
+.mp-inner .mp-rmwp-btn {
+    flex: 1; padding: 6px 10px; border-radius: 6px; cursor: pointer;
+    background: rgba(239,68,68,0.12); color: #F87171; font-weight: 700; font-size: 11px;
+    border: 1px solid rgba(239,68,68,0.35); transition: background 0.15s; white-space: nowrap;
+}
+.mp-inner .mp-rmwp-btn:hover { background: rgba(239,68,68,0.25); }
+.mp-inner .mp-renamewp-btn {
+    flex: 1; padding: 6px 10px; border-radius: 6px; cursor: pointer;
+    background: rgba(251,191,36,0.15); color: #FBBF24; font-weight: 700; font-size: 11px;
+    border: 1px solid rgba(251,191,36,0.4); transition: background 0.15s; white-space: nowrap;
+}
+.mp-inner .mp-renamewp-btn:hover { background: rgba(251,191,36,0.3); }
 
 /* Bouton « Imprimer le log de nav » : action finale de la préparation —
    il doit sauter aux yeux dans le panneau Calcul de navigation. */

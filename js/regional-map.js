@@ -637,6 +637,14 @@ if (typeof document !== 'undefined') {
         const name = (e.detail?.name || '').trim().slice(0, 24);
         if (icao && name) _renameFreeWaypoint(icao.toUpperCase(), name);
     });
+
+    // « Renommer » depuis le popup d'un repère libre EN ROUTE (son marqueur
+    // dédié est masqué par le point d'étape) : rouvre l'éditeur au point.
+    document.addEventListener('edit-free-waypoint', (e) => {
+        const icao = (e.detail?.icao || '').toUpperCase();
+        const wp = _freeWaypoints.get(icao);
+        if (wp) _openFreeWpEditor(L.latLng(wp.lat, wp.lon), icao);
+    });
 }
 
 function _setFreeWpInsertMode(on) {
