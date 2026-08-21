@@ -475,16 +475,18 @@
 <table>
 <thead><tr><th>Layer</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td>Base map</td><td>Satellite imagery (Esri)</td></tr>
-<tr><td>🟦 Radar</td><td>Real-time precipitation (RainViewer). Play/pause button to animate the past hours; time slider to scrub through frames.</td></tr>
-<tr><td>🟡 Current airfield</td><td>Yellow center marker</td></tr>
-<tr><td>Runways</td><td>Runway outlines colored by surface (green = grass, gray = concrete, ochre = dirt)</td></tr>
+<tr><td>Base map</td><td>Satellite (Esri), map, dark or terrain — via the "Satellite" selector in the toolbar</td></tr>
+<tr><td>🟦 Radar</td><td>Real-time precipitation (RainViewer) — <strong>off by default</strong>; play/pause button and time slider once enabled</td></tr>
+<tr><td>🟡 Current airfield</td><td>Yellow center marker; runway outlines colored by surface (green = grass, gray = concrete, ochre = dirt)</td></tr>
 <tr><td>Nearby airfields</td><td>Up to 25 surrounding fields with VFR/MVFR/IFR/LIFR colored markers</td></tr>
 <tr><td>🛩️ PIREPs</td><td>Pilot reports (turbulence, icing) in the area</td></tr>
-<tr><td>Airspaces</td><td>CTR, TMA, ATZ, ICAO classes — click a zone to highlight it</td></tr>
+<tr><td>Airspaces</td><td>CTR, TMA, ATZ, ICAO classes — click a zone to highlight it (off by default)</td></tr>
+<tr><td>SIGMET / AIRMET</td><td>Polygons of active hazardous phenomena (off by default)</td></tr>
 </tbody>
 </table>
-<p><strong>Value</strong>: if nearby fields drop to MVFR/IFR, beware — the weather is closing in. Click a marker to load that airfield.</p>
+<p><strong>Toolbar</strong> (single line): Radar · play + clock · Airspaces · SIGMET · Satellite · Airfield · + Waypoint. The clock slider adapts to the window width; radar, airspaces and SIGMET only switch on when you ask — nothing displays without your click.</p>
+<p><strong>Clicking a nearby airfield</strong>: the popup shows its decoded METAR (wind, visibility, ceiling, T/Td, QNH) and offers three actions — <strong>Load this airport</strong>, <strong>Set as destination</strong> and <strong>+ Waypoint</strong> (Navigation mode). Airfields without METAR offer the same actions.</p>
+<p><strong>Value</strong>: if nearby fields drop to MVFR/IFR, beware — the weather is closing in.</p>
 <p><strong>"Airfield" button</strong>: zooms directly to the current airfield to see runway details.</p>
 
 <h3>SIGMET / AIRMET</h3>
@@ -505,18 +507,35 @@
 <tr><td>🟧 <strong>Navigation</strong></td><td>TAF forecast at arrival time (ETA), viable alternates, en-route weather</td></tr>
 </tbody>
 </table>
+<p>When you switch to Navigation mode, the <strong>"Departure → Destination" bar</strong> appears below the header, the regional map opens and the cursor lands in the Destination field — everything is ready to plan your flight.</p>
 
 <h3>Alternates Comparator</h3>
 <p>In Navigation mode, the tool automatically lists <strong>diversion airfields</strong> around your destination, with their flight category, visibility, ceiling and wind — sorted by viability for a quick decision.</p>
 
+<h3>Departure → Destination Bar</h3>
+<p>The Destination field accepts an <strong>ICAO code</strong> (LFPO) or an <strong>airfield / city name</strong> ("Poitiers"): the list proposes airfields with their <strong>distance from your departure</strong>, closest first. The selected airfield's name appears under the bar — a safeguard against typos. Changing the destination <strong>resets the flight plan</strong>: waypoints of the previous route are removed (markers you dropped on the map remain available).</p>
+
 <h3>Flight Planner</h3>
-<p>Enter your departure airfield in the regional map ("Departure") to compute:</p>
+<p>As soon as a valid destination is entered, the "Flight plan" panel recomputes on every change:</p>
 <ul>
 <li><strong>Great-circle distance</strong> and true/magnetic course (automatic declination)</li>
 <li><strong>Surface and cruise wind</strong> (Open-Meteo)</li>
-<li><strong>Ground speed and estimated time en route</strong> (ETA)</li>
+<li><strong>Ground speed and estimated time</strong> per leg and cumulated</li>
 <li><strong>Estimated fuel + legal reserves</strong> (day/night VFR)</li>
 </ul>
+
+<h3>Waypoints and Markers</h3>
+<p>Five ways to add a leg:</p>
+<ul>
+<li><strong>Airfield popup</strong> on the map: "+ Waypoint" button;</li>
+<li>the <strong>"+ Waypoint" button</strong> in the map toolbar, then click where you want it;</li>
+<li><strong>right-click</strong> anywhere on the map;</li>
+<li>the plan's <strong>"Waypoints" field</strong> (ICAO codes, space-separated, typed by hand);</li>
+<li>clicking a previously dropped marker → "+ Plan".</li>
+</ul>
+<p>Every addition is <strong>inserted at the best position</strong>: the tool tests all slots and keeps the shortest total route — an intermediate stop automatically slips in <em>before</em> a farther leg. The order of already-entered waypoints is always preserved.</p>
+<p><strong>Free markers</strong>: a point dropped away from any known airfield defaults to <strong>its coordinates</strong> (e.g. 4851N 00221W). Name it at creation, or later via the <strong>pencil</strong> in the leg list or by clicking the marker (Rename). A point dropped near a known airfield simply becomes that leg, named after the airfield.</p>
+<p><strong>Managing legs</strong>: the plan's leg list shows number, code and name, with a <strong>pencil</strong> (rename markers) and a <strong>cross</strong> to remove a leg. On the map, clicking a leg point also offers "Remove from plan" — and "Rename" for markers. Departure, arrival and legs carry their <strong>ICAO code as a label</strong> (green / red / amber); markers carry their name.</p>
 
 <h3>Route Weather</h3>
 <p>Displays flight-category markers for airfields along your route, to anticipate possible en-route deterioration.</p>
@@ -548,8 +567,8 @@
 <h3>Audio Read-Aloud</h3>
 <p>The 🔊 button reads the METAR aloud (browser speech synthesis), ATIS-style.</p>
 
-<h3>Briefing PDF</h3>
-<p>The "Briefing PDF" button generates a <strong>printable PDF document</strong> containing: airfield header, raw METAR/TAF, flight category, wind, visibility, ceiling, QNH, best runway, day window, alerts and takeoff distances.</p>
+<h3>Printable Nav Log</h3>
+<p>In the "Flight plan" panel, the <strong>"Print nav log"</strong> button generates the A5 log (3-4 pages: nav log, navigation computations, performance &amp; terrain, weight &amp; balance if the aircraft is configured). A <strong>verification modal</strong> lists the automatically computed values to check before any in-flight use; once confirmed, the PDF <strong>opens in a browser tab</strong> — the viewer's Print button is one click away (fallback: direct download if the tab is blocked).</p>
 
 <h3>Share by Link</h3>
 <p>The 🔗 button generates a <strong>permalink</strong> containing the airfield, raw message and arrival time. A QR code lets you open it on mobile.</p>
@@ -1610,7 +1629,8 @@ TEMPO 0912 SHRA
 - ✅ Computes the <strong>day VFR flight window</strong> and alerts on aero night
 - ✅ <strong>Regional map</strong>: precipitation radar + nearby categories + PIREPs
 - ✅ <strong>Alternates comparator</strong> and route weather (Navigation mode)
-- ✅ Generates a printable, shareable <strong>Briefing PDF</strong></p>
+- ✅ <strong>Flight planner</strong>: courses, times, fuel, terrain — with waypoints inserted at the shortest route and named markers dropped at the pointer
+- ✅ Generates a <strong>printable A5 nav log</strong> (opened in a tab, ready to print)</p>
 <p><strong>What the tool does NOT do (yet)</strong> :
 - ❌ Does not replace the official weather briefing
 - ❌ Does not make decisions for you (the verdict is an aid, not an order)
