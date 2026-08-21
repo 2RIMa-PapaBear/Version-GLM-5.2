@@ -744,6 +744,18 @@ document.addEventListener('DOMContentLoaded', async function () {
         });
     }
 
+    // « Retirer du plan » : popup d'un waypoint de route sur la carte
+    // (route-weather.js émet l'événement) — même logique que la croix du plan.
+    document.addEventListener('remove-waypoint', (e) => {
+        const icao = e.detail?.icao;
+        if (!icao) return;
+        const wpInput = document.getElementById('fp-waypoints');
+        if (!wpInput) return;
+        const wps = wpInput.value.trim().toUpperCase().split(/\s+/).filter(w => /^[A-Z]{4}$/.test(w) && w !== icao);
+        wpInput.value = wps.join(' ');
+        wpInput.dispatchEvent(new Event('change'));
+    });
+
     // Autocomplétion du champ Destination : code OACI ou nom de terrain,
     // résultats priorisés par distance depuis le départ.
     initAutocomplete('route-to-input', (icao) => {
@@ -772,9 +784,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
 
     // « + Waypoint » : ajoute le terrain au champ Waypoints du planificateur
-    // (source de vérité des étapes) à la position qui rend le trajet total le
-    // plus court (insertion la moins coûteuse — l'ordre des étapes déjà
-    // saisies est préservé), puis relance le calcul via son événement 'change'.
+    // à la position qui rend le trajet total le plus court (insertion la moins
+    // coûteuse — l'ordre des étapes déjà saisies est préservé), puis relance
+    // le calcul via son événement 'change'.
     document.addEventListener('add-waypoint', (e) => {
         const icao = e.detail?.icao;
         if (!icao) return;

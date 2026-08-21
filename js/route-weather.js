@@ -8,6 +8,7 @@ let _routeLayer = null;
 let _routeMarkers = [];
 let _waypointMarkers = [];
 let _lastFitKey = null;
+let _wpActionsBound = false;   // handlers popupopen des waypoints de route
 
 // Étiquettes de tronçons (Cap / Distance / Temps) + case à cocher bas-gauche.
 const ROUTE_LABELS_LS = 'mt-route-labels';
@@ -67,11 +68,31 @@ export async function showRouteWeather(map, fromIcao, toIcao, opts = {}) {
     _addRouteEndpoint(map, toLat, toLon, toIcao, false);
     // Marqueurs intermédiaires pour les waypoints (cercles ambre) — ajoutés directement
     // à la map (pas à la polyline, qui n'accepte pas addTo).
+    // Étiquette permanente du CODE OACI pour les aérodromes ; les repères
+    // libres (ZZxx) portent déjà leur nom via leur marqueur dédié (pas de
+    // doublon d'étiquette).
+    const isFr = state.lang === 'fr';
     _waypointMarkers = routePoints.slice(1, -1).map(p => {
-        return L.circleMarker([p[0], p[1]], {
+        const isFreeWp = /^ZZ[A-Z]{2}$/.test(p[2]);
+        const apt = getAirportByICAO(p[2]);
+        const name = apt?.name && apt.name !== p[2] ? apt.name : null;
+        const marker = L.circleMarker([p[0], p[1]], {
             radius: 5, color: '#FBBF24', weight: 2, fillColor: '#FBBF24', fillOpacity: 0.4,
-        }).addTo(map).bindPopup(`<b>${escapeHtml(p[2])}</b>`);
+        }).addTo(map).bindPopup(`
+            <div class="mp-inner">
+                <div class="mp-title"><strong>${escapeHtml(p[2])}</strong>${name ? ' · ' + escapeHtml(name) : ''}</div>
+                <div class="mp-btns">
+                    ${isFreeWp ? `<button class="mp-renamewp-btn" data-icao="${escapeHtml(p[2])}">${isFr ? 'Renommer' : 'Rename'}</button>` : ''}
+                    <button class="mp-rmwp-btn" data-icao="${escapeHtml(p[2])}" title="${isFr ? 'Retire cette étape du plan de vol' : 'Remove this leg from the flight plan'}">${isFr ? 'Retirer du plan' : 'Remove from plan'}</button>
+                </div>
+            </div>
+        `, { maxWidth: 250, keepInView: true });
+        if (!isFreeWp) {
+            marker.bindTooltip(escapeHtml(p[2]), { permanent: true, direction: 'right', className: 'free-wp-label' });
+        }
+        return marker;
     });
+    _mountWaypointPopupActions(map);
 
     // Étiquettes Cap / Distance / Temps par tronçon (selon les cases cochées).
     _lastMap = map;
@@ -169,9 +190,36 @@ async function _loadCorridorMetars(map, fromLat, fromLon, toLat, toLon, fromIcao
     }
 }
 
-function _addRouteEndpoint(map, lat, lon, icao, isStart) {
-    const isFr = state.lang === 'fr';
-    const marker = L.circleMarker([lat, lon], {
+// Actions des popups des waypoints de route : « Retirer du plan » (app.js
+// retire le code du champ Waypoints et relance le calcul) et « Renommer »
+// pour les repères libres (regional-map rouvre son éditeur au point).
+function _mountWaypointPopupActions(map) {
+    if (_wpActionsBound || !map) return;
+    _wpActionsBound = true;
+    map.on('popupopen', (e) => {
+        const el = e.popup?.getElement();
+        const rmBtn = el?.querySelector('.mp-rmwp-btn');
+        if (rmBtn) {
+            rmBtn.addEventListener('click', () => {
+                const icao = rmBtn.dataset.icao;
+                if (!icao) return;
+                map.closePopup();
+                document.dispatchEvent(new CustomEvent('remove-waypoint', { detail: { icao } }));
+            });
+        }
+        const rnBtn = el?.querySelector('.mp-renamewp-btn');
+        if (rnBtn) {
+            rnBtn.addEventListener('click', () => {
+                const icao = rnBtn.dataset.icao;
+                if (!icao) return;
+                map.closePopup();
+                document.dispatchEvent(new CustomEvent('edit-free-waypoint', { detail: { icao } }));
+            });
+        }
+    });
+}
+
+function _addRouteEndpoint(map, lat, lon, icao, isStart) {    const marker = L.circleMarker([lat, lon], {
         radius: 11,
         fillColor: isStart ? '#4ADE80' : '#EF4444',
         color: '#fff',
@@ -179,8 +227,14 @@ function _addRouteEndpoint(map, lat, lon, icao, isStart) {
         opacity: 1,
         fillOpacity: 0.9,
     }).addTo(map);
-    const label = isStart ? (isFr ? 'Départ' : 'Departure') : 'Destination';
-    marker.bindTooltip(`<strong>${label}: ${icao}</strong>`, { direction: 'top', permanent: false });
+    // Étiquette permanente du code OACI (vert départ / rouge arrivée), même
+    // principe que les étapes intermédiaires. Remplace l'ancien tooltip de
+    // survol : l'information est désormais toujours visible.
+    marker.bindTooltip(escapeHtml(icao), {
+        permanent: true,
+        direction: 'right',
+        className: isStart ? 'route-dep-label' : 'route-arr-label',
+    });
     _routeMarkers.push(marker);
 }
 
