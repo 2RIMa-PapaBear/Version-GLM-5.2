@@ -56,14 +56,26 @@ export function buildPermalink() {
     }
 
     const mode = localStorage.getItem('flight-mode');
-    if (mode === 'nav') url.searchParams.set('mode', 'nav');
+    if (mode === 'nav') {
+        url.searchParams.set('mode', 'nav');
+        // Navigation complète : destination + étapes — le lien rouvre le plan
+        // de vol tel quel (et pas seulement le terrain de départ).
+        const icaoU = (icao || '').toUpperCase();
+        const dest = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
+        if (/^[A-Z][A-Z0-9]{3}$/.test(dest) && dest !== icaoU) {
+            url.searchParams.set('dest', dest);
+            const wps = (document.getElementById('fp-waypoints')?.value || '').trim().toUpperCase();
+            if (/^([A-Z][A-Z0-9]{3}\s*)+$/.test(wps)) url.searchParams.set('wp', wps);
+        }
+    }
 
     return url.toString();
 }
 
 /**
  * Lit les paramètres de l'URL courante.
- * @returns {{icao:string|null, taf:boolean, t:number|null, mode:'local'|'nav'|null}}
+ * @returns {{icao:string|null, taf:boolean, t:number|null, mode:'local'|'nav'|null,
+ *            dest:string|null, wp:string}}
  */
 export function readPermalink() {
     const params = new URLSearchParams(window.location.search);
@@ -72,6 +84,8 @@ export function readPermalink() {
         taf: params.get('taf') === '1',
         t: params.has('t') ? parseFloat(params.get('t')) : null,
         mode: params.get('mode') === 'nav' ? 'nav' : (params.get('mode') === 'local' ? 'local' : null),
+        dest: params.get('dest')?.toUpperCase() || null,
+        wp: (params.get('wp') || '').trim().toUpperCase(),
     };
 }
 
