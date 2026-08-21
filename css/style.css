@@ -1431,6 +1431,20 @@ html.night-mode body::before {
     gap: 8px 12px;
 }
 .wb-load-grid-fuel { grid-template-columns: 1fr 1fr; }
+/* Vol local : pas d'essence consommée → le carburant embarqué occupe toute la largeur. */
+.wb-load-grid-fuel.wb-fuel-solo { grid-template-columns: 1fr; }
+/* Essence consommée (mode navigation) : lecture seule, issue du plan de vol —
+   même gabarit visuel que le champ carburant, bordure en pointillés. */
+.wb-burn-ro {
+    background: var(--input-bg, #0F172A);
+    border: 1px dashed var(--border-color);
+    color: var(--text-color);
+    border-radius: 6px;
+    padding: 6px 9px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+}
 .wb-load input[type="range"] {
     width: 100%;
     accent-color: var(--primary, #38BDF8);

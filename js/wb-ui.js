@@ -5,9 +5,11 @@
  * Panneau repliable sous « Performance décollage », relié à l'avion
  * actif de la flotte. Affiche le centrogramme (enveloppe + points
  * décollage / arrivée / ZFW), permet de saisir le chargement du jour
- * (postes de l'avion, carburant embarqué et essence consommée —
- * pré-remplis depuis le plan de nav courant, modifiables) et donne
- * le verdict dedans/dehors enveloppe + marge MTOW.
+ * (postes de l'avion, carburant embarqué — pré-rempli du plan de nav,
+ * modifiable) et donne le verdict dedans/dehors enveloppe + marge MTOW.
+ * L'essence consommée n'apparaît qu'en mode NAVIGATION : lecture seule,
+ * issue du plan de vol (trajet à destination). En vol local elle n'a
+ * pas lieu d'être (point Arrivée confondu avec le Décollage).
  *
  * La configuration (enveloppe, postes, masse à vide, unités) se gère
  * dans la fenêtre Flotte : ce widget ne fait que consommer/afficher.
@@ -15,6 +17,7 @@
 
 import { state, escapeHtml } from './core.js';
 import { makeCollapsible } from './collapsible.js';
+import { getFlightMode } from './flight-mode.js';
 import { getActiveAircraft } from './aircraft-fleet.js';
 import { openFleetManager } from './fleet-ui.js';
 import {
@@ -82,6 +85,9 @@ function _render(body, ac, isFr) {
     const u = wb.units;
     const plan = state._lastNavPlan?.plan;
     const loads = resolveLoads(ac.id, plan);
+    // L'essence consommée n'existe qu'en navigation (lecture seule, plan
+    // de vol) : en vol local le point Arrivée est confondu avec le Décollage.
+    const isNav = getFlightMode() === 'nav';
 
     // Postes sans bras (saisie incomplète côté flotte) : ignorés ici.
     const usable = (s) => s.armMm != null && isFinite(s.armMm);
@@ -103,17 +109,18 @@ function _render(body, ac, isFr) {
                 </label>`).join('')}
         </div>
         ${fuelSt ? `
-        <div class="wb-load-grid wb-load-grid-fuel">
+        <div class="wb-load-grid wb-load-grid-fuel${isNav ? '' : ' wb-fuel-solo'}">
             <label class="wb-load wb-load-fuel" title="${isFr ? 'Quantité totale embarquée au décollage — pré-remplie du plan de nav (trajet + réserve), modifiable.' : 'Total fuel at takeoff — pre-filled from the nav plan (trip + reserve), editable.'}">
                 <span class="wb-load-lab"><span class="lab">${isFr ? 'Carburant embarqué (L)' : 'Fuel on board (L)'}</span>${fuelSt.maxKg ? ` <span class="val">Max ${fuelSt.maxKg}</span>` : ''}</span>
                 <input type="number" step="any" min="0" id="wb-fuel-l" data-key="fuel" data-max="${fuelSt.maxKg || ''}" value="${loads.fuelL || ''}" placeholder="0">
                 <input type="range" class="wb-load-range" data-key="fuel" min="0" max="${fuelSt.maxKg ? Math.max(1, Math.round(fuelSt.maxKg)) : 200}" step="1" value="${Math.round(loads.fuelL || 0)}">
             </label>
-            <label class="wb-load wb-load-fuel" title="${isFr ? 'Essence brûlée pendant le vol — le point Arrivée est calculé avec le carburant restant (embarqué − consommée). Pré-remplie du plan de nav (trajet, sans la réserve).' : 'Fuel burned during the flight — the landing point uses the remaining fuel (on board − burned). Pre-filled from the nav plan (trip, no reserve).'}">
-                <span class="wb-load-lab"><span class="lab">${isFr ? 'Essence consommée en vol (L)' : 'Fuel burned in flight (L)'}</span> <span class="val dim">${isFr ? 'option' : 'optional'}</span></span>
-                <input type="number" step="any" min="0" id="wb-burn-l" data-key="burn" value="${loads.burnL || ''}" placeholder="0">
-                <input type="range" class="wb-load-range" data-key="burn" min="0" max="${Math.max(1, Math.round(loads.fuelL || 1))}" step="1" value="${Math.round(loads.burnL || 0)}">
-            </label>
+            ${isNav ? `
+            <label class="wb-load wb-load-fuel" title="${isFr ? 'Essence consommée jusqu\u2019à destination, issue du plan de vol (trajet, sans la réserve) — non modifiable. Le point Arrivée est calculé avec le carburant restant (embarqué − consommée).' : 'Fuel burned to destination, from the flight plan (trip, no reserve) — read-only. The landing point uses the remaining fuel (on board − burned).'}">
+                <span class="wb-load-lab"><span class="lab">${isFr ? 'Essence consommée en vol (L)' : 'Fuel burned in flight (L)'}</span> <span class="val dim">${isFr ? 'plan de vol' : 'flight plan'}</span></span>
+                <input type="hidden" id="wb-burn-l" data-key="burn" value="${loads.burnL || ''}">
+                <div class="wb-burn-ro">${loads.burnL || 0}</div>
+            </label>` : ''}
         </div>` : ''}
         <div class="wb-chart-host"></div>
         <div class="wb-results">
@@ -125,13 +132,17 @@ function _render(body, ac, isFr) {
         <div class="wb-note">
             <i data-lucide="info" style="width:11px;height:11px;vertical-align:middle;"></i>
             ${isFr
-                ? 'Carburant embarqué et essence consommée en vol pré-remplis du plan de nav (modifiables). Point Arrivée = carburant embarqué − essence consommée. Enveloppe, postes et masse à vide : fenêtre Flotte.'
-                : 'Fuel on board and fuel burned in flight pre-filled from the nav plan (editable). Landing point = fuel on board − fuel burned. Envelope, stations and empty weight: Fleet window.'}
+                ? (isNav
+                    ? 'Carburant embarqué pré-rempli du plan de nav (modifiable) ; essence consommée = trajet du plan de vol (non modifiable). Point Arrivée = carburant embarqué − essence consommée. Enveloppe, postes et masse à vide : fenêtre Flotte.'
+                    : 'Carburant embarqué pré-rempli du plan de nav (modifiable). En vol local, pas d\u2019essence consommée : le point Arrivée est confondu avec le Décollage. Enveloppe, postes et masse à vide : fenêtre Flotte.')
+                : (isNav
+                    ? 'Fuel on board pre-filled from the nav plan (editable); fuel burned = flight plan trip (read-only). Landing point = fuel on board − fuel burned. Envelope, stations and empty weight: Fleet window.'
+                    : 'Fuel on board pre-filled from the nav plan (editable). In local flight there is no fuel burned: the landing point merges with takeoff. Envelope, stations and empty weight: Fleet window.')}
         </div>
     `;
     if (window.lucide) window.lucide.createIcons({ root: body });
 
-    body.querySelectorAll('.wb-load-in, #wb-fuel-l, #wb-burn-l').forEach(input => {
+    body.querySelectorAll('.wb-load-in, #wb-fuel-l').forEach(input => {
         input.addEventListener('input', () => _recalc(body, ac, isFr));
     });
     // Sliders : pilotent le champ numérique associé (même data-key).
@@ -192,7 +203,9 @@ function _recalc(body, ac, isFr) {
     };
     const set = (sel, html) => { const el = body.querySelector(sel); if (el) el.innerHTML = html; };
     set('#wb-res-to', mkLine(isFr ? 'Décollage :' : 'Takeoff:', calc.takeoff));
-    set('#wb-res-ar', mkLine(isFr ? `Arrivée (−${burnL} L) :` : `Landing (−${burnL} L):`, calc.arrival));
+    set('#wb-res-ar', mkLine(burnL > 0
+        ? (isFr ? `Arrivée (−${burnL} L) :` : `Landing (−${burnL} L):`)
+        : (isFr ? 'Arrivée :' : 'Landing:'), calc.arrival));
     set('#wb-res-zf', mkLine(isFr ? 'ZFW (zéro carburant) :' : 'ZFW (zero fuel):', calc.zfw));
 
     // Bandeau verdict.
@@ -219,12 +232,10 @@ function _recalc(body, ac, isFr) {
         vEl.innerHTML = `${isFr ? 'HORS LIMITES' : 'OUT OF LIMITS'} — ${reasons.join(' · ')}`;
     }
 
-    // Resynchronise les sliders sur les valeurs saisies ; le slider
-    // « essence consommée » est borné au carburant embarqué courant.
+    // Resynchronise les sliders sur les valeurs saisies.
     body.querySelectorAll('input[type="range"].wb-load-range').forEach(rng => {
         const num = body.querySelector(`input[type="number"][data-key="${CSS.escape(rng.dataset.key)}"]`);
         if (!num) return;
-        if (rng.dataset.key === 'burn') rng.max = Math.max(1, Math.round(loads.fuelL));
         const v = _num(num.value);
         rng.value = (isFinite(v) && v > 0) ? Math.min(v, Number(rng.max)) : 0;
     });
