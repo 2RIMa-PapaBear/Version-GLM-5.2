@@ -134,26 +134,15 @@ function render(container, r, icao) {
             </div>
         </div>
         <div class="to-profile" style="margin-top:10px;"></div>
-        <div style="display:flex; align-items:flex-end; gap:14px; margin-top:10px; flex-wrap:nowrap;">
-            <label style="font-size:11px; color:var(--text-muted); display:flex; flex-direction:column; gap:3px;">
-                <span>${isFr ? 'Piste en service' : 'Runway in use'}</span>
-                ${activeRwy
-                    ? `<span title="${isFr ? 'Piste sélectionnée dans la rose des vents' : 'Runway selected in wind compass'}" style="font-size:11px; background:rgba(74,222,128,0.15); color:#4ADE80; padding:3px 8px; border-radius:4px; letter-spacing:0.5px; font-weight:600; font-family:'DM Mono',monospace; align-self:flex-start;">RWY ${escapeHtml(activeRwy)}</span>`
-                    : `<span style="font-family:'DM Mono',monospace; font-size:13px; color:var(--text-muted);">—</span>`}
-            </label>
-            <label style="font-size:11px; color:var(--text-muted); display:flex; flex-direction:column; gap:3px;">
-                <span>${isFr ? 'Longueur de piste' : 'Runway length'}</span>
-                <div style="width:120px; background:var(--input-bg); border:1px solid var(--border-color); color:var(--primary); border-radius:6px; padding:5px 8px; font-family:'DM Mono',monospace; font-size:13px; font-weight:500;">
-                    ${rwyLenM != null ? rwyLenM + ' m' : '—'}
-                </div>
-            </label>
+        <div style="display:flex; align-items:baseline; gap:6px; margin-top:10px; flex-wrap:wrap; font-size:12px; line-height:1.6;">
+            <span style="color:var(--text-muted);">${isFr ? 'Piste en service' : 'Runway in use'} :</span>
+            <span title="${isFr ? 'Piste sélectionnée dans la rose des vents' : 'Runway selected in wind compass'}" style="font-family:'DM Mono',monospace; color:var(--text-color);">${activeRwy ? 'RWY ' + escapeHtml(activeRwy) : '—'}</span>
+            <span style="color:var(--text-muted);">·</span>
+            <span style="color:var(--text-muted);">${isFr ? 'Longueur de piste' : 'Runway length'} :</span>
+            <span style="font-family:'DM Mono',monospace; color:var(--text-color);">${rwyLenM != null ? rwyLenM + ' m' : '—'}</span>
             ${r.margin != null ? `
-                <div style="margin-left:auto; text-align:right;">
-                    <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px;">${isFr ? 'Longueur restante' : 'Remaining length'}</div>
-                    <div style="font-family:'DM Mono',monospace; font-weight:500; font-size:15px; color:${marginColor};">
-                        ${r.margin >= 0 ? '+' : ''}${ftToM(r.margin)} m
-                    </div>
-                </div>
+                <span style="margin-left:auto; color:var(--text-muted);">${isFr ? 'Longueur restante' : 'Remaining length'} :</span>
+                <span style="font-family:'DM Mono',monospace; font-weight:500; color:${marginColor};">${r.margin >= 0 ? '+' : ''}${ftToM(r.margin)} m</span>
             ` : ''}
         </div>
         <div style="font-size:10px; color:var(--text-muted); margin-top:8px; line-height:1.4;">
