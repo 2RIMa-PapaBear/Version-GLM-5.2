@@ -70,13 +70,14 @@ export function showTakeoffWidget(icao) {
 const FT_TO_M = 0.3048;
 
 /** État de piste déduit du facteur de majoration (mêmes seuils que
- *  takeoff-performance). Herbe sèche (+15 %) : rien à préciser. */
+ *  takeoff-performance). Herbe sèche (+15 %) : rien à préciser. Les états
+ *  restent courts (« humide », « contaminée ») : la ligne doit tenir entière. */
 function _surfaceState(factor, isFr) {
     if (Math.abs(factor - 1.15) < 1e-9) return '';            // herbe sèche
     if (factor >= 1.30) return isFr ? 'contaminée' : 'contaminated';
     if (factor >= 1.25) return isFr ? 'humide' : 'wet';
-    if (factor >= 1.10) return isFr ? 'piste contaminée' : 'contaminated rwy';
-    if (factor > 1) return isFr ? 'piste humide' : 'wet rwy';
+    if (factor >= 1.10) return isFr ? 'contaminée' : 'contaminated';
+    if (factor > 1) return isFr ? 'humide' : 'wet';
     return '';
 }
 

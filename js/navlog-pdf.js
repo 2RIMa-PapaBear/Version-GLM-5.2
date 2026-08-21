@@ -670,8 +670,8 @@ function _drawPerfPage(doc, p) {
         // État de piste explicite quand la majoration ne s'explique pas par
         // le seul revêtement (piste dure humide/contaminée, herbe mouillée).
         const surfStateMap = fr
-            ? { 5: 'piste humide', 10: 'piste contaminée', 25: 'humide', 30: 'contaminée' }
-            : { 5: 'wet runway', 10: 'contaminated runway', 25: 'wet', 30: 'contaminated' };
+            ? { 5: 'humide', 10: 'contaminée', 25: 'humide', 30: 'contaminée' }
+            : { 5: 'wet', 10: 'contaminated', 25: 'wet', 30: 'contaminated' };
         const surfState = t.surfacePct && surfStateMap[t.surfacePct] ? ' · ' + surfStateMap[t.surfacePct] : '';
         const surfTxt = t.surfacePct ? `${t.surfaceLabel}${surfState} +${t.surfacePct} %` : (t.surfaceLabel || '—');
         cell(L + cw3 + 7, y, cw3, 29, fr ? 'Revêtement' : 'Surface', surfTxt,
