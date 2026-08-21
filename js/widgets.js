@@ -58,7 +58,7 @@ function _windSpeedColor(speed) {
     return '#EF4444';
 }
 
-const ARROW_SVG = `<svg class="widget-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>`;
+const ARROW_SVG = `<svg class="widget-arrow-svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>`;
 
 function _renderWindWidget(windStr) {
     const tr = _tr();
@@ -73,7 +73,9 @@ function _renderWindWidget(windStr) {
     let subHtml = '';
     if (w.gust != null && w.gust > 0) subHtml += `<div class="widget-row"><span class="widget-label">${tr.lblWidgetGust}</span><span class="widget-data" style="color:#F97316;">${w.gust} KT</span></div>`;
     if (w.varFrom != null && w.varTo != null) subHtml += `<div class="widget-row"><span class="widget-label">${tr.lblWidgetVariable}</span><span class="widget-data">${w.varFrom}°–${w.varTo}°</span></div>`;
-    const arrowHtml = (!w.variable && w.dir != null) ? `<span class="widget-arrow" style="transform: rotate(${w.dir}deg); color:${speedColor};">${ARROW_SVG}</span>` : '';
+    // +180° : la flèche montre le flux du vent (queue à l'origine, pointe vers
+    // où il souffle), même convention que la rose des vents (js/engine.js).
+    const arrowHtml = (!w.variable && w.dir != null) ? `<span class="widget-arrow" style="transform: rotate(${(w.dir + 180) % 360}deg); color:${speedColor};">${ARROW_SVG}</span>` : '';
     const valueHtml = isCalm ? `<div class="widget-value">${tr.lblWidgetCalm}</div>` : `<div class="widget-value" style="color:${speedColor};">${w.speed ?? '--'}<span class="widget-unit">KT</span></div>`;
     el.innerHTML = `<i data-lucide="wind" class="widget-watermark"></i><div class="widget-title"><i data-lucide="wind" class="widget-title-icon"></i>${tr.lblWidgetWind}</div><div class="widget-body"><div class="widget-row" style="justify-content:space-between;"><div style="display:flex; flex-direction:column;">${valueHtml}<span class="widget-sub">${dirLabel}</span></div>${arrowHtml}</div>${subHtml}</div>`;
     if (window.lucide) window.lucide.createIcons({ root: el });
@@ -103,7 +105,8 @@ async function _renderTempWidget(tempStr, nuageStr, icao) {
     const td = _parseTempDew(tempStr);
     if (!td) { _emptyWidget('widget-temp', 'thermometer', tr.lblWidgetTemp); return; }
     const spreadColor = td.spread <= 2 ? '#FBBF24' : 'var(--text-muted)';
-    el.innerHTML = `<i data-lucide="thermometer" class="widget-watermark"></i><div class="widget-title"><i data-lucide="thermometer" class="widget-title-icon"></i>${tr.lblWidgetTemp}</div><div class="widget-body"><div class="widget-value">${td.temp}<span class="widget-unit">°C</span></div><div class="widget-row"><span class="widget-label">${tr.lblWidgetDewpoint}</span><span class="widget-data">${td.dew}°C</span></div><div class="widget-row"><span class="widget-label">${tr.lblWidgetSpread}</span><span class="widget-data" style="color:${spreadColor};">${td.spread}°C</span></div><div id="widget-icing-slot" class="widget-row"><span class="widget-label">${tr.lblWidgetIcingCell}</span><span class="widget-sub">…</span></div><div id="widget-carb-slot" class="widget-row"><span class="widget-label">${tr.lblWidgetIcingCarb}</span><span class="widget-sub">…</span></div><div id="widget-carb-note" class="widget-footnote"></div></div>`;
+    const carbLabelTip = tr.tipCarbChart.replace('{t}', td.temp).replace('{td}', td.dew).replace('{s}', td.spread);
+    el.innerHTML = `<i data-lucide="thermometer" class="widget-watermark"></i><div class="widget-title"><i data-lucide="thermometer" class="widget-title-icon"></i>${tr.lblWidgetTemp}</div><div class="widget-body"><div class="widget-row widget-inline"><span class="widget-ig"><span class="widget-label">${tr.lblTempShort} :</span><span class="widget-data">${td.temp}°C</span></span><span class="widget-ig"><span class="widget-label">${tr.lblDewShort} :</span><span class="widget-data">${td.dew}°C</span></span></div><div class="widget-row widget-inline"><span class="widget-ig"><span class="widget-label">${tr.lblWidgetSpread} :</span><span class="widget-data" style="color:${spreadColor};">${td.spread}°C</span></span></div><div class="widget-row widget-stack"><span class="widget-label" title="${_escAttr(tr.tipIcingCell)}">${tr.lblWidgetIcingCell}</span><span id="widget-icing-slot"><span class="widget-sub">…</span></span></div><div class="widget-row widget-stack"><span class="widget-label" title="${_escAttr(carbLabelTip)}">${tr.lblWidgetIcingCarb}</span><span id="widget-carb-slot"><span class="widget-sub">…</span></span></div></div>`;
     if (window.lucide) window.lucide.createIcons({ root: el });
     _renderCarbIcingPill(td);
     try {
@@ -119,29 +122,24 @@ function _renderIcingPill(risk) {
     const slot = document.getElementById('widget-icing-slot');
     if (!slot) return;
     const tr = _tr();
-    // Annotation : précise que cette ligne évalue le givrage de la CELLULE (structure),
-    // pas du carburateur (voir ligne « Givrage carbu » ci-dessous).
-    const label = `<span class="widget-label" title="${_escAttr(tr.tipIcingCell)}">${tr.lblWidgetIcingCell}</span>`;
     if (!risk || risk.level === 'ok') {
-        slot.innerHTML = `${label}<span class="widget-pill icing-ok" title="${_escAttr(tr.tipIcingCell)}"><span class="widget-pill-dot"></span>${tr.lblIcingOk}</span>`;
+        slot.innerHTML = `<span class="widget-pill icing-ok" title="${_escAttr(tr.tipIcingCell)}">${tr.lblIcingOk}</span>`;
         return;
     }
     const cls = risk.level === 'danger' ? 'icing-danger' : 'icing-caution';
     const msg = risk.message || '';
-    slot.innerHTML = `${label}<span class="widget-pill ${cls}" title="${_escAttr(msg)}"><span class="widget-pill-dot"></span>${msg}</span>`;
+    slot.innerHTML = `<span class="widget-pill ${cls}" title="${_escAttr(msg)}">${msg}</span>`;
 }
 
 // Givrage carburateur : abaque T / Td (js/carb-icing.js) + estimation de la
 // T° carburateur (OAT −20 à −35 °C par vaporisation dans le venturi).
 function _renderCarbIcingPill(td) {
     const slot = document.getElementById('widget-carb-slot');
-    const note = document.getElementById('widget-carb-note');
     if (!slot) return;
     const tr = _tr();
     const r = evaluateCarbIcing(td.temp, td.dew);
     if (!r) {
-        slot.innerHTML = `<span class="widget-label">${tr.lblWidgetIcingCarb}</span><span class="widget-sub">--</span>`;
-        if (note) note.textContent = '';
+        slot.innerHTML = `<span class="widget-sub">--</span>`;
         return;
     }
     const ZONES = {
@@ -153,8 +151,7 @@ function _renderCarbIcingPill(td) {
     const z = ZONES[r.level];
     const tip = tr.tipCarbChart.replace('{t}', td.temp).replace('{td}', td.dew).replace('{s}', r.spread)
         + ' — ' + tr.tipCarbTemp.replace('{min}', Math.round(r.carbMin)).replace('{max}', Math.round(r.carbMax));
-    slot.innerHTML = `<span class="widget-label" title="${_escAttr(tip)}">${tr.lblWidgetIcingCarb}</span><span class="widget-pill ${z.cls}" title="${_escAttr(tip)}"><span class="widget-pill-dot"></span>${z.lbl}</span>`;
-    if (note) note.textContent = tr.noteCarb.replace('{min}', Math.round(r.carbMin)).replace('{max}', Math.round(r.carbMax));
+    slot.innerHTML = `<span class="widget-pill ${z.cls}" title="${_escAttr(tip)}">${z.lbl}</span>`;
 }
 
 function _renderQnhWidget(qnhStr) {
