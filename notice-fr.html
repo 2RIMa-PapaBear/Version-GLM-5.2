@@ -488,16 +488,18 @@
 <table>
 <thead><tr><th>Calque</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td>Fond de carte</td><td>Imagerie satellite (Esri)</td></tr>
-<tr><td>🟦 Radar</td><td>Précipitations en temps réel (RainViewer). Bouton lecture/pause pour animer les dernières heures ; curseur temporel pour naviguer.</td></tr>
-<tr><td>🟡 Terrain courant</td><td>Marqueur jaune au centre</td></tr>
-<tr><td>Pistes</td><td>Tracé des pistes coloré selon le revêtement (vert = herbe, gris = béton, ocre = terre)</td></tr>
+<tr><td>Fond de carte</td><td>Satellite (Esri), plan, sombre ou relief — sélecteur « Satellite » de la barre d'outils</td></tr>
+<tr><td>🟦 Radar</td><td>Précipitations en temps réel (RainViewer) — <strong>décoché par défaut</strong> ; bouton lecture/pause et curseur horloge une fois activé</td></tr>
+<tr><td>🟡 Terrain courant</td><td>Marqueur jaune au centre ; pistes tracées selon le revêtement (vert = herbe, gris = béton, ocre = terre)</td></tr>
 <tr><td>Terrains voisins</td><td>Jusqu'à 25 terrains environnants avec marqueurs colorés VFR/MVFR/IFR/LIFR</td></tr>
 <tr><td>🛩️ PIREPs</td><td>Observations de pilotes (turbulence, givrage) dans la zone</td></tr>
-<tr><td>Espaces aériens</td><td>CTR, TMA, ATZ, classes ICAO — cliquez une zone pour la surligner</td></tr>
+<tr><td>Espaces aériens</td><td>CTR, TMA, ATZ, classes ICAO — cliquez une zone pour la surligner (décoché par défaut)</td></tr>
+<tr><td>SIGMET / AIRMET</td><td>Polygones de phénomènes dangereux actifs (décoché par défaut)</td></tr>
 </tbody>
 </table>
-<p><strong>Intérêt</strong> : si les terrains voisins tombent en MVFR/IFR, méfiance — le temps se ferme. Cliquez un marqueur pour charger ce terrain.</p>
+<p><strong>Barre d'outils</strong> (une ligne) : Radar · lecture + horloge · Espaces · SIGMET · Satellite · Terrain · + Waypoint. Le curseur horloge s'adapte à la largeur de la fenêtre ; radar, espaces et SIGMET s'allument à la demande — rien ne s'affiche sans votre clic.</p>
+<p><strong>Clic sur un terrain voisin</strong> : le popup montre son METAR décodé (vent, visibilité, plafond, T/Td, QNH) et propose trois actions — <strong>Charger ce terrain</strong> (change le terrain observé), <strong>Définir comme destination</strong> et <strong>+ Waypoint</strong> (mode Navigation). Les terrains sans METAR offrent les mêmes actions.</p>
+<p><strong>Intérêt</strong> : si les terrains voisins tombent en MVFR/IFR, méfiance — le temps se ferme.</p>
 <p><strong>Bouton « Terrain »</strong> : zoome directement sur le terrain courant pour voir les pistes en détail.</p>
 
 <h3>SIGMET / AIRMET</h3>
@@ -518,18 +520,35 @@
 <tr><td>🟧 <strong>Navigation</strong></td><td>Prévision TAF à l'heure d'arrivée (HPP), alternates viables, météo en route</td></tr>
 </tbody>
 </table>
+<p>À l'activation du mode Navigation, la <strong>barre « Départ → Destination »</strong> apparaît sous l'en-tête, la carte régionale s'ouvre et le curseur se place dans le champ Destination : tout est prêt pour saisir votre nav.</p>
 
 <h3>Comparateur d'alternates</h3>
 <p>En mode Navigation, l'outil liste automatiquement les <strong>terrains de déroutement</strong> autour de votre destination, avec leur catégorie de vol, visibilité, plafond et vent — triés par viabilité pour une décision rapide.</p>
 
+<h3>Barre Départ → Destination</h3>
+<p>Le champ Destination accepte un <strong>code OACI</strong> (LFPO) ou un <strong>nom de terrain / de ville</strong> (« Poitiers ») : la liste propose les terrains avec leur <strong>distance depuis votre départ</strong>, les plus proches d'abord. Le nom du terrain retenu s'affiche sous la barre — un garde-fou contre le mauvais code. Changer de destination <strong>remet le plan à zéro</strong> : les waypoints de la route précédente sont retirés (vos repères posés sur la carte restent disponibles).</p>
+
 <h3>Planificateur de vol</h3>
-<p>Saisissez votre terrain de départ dans la carte régionale (« Départ ») pour calculer :</p>
+<p>Dès qu'une destination valide est saisie, le panneau « Calcul de navigation » recalcule à chaque changement :</p>
 <ul>
-<li><strong>Distance orthodromique</strong> et cap vrai/magnétique (déclination automatique)</li>
+<li><strong>Distance orthodromique</strong> et cap vrai/magnétique (déclinaison automatique)</li>
 <li><strong>Vent au sol et en croisière</strong> (Open-Meteo)</li>
-<li><strong>Vitesse sol et temps estimé</strong> (ETA)</li>
+<li><strong>Vitesse sol et temps estimé</strong> par tronçon et cumulés</li>
 <li><strong>Carburant estimé + réserves légales</strong> (jour/nuit VFR)</li>
 </ul>
+
+<h3>Waypoints et repères</h3>
+<p>Cinq façons d'ajouter une étape :</p>
+<ul>
+<li><strong>Popup d'un terrain</strong> sur la carte : bouton « + Waypoint » ;</li>
+<li><strong>Bouton « + Waypoint »</strong> de la barre de la carte, puis clic à l'endroit voulu ;</li>
+<li><strong>Clic droit</strong> n'importe où sur la carte ;</li>
+<li>champ <strong>« Waypoints »</strong> du plan (codes OACI séparés par des espaces, à la main) ;</li>
+<li>clic sur un repère déjà posé → « + Plan ».</li>
+</ul>
+<p>Chaque ajout est <strong>inséré à la meilleure position</strong> : l'outil teste tous les emplacements possibles et garde le trajet total le plus court — un intermédiaire se glisse ainsi automatiquement <em>avant</em> une étape plus lointaine. L'ordre des étapes déjà saisies est toujours respecté.</p>
+<p><strong>Repères libres</strong> : un point posé hors de tout aérodrome connu porte par défaut <strong>ses coordonnées</strong> (ex. 4851N 00221W). Nommez-le à la création, ou plus tard via le <strong>crayon</strong> de la liste des étapes ou le clic sur le repère (Renommer). Un point posé à proximité d'un aérodrome connu devient simplement cette étape, nommée comme l'aérodrome.</p>
+<p><strong>Gestion</strong> : la liste des étapes du plan affiche numéro, code et nom, avec le <strong>crayon</strong> (renommage des repères) et la <strong>croix</strong> pour retirer une étape. Sur la carte, le clic sur un point d'étape propose aussi « Retirer du plan » — et « Renommer » pour les repères. Départ, arrivée et étapes portent leur <strong>code OACI en étiquette</strong> (vert / rouge / ambre), les repères leur nom.</p>
 
 <h3>Météo sur la route</h3>
 <p>Affiche les marqueurs de catégorie de vol des terrains situés le long de votre route, pour anticiper une éventuelle dégradation en chemin.</p>
@@ -561,8 +580,8 @@
 <h3>Lecture audio</h3>
 <p>Le bouton 🔊 lit le METAR à voix haute (synthèse vocale du navigateur), façon lecture ATIS.</p>
 
-<h3>Briefing PDF</h3>
-<p>Le bouton « Briefing PDF » génère un <strong>document PDF imprimable</strong> contenant : en-tête terrain, METAR/TAF brut, catégorie de vol, vent, visibilité, plafond, QNH, meilleure piste, créneau jour, alertes et distances de décollage.</p>
+<h3>Log de nav imprimable</h3>
+<p>Dans le panneau « Calcul de navigation », le bouton <strong>« Imprimer le log de nav »</strong> génère le log A5 (3 à 4 pages : log de nav, calculs de navigation, performances et terrain, centrage si l'avion est configuré). Une <strong>modale de vérification</strong> rappelle les valeurs calculées automatiquement à contrôler avant tout usage en vol ; après confirmation, le PDF <strong>s'ouvre dans un onglet</strong> — le bouton Imprimer du visualiseur est à portée de main (repli : téléchargement direct si l'onglet est bloqué).</p>
 
 <h3>Partage par lien</h3>
 <p>Le bouton 🔗 génère un <strong>permalien</strong> contenant le terrain, le message brut et l'heure d'arrivée. Un QR code permet de l'ouvrir sur mobile.</p>
@@ -1623,7 +1642,8 @@ TEMPO 0912 SHRA
 - ✅ Calcule le <strong>créneau de vol jour VFR</strong> et alerte en cas de nuit aéro
 - ✅ <strong>Carte régionale</strong> : radar précipitations + catégories voisines + PIREPs
 - ✅ <strong>Comparateur d'alternates</strong> et météo de route (mode Navigation)
-- ✅ Génère un <strong>briefing PDF</strong> imprimable et partageable</p>
+- ✅ <strong>Planificateur de vol</strong> : caps, temps, carburant, relief — avec waypoints insérés au trajet le plus court et repères nommés posés au pointeur
+- ✅ Génère un <strong>log de nav A5 imprimable</strong> (ouvert dans un onglet, prêt à imprimer)</p>
 <p><strong>Ce que l'outil ne fait PAS (encore)</strong> :
 - ❌ Ne remplace pas le briefing météo officiel
 - ❌ Ne prend pas de décision à votre place (le verdict est une aide, pas un ordre)
