@@ -343,6 +343,19 @@ function _initLayerControls() {
             showRouteWeather(_map, _currentIcao, toIcao, { skipMetars: true, skipIcao: _skipDisplayedIcao });
         }
     });
+
+    // Un plan vient d'être (re)calculé : resynchronise les étiquettes de
+    // tronçons — le TEMPS (cap/distance sont géométriques) exige les valeurs
+    // du plan (vent), disponibles seulement APRÈS ce rendu. Sans ceci, une
+    // route tracée avant le plan gardait des pilules sans temps.
+    window.addEventListener('navplan-changed', () => {
+        if (!_map || !_currentIcao) return;
+        const toInput = document.getElementById('route-to-input');
+        const toIcao = toInput?.value?.trim().toUpperCase();
+        if (toIcao && /^[A-Z][A-Z0-9]{3}$/.test(toIcao) && toIcao !== _currentIcao.toUpperCase()) {
+            showRouteWeather(_map, _currentIcao, toIcao, { skipMetars: true, skipIcao: _skipDisplayedIcao });
+        }
+    });
 }
 
 // Contrôleur SIGMET/AIRMET : trace les polygones de hazard sur la carte.

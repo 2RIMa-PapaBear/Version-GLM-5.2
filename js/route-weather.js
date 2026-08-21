@@ -309,11 +309,16 @@ function _drawLegLabels(map, routePoints) {
     const prefs = _readLabelPrefs();
     if (!prefs.cap && !prefs.dist && !prefs.time) return;
 
-    const legs = state._lastNavPlan?.plan?.legs;
+    const plan = state._lastNavPlan?.plan;
+    const legs = plan?.legs;
     for (let i = 0; i < routePoints.length - 1; i++) {
         const [aLat, aLon] = routePoints[i];
         const [bLat, bLon] = routePoints[i + 1];
-        const leg = Array.isArray(legs) ? legs[i] : null;
+        // Tronçon unique (A→B sans étape) : le plan single-leg porte aussi
+        // cap/distance/temps — exposés comme une jambe virtuelle d'indice 0.
+        const leg = Array.isArray(legs)
+            ? legs[i]
+            : (i === 0 ? { magHeading: plan?.magHeading, distanceNm: plan?.distanceNm, legTimeMin: plan?.legTimeMin } : null);
         const tc = trueCourseDeg(aLat, aLon, bLat, bLon);
 
         const lines = [];

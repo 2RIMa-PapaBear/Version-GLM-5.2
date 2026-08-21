@@ -98,10 +98,12 @@ export function setFlightMode(mode) {
     // - Navigation : affiche le comparateur d'alternates pour le terrain courant.
     // - Local : le masque (un pilote en local n'a pas besoin de déroutement).
     const altC = document.getElementById('alternates-container');
-    if (mode === 'nav' && state.requestedIcao) {
-        showAlternates(state.requestedIcao);
+    if (mode === 'nav') {
+        if (state.requestedIcao) showAlternates(state.requestedIcao);
         // Guide le pilote : ouvre la carte régionale et place le curseur dans
-        // le champ Destination de la barre de navigation (sans faire défiler).
+        // le champ Destination (sans faire défiler). Au permalien nav, le
+        // METAR du départ arrive APRÈS la bascule : la carte s'ouvre quand
+        // même et se remplira à son tour.
         openRegionalMap();
         setTimeout(() => document.getElementById('route-to-input')?.focus({ preventScroll: true }), 120);
     } else if (altC) {
