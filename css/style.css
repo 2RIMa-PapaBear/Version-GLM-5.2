@@ -1416,10 +1416,19 @@ html.night-mode body::before {
 .wb-dot-zf { background: #F87171; }
 .wb-out { color: #F87171; }
 
+/* Chargement du jour : ligne 1 = postes (autant de colonnes que nécessaire),
+   ligne 2 = les deux champs carburant ; chaque champ = saisie + slider. */
 .wb-load-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 8px 12px;
+}
+.wb-load-grid-fuel { grid-template-columns: 1fr 1fr; }
+.wb-load input[type="range"] {
+    width: 100%;
+    accent-color: var(--primary, #38BDF8);
+    margin-top: 3px;
+    cursor: pointer;
 }
 .wb-load {
     display: flex;

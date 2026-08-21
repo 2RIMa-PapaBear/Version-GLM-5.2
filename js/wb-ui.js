@@ -103,16 +103,21 @@ function _render(body, ac, isFr) {
         <div class="wb-load-grid">
             ${stations.map(s => `
                 <label class="wb-load">${escapeHtml(s.name)} (${u.mass})${s.maxKg ? ` <span class="wb-load-max">max ${_m(s.maxKg, u.mass)}</span>` : ''}
-                    <input type="number" step="any" min="0" class="wb-load-in" data-st="${escapeHtml(s.name)}" data-max="${s.maxKg || ''}" value="${loads.masses[s.name] ?? ''}" placeholder="0">
+                    <input type="number" step="any" min="0" class="wb-load-in" data-key="st:${escapeHtml(s.name)}" data-max="${s.maxKg || ''}" value="${loads.masses[s.name] ?? ''}" placeholder="0">
+                    <input type="range" class="wb-load-range" data-key="st:${escapeHtml(s.name)}" min="0" max="${s.maxKg ? Math.max(1, Math.round(massFromKg(s.maxKg, u.mass))) : 150}" step="1" value="${Math.round(massFromKg(loads.masses[s.name] || 0, u.mass))}">
                 </label>`).join('')}
-            ${fuelSt ? `
-                <label class="wb-load wb-load-fuel" title="${isFr ? 'Quantité totale embarquée au décollage — pré-remplie du plan de nav (trajet + réserve), modifiable.' : 'Total fuel at takeoff — pre-filled from the nav plan (trip + reserve), editable.'}">${isFr ? 'Carburant embarqué (L)' : 'Fuel on board (L)'}${fuelSt.maxKg ? ` <span class="wb-load-max">max ${fuelSt.maxKg} L</span>` : ''}
-                    <input type="number" step="any" min="0" id="wb-fuel-l" data-max="${fuelSt.maxKg || ''}" value="${loads.fuelL || ''}" placeholder="0">
-                </label>
-                <label class="wb-load wb-load-fuel" title="${isFr ? 'Essence brûlée pendant le vol — le point Arrivée est calculé avec le carburant restant (embarqué − consommée). Pré-remplie du plan de nav (trajet, sans la réserve).' : 'Fuel burned during the flight — the landing point uses the remaining fuel (on board − burned). Pre-filled from the nav plan (trip, no reserve).'}">${isFr ? 'Essence consommée en vol (L)' : 'Fuel burned in flight (L)'}
-                    <input type="number" step="any" min="0" id="wb-burn-l" value="${loads.burnL || ''}" placeholder="0">
-                </label>` : ''}
         </div>
+        ${fuelSt ? `
+        <div class="wb-load-grid wb-load-grid-fuel">
+            <label class="wb-load wb-load-fuel" title="${isFr ? 'Quantité totale embarquée au décollage — pré-remplie du plan de nav (trajet + réserve), modifiable.' : 'Total fuel at takeoff — pre-filled from the nav plan (trip + reserve), editable.'}">${isFr ? 'Carburant embarqué (L)' : 'Fuel on board (L)'}${fuelSt.maxKg ? ` <span class="wb-load-max">max ${fuelSt.maxKg} L</span>` : ''}
+                <input type="number" step="any" min="0" id="wb-fuel-l" data-key="fuel" data-max="${fuelSt.maxKg || ''}" value="${loads.fuelL || ''}" placeholder="0">
+                <input type="range" class="wb-load-range" data-key="fuel" min="0" max="${fuelSt.maxKg ? Math.max(1, Math.round(fuelSt.maxKg)) : 200}" step="1" value="${Math.round(loads.fuelL || 0)}">
+            </label>
+            <label class="wb-load wb-load-fuel" title="${isFr ? 'Essence brûlée pendant le vol — le point Arrivée est calculé avec le carburant restant (embarqué − consommée). Pré-remplie du plan de nav (trajet, sans la réserve).' : 'Fuel burned during the flight — the landing point uses the remaining fuel (on board − burned). Pre-filled from the nav plan (trip, no reserve).'}">${isFr ? 'Essence consommée en vol (L)' : 'Fuel burned in flight (L)'} <span class="wb-load-max">${isFr ? 'option' : 'optional'}</span>
+                <input type="number" step="any" min="0" id="wb-burn-l" data-key="burn" value="${loads.burnL || ''}" placeholder="0">
+                <input type="range" class="wb-load-range" data-key="burn" min="0" max="${Math.max(1, Math.round(loads.fuelL || 1))}" step="1" value="${Math.round(loads.burnL || 0)}">
+            </label>
+        </div>` : ''}
         <div class="wb-verdict" id="wb-verdict"></div>
         <div class="wb-note">
             <i data-lucide="info" style="width:11px;height:11px;vertical-align:middle;"></i>
@@ -126,6 +131,14 @@ function _render(body, ac, isFr) {
     body.querySelectorAll('.wb-load-in, #wb-fuel-l, #wb-burn-l').forEach(input => {
         input.addEventListener('input', () => _recalc(body, ac, isFr));
     });
+    // Sliders : pilotent le champ numérique associé (même data-key).
+    body.querySelectorAll('input[type="range"].wb-load-range').forEach(rng => {
+        rng.addEventListener('input', () => {
+            const num = body.querySelector(`input[type="number"][data-key="${CSS.escape(rng.dataset.key)}"]`);
+            if (num) num.value = rng.value;
+            _recalc(body, ac, isFr);
+        });
+    });
 
     _recalc(body, ac, isFr);
 }
@@ -135,11 +148,14 @@ function _recalc(body, ac, isFr) {
     const wb = ac.wb;
     const u = wb.units;
 
-    // Saisies → chargement interne (kg / litres).
+    // Saisies → chargement interne (kg / litres). data-key : "st:Nom" pour
+    // les postes, "fuel"/"burn" pour le carburant.
     const loads = { masses: {}, fuelL: 0, burnL: 0 };
     body.querySelectorAll('.wb-load-in').forEach(inp => {
+        const name = (inp.dataset.key || '').startsWith('st:') ? inp.dataset.key.slice(3) : null;
+        if (!name) return;
         const v = _num(inp.value);
-        if (isFinite(v) && v > 0) loads.masses[inp.dataset.st] = massToKg(v, u.mass);
+        if (isFinite(v) && v > 0) loads.masses[name] = massToKg(v, u.mass);
         // Pastille ambre si le max du poste est dépassé.
         const max = _num(inp.dataset.max);
         const over = max > 0 && isFinite(v) && v > massFromKg(max, u.mass) + 1e-9;
@@ -199,4 +215,14 @@ function _recalc(body, ac, isFr) {
         vEl.className = 'wb-verdict danger';
         vEl.innerHTML = `${isFr ? 'HORS LIMITES' : 'OUT OF LIMITS'} — ${reasons.join(' · ')}`;
     }
+
+    // Resynchronise les sliders sur les valeurs saisies ; le slider
+    // « essence consommée » est borné au carburant embarqué courant.
+    body.querySelectorAll('input[type="range"].wb-load-range').forEach(rng => {
+        const num = body.querySelector(`input[type="number"][data-key="${CSS.escape(rng.dataset.key)}"]`);
+        if (!num) return;
+        if (rng.dataset.key === 'burn') rng.max = Math.max(1, Math.round(loads.fuelL));
+        const v = _num(num.value);
+        rng.value = (isFinite(v) && v > 0) ? Math.min(v, Number(rng.max)) : 0;
+    });
 }
