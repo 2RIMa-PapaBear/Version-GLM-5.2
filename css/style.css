@@ -962,16 +962,22 @@ html.night-mode body::before {
 .takeoff-panel {
     padding: 14px 18px;
 }
+/* Indicateurs de décollage : UNE ligne de texte « Libellé : valeur »,
+   typographie homogène (12 px), répartie sur la largeur du panneau. */
 .to-metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);   /* une seule ligne, dans l'ordre */
-    gap: 8px 10px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 4px 12px;
     font-size: 12px;
+    line-height: 1.6;
 }
-@media (max-width: 500px) {
-    /* Toujours une seule ligne : on compacte plutôt que de passer en 2 colonnes. */
-    .to-metrics-grid { gap: 6px; font-size: 10px; }
-    .to-metrics-grid > div > div:first-child { font-size: 7.5px; letter-spacing: 0.5px; }
+.to-metrics-grid > span { white-space: nowrap; }
+.to-metrics-grid .lab { color: var(--text-muted); }
+.to-metrics-grid .val {
+    font-family: 'DM Mono', monospace;
+    color: var(--text-color);
 }
 .takeoff-panel input[type="number"]::-webkit-inner-spin-button {
     -webkit-appearance: none;

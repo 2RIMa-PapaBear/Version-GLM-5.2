@@ -107,31 +107,12 @@ function render(container, r, icao) {
             </select>
         </div>
         <div class="to-metrics-grid">
-            <div>
-                <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px;">${lblRoll}</div>
-                <div style="font-family:'DM Mono',monospace; font-weight:500; color:var(--text-color);">${ftToM(r.groundRoll)} m</div>
-            </div>
-            <div>
-                <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px;">${lbl50ft}</div>
-                <div style="font-family:'DM Mono',monospace; font-weight:500; color:var(--text-color);">${ftToM(r.fiftyFt)} m</div>
-            </div>
-            <div>
-                <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px;">${lblDa}</div>
-                <div style="font-family:'DM Mono',monospace; font-weight:500; color:var(--text-color);">${r.da} ft</div>
-            </div>
-            <div>
-                <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px;">${isFr ? 'Revêtement' : 'Surface'}</div>
-                <div style="font-family:'DM Sans',sans-serif; font-weight:700; color:${surfSoft ? '#FBBF24' : 'var(--text-color)'}; font-size:12px; display:flex; align-items:center; gap:4px;">
-                    ${surfInfo ? escapeHtml(surfInfo.label) : '—'}
-                    ${r.surfaceFactor > 1
-                        ? `<span style="font-size:9px; background:${surfSoft ? 'rgba(251,191,36,0.18)' : 'rgba(56,189,248,0.15)'}; color:${surfSoft ? '#FBBF24' : '#38BDF8'}; padding:1px 5px; border-radius:3px; font-weight:500; font-family:'DM Mono',monospace;">+${Math.round((r.surfaceFactor-1)*100)}%</span>`
-                        : ''}
-                </div>
-            </div>
-            <div>
-                <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px;">${lblAcRef}</div>
-                <div style="font-family:'DM Mono',monospace; font-weight:500; color:var(--text-muted); font-size:11px;">${ftToM(ref.groundRoll)}/${ftToM(ref.fiftyFt)} m</div>
-            </div>
+            <span><span class="lab">${lblRoll} :</span> <span class="val">${ftToM(r.groundRoll)} m</span></span>
+            <span><span class="lab">${lbl50ft} :</span> <span class="val">${ftToM(r.fiftyFt)} m</span></span>
+            <span><span class="lab">${lblDa} :</span> <span class="val">${r.da} ft</span></span>
+            <span><span class="lab">${isFr ? 'Revêtement' : 'Surface'} :</span> <span class="val">${surfInfo ? escapeHtml(surfInfo.label) : '—'}${r.surfaceFactor > 1
+                ? ` <span style="color:${surfSoft ? '#FBBF24' : '#38BDF8'};">+${Math.round((r.surfaceFactor - 1) * 100)}%</span>` : ''}</span></span>
+            <span><span class="lab">${lblAcRef} :</span> <span class="val">${ftToM(ref.groundRoll)}/${ftToM(ref.fiftyFt)} m</span></span>
         </div>
         <div class="to-profile" style="margin-top:10px;"></div>
         <div style="display:flex; align-items:baseline; gap:6px; margin-top:10px; flex-wrap:wrap; font-size:12px; line-height:1.6;">
