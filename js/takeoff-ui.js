@@ -22,6 +22,7 @@ import {
 } from './takeoff-performance.js';
 import { getFleet, getActiveAircraftId, setActiveAircraft } from './aircraft-fleet.js';
 import { openFleetManager } from './fleet-ui.js';
+import { getDeclinationForIcao } from './magvar.js';
 import { getActiveRunwaySurfaceInfo, surfaceLabel, isSoftSurface } from './runway-surface.js';
 
 /**
@@ -95,8 +96,18 @@ function render(container, r, icao) {
     const lblDa = isFr ? 'Densité-alt.' : 'Density alt.';
     const lblAcRef = isFr ? 'Réf. avion' : 'A/C ref';
     const ref = getAircraftRef();
-    // Piste active selon la rose des vents (null si non définie).
-    const activeRwy = getActiveRunwayNameForIcao(icao);
+    // Piste active alignée sur le vent RÉEL du METAR courant (numéros de piste
+    // magnétiques, vent METAR vrai → correction de déclinaison), comme la
+    // rose des vents. Sans ce vent, la 1re extrémité de la paire était
+    // affichée (bug « 22 en service → affichait 04 »).
+    let rwyWind = null;
+    const ventStr = state.lastParsed?.base?.vent?.[0]?.val;
+    if (ventStr) {
+        const m = String(ventStr).match(/(VRB|\d{3})(\d{2,3})/);
+        if (m) rwyWind = { dir: m[1] === 'VRB' ? null : parseInt(m[1], 10), speed: parseInt(m[2], 10) };
+    }
+    const activeRwy = getActiveRunwayNameForIcao(
+        icao, rwyWind, getDeclinationForIcao(state.requestedIcao || state.lastParsed?.code));
     // Revêtement de la piste active + état (humide/contaminée) quand le
     // facteur majoré ne s'explique pas par le seul revêtement (herbe sèche).
     const surfInfo = getActiveRunwaySurfaceInfo(icao);
