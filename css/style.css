@@ -671,6 +671,13 @@ body.mode-local #alternates-container { display: none !important; }
     white-space: nowrap;
 }
 .mp-inner .mp-load-btn:hover { background: rgba(56,189,248,0.3); }
+/* En mode Navigation, « Charger ce terrain » devient « Définir comme départ » :
+   vert, la couleur du point de départ sur la carte. */
+.mp-inner .mp-load-btn.mp-dep-btn {
+    background: rgba(74,222,128,0.14); color: #4ADE80;
+    border-color: rgba(74,222,128,0.45);
+}
+.mp-inner .mp-load-btn.mp-dep-btn:hover { background: rgba(74,222,128,0.28); }
 /* « Définir comme destination » : rouge du point d'arrivée sur la carte. */
 .mp-inner .mp-dest-btn {
     width: 100%; padding: 6px 10px; border-radius: 6px; cursor: pointer;

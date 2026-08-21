@@ -964,7 +964,11 @@ function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null
         const hasDest = isNav && /^[A-Z]{4}$/.test(toInputVal) && toInputVal !== icao.toUpperCase();
         const btnsHtml = `
             <div class="mp-btns">
-                <button class="mp-load-btn" data-icao="${escapeHtml(icao)}">${isFr ? 'Charger ce terrain' : 'Load this airport'}</button>
+                <button class="mp-load-btn${isNav ? ' mp-dep-btn' : ''}" data-icao="${escapeHtml(icao)}" title="${isNav
+                    ? (isFr ? 'Charge la météo de ce terrain et en fait le départ de la navigation' : 'Loads this airfield\'s weather and makes it the navigation departure')
+                    : (isFr ? 'Charger ce terrain' : 'Load this airport')}">${isNav
+                    ? (isFr ? 'Définir comme départ' : 'Set as departure')
+                    : (isFr ? 'Charger ce terrain' : 'Load this airport')}</button>
                 ${isNav ? `<button class="mp-dest-btn" data-icao="${escapeHtml(icao)}" title="${isFr ? 'Définir ce terrain comme destination de la navigation' : 'Set this airfield as the navigation destination'}">${isFr ? 'Définir comme destination' : 'Set as destination'}</button>` : ''}
             </div>
             ${hasDest ? `<div class="mp-btns"><button class="mp-waypoint-btn" data-icao="${escapeHtml(icao)}" title="${isFr ? 'Ajouter ce terrain comme waypoint intermédiaire du plan de navigation' : 'Add this airfield as a waypoint to the flight plan'}">+ Waypoint</button></div>` : ''}`;
