@@ -93,13 +93,7 @@ function _render(body, ac, isFr) {
             <span class="wb-ac-reg">${escapeHtml(ac.registration || ac.name)}${ac.type ? ' · ' + escapeHtml(ac.type) : ''}</span>
             <span class="wb-units">${u.mass} / ${u.arm}</span>
         </div>
-        <div class="wb-chart-host"></div>
-        <div class="wb-results">
-            <div class="wb-res"><span class="wb-dot wb-dot-to"></span><span class="wb-res-val" id="wb-res-to"></span></div>
-            <div class="wb-res"><span class="wb-dot wb-dot-ar"></span><span class="wb-res-val" id="wb-res-ar"></span></div>
-            <div class="wb-res"><span class="wb-dot wb-dot-zf"></span><span class="wb-res-val" id="wb-res-zf"></span></div>
-        </div>
-        <div class="fleet-wb-sub" style="margin-top:12px;">${isFr ? 'CHARGEMENT DU JOUR' : 'TODAY\'S LOADING'}</div>
+        <div class="fleet-wb-sub">${isFr ? 'CHARGEMENT DU JOUR' : 'TODAY\'S LOADING'}</div>
         <div class="wb-load-grid">
             ${stations.map(s => `
                 <label class="wb-load">
@@ -121,6 +115,12 @@ function _render(body, ac, isFr) {
                 <input type="range" class="wb-load-range" data-key="burn" min="0" max="${Math.max(1, Math.round(loads.fuelL || 1))}" step="1" value="${Math.round(loads.burnL || 0)}">
             </label>
         </div>` : ''}
+        <div class="wb-chart-host"></div>
+        <div class="wb-results">
+            <div class="wb-res"><span class="wb-dot wb-dot-to"></span><span class="wb-res-val" id="wb-res-to"></span></div>
+            <div class="wb-res"><span class="wb-dot wb-dot-ar"></span><span class="wb-res-val" id="wb-res-ar"></span></div>
+            <div class="wb-res"><span class="wb-dot wb-dot-zf"></span><span class="wb-res-val" id="wb-res-zf"></span></div>
+        </div>
         <div class="wb-verdict" id="wb-verdict"></div>
         <div class="wb-note">
             <i data-lucide="info" style="width:11px;height:11px;vertical-align:middle;"></i>
