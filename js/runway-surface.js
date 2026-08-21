@@ -69,11 +69,33 @@ export function getActiveRunwaySurfaceInfo(icao) {
 }
 
 /**
- * Résout le nom de la piste active via selectBestRunway.
- * engine.js n'importe pas runway-surface → pas de cycle.
+ * Indique si un numéro de piste (ex: "26") appartient à une des paires de
+ * ce terrain (ex: "08/26" → true). Sert à n'appliquer la piste publiée par
+ * la rose des vents QUE si elle concerne bien ce terrain.
+ * @param {Object} apt Terrain (avec .runways).
+ * @param {string} rwyName Numéro de piste.
+ * @returns {boolean}
+ */
+export function runwayBelongsToAirport(apt, rwyName) {
+    if (!apt || !Array.isArray(apt.runways) || !rwyName) return false;
+    return apt.runways.some(str => {
+        const nums = String(str).match(/\d{2}[LRC]?/g);
+        return nums != null && nums.includes(rwyName);
+    });
+}
+
+/**
+ * Résout le nom de la piste active : en priorité celle PUBLIÉE PAR LA ROSE
+ * DES VENTS (state.activeRunwayName — choix automatique au vent de la vue
+ * courante, ou paire sélectionnée manuellement au clic sur une bulle), qui
+ * est la source de vérité de l'affichage ET des calculs (longueur, surface).
+ * Fallback : selectBestRunway (comportement historique).
  */
 function _resolveActiveRunwayName(apt) {
     if (!apt || !Array.isArray(apt.runways) || apt.runways.length === 0) return null;
+    if (state.activeRunwayName && runwayBelongsToAirport(apt, state.activeRunwayName)) {
+        return state.activeRunwayName;
+    }
     const rwyData = selectBestRunway(apt.runways, null, state.forcedRunway);
     return rwyData?.active?.name || null;
 }

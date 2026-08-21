@@ -45,7 +45,7 @@ import { densityAltitude, getPerformanceData } from './density-altitude.js';
 import { getAirportByICAO } from './ui-module.js';
 import { getActiveAircraft } from './aircraft-fleet.js';
 import { selectBestRunway } from './engine.js';
-import { getRunwaySurface, isSoftSurface, surfaceLabel } from './runway-surface.js';
+import { getRunwaySurface, isSoftSurface, surfaceLabel, runwayBelongsToAirport } from './runway-surface.js';
 
 // Distance de référence C172 (ft), au niveau de la mer / ISA.
 const DEFAULT_GROUND_ROLL = 830;
@@ -124,6 +124,13 @@ export function getActiveRunwayNameForIcao(icao, wind = null, magDeclination = 0
  */
 function _getActiveRunwayName(apt, wind = null, magDeclination = 0) {
     if (!apt || !Array.isArray(apt.runways) || apt.runways.length === 0) return null;
+    // Priorité à la piste PUBLIÉE PAR LA ROSE DES VENTS (sélection du pilote
+    // ou choix automatique de la vue courante) : le calcul des performances
+    // doit porter sur CETTE piste. Uniquement si elle appartient à CE terrain
+    // (le planificateur peut interroger un autre aérodrome que l'affiché).
+    if (state.activeRunwayName && runwayBelongsToAirport(apt, state.activeRunwayName)) {
+        return state.activeRunwayName;
+    }
     // wind=null : selectBestRunway retourne quand même la paire (et la piste
     // active si forcedRunway est défini). C'est suffisant pour récupérer le nom.
     const rwyData = selectBestRunway(apt.runways, wind, state.forcedRunway, magDeclination);
