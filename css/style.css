@@ -1434,16 +1434,24 @@ html.night-mode body::before {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    font-size: 10.5px;
+    font-size: 11px;
     color: var(--text-muted);
     font-weight: 600;
 }
-.wb-load-max {
-    font-size: 9px;
-    color: var(--text-muted);
-    opacity: 0.8;
+/* Libellé du champ sur UNE ligne, style « Performance décollage » :
+   libellé gris + « Max N » en valeur mono, jamais de retour à la ligne. */
+.wb-load-lab {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    white-space: nowrap;
+}
+.wb-load-lab .val {
+    font-family: 'DM Mono', monospace;
+    color: var(--text-color);
     font-weight: 500;
 }
+.wb-load-lab .val.dim { color: var(--text-muted); font-weight: 400; }
 .wb-load input {
     background: var(--input-bg, #0F172A);
     border: 1px solid var(--border-color);

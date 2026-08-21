@@ -102,18 +102,21 @@ function _render(body, ac, isFr) {
         <div class="fleet-wb-sub" style="margin-top:12px;">${isFr ? 'CHARGEMENT DU JOUR' : 'TODAY\'S LOADING'}</div>
         <div class="wb-load-grid">
             ${stations.map(s => `
-                <label class="wb-load">${escapeHtml(s.name)} (${u.mass})${s.maxKg ? ` <span class="wb-load-max">max ${_m(s.maxKg, u.mass)}</span>` : ''}
+                <label class="wb-load">
+                    <span class="wb-load-lab"><span class="lab">${escapeHtml(s.name)} (${u.mass})</span>${s.maxKg ? ` <span class="val">Max ${_m(s.maxKg, u.mass)}</span>` : ''}</span>
                     <input type="number" step="any" min="0" class="wb-load-in" data-key="st:${escapeHtml(s.name)}" data-max="${s.maxKg || ''}" value="${loads.masses[s.name] ?? ''}" placeholder="0">
                     <input type="range" class="wb-load-range" data-key="st:${escapeHtml(s.name)}" min="0" max="${s.maxKg ? Math.max(1, Math.round(massFromKg(s.maxKg, u.mass))) : 150}" step="1" value="${Math.round(massFromKg(loads.masses[s.name] || 0, u.mass))}">
                 </label>`).join('')}
         </div>
         ${fuelSt ? `
         <div class="wb-load-grid wb-load-grid-fuel">
-            <label class="wb-load wb-load-fuel" title="${isFr ? 'Quantité totale embarquée au décollage — pré-remplie du plan de nav (trajet + réserve), modifiable.' : 'Total fuel at takeoff — pre-filled from the nav plan (trip + reserve), editable.'}">${isFr ? 'Carburant embarqué (L)' : 'Fuel on board (L)'}${fuelSt.maxKg ? ` <span class="wb-load-max">max ${fuelSt.maxKg} L</span>` : ''}
+            <label class="wb-load wb-load-fuel" title="${isFr ? 'Quantité totale embarquée au décollage — pré-remplie du plan de nav (trajet + réserve), modifiable.' : 'Total fuel at takeoff — pre-filled from the nav plan (trip + reserve), editable.'}">
+                <span class="wb-load-lab"><span class="lab">${isFr ? 'Carburant embarqué (L)' : 'Fuel on board (L)'}</span>${fuelSt.maxKg ? ` <span class="val">Max ${fuelSt.maxKg}</span>` : ''}</span>
                 <input type="number" step="any" min="0" id="wb-fuel-l" data-key="fuel" data-max="${fuelSt.maxKg || ''}" value="${loads.fuelL || ''}" placeholder="0">
                 <input type="range" class="wb-load-range" data-key="fuel" min="0" max="${fuelSt.maxKg ? Math.max(1, Math.round(fuelSt.maxKg)) : 200}" step="1" value="${Math.round(loads.fuelL || 0)}">
             </label>
-            <label class="wb-load wb-load-fuel" title="${isFr ? 'Essence brûlée pendant le vol — le point Arrivée est calculé avec le carburant restant (embarqué − consommée). Pré-remplie du plan de nav (trajet, sans la réserve).' : 'Fuel burned during the flight — the landing point uses the remaining fuel (on board − burned). Pre-filled from the nav plan (trip, no reserve).'}">${isFr ? 'Essence consommée en vol (L)' : 'Fuel burned in flight (L)'} <span class="wb-load-max">${isFr ? 'option' : 'optional'}</span>
+            <label class="wb-load wb-load-fuel" title="${isFr ? 'Essence brûlée pendant le vol — le point Arrivée est calculé avec le carburant restant (embarqué − consommée). Pré-remplie du plan de nav (trajet, sans la réserve).' : 'Fuel burned during the flight — the landing point uses the remaining fuel (on board − burned). Pre-filled from the nav plan (trip, no reserve).'}">
+                <span class="wb-load-lab"><span class="lab">${isFr ? 'Essence consommée en vol (L)' : 'Fuel burned in flight (L)'}</span> <span class="val dim">${isFr ? 'option' : 'optional'}</span></span>
                 <input type="number" step="any" min="0" id="wb-burn-l" data-key="burn" value="${loads.burnL || ''}" placeholder="0">
                 <input type="range" class="wb-load-range" data-key="burn" min="0" max="${Math.max(1, Math.round(loads.fuelL || 1))}" step="1" value="${Math.round(loads.burnL || 0)}">
             </label>
