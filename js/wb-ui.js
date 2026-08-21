@@ -200,8 +200,8 @@ function _recalc(body, ac, isFr) {
         const U = u.arm.toUpperCase();
         vEl.className = 'wb-verdict ok';
         vEl.innerHTML = isFr
-            ? `CG DÉCOLLAGE ${_a(calc.takeoff.cgMm, u.arm)} ${U} · DANS L'ENVELOPPE · MARGE AVANT ${Math.round(armFromMm(p.fwdMm, u.arm))} ${U} / ARRIÈRE ${Math.round(armFromMm(p.aftMm, u.arm))} ${U}`
-            : `TAKEOFF CG ${_a(calc.takeoff.cgMm, u.arm)} ${U} · IN ENVELOPE · FWD ${Math.round(armFromMm(p.fwdMm, u.arm))} ${U} / AFT ${Math.round(armFromMm(p.aftMm, u.arm))} ${U}`;
+            ? `CG DÉCOLLAGE ${_a(calc.takeoff.cgMm, u.arm)} ${U} · DANS L'ENVELOPPE · MARGE AVANT ${_a(p.fwdMm, u.arm)} ${U} / ARRIÈRE ${_a(p.aftMm, u.arm)} ${U}`
+            : `TAKEOFF CG ${_a(calc.takeoff.cgMm, u.arm)} ${U} · IN ENVELOPE · FWD ${_a(p.fwdMm, u.arm)} ${U} / AFT ${_a(p.aftMm, u.arm)} ${U}`;
     } else {
         const reasons = [];
         if (!calc.mtowOk) reasons.push(isFr
