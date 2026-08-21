@@ -35,7 +35,7 @@ export const I18N = {
         errInvalidIcao: "Veuillez entrer un code aéroport valide à 4 lettres.",
         errInvalidHpp: "Format d'heure invalide. Utilisez HH:MM.",
         searchInProgress: "Recherche en cours...",
-        localTimeFormat: " (Il est actuellement {time} à {name} : {temp}°C, QNH {qnh} hPa [temps réel])",
+        localTimeFormat: " (Il est actuellement {time} à {name} : {temp}°C, QNH {qnh} hPa [estimation Open-Meteo])",
         footerWarning: "Avertissement : Cet outil est fourni à titre indicatif. Ne pas utiliser pour la préparation des vols.",
         legClr: "Clair", legFew: "Peu", legSct: "Épars",
         legBkn: "Fragmenté", legOvc: "Couvert", legVv: "Invisible",
@@ -190,7 +190,7 @@ export const I18N = {
         errNoTaf: "Unable to parse weather message.", errNoData: "No recent data found for",
         errNetwork: "Connection error. Please check your network.", errInvalidIcao: "Please enter a valid 4-letter code.",
         errInvalidHpp: "Invalid time format. Use HH:MM.", searchInProgress: "Searching...",
-        localTimeFormat: " (Currently at {time} in {name}: {temp}°C, QNH {qnh} hPa [live])",
+        localTimeFormat: " (Currently at {time} in {name}: {temp}°C, QNH {qnh} hPa [Open-Meteo estimate])",
         footerWarning: "Warning: Informational purposes only. Do not use for flight preparation.",
         legClr: "Clear", legFew: "Few", legSct: "Scattered", legBkn: "Broken", legOvc: "Overcast", legVv: "Invisible",
 
