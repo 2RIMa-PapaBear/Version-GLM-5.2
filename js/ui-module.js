@@ -520,7 +520,7 @@ export function initAutocomplete(inputId, onSelect, opts = {}) {
                 const { searchAirports } = await import('./openaip.js');
                 let liveResults = await searchAirports(val, 8);
                 // Champ Destination : seuls les codes OACI sont exploitables.
-                if (opts.requireIcao) liveResults = liveResults.filter(a => a.icao && /^[A-Z]{4}$/.test(a.icao));
+                if (opts.requireIcao) liveResults = liveResults.filter(a => a.icao && /^[A-Z][A-Z0-9]{3}$/.test(a.icao));
 
                 if (reqId === _acRequestId && liveResults.length > 0) {
                     // Destination : la base locale (codes + distance depuis le

@@ -252,8 +252,8 @@ export async function searchAirports(query, limit = 8) {
 
 function _extractIcao(aip) {
 
-    if (aip.icaoId && /^[A-Z]{4}$/.test(aip.icaoId)) return aip.icaoId;
-    if (aip.ICAO && /^[A-Z]{4}$/.test(aip.ICAO)) return aip.ICAO;
+    if (aip.icaoId && /^[A-Z][A-Z0-9]{3}$/.test(aip.icaoId)) return aip.icaoId;
+    if (aip.ICAO && /^[A-Z][A-Z0-9]{3}$/.test(aip.ICAO)) return aip.ICAO;
 
     return '';
 }

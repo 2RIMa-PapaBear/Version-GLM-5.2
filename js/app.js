@@ -56,15 +56,15 @@ export function handleDestinationChange() {
     // Nom du terrain destination : confirmation visuelle du code saisi.
     const toNameEl = document.getElementById('route-to-name');
     if (toNameEl) {
-        const apt = /^[A-Z]{4}$/.test(toIcao) ? getAirportByICAO(toIcao) : null;
+        const apt = /^[A-Z][A-Z0-9]{3}$/.test(toIcao) ? getAirportByICAO(toIcao) : null;
         toNameEl.textContent = apt
             ? apt.name
-            : (/^[A-Z]{4}$/.test(toIcao) ? (state.lang === 'fr' ? '(terrain inconnu)' : '(unknown airfield)') : '');
+            : (/^[A-Z][A-Z0-9]{3}$/.test(toIcao) ? (state.lang === 'fr' ? '(terrain inconnu)' : '(unknown airfield)') : '');
     }
 
     const depForNav = _navDepRef();
     // Destination valide : 4 lettres, ≠ départ, connue de la base locale.
-    const destApt = /^[A-Z]{4}$/.test(toIcao) ? getAirportByICAO(toIcao) : null;
+    const destApt = /^[A-Z][A-Z0-9]{3}$/.test(toIcao) ? getAirportByICAO(toIcao) : null;
     const validDest = !!(destApt && depForNav && toIcao !== depForNav.toUpperCase());
 
     // NOUVELLE destination : le plan repart à zéro — les waypoints saisis pour
@@ -98,7 +98,7 @@ export function handleDestinationChange() {
 
 // Coordonnées d'un terrain (base locale enrichie + mémo), ou null.
 function _icaoCoords(code) {
-    if (!code || !/^[A-Z]{4}$/.test(code)) return null;
+    if (!code || !/^[A-Z][A-Z0-9]{3}$/.test(code)) return null;
     const apt = getAirportByICAO(code);
     const memo = memoGet(code);
     const lat = memo?.lat ?? apt?.lat ?? null;
@@ -175,7 +175,7 @@ export function genererGraphique() {
     // manuel (pas de recherche → requestedIcao peut être null ou obsolète).
     // On évite aussi d'écraser quand res.code est un substitut (ex: LFRD au
     // lieu de LFRT demandé) : traiterSucces a déjà mis le bon code.
-    if (res.code && /^[A-Z]{4}$/.test(res.code) && !state.requestedIcao) {
+    if (res.code && /^[A-Z][A-Z0-9]{3}$/.test(res.code) && !state.requestedIcao) {
         state.requestedIcao = res.code;
     }
 
@@ -449,8 +449,11 @@ export function telechargerMessage(typeMessage) {
             showAlternates(depForNav);
             // Flight planner : visible si une destination est saisie.
             const toIcao = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
-            if (toIcao && /^[A-Z]{4}$/.test(toIcao) && toIcao !== depForNav.toUpperCase()) {
+            if (toIcao && /^[A-Z][A-Z0-9]{3}$/.test(toIcao) && toIcao !== depForNav.toUpperCase()) {
                 showFlightPlanner(depForNav, toIcao);
+                // Tout chemin qui calcule un plan mémorise sa destination :
+                // le reset des waypoints ne jouera que sur un VRAI changement.
+                _lastPlannedDest = toIcao;
             } else {
                 clearElevationChart('elevation-profile-container');
             }
@@ -529,7 +532,7 @@ export function telechargerMessage(typeMessage) {
                 let aerosTries = stations
                     .map(st => {
                         const code = st.icaoId || st.id;
-                        if (!code || !/^[A-Z]{4}$/.test(code)) return null;
+                        if (!code || !/^[A-Z][A-Z0-9]{3}$/.test(code)) return null;
                         return { code, name: st.site || st.name || code, lat: st.lat, lon: st.lon, dist: Math.pow(st.lat - lat, 2) + Math.pow(st.lon - lon, 2) };
                     })
                     .filter(Boolean)
@@ -550,7 +553,7 @@ export function telechargerMessage(typeMessage) {
             });
     }
 
-    if (icao.length === 4 && /^[A-Z]{4}$/.test(icao)) {
+    if (icao.length === 4 && /^[A-Z][A-Z0-9]{3}$/.test(icao)) {
         fetchAvecRelais(`https://aviationweather.gov/api/data/stationinfo?ids=${icao}&format=json`, 'json', 3600)
             .then(data => {
                 if (data && data.length > 0) lancerRechercheZone(data[0].lat, data[0].lon, icao, data[0].site || data[0].name);
@@ -651,7 +654,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                 if (depForNav) {
                     showAlternates(depForNav);
                     const toIcao = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
-                    if (toIcao && /^[A-Z]{4}$/.test(toIcao) && toIcao !== depForNav.toUpperCase()) {
+                    if (toIcao && /^[A-Z][A-Z0-9]{3}$/.test(toIcao) && toIcao !== depForNav.toUpperCase()) {
                         showFlightPlanner(depForNav, toIcao);
                     }
                 }
@@ -709,7 +712,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             } else {
                 // Va à la destination : mémorise le départ actuel.
                 const destIcao = (toInput?.value || '').trim().toUpperCase();
-                if (destIcao && /^[A-Z]{4}$/.test(destIcao)) {
+                if (destIcao && /^[A-Z][A-Z0-9]{3}$/.test(destIcao)) {
                     _depIcao = input.value.trim().toUpperCase();
                     _viewingDest = true;
                     input.value = destIcao;
@@ -751,7 +754,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         if (!icao) return;
         const wpInput = document.getElementById('fp-waypoints');
         if (!wpInput) return;
-        const wps = wpInput.value.trim().toUpperCase().split(/\s+/).filter(w => /^[A-Z]{4}$/.test(w) && w !== icao);
+        const wps = wpInput.value.trim().toUpperCase().split(/\s+/).filter(w => /^[A-Z][A-Z0-9]{3}$/.test(w) && w !== icao);
         wpInput.value = wps.join(' ');
         wpInput.dispatchEvent(new Event('change'));
     });
@@ -792,7 +795,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         if (!icao) return;
         const wpInput = document.getElementById('fp-waypoints');
         if (!wpInput) return;   // pas de plan affiché : rien à ajouter
-        const wps = wpInput.value.trim().toUpperCase().split(/\s+/).filter(w => /^[A-Z]{4}$/.test(w));
+        const wps = wpInput.value.trim().toUpperCase().split(/\s+/).filter(w => /^[A-Z][A-Z0-9]{3}$/.test(w));
         if (wps.includes(icao)) return;   // déjà dans la liste : rien à faire
         const toIcao = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
         const idx = cheapestWaypointInsertion(_navDepRef(), wps, toIcao, icao, _icaoCoords);
@@ -964,21 +967,47 @@ document.addEventListener('DOMContentLoaded', async function () {
     // ---- Permalien : si l'URL contient ?icao=..., on charge le terrain ----
     if (hasPermalink()) {
         const link = readPermalink();
-        if (link.icao && /^[A-Z]{4}$/.test(link.icao)) {
+        if (link.icao && /^[A-Z][A-Z0-9]{3}$/.test(link.icao)) {
             const input = document.getElementById('icaoInput');
             if (input) input.value = link.icao;
             // Applique le mode si spécifié.
             if (link.mode === 'nav') setFlightMode('nav');
+            // Destination transportée par le lien : pré-remplie AVANT le
+            // chargement — le plan se créera dès le METAR du départ arrivé.
+            const destVal = (/^[A-Z][A-Z0-9]{3}$/.test(link.dest || '') && link.dest !== link.icao.toUpperCase())
+                ? link.dest : null;
+            if (destVal) {
+                const toInput = document.getElementById('route-to-input');
+                if (toInput) toInput.value = destVal;
+                const apt = getAirportByICAO(destVal);
+                const toNameEl = document.getElementById('route-to-name');
+                if (toNameEl) toNameEl.textContent = apt?.name || (state.lang === 'fr' ? '(terrain inconnu)' : '(unknown airfield)');
+            }
             // Charge METAR ou TAF selon le paramètre.
             setTimeout(() => telechargerMessage(link.taf ? 'taf' : 'metar'), 300);
+            // Waypoints du lien : injectés dès que le champ du planner existe,
+            // puis recalcul multi-tronçons (réessai prudent jusqu'à rendu).
+            if (destVal && link.wp && /^([A-Z][A-Z0-9]{3})(\s+[A-Z][A-Z0-9]{3})*$/.test(link.wp)) {
+                const wps = link.wp;
+                const inject = (tries) => {
+                    const wpInput = document.getElementById('fp-waypoints');
+                    if (wpInput && !wpInput.value.trim()) {
+                        wpInput.value = wps;
+                        wpInput.dispatchEvent(new Event('change'));
+                    } else if (tries > 0) {
+                        setTimeout(() => inject(tries - 1), 900);
+                    }
+                };
+                setTimeout(() => inject(12), 2500);
+            }
         }
     } else {
         // ---- Pas de permalien : priorité au favori de démarrage, sinon dernier terrain ----
         const startupIcao = getStartupFavorite();
         const lastIcao = (() => { try { return localStorage.getItem('last-icao'); } catch { return null; } })();
-        const icaoToLoad = (startupIcao && /^[A-Z]{4}$/.test(startupIcao))
+        const icaoToLoad = (startupIcao && /^[A-Z][A-Z0-9]{3}$/.test(startupIcao))
             ? startupIcao
-            : (lastIcao && /^[A-Z]{4}$/.test(lastIcao) ? lastIcao : null);
+            : (lastIcao && /^[A-Z][A-Z0-9]{3}$/.test(lastIcao) ? lastIcao : null);
         if (icaoToLoad) {
             const input = document.getElementById('icaoInput');
             if (input) input.value = icaoToLoad;

@@ -89,7 +89,7 @@ export async function getEnRouteAlternates(routePts, maxOffsetNm = 50, maxRows =
         const candidates = [];
         for (const s of stations) {
             const code = (s.icaoId || s.id || '').toUpperCase();
-            if (!/^[A-Z]{4}$/.test(code) || routeIcaos.has(code)) continue;
+            if (!/^[A-Z][A-Z0-9]{3}$/.test(code) || routeIcaos.has(code)) continue;
             if (s.lat == null || s.lon == null) continue;
             // Distance à la polyligne = min sur tous les segments.
             let best = null;
@@ -160,7 +160,7 @@ export async function showAlternates(icao) {
                 lat: s.lat, lon: s.lon,
                 dist: Math.pow(s.lat - lat, 2) + Math.pow(s.lon - lon, 2),
             }))
-            .filter(s => s.code && /^[A-Z]{4}$/.test(s.code) && s.code !== icao.toUpperCase())
+            .filter(s => s.code && /^[A-Z][A-Z0-9]{3}$/.test(s.code) && s.code !== icao.toUpperCase())
             .sort((a, b) => a.dist - b.dist)
             .slice(0, 12);
 

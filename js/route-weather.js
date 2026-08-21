@@ -144,7 +144,7 @@ async function _loadCorridorMetars(map, fromLat, fromLon, toLat, toLon, fromIcao
 
         const corridorStations = stations
             .filter(s => {
-                if (!s.icaoId || !/^[A-Z]{4}$/.test(s.icaoId)) return false;
+                if (!s.icaoId || !/^[A-Z][A-Z0-9]{3}$/.test(s.icaoId)) return false;
                 const code = s.icaoId.toUpperCase();
                 if (code === fromIcao.toUpperCase() || code === toIcao.toUpperCase()) return false;
                 if (skip(code)) return false;

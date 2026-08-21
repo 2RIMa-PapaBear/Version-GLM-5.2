@@ -290,7 +290,7 @@ async function _initOrRefresh() {
 
     const toInput = document.getElementById('route-to-input');
     const toIcao = toInput?.value?.trim().toUpperCase();
-    if (toIcao && /^[A-Z]{4}$/.test(toIcao) && toIcao !== _currentIcao.toUpperCase()) {
+    if (toIcao && /^[A-Z][A-Z0-9]{3}$/.test(toIcao) && toIcao !== _currentIcao.toUpperCase()) {
         await showRouteWeather(_map, _currentIcao, toIcao, { skipIcao: _skipDisplayedIcao });
         if (myToken !== _refreshToken) return;
     }
@@ -339,7 +339,7 @@ function _initLayerControls() {
         if (!_map || !_currentIcao) return;
         const toInput = document.getElementById('route-to-input');
         const toIcao = toInput?.value?.trim().toUpperCase();
-        if (toIcao && /^[A-Z]{4}$/.test(toIcao) && toIcao !== _currentIcao.toUpperCase()) {
+        if (toIcao && /^[A-Z][A-Z0-9]{3}$/.test(toIcao) && toIcao !== _currentIcao.toUpperCase()) {
             showRouteWeather(_map, _currentIcao, toIcao, { skipMetars: true, skipIcao: _skipDisplayedIcao });
         }
     });
@@ -513,10 +513,9 @@ function _nearestKnownAirport(lat, lon) {
     return bestD <= R ? best : null;
 }
 
-// Pseudo-codes en LETTRES uniquement (ZZAA, ZZAB…) : ils passent ainsi tous
-// les filtres /^[A-Z]{4}$/ du pipeline (planner, recalcul, route), contrairement
-// à des codes chiffrés qui seraient silencieusement rejetés. Aucun ZZ** réel
-// dans airports.json → pas de collision.
+// Pseudo-codes en LETTRES uniquement (ZZAA, ZZAB…) : reconnaissables par
+// /^ZZ[A-Z]{2}$/ pour le renommage. Aucun ZZ** réel dans airports.json →
+// pas de collision avec un vrai code OACI.
 function _nextFreeWpCode() {
     const letters = (n) => {
         let s = '';
@@ -624,7 +623,7 @@ function _deleteFreeWaypoint(code) {
     _freeWaypoints.delete(code);
     const wpInput = document.getElementById('fp-waypoints');
     if (wpInput && wpInput.value.trim()) {
-        const wps = wpInput.value.trim().toUpperCase().split(/\s+/).filter(w => /^[A-Z]{4}$/.test(w) && w !== code);
+        const wps = wpInput.value.trim().toUpperCase().split(/\s+/).filter(w => /^[A-Z][A-Z0-9]{3}$/.test(w) && w !== code);
         wpInput.value = wps.join(' ');
         wpInput.dispatchEvent(new Event('change'));
     }
@@ -756,11 +755,11 @@ async function _loadNeighborCategories(lat, lon) {
         if (Array.isArray(stations)) {
             const nearby = stations
                 .map(s => ({ code: s.icaoId || s.id }))
-                .filter(s => s.code && /^[A-Z]{4}$/.test(s.code))
+                .filter(s => s.code && /^[A-Z][A-Z0-9]{3}$/.test(s.code))
                 .slice(0, 50);
             stations.forEach(s => {
                 const code = s.icaoId || s.id;
-                if (code && /^[A-Z]{4}$/.test(code) && typeof s.lat === 'number' && typeof s.lon === 'number') {
+                if (code && /^[A-Z][A-Z0-9]{3}$/.test(code) && typeof s.lat === 'number' && typeof s.lon === 'number') {
                     stationPos[code] = { lat: s.lat, lon: s.lon };
                 }
             });
@@ -961,7 +960,7 @@ function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null
         // étape intermédiaire n'a de sens qu'entre un départ et une arrivée).
         const isNav = document.body.classList.contains('mode-nav');
         const toInputVal = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
-        const hasDest = isNav && /^[A-Z]{4}$/.test(toInputVal) && toInputVal !== icao.toUpperCase();
+        const hasDest = isNav && /^[A-Z][A-Z0-9]{3}$/.test(toInputVal) && toInputVal !== icao.toUpperCase();
         const btnsHtml = `
             <div class="mp-btns">
                 <button class="mp-load-btn${isNav ? ' mp-dep-btn' : ''}" data-icao="${escapeHtml(icao)}" title="${isNav

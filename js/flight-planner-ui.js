@@ -771,7 +771,7 @@ function _wireInputs(container, from, to) {
             // Lit les waypoints saisis et peuple state.route pour le multi-leg.
             const wpInput = container.querySelector('#fp-waypoints');
             if (wpInput) {
-                const wps = wpInput.value.trim().toUpperCase().split(/\s+/).filter(w => /^[A-Z]{4}$/.test(w));
+                const wps = wpInput.value.trim().toUpperCase().split(/\s+/).filter(w => /^[A-Z][A-Z0-9]{3}$/.test(w));
                 state.route = wps.length ? [from, ...wps, to] : null;
             }
             showFlightPlanner(from, to);
@@ -815,7 +815,7 @@ function _wireInputs(container, from, to) {
             const icao = btn.dataset.icao;
             const wpInput = container.querySelector('#fp-waypoints');
             if (!icao || !wpInput) return;
-            const wps = wpInput.value.trim().toUpperCase().split(/\s+/).filter(w => /^[A-Z]{4}$/.test(w) && w !== icao);
+            const wps = wpInput.value.trim().toUpperCase().split(/\s+/).filter(w => /^[A-Z][A-Z0-9]{3}$/.test(w) && w !== icao);
             wpInput.value = wps.join(' ');
             wpInput.dispatchEvent(new Event('change'));
         });
