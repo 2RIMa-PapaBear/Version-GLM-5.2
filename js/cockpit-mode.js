@@ -38,6 +38,7 @@ const STORAGE_KEY = 'cockpit-mode';
 // Liste des sélecteurs (le CSS fait le travail de masquage).
 const HIDDEN_SELECTORS = [
     '.side-column',              // favoris + historique
+    '#route-planner',            // barre Départ → Destination (nav déjà décidée)
     '#regional-map-panel',       // carte (trop chargée)
     '.legend-bar-bottom',        // légende nuages
     '.aero-legend-bar',          // bandeau heures aéro

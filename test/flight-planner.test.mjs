@@ -20,6 +20,7 @@ import {
     windCorrection,
     trueToMagneticHdg,
     computeFuel,
+    cheapestWaypointInsertion,
     RESERVES,
 } from '../js/flight-planner.js';
 
@@ -124,6 +125,63 @@ describe('trueToMagneticHdg', () => {
     test('wrap-around 360°→0°', () => {
         // Cap vrai 005°, déclinaison +10°E → Mag = 355°.
         assert.equal(trueToMagneticHdg(5, 10), 355);
+    });
+});
+
+describe('cheapestWaypointInsertion', () => {
+    // Axe nord-sud : départ (0,0), destination (0,10) — distances en degrés.
+    const coords = {
+        DEP:  { lat: 0, lon: 0 },
+        DEST: { lat: 0, lon: 10 },
+        MID:  { lat: 0, lon: 5 },    // à mi-route
+        NEAR: { lat: 0, lon: 2.5 },  // premier quart de route
+        FAR:  { lat: 0, lon: 7.5 },  // dernier quart de route
+        OFF:  { lat: 1, lon: 5 },    // hors axe, au milieu
+    };
+    const coordsOf = (code) => coords[code] || null;
+
+    test('liste vide → seule position possible (0)', () => {
+        assert.equal(cheapestWaypointInsertion('DEP', [], 'DEST', 'MID', coordsOf), 0);
+    });
+
+    test('étape intermédiaire insérée AVANT l\'étape lointaine', () => {
+        // Route DEP → MID → DEST existante : NEAR (premier quart) doit se
+        // glisser AVANT MID, pas s'empiler à la fin.
+        const idx = cheapestWaypointInsertion('DEP', ['MID'], 'DEST', 'NEAR', coordsOf);
+        assert.equal(idx, 0);
+    });
+
+    test('étape du dernier tronçon insérée APRÈS l\'étape existante', () => {
+        // FAR (dernier quart) doit passer après MID.
+        const idx = cheapestWaypointInsertion('DEP', ['MID'], 'DEST', 'FAR', coordsOf);
+        assert.equal(idx, 1);
+    });
+
+    test('insertion au meilleur endroit parmi plusieurs étapes', () => {
+        // Chaîne DEP → MID → DEST : OFF (hors axe mais au milieu) doit
+        // s'insérer de part et d'autre de MID selon le trajet le plus court —
+        // ici équidistant de MID vers l'avant ou l'arrière, le meilleur slot
+        // reste déterminé par la distance totale minimale.
+        const idx = cheapestWaypointInsertion('DEP', ['MID'], 'DEST', 'OFF', coordsOf);
+        assert.ok(idx === 0 || idx === 1, `index inattendu : ${idx}`);
+        // Vérifie par le calcul que l'index retenu est bien le plus court.
+        const len = (codes) => {
+            const pts = codes.map(c => coords[c]);
+            let s = 0;
+            for (let i = 0; i < pts.length - 1; i++) {
+                s += greatCircleDistanceNm(pts[i].lat, pts[i].lon, pts[i + 1].lat, pts[i + 1].lon);
+            }
+            return s;
+        };
+        const withAt0 = len(['DEP', 'OFF', 'MID', 'DEST']);
+        const withAt1 = len(['DEP', 'MID', 'OFF', 'DEST']);
+        const best = withAt0 <= withAt1 ? 0 : 1;
+        assert.equal(idx, best);
+    });
+
+    test('coordonnées manquantes → null (fallback ajout en fin)', () => {
+        assert.equal(cheapestWaypointInsertion('DEP', ['MID'], 'DEST', 'XXX', coordsOf), null);
+        assert.equal(cheapestWaypointInsertion('DEP', ['MID'], 'DEST', 'MID', () => null), null);
     });
 });
 

@@ -7,6 +7,7 @@ import { getDeclinationForIcao } from './magvar.js';
 let _routeLayer = null;
 let _routeMarkers = [];
 let _waypointMarkers = [];
+let _lastFitKey = null;
 
 // Étiquettes de tronçons (Cap / Distance / Temps) + case à cocher bas-gauche.
 const ROUTE_LABELS_LS = 'mt-route-labels';
@@ -78,13 +79,38 @@ export async function showRouteWeather(map, fromIcao, toIcao, opts = {}) {
     _mountRouteLabelsControl(map);
     _drawLegLabels(map, routePoints);
 
+    // Cadrage automatique sur la route (départ + arrivée visibles) — uniquement
+    // quand la route CHANGE, pas aux rafraîchissements météo, pour ne pas
+    // reprendre la main sur un utilisateur qui a déplacé la carte.
+    const fitKey = routePoints.map(p => p[2]).join('>');
+    if (fitKey !== _lastFitKey) {
+        _lastFitKey = fitKey;
+        map.fitBounds(_routeLayer.getBounds(), { padding: [40, 40], maxZoom: 10 });
+    }
+
     if (!opts.skipMetars) {
-        await _loadCorridorMetars(map, fromLat, fromLon, toLat, toLon);
+        await _loadCorridorMetars(map, fromLat, fromLon, toLat, toLon, fromIcao, toIcao, opts);
     }
 }
 
-async function _loadCorridorMetars(map, fromLat, fromLon, toLat, toLon) {
+// Force le prochain affichage de route à recadrer la carte (appelé par
+// regional-map à chaque (ré)initialisation, et quand la route est effacée).
+export function resetRouteFit() {
+    _lastFitKey = null;
+}
+
+// Effacement de la route (retour au vol local) : le prochain tracé recadrera.
+// (Garde-fou DOM : le module est aussi importé par les tests Node.)
+if (typeof document !== 'undefined') {
+    document.addEventListener('clear-route', resetRouteFit);
+}
+
+async function _loadCorridorMetars(map, fromLat, fromLon, toLat, toLon, fromIcao, toIcao, opts = {}) {
     try {
+        // Anti-doublon : pas de seconde pastille sur un aérodrome déjà affiché
+        // comme voisin, ni sur le départ/destination (points verts/rouges de la
+        // route) — sinon deux points décalés par terrain (ARP vs station).
+        const skip = opts.skipIcao || (() => false);
 
         const minLat = Math.min(fromLat, toLat) - 1;
         const maxLat = Math.max(fromLat, toLat) + 1;
@@ -98,6 +124,9 @@ async function _loadCorridorMetars(map, fromLat, fromLon, toLat, toLon) {
         const corridorStations = stations
             .filter(s => {
                 if (!s.icaoId || !/^[A-Z]{4}$/.test(s.icaoId)) return false;
+                const code = s.icaoId.toUpperCase();
+                if (code === fromIcao.toUpperCase() || code === toIcao.toUpperCase()) return false;
+                if (skip(code)) return false;
                 const d = _pointToSegmentDist(s.lat, s.lon, fromLat, fromLon, toLat, toLon);
                 return d < 0.8;
             })
@@ -150,7 +179,8 @@ function _addRouteEndpoint(map, lat, lon, icao, isStart) {
         opacity: 1,
         fillOpacity: 0.9,
     }).addTo(map);
-    marker.bindTooltip(`<strong>${isFr ? 'Départ' : 'Departure'}: ${icao}</strong>`, { direction: 'top', permanent: false });
+    const label = isStart ? (isFr ? 'Départ' : 'Departure') : 'Destination';
+    marker.bindTooltip(`<strong>${label}: ${icao}</strong>`, { direction: 'top', permanent: false });
     _routeMarkers.push(marker);
 }
 

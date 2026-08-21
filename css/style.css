@@ -340,6 +340,10 @@ canvas { background-color: transparent; display: block; transition: opacity 0.3s
 .autocomplete-item:hover, .autocomplete-active { background: var(--hover-bg); }
 .autocomplete-icao { font-weight:500; color: var(--primary); font-size: 14px; font-family: 'DM Mono', monospace;}
 .autocomplete-name { color: var(--text-color); font-size: 13px; margin-top: 2px; }
+/* Item destination (barre de nav) : code + distance depuis le départ sur une ligne. */
+.autocomplete-topline { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.autocomplete-topline .autocomplete-icao { flex-shrink: 0; }
+.autocomplete-dist { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-muted); white-space: nowrap; }
 
 .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(2, 6, 23, 0.85); display: flex; align-items: center; justify-content: center; z-index: 10000; backdrop-filter: blur(4px); }
 .modal-content { background: var(--panel-bg); border-radius: var(--radius-lg); max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.6); border: 1px solid var(--border-color); scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; }
@@ -555,16 +559,30 @@ body.mode-nav .dep-dest-toggle { display: flex; }
 }
 .regional-map-panel.open .regional-map-body { display: flex; }
 
-/* Route planner : visible uniquement en mode navigation. */
+/* Barre de navigation Départ → Destination : carte autonome, visible
+   uniquement en mode navigation (plus besoin d'ouvrir le panneau carte). */
 .route-planner {
     display: none;
     align-items: center;
     gap: 10px;
-    margin-bottom: 10px;
-    padding: 8px 4px;
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    /* La dropdown d'autocomplétion déborde sous la carte : chaque .card a un
+       backdrop-filter (stacking context isolé), il faut hisser la carte entière
+       au-dessus des suivantes pour que la dropdown ne soit pas recouverte. */
+    position: relative;
+    z-index: 20;
 }
 body.mode-nav .route-planner { display: flex; }
 .route-planner input:focus { border-color: var(--primary); }
+.route-planner .route-to-wrapper { flex: 1 1 170px; max-width: 320px; }
+/* Nom du terrain destination (confirmation visuelle du code saisi). */
+.route-to-name {
+    flex-basis: 100%;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+.route-to-name:empty { display: none; }
 
 /* ================================================================
  * ADAPTATION DU DASHBOARD AU MODE DE VOL (Local / Navigation)
@@ -645,12 +663,115 @@ body.mode-local #alternates-container { display: none !important; }
     font-family: 'DM Mono', monospace; font-size: 10px; color: #94A3B8;
     white-space: pre-wrap; word-break: break-all; max-height: 90px; overflow-y: auto;
 }
+.mp-inner .mp-btns { display: flex; gap: 6px; margin-top: 6px; }
 .mp-inner .mp-load-btn {
     width: 100%; padding: 6px 10px; border-radius: 6px; cursor: pointer;
     background: rgba(56,189,248,0.15); color: #38BDF8; font-weight: 700; font-size: 11px;
     border: 1px solid rgba(56,189,248,0.4); transition: background 0.15s;
+    white-space: nowrap;
 }
 .mp-inner .mp-load-btn:hover { background: rgba(56,189,248,0.3); }
+/* « Définir comme destination » : rouge du point d'arrivée sur la carte. */
+.mp-inner .mp-dest-btn {
+    width: 100%; padding: 6px 10px; border-radius: 6px; cursor: pointer;
+    background: rgba(239,68,68,0.15); color: #F87171; font-weight: 700; font-size: 11px;
+    border: 1px solid rgba(239,68,68,0.4); transition: background 0.15s;
+    white-space: nowrap;
+}
+.mp-inner .mp-dest-btn:hover { background: rgba(239,68,68,0.3); }
+/* « + Waypoint » : ambre comme les marqueurs d'étapes sur la carte. */
+.mp-inner .mp-waypoint-btn {
+    width: 100%; padding: 6px 10px; border-radius: 6px; cursor: pointer;
+    background: rgba(251,191,36,0.15); color: #FBBF24; font-weight: 700; font-size: 11px;
+    border: 1px solid rgba(251,191,36,0.4); transition: background 0.15s;
+    white-space: nowrap;
+}
+.mp-inner .mp-waypoint-btn:hover { background: rgba(251,191,36,0.3); }
+
+/* ---- Waypoints libres (clic droit / mode insertion) ---- */
+.regional-map-body { position: relative; }
+#regional-map.inserting-wp,
+#regional-map.inserting-wp .leaflet-grab { cursor: crosshair; }
+.wp-insert-hint {
+    position: absolute; top: 56px; left: 50%; transform: translateX(-50%);
+    z-index: 1100; padding: 6px 12px; border-radius: 6px;
+    background: rgba(251,191,36,0.94); color: #1E293B;
+    font-size: 11px; font-weight: 700; pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+/* Étiquette permanente du repère (tooltip Leaflet custom). */
+.leaflet-tooltip.free-wp-label {
+    background: rgba(15,23,42,0.92); border: 1px solid rgba(251,191,36,0.55);
+    color: #FBBF24; font-size: 11px; font-weight: 600;
+    padding: 2px 7px; border-radius: 5px; box-shadow: none;
+}
+.leaflet-tooltip.free-wp-label::before { display: none; }
+/* Éditeur de nom (création / renommage). */
+.fw-inner { min-width: 200px; display: flex; flex-direction: column; gap: 8px; }
+.fw-inner .fw-title { font-size: 12px; color: #F8FAFC; }
+.fw-inner .fw-title .fw-code { font-family: 'DM Mono', monospace; color: #94A3B8; font-size: 10px; margin-left: 4px; }
+.fw-inner .fw-name-input {
+    background: #0F172A; border: 1px solid #334155; color: #F8FAFC;
+    border-radius: 6px; padding: 6px 8px; font-size: 12px; width: 100%;
+    box-sizing: border-box; font-family: inherit; outline: none;
+}
+.fw-inner .fw-name-input:focus { border-color: #FBBF24; }
+.fw-inner .fw-ok-btn {
+    flex: 1; padding: 6px 10px; border-radius: 6px; cursor: pointer;
+    background: rgba(251,191,36,0.15); color: #FBBF24; font-weight: 700; font-size: 11px;
+    border: 1px solid rgba(251,191,36,0.4); transition: background 0.15s; white-space: nowrap;
+}
+.fw-inner .fw-ok-btn:hover { background: rgba(251,191,36,0.3); }
+.fw-inner .fw-add-btn {
+    flex: 1; padding: 6px 10px; border-radius: 6px; cursor: pointer;
+    background: rgba(56,189,248,0.15); color: #38BDF8; font-weight: 700; font-size: 11px;
+    border: 1px solid rgba(56,189,248,0.4); transition: background 0.15s; white-space: nowrap;
+}
+.fw-inner .fw-add-btn:hover { background: rgba(56,189,248,0.3); }
+.fw-inner .fw-del-btn {
+    width: 100%; padding: 6px 10px; border-radius: 6px; cursor: pointer;
+    background: rgba(239,68,68,0.12); color: #F87171; font-weight: 700; font-size: 11px;
+    border: 1px solid rgba(239,68,68,0.35); transition: background 0.15s; white-space: nowrap;
+}
+.fw-inner .fw-del-btn:hover { background: rgba(239,68,68,0.25); }
+
+/* Bouton « Imprimer le log de nav » : action finale de la préparation —
+   il doit sauter aux yeux dans le panneau Calcul de navigation. */
+.fp-print-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 16px; border-radius: 8px; cursor: pointer;
+    background: linear-gradient(180deg, #38BDF8 0%, #0EA5E9 100%);
+    color: #04131F; font-weight: 800; font-size: 12.5px;
+    border: 1px solid rgba(125, 211, 252, 0.8);
+    box-shadow: 0 2px 12px rgba(14, 165, 233, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    transition: transform 0.12s, box-shadow 0.12s;
+    white-space: nowrap;
+}
+.fp-print-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(14, 165, 233, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.fp-print-btn:active { transform: translateY(0); }
+.fp-print-btn svg { width: 15px; height: 15px; }
+
+/* Liste des étapes intermédiaires du plan (code + nom, renommage des repères). */
+.fp-waypoint-list { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+.fp-wp-row { display: flex; align-items: center; gap: 7px; font-size: 11px; min-width: 0; }
+.fp-wp-row .fp-wp-num { color: var(--text-muted); min-width: 14px; text-align: right; }
+.fp-wp-row .fp-wp-code { font-family: 'DM Mono', monospace; color: var(--primary); font-weight: 600; min-width: 42px; }
+.fp-wp-row .fp-wp-name { color: var(--text-color); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fp-wp-rename { background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 2px; display: flex; flex-shrink: 0; }
+.fp-wp-rename:hover { color: var(--secondary); }
+.fp-wp-rename svg { width: 12px; height: 12px; }
+.fp-wp-del { background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 2px; display: flex; flex-shrink: 0; }
+.fp-wp-del:hover { color: #F87171; }
+.fp-wp-del svg { width: 12px; height: 12px; }
+html.night-mode .fp-print-btn {
+    background: #3A0A0A;
+    border-color: rgba(232, 155, 130, 0.5);
+    color: #FCA5A5;
+    box-shadow: none;
+}
 
 /* Désignateurs de piste (divIcon Leaflet). */
 .regional-map .runway-designator span {
@@ -1546,23 +1667,36 @@ html.night-mode body::before {
 .map-layers-bar {
     display: flex;
     align-items: center;
-    gap: 12px;
+    /* UNE ligne en desktop : l'horloge radar est le tampon élastique qui
+       absorbe les variations de largeur de la fenêtre (nowrap > 600 px). */
+    gap: 6px;
     flex-wrap: wrap;
-    padding: 8px 10px;
+    padding: 6px 8px;
     background: var(--inner-bg);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     margin-bottom: 8px;
+}
+@media (min-width: 601px) {
+    .map-layers-bar { flex-wrap: nowrap; }
 }
 
 .precip-control-group {
     display: flex;
     align-items: center;
     gap: 6px;
+    /* Incompressible : seul le slider horloge absorbe les variations de
+       largeur — sinon les libellés passent sur 2 lignes et les boutons
+       n'ont plus la même hauteur. */
+    flex-shrink: 0;
 }
 
 .basemap-select {
-    padding: 5px 8px;
+    /* Hauteur alignée sur les boutons de la barre (le select natif prend
+       2px de plus à padding égal). */
+    box-sizing: border-box;
+    height: 26px;
+    padding: 0 8px;
     background: var(--input-bg);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
@@ -1580,7 +1714,9 @@ html.night-mode body::before {
     display: flex;
     align-items: center;
     gap: 5px;
-    padding: 5px 10px;
+    padding: 5px 8px;
+    /* Libellé toujours sur une ligne (hauteur homogène de la barre). */
+    white-space: nowrap;
     background: transparent;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
@@ -1622,8 +1758,8 @@ html.night-mode body::before {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 30px;
-    height: 30px;
+    width: 26px;
+    height: 26px;
     padding: 0;
     background: var(--input-bg);
     border: 1px solid var(--border-color);
@@ -1640,13 +1776,17 @@ html.night-mode body::before {
 .precip-slider-group {
     display: flex;
     align-items: center;
-    gap: 8px;
-    flex: 1;
-    min-width: 160px;
+    gap: 6px;
+    /* Groupe horloge élastique : il s'étire quand la fenêtre est large et
+       rétrécit quand elle est étroite — la barre reste sur une ligne. */
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .precip-slider {
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 40px;
+    max-width: 160px;
     height: 4px;
     -webkit-appearance: none;
     appearance: none;
@@ -1703,17 +1843,21 @@ html.night-mode .precip-play-btn {
     color: var(--text-muted);
 }
 
-/* ---- Responsive : barre de calques compacte sur petits écrans ---- */
-@media (max-width: 600px) {
+/* ---- Responsive : barre de calques compacte sur petits écrans ----
+   (seuil 700 px : en dessous, le nowrap couperait le dernier bouton —
+   on repasse en icônes seules avec l'horloge en seconde ligne). */
+@media (max-width: 700px) {
     .map-layers-bar {
         gap: 6px;
         padding: 6px;
+        flex-wrap: wrap;
     }
     .precip-slider-group {
         order: 3;
         flex-basis: 100%;
         min-width: 0;
     }
+    .precip-slider { min-width: 0; }
     .precip-toggle span:not(.airspace-count) {
         display: none;  /* icônes seules sur mobile */
     }
@@ -1834,6 +1978,10 @@ html.night-mode .precip-play-btn {
  * ================================================================ */
 .flight-planner-panel {
     padding: 14px 18px;
+    /* Le re-render « chargement → résultat » fait varier fortement la hauteur
+       du panneau : sans ceci, l'ancre de défilement du navigateur déplace la
+       fenêtre (le pilote perd la carte qu'il regardait). */
+    overflow-anchor: none;
 }
 .fp-cell {
     background: var(--inner-bg);
@@ -1951,6 +2099,7 @@ html.night-mode .precip-play-btn {
  * COCKPIT MODE — Briefing express (vue épurée)
  * ================================================================ */
 body.cockpit-mode .side-column,
+body.cockpit-mode #route-planner,
 body.cockpit-mode #regional-map-panel,
 body.cockpit-mode .legend-bar-bottom,
 body.cockpit-mode .aero-legend-bar,

@@ -26,6 +26,7 @@ import { refreshWbWidget } from './wb-ui.js';
 import { showFrequenciesWidget } from './frequencies-ui.js';
 import { showFlightPlanner } from './flight-planner-ui.js';
 import { clearElevationChart, refreshElevationChart } from './elevation-chart.js';
+import { greatCircleDistanceNm, cheapestWaypointInsertion } from './flight-planner.js';
 import { initCockpitMode, toggleCockpitMode } from './cockpit-mode.js';
 import { openShareModal, hasPermalink, readPermalink } from './permalink.js';
 import { initWatchdog, openWatchdogPanel, getWatchdogSettings } from './watchdog.js';
@@ -36,6 +37,101 @@ const lastFetchTime = {};
 // Toggle Départ/Destination (mode Navigation).
 let _depIcao = null;       // mémorise le code de départ pendant la consultation destination.
 let _viewingDest = false;  // true quand on consulte la destination (pas le départ).
+
+// Départ réel de la navigation (même pendant la consultation de la météo
+// destination via le toggle Départ/Destination).
+function _navDepRef() {
+    return (_viewingDest ? _depIcao : state.requestedIcao) || state.requestedIcao;
+}
+
+// Applique un changement de destination : nom du terrain, route sur la carte
+// régionale, plan de navigation et profil d'élévation.
+let _lastPlannedDest = null;   // destination du plan courant (reset waypoints si changement)
+
+export function handleDestinationChange() {
+    const toInput = document.getElementById('route-to-input');
+    if (!toInput) return;
+    const toIcao = toInput.value.trim().toUpperCase();
+
+    // Nom du terrain destination : confirmation visuelle du code saisi.
+    const toNameEl = document.getElementById('route-to-name');
+    if (toNameEl) {
+        const apt = /^[A-Z]{4}$/.test(toIcao) ? getAirportByICAO(toIcao) : null;
+        toNameEl.textContent = apt
+            ? apt.name
+            : (/^[A-Z]{4}$/.test(toIcao) ? (state.lang === 'fr' ? '(terrain inconnu)' : '(unknown airfield)') : '');
+    }
+
+    const depForNav = _navDepRef();
+    // Destination valide : 4 lettres, ≠ départ, connue de la base locale.
+    const destApt = /^[A-Z]{4}$/.test(toIcao) ? getAirportByICAO(toIcao) : null;
+    const validDest = !!(destApt && depForNav && toIcao !== depForNav.toUpperCase());
+
+    // NOUVELLE destination : le plan repart à zéro — les waypoints saisis pour
+    // la route précédente n'ont pas de sens vers une autre arrivée (les repères
+    // libres restent posés sur la carte, réutilisables via leur popup « + Plan »).
+    if (validDest && toIcao !== _lastPlannedDest) {
+        const wpInput = document.getElementById('fp-waypoints');
+        if (wpInput && wpInput.value.trim()) wpInput.value = '';
+        state.route = null;
+        _lastPlannedDest = toIcao;
+    } else if (validDest) {
+        _lastPlannedDest = toIcao;
+    }
+
+    // Si le panneau carte est ouvert, on rafraîchit la route.
+    const panel = document.getElementById('regional-map-panel');
+    if (panel && panel.classList.contains('open') && depForNav) {
+        showRegionalMapFor(depForNav, true);
+    }
+    // Flight planner + profil d'élévation.
+    if (getFlightMode() === 'nav' && depForNav) {
+        if (validDest) {
+            showFlightPlanner(depForNav, toIcao);
+        } else {
+            const fpPanel = document.getElementById('flight-planner-panel');
+            if (fpPanel) fpPanel.style.display = 'none';
+            clearElevationChart('elevation-profile-container');
+        }
+    }
+}
+
+// Coordonnées d'un terrain (base locale enrichie + mémo), ou null.
+function _icaoCoords(code) {
+    if (!code || !/^[A-Z]{4}$/.test(code)) return null;
+    const apt = getAirportByICAO(code);
+    const memo = memoGet(code);
+    const lat = memo?.lat ?? apt?.lat ?? null;
+    const lon = memo?.lon ?? apt?.lon ?? null;
+    return (lat != null && lon != null) ? { lat, lon } : null;
+}
+
+// Distance orthodromique entre le départ courant et un terrain (NM, ou null).
+function _destDistNm(apt) {
+    const dep = _icaoCoords(_navDepRef());
+    if (!dep || apt.lat == null) return null;
+    return greatCircleDistanceNm(dep.lat, dep.lon, apt.lat, apt.lon);
+}
+
+// Item d'autocomplétion du champ Destination : code, nom, distance depuis le départ.
+function _formatDestItem(apt) {
+    const nm = _destDistNm(apt);
+    const distHtml = nm != null
+        ? `<span class="autocomplete-dist">${Math.round(nm)} NM</span>`
+        : '';
+    return `<span class="autocomplete-topline"><span class="autocomplete-icao">${escapeHtml(apt.icao)}</span>${distHtml}</span>` +
+           `<span class="autocomplete-name">${escapeHtml(apt.name)}</span>`;
+}
+
+// Trie les correspondances : code OACI en préfixe d'abord, puis par distance
+// depuis le départ (les terrains les plus proches apparaissent en tête).
+function _sortDestMatches(matches, valUpper) {
+    const startsWithCode = a => a.icao && a.icao.toUpperCase().startsWith(valUpper);
+    const dist = a => _destDistNm(a) ?? 1e9;
+    return [...matches]
+        .sort((a, b) => (startsWithCode(b) ? 1 : 0) - (startsWithCode(a) ? 1 : 0) || dist(a) - dist(b))
+        .slice(0, 8);
+}
 
 
 export function genererGraphique() {
@@ -639,29 +735,60 @@ document.addEventListener('DOMContentLoaded', async function () {
         });
     }
 
-    // Météo de route : mise à jour quand la destination change.
+    // Météo de route : mise à jour quand la destination change (frappe clavier).
     const routeToInput = document.getElementById('route-to-input');
     if (routeToInput) {
         routeToInput.addEventListener('input', () => {
             routeToInput.value = routeToInput.value.toUpperCase();
-            // Si le panneau carte est ouvert, on rafraîchit la route.
-            const panel = document.getElementById('regional-map-panel');
-            if (panel && panel.classList.contains('open') && state.requestedIcao) {
-                showRegionalMapFor(state.requestedIcao, true);
-            }
-            // Flight planner + profil d'élévation : recalcule si en mode navigation et route valide.
-            if (getFlightMode() === 'nav' && state.requestedIcao) {
-                const toIcao = routeToInput.value.trim().toUpperCase();
-                if (toIcao && /^[A-Z]{4}$/.test(toIcao) && toIcao !== state.requestedIcao.toUpperCase()) {
-                    showFlightPlanner(state.requestedIcao, toIcao);
-                } else {
-                    const fpPanel = document.getElementById('flight-planner-panel');
-                    if (fpPanel) fpPanel.style.display = 'none';
-                    clearElevationChart('elevation-profile-container');
-                }
-            }
+            handleDestinationChange();
         });
     }
+
+    // Autocomplétion du champ Destination : code OACI ou nom de terrain,
+    // résultats priorisés par distance depuis le départ.
+    initAutocomplete('route-to-input', (icao) => {
+        const toInput = document.getElementById('route-to-input');
+        if (toInput) toInput.value = icao.toUpperCase();
+        handleDestinationChange();
+    }, {
+        formatItem: _formatDestItem,
+        filterList: _sortDestMatches,
+        requireIcao: true,   // la destination doit être un code OACI exploitable
+        preferLocal: true,   // base locale (codes + distances) prime sur le live
+    });
+
+    // « Définir comme destination » : bouton du popup d'un aérodrome voisin
+    // sur la carte régionale (regional-map.js émet l'événement).
+    document.addEventListener('set-destination', (e) => {
+        const icao = e.detail?.icao;
+        if (!icao) return;
+        const toInput = document.getElementById('route-to-input');
+        if (toInput) {
+            toInput.value = icao;
+            // PAS de focus ici : il ferait sauter la fenêtre de la carte vers
+            // la barre de destination alors que le pilote regarde la carte.
+            handleDestinationChange();
+        }
+    });
+
+    // « + Waypoint » : ajoute le terrain au champ Waypoints du planificateur
+    // (source de vérité des étapes) à la position qui rend le trajet total le
+    // plus court (insertion la moins coûteuse — l'ordre des étapes déjà
+    // saisies est préservé), puis relance le calcul via son événement 'change'.
+    document.addEventListener('add-waypoint', (e) => {
+        const icao = e.detail?.icao;
+        if (!icao) return;
+        const wpInput = document.getElementById('fp-waypoints');
+        if (!wpInput) return;   // pas de plan affiché : rien à ajouter
+        const wps = wpInput.value.trim().toUpperCase().split(/\s+/).filter(w => /^[A-Z]{4}$/.test(w));
+        if (wps.includes(icao)) return;   // déjà dans la liste : rien à faire
+        const toIcao = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
+        const idx = cheapestWaypointInsertion(_navDepRef(), wps, toIcao, icao, _icaoCoords);
+        const at = (idx == null) ? wps.length : idx;   // coords manquantes → en fin
+        const next = [...wps.slice(0, at), icao, ...wps.slice(at)];
+        wpInput.value = next.join(' ');
+        wpInput.dispatchEvent(new Event('change'));
+    });
 
     initAutocomplete('icaoInput', (icao) => { document.getElementById('icaoInput').value = icao; telechargerMessage('metar'); });
     renderSearchHistory('search-history-list', _selectAndFetch);

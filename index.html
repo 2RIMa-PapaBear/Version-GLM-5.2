@@ -110,7 +110,6 @@
             <label for="icaoInput" class="sr-only">Code OACI de l'aéroport</label>
             <div class="autocomplete-wrapper">
                 <input type="text" id="icaoInput" placeholder="ex: LFPG ou Paris" autocomplete="off" aria-autocomplete="list">
-                <div id="autocomplete-results" class="autocomplete-dropdown" role="listbox"></div>
                 <div id="search-history" class="search-history hidden">
                     <div class="search-history-title" id="search-history-title">Recherches récentes</div>
                     <div id="history-items" class="history-items"></div>
@@ -149,6 +148,25 @@
         </div>
     </header>
 
+    <!-- Barre de navigation Départ → Destination : carte autonome, visible
+         dès l'activation du mode Navigation (plus besoin d'ouvrir la carte). -->
+    <aside id="route-planner" class="card route-planner" aria-label="Route de navigation">
+        <label style="font-size:11px;color:var(--text-muted);font-weight:600;display:flex;align-items:center;gap:6px;white-space:nowrap;">
+            <i data-lucide="plane-takeoff" style="width:14px;height:14px;"></i>
+            <span id="lbl-route-from">Départ</span>
+        </label>
+        <span id="route-from-display" style="font-family:'DM Mono',monospace;font-weight:700;color:var(--secondary);font-size:14px;">—</span>
+        <i data-lucide="arrow-right" style="width:16px;height:16px;color:var(--text-muted);flex-shrink:0;"></i>
+        <label for="route-to-input" style="font-size:11px;color:var(--text-muted);font-weight:600;display:flex;align-items:center;gap:6px;white-space:nowrap;">
+            <i data-lucide="plane-landing" style="width:14px;height:14px;"></i>
+            <span id="lbl-route-to">Destination</span>
+        </label>
+        <div class="route-to-wrapper">
+            <input type="text" id="route-to-input" placeholder="ex : LFPO ou Poitiers" autocomplete="off" aria-autocomplete="list" style="text-transform:uppercase;font-family:'DM Mono',monospace;font-size:14px;font-weight:600;background:var(--input-bg);border:1px solid var(--border-color);color:var(--primary);border-radius:6px;padding:6px 10px;width:100%;outline:none;">
+        </div>
+        <div id="route-to-name" class="route-to-name"></div>
+    </aside>
+
     <aside id="flight-window-banner" class="card flight-window" role="status" aria-live="polite" style="display:none;"></aside>
 
     <aside id="takeoff-widget" class="card takeoff-panel" style="display:none;"></aside>
@@ -177,19 +195,6 @@
             <i data-lucide="chevron-down" class="regional-map-chevron" style="width:18px;height:18px;margin-left:auto;"></i>
         </div>
         <div id="regional-map-body" class="regional-map-body">
-            <div class="route-planner" id="route-planner">
-                <label style="font-size:11px;color:var(--text-muted);font-weight:600;display:flex;align-items:center;gap:6px;">
-                    <i data-lucide="plane-takeoff" style="width:14px;height:14px;"></i>
-                    <span id="lbl-route-from">Départ</span>
-                </label>
-                <span id="route-from-display" style="font-family:'DM Mono',monospace;font-weight:700;color:var(--secondary);font-size:14px;">—</span>
-                <i data-lucide="arrow-right" style="width:16px;height:16px;color:var(--text-muted);"></i>
-                <label for="route-to-input" style="font-size:11px;color:var(--text-muted);font-weight:600;display:flex;align-items:center;gap:6px;">
-                    <i data-lucide="plane-landing" style="width:14px;height:14px;"></i>
-                    <span id="lbl-route-to">Destination</span>
-                </label>
-                <input type="text" id="route-to-input" placeholder="LFPO" maxlength="4" autocomplete="off" style="text-transform:uppercase;font-family:'DM Mono',monospace;font-size:14px;font-weight:600;background:var(--input-bg);border:1px solid var(--border-color);color:var(--primary);border-radius:6px;padding:6px 10px;width:90px;outline:none;">
-            </div>
             <div id="regional-map" class="regional-map"></div>
             <div class="regional-map-legend">
                 <span class="map-legend-item"><span class="map-dot" style="background:#4ADE80;"></span> VFR</span>
