@@ -26,6 +26,16 @@ import {
 } from './wb-core.js';
 
 let _chartDispose = null;
+// Pop-up « carburant insuffisant » déjà affiché pour l'épisode courant
+// (reset dès que l'embarqué atteint le requis, re-alerte ensuite si rechute).
+let _fuelWarnActive = false;
+
+/** Navigation + plan actif → carburant requis {totalL, tripFuelL, reserveL}, sinon null. */
+function _requiredFuel() {
+    if (getFlightMode() !== 'nav') return null;
+    const f = state._lastNavPlan?.plan?.fuel;
+    return (f && f.totalL > 0) ? f : null;
+}
 
 /** Masse affichée (unité de l'avion) → chaîne arrondie. */
 const _m = (kg, u) => Math.round(massFromKg(kg, u));
@@ -94,38 +104,42 @@ function _render(body, ac, isFr) {
     const stations = wb.stations.filter(s => !s.fuel && usable(s));
     const fuelSt = wb.stations.find(s => s.fuel && usable(s));
 
+    // Grille « chargement du jour » : 4 postes MAX par ligne ; le carburant
+    // (et la consommée en navigation) ouvre TOUJOURS la ligne suivante,
+    // accompagné des postes restants (ex. Bagages 1/2).
+    const stCell = (s) => `
+        <label class="wb-load">
+            <span class="wb-load-lab"><span class="lab">${escapeHtml(s.name)}</span>${s.maxKg ? ` <span class="val">Max ${_m(s.maxKg, u.mass)}</span>` : ''}</span>
+            <input type="number" step="any" min="0" class="wb-load-in" data-key="st:${escapeHtml(s.name)}" data-max="${s.maxKg || ''}" value="${loads.masses[s.name] ?? ''}" placeholder="0">
+            <input type="range" class="wb-load-range" data-key="st:${escapeHtml(s.name)}" min="0" max="${s.maxKg ? Math.max(1, Math.round(massFromKg(s.maxKg, u.mass))) : 150}" step="1" value="${Math.round(massFromKg(loads.masses[s.name] || 0, u.mass))}">
+        </label>`;
+    const fuelCell = fuelSt ? `
+        <label class="wb-load wb-load-fuel" title="${isFr ? 'Quantité totale embarquée au décollage — pré-remplie du plan de nav (trajet + réserve), modifiable.' : 'Total fuel at takeoff — pre-filled from the nav plan (trip + reserve), editable.'}">
+            <span class="wb-load-lab"><span class="lab">${isFr ? 'Carburant embarqué (L)' : 'Fuel on board (L)'}</span>${fuelSt.maxKg ? ` <span class="val">Max ${fuelSt.maxKg}</span>` : ''}</span>
+            <input type="number" step="any" min="0" id="wb-fuel-l" data-key="fuel" data-max="${fuelSt.maxKg || ''}" value="${loads.fuelL || ''}" placeholder="0">
+            <input type="range" class="wb-load-range" data-key="fuel" min="0" max="${fuelSt.maxKg ? Math.max(1, Math.round(fuelSt.maxKg)) : 200}" step="1" value="${Math.round(loads.fuelL || 0)}">
+        </label>` : '';
+    const burnCell = (fuelSt && isNav) ? `
+        <label class="wb-load wb-load-fuel" title="${isFr ? 'Essence consommée jusqu\u2019à destination, issue du plan de vol (trajet, sans la réserve) — non modifiable. Le point Arrivée est calculé avec le carburant restant (embarqué − consommée).' : 'Fuel burned to destination, from the flight plan (trip, no reserve) — read-only. The landing point uses the remaining fuel (on board − burned).'}">
+            <span class="wb-load-lab"><span class="lab">${isFr ? 'Consommée (L)' : 'Burned (L)'}</span> <span class="val dim">${isFr ? 'plan de vol' : 'flight plan'}</span></span>
+            <input type="hidden" id="wb-burn-l" data-key="burn" value="${loads.burnL || ''}">
+            <div class="wb-burn-ro">${loads.burnL || 0}</div>
+        </label>` : '';
+    const line1 = stations.slice(0, 4);
+    const rest = stations.slice(4);
+
     body.innerHTML = `
         <div class="wb-ac-line">
             <span class="wb-ac-reg">${escapeHtml(ac.registration || ac.name)}${ac.type ? ' · ' + escapeHtml(ac.type) : ''}</span>
             <span class="wb-units">${u.mass} / ${u.arm}</span>
         </div>
-        <div class="fleet-wb-sub">${isFr ? 'CHARGEMENT DU JOUR' : 'TODAY\'S LOADING'}</div>
-        <div class="wb-load-grid">
-            ${stations.map(s => `
-                <label class="wb-load">
-                    <span class="wb-load-lab"><span class="lab">${escapeHtml(s.name)} (${u.mass})</span>${s.maxKg ? ` <span class="val">Max ${_m(s.maxKg, u.mass)}</span>` : ''}</span>
-                    <input type="number" step="any" min="0" class="wb-load-in" data-key="st:${escapeHtml(s.name)}" data-max="${s.maxKg || ''}" value="${loads.masses[s.name] ?? ''}" placeholder="0">
-                    <input type="range" class="wb-load-range" data-key="st:${escapeHtml(s.name)}" min="0" max="${s.maxKg ? Math.max(1, Math.round(massFromKg(s.maxKg, u.mass))) : 150}" step="1" value="${Math.round(massFromKg(loads.masses[s.name] || 0, u.mass))}">
-                </label>`).join('')}
-        </div>
-        ${fuelSt ? `
-        <div class="wb-load-grid wb-load-grid-fuel${isNav ? '' : ' wb-fuel-solo'}">
-            <label class="wb-load wb-load-fuel" title="${isFr ? 'Quantité totale embarquée au décollage — pré-remplie du plan de nav (trajet + réserve), modifiable.' : 'Total fuel at takeoff — pre-filled from the nav plan (trip + reserve), editable.'}">
-                <span class="wb-load-lab"><span class="lab">${isFr ? 'Carburant embarqué (L)' : 'Fuel on board (L)'}</span>${fuelSt.maxKg ? ` <span class="val">Max ${fuelSt.maxKg}</span>` : ''}</span>
-                <input type="number" step="any" min="0" id="wb-fuel-l" data-key="fuel" data-max="${fuelSt.maxKg || ''}" value="${loads.fuelL || ''}" placeholder="0">
-                <input type="range" class="wb-load-range" data-key="fuel" min="0" max="${fuelSt.maxKg ? Math.max(1, Math.round(fuelSt.maxKg)) : 200}" step="1" value="${Math.round(loads.fuelL || 0)}">
-            </label>
-            ${isNav ? `
-            <label class="wb-load wb-load-fuel" title="${isFr ? 'Essence consommée jusqu\u2019à destination, issue du plan de vol (trajet, sans la réserve) — non modifiable. Le point Arrivée est calculé avec le carburant restant (embarqué − consommée).' : 'Fuel burned to destination, from the flight plan (trip, no reserve) — read-only. The landing point uses the remaining fuel (on board − burned).'}">
-                <span class="wb-load-lab"><span class="lab">${isFr ? 'Essence consommée en vol (L)' : 'Fuel burned in flight (L)'}</span> <span class="val dim">${isFr ? 'plan de vol' : 'flight plan'}</span></span>
-                <input type="hidden" id="wb-burn-l" data-key="burn" value="${loads.burnL || ''}">
-                <div class="wb-burn-ro">${loads.burnL || 0}</div>
-            </label>` : ''}
-        </div>` : ''}
+        <div class="fleet-wb-sub">${isFr ? `CHARGEMENT DU JOUR (${u.mass.toUpperCase()})` : `TODAY'S LOADING (${u.mass.toUpperCase()})`}</div>
+        ${line1.length ? `<div class="wb-load-grid">${line1.map(stCell).join('')}</div>` : ''}
+        ${(rest.length || fuelCell || burnCell) ? `<div class="wb-load-grid">${rest.map(stCell).join('')}${fuelCell}${burnCell}</div>` : ''}
         <div class="wb-chart-host"></div>
         <div class="wb-results">
             <div class="wb-res"><span class="wb-dot wb-dot-to"></span><span class="wb-res-val" id="wb-res-to"></span></div>
-            <div class="wb-res"><span class="wb-dot wb-dot-ar"></span><span class="wb-res-val" id="wb-res-ar"></span></div>
+            ${isNav ? `<div class="wb-res"><span class="wb-dot wb-dot-ar"></span><span class="wb-res-val" id="wb-res-ar"></span></div>` : ''}
             <div class="wb-res"><span class="wb-dot wb-dot-zf"></span><span class="wb-res-val" id="wb-res-zf"></span></div>
         </div>
         <div class="wb-verdict" id="wb-verdict"></div>
@@ -134,10 +148,10 @@ function _render(body, ac, isFr) {
             ${isFr
                 ? (isNav
                     ? 'Carburant embarqué pré-rempli du plan de nav (modifiable) ; essence consommée = trajet du plan de vol (non modifiable). Point Arrivée = carburant embarqué − essence consommée. Enveloppe, postes et masse à vide : fenêtre Flotte.'
-                    : 'Carburant embarqué pré-rempli du plan de nav (modifiable). En vol local, pas d\u2019essence consommée : le point Arrivée est confondu avec le Décollage. Enveloppe, postes et masse à vide : fenêtre Flotte.')
+                    : 'Carburant embarqué pré-rempli du plan de nav (modifiable). Enveloppe, postes et masse à vide : fenêtre Flotte.')
                 : (isNav
                     ? 'Fuel on board pre-filled from the nav plan (editable); fuel burned = flight plan trip (read-only). Landing point = fuel on board − fuel burned. Envelope, stations and empty weight: Fleet window.'
-                    : 'Fuel on board pre-filled from the nav plan (editable). In local flight there is no fuel burned: the landing point merges with takeoff. Envelope, stations and empty weight: Fleet window.')}
+                    : 'Fuel on board pre-filled from the nav plan (editable). Envelope, stations and empty weight: Fleet window.')}
         </div>
     `;
     if (window.lucide) window.lucide.createIcons({ root: body });
@@ -155,12 +169,31 @@ function _render(body, ac, isFr) {
     });
 
     _recalc(body, ac, isFr);
+
+    // Pop-up de sécurité (une seule fois par épisode) : carburant embarqué
+    // insuffisant vs total requis du plan de vol. Le champ reste rouge
+    // (géré dans _recalc) jusqu'à ce que la quantité soit suffisante.
+    const req = _requiredFuel();
+    if (req) {
+        const fl2 = _num(body.querySelector('#wb-fuel-l')?.value);
+        const under = !(isFinite(fl2) && fl2 + 0.05 >= req.totalL);
+        if (under && !_fuelWarnActive) {
+            _fuelWarnActive = true;
+            const plan = state._lastNavPlan.plan;
+            const route = (plan?.from?.icao && plan?.to?.icao) ? ` (${plan.from.icao} → ${plan.to.icao})` : '';
+            window.alert(isFr
+                ? `⚠ CARBURANT INSUFFISANT${route}\n\nEmbarqué : ${isFinite(fl2) ? fl2 : 0} L\nRequis : ${req.totalL} L (trajet ${req.tripFuelL} L + réserve ${req.reserveL} L)\n\nLe champ « Carburant embarqué » restera rouge jusqu'à ce que la quantité embarquée atteigne le total requis.`
+                : `⚠ INSUFFICIENT FUEL${route}\n\nOn board: ${isFinite(fl2) ? fl2 : 0} L\nRequired: ${req.totalL} L (trip ${req.tripFuelL} L + reserve ${req.reserveL} L)\n\nThe "Fuel on board" field stays red until the quantity on board reaches the required total.`);
+        }
+    }
 }
 
 /** Relit les saisies, recalcule, rafraîchit graphe + résultats + verdict. */
 function _recalc(body, ac, isFr) {
     const wb = ac.wb;
     const u = wb.units;
+    // Vol local : pas de point/ligne Arrivée (confondu avec le Décollage).
+    const isNav = getFlightMode() === 'nav';
 
     // Saisies → chargement interne (kg / litres). data-key : "st:Nom" pour
     // les postes, "fuel"/"burn" pour le carburant.
@@ -184,15 +217,22 @@ function _recalc(body, ac, isFr) {
     if (fuelIn) {
         const maxL = _num(fuelIn.dataset.max);
         fuelIn.classList.toggle('wb-over', maxL > 0 && isFinite(fl) && fl > maxL + 1e-9);
+        // Sécurité (navigation) : rouge tant que l'embarqué est inférieur au
+        // total requis du plan de vol (trajet + réserve).
+        const req = _requiredFuel();
+        const under = !!req && loads.fuelL + 0.05 < req.totalL;
+        fuelIn.classList.toggle('wb-under', under);
+        if (!under) _fuelWarnActive = false;
     }
     writeWbLoads(ac.id, loads);
 
     const calc = computeWb(wb, loads);
 
-    // Graphe (remonté à chaque saisie : léger).
+    // Graphe (remonté à chaque saisie : léger) — en vol local le point
+    // Arrivée n'est pas tracé (superposé au Décollage).
     if (_chartDispose) { _chartDispose(); _chartDispose = null; }
     const host = body.querySelector('.wb-chart-host');
-    if (host) _chartDispose = mountWbChart(host, wb, calc, isFr);
+    if (host) _chartDispose = mountWbChart(host, wb, calc, isFr, isNav ? {} : { hideArrival: true });
 
     // Résultats : Décollage (vert) / Arrivée (orange) / ZFW (rouge) — masse
     // et CG seuls (le bandeau verdict ci-dessous porte marges et alertes).
@@ -224,7 +264,7 @@ function _recalc(body, ac, isFr) {
             ? `masse décollage > MTOW (${_m(calc.takeoff.massKg, u.mass)} > ${_m(wb.mtowKg, u.mass)} ${u.mass})`
             : `takeoff weight > MTOW (${_m(calc.takeoff.massKg, u.mass)} > ${_m(wb.mtowKg, u.mass)} ${u.mass})`);
         for (const [k, lbl] of [['takeoff', isFr ? 'décollage' : 'takeoff'],
-                                 ['arrival', isFr ? 'arrivée' : 'landing'],
+                                 ...(isNav ? [['arrival', isFr ? 'arrivée' : 'landing']] : []),
                                  ['zfw', 'ZFW']]) {
             if (!calc.points[k].inside) reasons.push(`${lbl} ${isFr ? 'hors enveloppe' : 'out of envelope'}`);
         }
