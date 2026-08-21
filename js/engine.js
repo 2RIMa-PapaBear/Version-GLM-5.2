@@ -668,10 +668,11 @@ export function renderWindCompass(containerId, windStr, runways = null, forcedId
     if (!host) return;
     const isFr = state.lang === 'fr';
     const wind = parseWindString(windStr);
-    
-    if (!wind) { 
-        host.innerHTML = `<div class="dash-title">${isFr ? 'Vent' : 'Wind'}</div><div style="flex:1;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.3);">—</div>`; 
-        return; 
+
+    if (!wind) {
+        state.activeRunwayName = null;   // sans vent : plus de piste active publiée
+        host.innerHTML = `<div class="dash-title">${isFr ? 'Vent' : 'Wind'}</div><div style="flex:1;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.3);">—</div>`;
+        return;
     }
     
     const color = getWindColorBySpeed(wind.speed);
@@ -858,6 +859,35 @@ export function renderWindCompass(containerId, windStr, runways = null, forcedId
         </div>
     `;
     if (window.lucide && surfHtml) window.lucide.createIcons({ root: host });
+}
+
+/**
+ * Recalcule et publie la piste active de façon SYNCHRONE (vent de la vue
+ * courante + paire forcée). Appelé au clic sur une bulle de piste AVANT le
+ * re-rendu global : les widgets rendus juste après (Performance décollage…)
+ * voient déjà la nouvelle piste, sans attendre le requestAnimationFrame de
+ * la rose (sans cela, il fallait cliquer deux fois pour voir le changement).
+ * @param {Object|null} apt Terrain courant (getAirportByICAO côté appelant).
+ */
+export function publishActiveRunway(apt) {
+    const parsed = state.lastParsed;
+    if (!apt || !Array.isArray(apt.runways) || !parsed) return;
+    let windStr = null;
+    if (parsed.isMetar) windStr = parsed.base?.vent?.[0]?.val || null;
+    else {
+        const h = state.manualTargetHour;
+        if (h == null) windStr = parsed.base?.vent?.[0]?.val || null;
+        else {
+            windStr = findActiveValueAtHour(parsed.base?.vent, h);
+            const tempoArr = parsed.tempo || [];
+            for (let i = tempoArr.length - 1; i >= 0; i--) {
+                if (h >= tempoArr[i].start && h < tempoArr[i].end && tempoArr[i].vent) { windStr = tempoArr[i].vent; break; }
+            }
+        }
+    }
+    const rwyData = selectBestRunway(apt.runways, parseWindString(windStr), state.forcedRunway,
+        getDeclinationForIcao(state.requestedIcao || parsed.code));
+    state.activeRunwayName = rwyData.active?.name || null;
 }
 
 export function updateWindCompass(parsedData, targetHour, timeLabel, runways = null, forcedId = null, apt = null) {

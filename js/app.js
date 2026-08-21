@@ -4,7 +4,7 @@
 
 import { state, memoSet, memoGet, escapeHtml, I18N, fetchOpenMeteo } from './core.js';
 import { fetchAvecRelais } from './core.js';
-import { analyserMETAR, analyserTAF } from './engine.js';
+import { analyserMETAR, analyserTAF, publishActiveRunway } from './engine.js';
 import { displayWeatherAlerts } from './weather.js';
 import { tzGet, tzPut } from './db.js';
 import {
@@ -678,6 +678,10 @@ document.addEventListener('DOMContentLoaded', async function () {
         const bubble = e.target.closest('.rwy-bubble');
         if (bubble) {
             state.forcedRunway = bubble.dataset.rwyId;
+            // Publie la nouvelle piste active IMMÉDIATEMENT : le widget
+            // décollage (rendu synchrone juste après) doit voir le changement
+            // dès ce clic, sans attendre le rAF de la rose.
+            publishActiveRunway(getAirportByICAO(state.requestedIcao || state.lastParsed?.code));
             state.lastRenderState = null;
             genererGraphique();
         }
