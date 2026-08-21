@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <!-- Aperçu autonome du schéma de décollage en coupe (js/takeoff-profile.js).
      Servi en HTTP local (modules ES) : QA visuelle + géométrique.
-     Chaque cas affiche la COUPE puis la BARRE « plan » (réplique exacte
-     du widget) : les deux doivent faire la même longueur et s'aligner. -->
+     (La barre « plan » historique a été supprimée du widget : la coupe est
+     seule, pleine largeur, échelle proportionnelle aux distances.) -->
 <html lang="fr">
 <head>
 <meta charset="utf-8">
@@ -36,30 +36,11 @@ const CASES = [
     { title: 'OK — marge confortable (piste 1005 m)', r: { groundRoll: 950, fiftyFt: 1680, runwayLength: 3300, margin: 1620, level: 'ok' } },
     { title: 'Caution — marge faible (piste 579 m)', r: { groundRoll: 950, fiftyFt: 1680, runwayLength: 1900, margin: 220, level: 'caution' } },
     { title: 'Danger — 50 ft au-delà de la piste (piste 457 m)', r: { groundRoll: 950, fiftyFt: 1680, runwayLength: 1500, margin: -180, level: 'danger' } },
-    { title: 'Piste inconnue (pas de barre)', r: { groundRoll: 950, fiftyFt: 1680, runwayLength: null, margin: null, level: 'unknown' } },
+    { title: 'Piste inconnue (pas de marge)', r: { groundRoll: 950, fiftyFt: 1680, runwayLength: null, margin: null, level: 'unknown' } },
     { title: 'Extrême — très longue piste (2438 m)', r: { groundRoll: 700, fiftyFt: 1250, runwayLength: 8000, margin: 6750, level: 'ok' } },
     { title: 'Extrême — roulement avant la fin, 50 ft bien après', r: { groundRoll: 900, fiftyFt: 1680, runwayLength: 1000, margin: -680, level: 'danger' } },
     { title: 'Version anglaise (OK)', r: { groundRoll: 950, fiftyFt: 1680, runwayLength: 3300, margin: 1620, level: 'ok' }, en: true },
 ];
-
-// Réplique exacte de la barre du widget (takeoff-ui.js, barHtml).
-function barReplica(r) {
-    if (r.runwayLength == null) return '';
-    const col = r.level === 'danger' ? '#EF4444' : (r.level === 'caution' ? '#F59E0B' : '#10B981');
-    const rollPct = Math.min(100, (r.groundRoll / r.runwayLength) * 100);
-    const fiftyPct = Math.min(100, (r.fiftyFt / r.runwayLength) * 100);
-    const m = Math.round(r.runwayLength * 0.3048);
-    return `
-        <div class="to-bar" style="margin-top:2px;">
-            <div class="bar-track" style="position:relative; height:22px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden;">
-                <div style="position:absolute; left:0; top:0; height:100%; width:${fiftyPct}%; background:${col}33; border-right:2px solid ${col};"></div>
-                <div style="position:absolute; left:0; top:0; height:100%; width:${rollPct}%; background:${col}99; border-right:2px solid #fff;"></div>
-            </div>
-            <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); margin-top:3px;">
-                <span>0</span><span>${m} m</span>
-            </div>
-        </div>`;
-}
 
 const host = document.getElementById('cases');
 for (const c of CASES) {
@@ -68,7 +49,6 @@ for (const c of CASES) {
         div.className = 'panel ' + cls;
         div.innerHTML = `<h3>${c.title} — ${cls === 'narrow' ? '354 px' : '770 px'}</h3>`
             + `<div class="tp"></div>`
-            + barReplica(c.r)
             + `<p class="ref">réf. 10 px : 0123456789 m</p>`;
         host.appendChild(div);
         mountTakeoffProfile(div.querySelector('.tp'), c.r, !c.en);
@@ -101,20 +81,6 @@ const check = () => {
             const fs = getComputedStyle(t).fontSize;
             if (fs !== '10px') problems.push(`${label} : texte à ${fs} au lieu de 10px`);
         }
-
-        // Même longueur que la barre « plan » : la ligne de piste doit
-        // coïncider avec la piste du widget (gauche/droite/étendue).
-        const track = panel.querySelector('.bar-track');
-        const rwy = svg.querySelector('line[data-rwy]');
-        if (track && rwy) {
-            const t = track.getBoundingClientRect();
-            const l = rwy.getBoundingClientRect();
-            const dLeft = Math.abs(t.left - l.left);
-            const dRight = Math.abs(t.right - l.right);
-            if (dLeft > 2 || dRight > 2) {
-                problems.push(`${label} : coupe et plan désalignées (Δgauche ${dLeft.toFixed(1)} px, Δdroite ${dRight.toFixed(1)} px)`);
-            }
-        }
     }
     return problems;
 };
@@ -125,7 +91,7 @@ const problems = check();
 const out = document.getElementById('qa-result');
 const qaText = problems.length
     ? 'QA: KO\n' + problems.join('\n')
-    : `QA: OK — ${document.querySelectorAll('svg').length} schémas : échelle 1:1, textes 10 px, rien hors cadre, coupe alignée sur la barre « plan »`;
+    : `QA: OK — ${document.querySelectorAll('svg').length} schémas : échelle 1:1, textes 10 px, rien hors cadre`;
 out.className = problems.length ? 'err' : '';
 out.textContent = qaText;
 document.title = problems.length ? 'QA KO' : 'QA OK';

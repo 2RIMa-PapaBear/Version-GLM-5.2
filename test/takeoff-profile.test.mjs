@@ -20,7 +20,7 @@ const CASES = {
     unknown: { groundRoll: 950, fiftyFt: 1680, runwayLength: null, margin: null, level: 'unknown' },
 };
 
-test('layout : piste pleine largeur = même longueur que la barre « plan »', () => {
+test('layout : piste pleine largeur (du bord gauche au bord droit)', () => {
     for (const name of ['ok', 'caution', 'danger']) {
         for (const width of [340, 770]) {
             const L = takeoffProfileLayout(CASES[name], width);
@@ -51,17 +51,18 @@ test('layout : position du 50ft selon le verdict', () => {
     assert.equal(takeoffProfileLayout(CASES.unknown).rwyEndX, null, 'unknown : pas de fin de piste');
 });
 
-test('layout : échelle identique à la barre du widget', () => {
-    // La barre place le 50ft à (fiftyFt/runwayLength)*100 % de la
-    // largeur ; le schéma doit retomber sur la même position.
+test('layout : échelle proportionnelle aux distances réelles', () => {
+    // Le 50ft tombe à (fiftyFt/runwayLength)×100 % de la largeur, la
+    // rotation à (groundRoll/runwayLength)×100 % — invariants conservés
+    // de l'époque où la barre « plan » servait de référence.
     const W = 770;
     for (const name of ['ok', 'caution', 'danger']) {
         const r = CASES[name];
         const L = takeoffProfileLayout(r, W);
         const expected = (r.fiftyFt / r.runwayLength) * W;
-        assert.ok(Math.abs(L.fiftyX - expected) < 0.5, `${name}: position 50ft = barre`);
+        assert.ok(Math.abs(L.fiftyX - expected) < 0.5, `${name}: position 50ft proportionnelle`);
         const expectedRoll = Math.min(r.groundRoll / r.runwayLength * W, W - 30);
-        assert.ok(Math.abs(L.liftX - expectedRoll) < 0.5, `${name}: position rotation = barre`);
+        assert.ok(Math.abs(L.liftX - expectedRoll) < 0.5, `${name}: position rotation proportionnelle`);
     }
 });
 
