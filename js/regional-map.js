@@ -612,8 +612,10 @@ function _createFreeWaypoint(lat, lon, name) {
     marker.bindPopup(() => _freeWpPopupHtml(code), { maxWidth: 250, keepInView: true });
     _freeWaypoints.set(code, { lat, lon, name, marker });
 
-    // Insertion intelligente + recalcul du plan (handler add-waypoint d'app.js).
+    // Insertion intelligente + recalcul du plan (handler add-waypoint d'app.js)
+    // + annonce du code créé (l'import d'un plan recompose l'ordre du fichier).
     document.dispatchEvent(new CustomEvent('add-waypoint', { detail: { icao: code } }));
+    document.dispatchEvent(new CustomEvent('free-waypoint-created', { detail: { icao: code } }));
 }
 
 function _renameFreeWaypoint(code, name) {
@@ -656,6 +658,15 @@ if (typeof document !== 'undefined') {
         const icao = (e.detail?.icao || '').toUpperCase();
         const wp = _freeWaypoints.get(icao);
         if (wp) _openFreeWpEditor(L.latLng(wp.lat, wp.lon), icao);
+    });
+
+    // Import d'un plan (flight-plan-io.js) : recrée un repère libre nommé
+    // à ses coordonnées (l'auto-ajout au plan suit, puis l'import reposera
+    // la liste des étapes dans l'ordre du fichier).
+    document.addEventListener('restore-free-waypoint', (e) => {
+        const { lat, lon, name } = e.detail || {};
+        if (typeof lat !== 'number' || typeof lon !== 'number' || !_map) return;
+        _createFreeWaypoint(lat, lon, String(name || 'WPT').slice(0, 24));
     });
 }
 

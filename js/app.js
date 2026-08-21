@@ -31,6 +31,7 @@ import { initCockpitMode, toggleCockpitMode } from './cockpit-mode.js';
 import { openShareModal, hasPermalink, readPermalink } from './permalink.js';
 import { initWatchdog, openWatchdogPanel, getWatchdogSettings } from './watchdog.js';
 import { fetchAirportByIcao } from './openaip.js';
+import { initPlanIo } from './flight-plan-io.js';
 
 const lastFetchTime = {};
 
@@ -805,6 +806,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         wpInput.dispatchEvent(new Event('change'));
     });
 
+    initPlanIo();
     initAutocomplete('icaoInput', (icao) => { document.getElementById('icaoInput').value = icao; telechargerMessage('metar'); });
     renderSearchHistory('search-history-list', _selectAndFetch);
     updateFavoritesUI(_selectAndFetch);

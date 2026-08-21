@@ -584,6 +584,31 @@ body.mode-nav .route-planner { display: flex; }
 }
 .route-to-name:empty { display: none; }
 
+/* Bouton Sauvegarder/Importer le plan (barre de navigation). */
+.plan-io-wrapper { position: relative; flex-shrink: 0; }
+.plan-io-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 6px; cursor: pointer;
+    background: var(--input-bg); border: 1px solid var(--border-color);
+    color: var(--text-muted); transition: all 0.15s;
+}
+.plan-io-btn:hover { border-color: var(--primary); color: var(--primary); }
+.plan-io-menu {
+    display: none; position: absolute; top: calc(100% + 6px); right: 0;
+    min-width: 190px; z-index: 1100;
+    background: var(--panel-bg); border: 1px solid var(--border-color);
+    border-radius: 8px; padding: 4px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+}
+.plan-io-menu.visible { display: flex; flex-direction: column; }
+.plan-io-menu button {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border: none; border-radius: 6px;
+    background: none; color: var(--text-color); font-size: 12px;
+    font-family: 'DM Sans', sans-serif; text-align: left; cursor: pointer;
+}
+.plan-io-menu button:hover { background: var(--hover-bg); }
+
 /* ================================================================
  * ADAPTATION DU DASHBOARD AU MODE DE VOL (Local / Navigation)
  * ================================================================
