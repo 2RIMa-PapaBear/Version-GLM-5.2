@@ -39,6 +39,11 @@ dans une PWA installable qui fonctionne aussi hors ligne.
   alternates, compagnie du trajet, autocomplétion.
 - **Carte régionale** (Leaflet) : route, étiquettes de tronçons
   (cap / distance / temps), espaces aériens (openAIP), radar.
+- **Radiophares et points VFR mondiaux** (openAIP, actualisés chaque
+  semaine par un cron GitHub) : couches VOR / NDB / points de repère
+  VFR activables case par case dans le menu du bouton « Espaces », avec
+  allègement selon le zoom — chaque point est utilisable comme waypoint
+  du plan de vol.
 - **Profil d'élévation** du trajet (Open-Meteo) en NM par tronçon.
 - **Météo de route** sur chaque waypoint, créneaux de vol par étape.
 - **Permalien complet** du plan de vol (départ / destination / waypoints),
@@ -69,7 +74,7 @@ dans une PWA installable qui fonctionne aussi hors ligne.
 |---|---|
 | [aviationweather.gov](https://aviationweather.gov/) | METAR, TAF, PIREP, SIGMET, ATIS, infos stations |
 | [Open-Meteo](https://open-meteo.com/) | Prévisions, élévation, vents en altitude |
-| [openAIP](https://www.openaip.net/) | Terrains et espaces aériens |
+| [openAIP](https://www.openaip.net/) | Terrains, espaces aériens, radiophares et points VFR |
 | [RainViewer](https://rainviewer.com/) | Radar de précipitations |
 | Relais CORS (Google Apps Script) | Proxy met en cache les requêtes météo |
 

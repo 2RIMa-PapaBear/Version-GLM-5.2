@@ -22,6 +22,9 @@ on:
         description: 'Réf de base du diff (vide = auto)'
         required: false
         default: ''
+  # Appelé par update-radio-points.yml après son commit : un push au
+  # GITHUB_TOKEN n'amorce pas de workflow, l'appelant enchaîne lui-même.
+  workflow_call:
 
 concurrency:
   group: deploy-ftp

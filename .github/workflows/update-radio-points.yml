@@ -1,0 +1,56 @@
+# ============================================================================
+# RADIO POINTS — mise à jour hebdomadaire du fichier data/radio-points.json.
+#
+# Chaque lundi 05:30 UTC : régénère le fichier mondial des radiophares
+# (VOR/DME/NDB) et points de repère VFR depuis l'API openAIP, puis commit et
+# appelle le déploiement FTP (un push au GITHUB_TOKEN n'amorce pas de
+# workflow : c'est le « needs/uses » qui enchaîne).
+#
+# Secret requis (Settings → Secrets and variables → Actions) :
+#   OPENAIP_API_KEY  clé openAIP (déjà utilisée par l'app)
+# ============================================================================
+name: Radio points (maj hebdo)
+
+on:
+  schedule:
+    - cron: '30 5 * * 1'   # lundi 05:30 UTC ≈ 07:30 Paris (été)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: Version-2.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Régénère data/radio-points.json (openAIP mondial)
+        env:
+          OPENAIP_API_KEY: ${{ secrets.OPENAIP_API_KEY }}
+        run: node scripts/fetch-radio-points.mjs
+
+      - name: Commit + push si changement
+        run: |
+          git config user.name "radio-points-bot"
+          git config user.email "radio-points-bot@users.noreply.github.com"
+          git add data/radio-points.json
+          if git diff --cached --quiet; then
+            echo "Aucun changement openAIP cette semaine."
+          else
+            git commit -m "radio-points: mise à jour hebdomadaire openAIP ($(date -u +%F))"
+            git push
+          fi
+
+  deploy:
+    needs: update
+    uses: ./.github/workflows/deploy-ftp.yml
+    secrets: inherit

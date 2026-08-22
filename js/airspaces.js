@@ -46,8 +46,8 @@ const TYPE_MAP = {
     30: 'OTHER',
     31: 'OTHER',
     32: 'OTHER',
-    33: 'OTHER',
-    34: 'OTHER',
+    33: 'SIV',     // France : « SIV SEINE », « SIV CHEVREUSE »…
+    34: 'CTA',     // LTA
     35: 'OTHER',
     36: 'OTHER',
 };
@@ -83,8 +83,26 @@ const AIRSPACE_STYLE = {
     'RESTRICTED': { color: '#EF4444', fill: 'rgba(239,68,68,0.18)', weight: 2, label: 'Réglementée' },
     'DANGER': { color: '#F59E0B', fill: 'rgba(245,158,11,0.15)', weight: 2, label: 'Dangereuse' },
     'PROHIBITED': { color: '#DC2626', fill: 'rgba(220,38,38,0.25)', weight: 2.5, label: 'Interdite' },
+    'SIV':   { color: '#38BDF8', fill: 'rgba(56,189,248,0.07)', weight: 1.5, label: 'SIV' },
     'OTHER': { color: '#94A3B8', fill: 'rgba(148,163,184,0.06)', weight: 1, label: '?' },
 };
+
+// Familles (dé)cochables du menu « Espaces » — chaque case filtre le rendu
+// sans re-téléchargement (les items du dernier cadrage sont rejoués).
+export const AIRSPACE_GROUPS = {
+    ctr:    { kinds: ['CTR'], label: 'CTR', en: 'CTR', color: '#EF4444' },
+    tma:    { kinds: ['TMA', 'CTA'], label: 'TMA / CTA', en: 'TMA / CTA', color: '#F97316' },
+    siv:    { kinds: ['SIV'], label: 'SIV', en: 'SIV', color: '#38BDF8' },
+    atz:    { kinds: ['ATZ'], label: 'ATZ', en: 'ATZ', color: '#FBBF24' },
+    rpd:    { kinds: ['RESTRICTED', 'PROHIBITED', 'DANGER', 'DROP'], label: 'Zones R · P · D', en: 'R · P · D areas', color: '#DC2626' },
+    tmz:    { kinds: ['TMZ', 'RMZ'], label: 'TMZ / RMZ', en: 'TMZ / RMZ', color: '#A855F7' },
+    autres: { kinds: ['GLIDER', 'ACRO', 'OTHER'], label: 'Planeurs & autres', en: 'Glider & others', color: '#4ADE80' },
+};
+const _KIND_TO_GROUP = (() => {
+    const m = {};
+    for (const [g, def] of Object.entries(AIRSPACE_GROUPS)) for (const k of def.kinds) m[k] = g;
+    return m;
+})();
 
 function _openDB() {
     return new Promise((resolve, reject) => {
@@ -175,13 +193,29 @@ function _decodeIcaoClass(as) {
     return /^[A-G]$/.test(c) ? c : '';
 }
 
-function _baseFt(as) {
-    const lower = as.lower;
-    if (!lower) return 0;
-    const m = typeof lower.value === 'number' ? lower.value : null;
-    if (m == null) return 0;
+// Limites verticales openAIP : lowerLimit/upperLimit { value, unit,
+// referenceDatum } — unit 6 = FL, unit 1 = ft, unit 0 = m ; referenceDatum
+// 1 = AGL. (L'ancien format `lower`/`upper` en mètres est encore accepté.)
+function _limitFt(lim) {
+    if (!lim || !isFinite(lim.value)) return null;
+    if (lim.unit === 6) return lim.value * 100;                      // FL → ft
+    if (lim.unit === 0) return Math.round(lim.value * 3.28084);      // m → ft
+    return Math.round(lim.value);                                    // ft
+}
 
-    return Math.round(m * 3.28084);
+/** Texte d'une borne : « SFC », « FL065 », « 2500 ft AGL »… */
+function _limitTxt(lim) {
+    const ft = _limitFt(lim);
+    if (ft == null) return null;
+    if (ft <= 0) return 'SFC';
+    if (lim.unit === 6 || (ft >= 4000 && ft % 500 === 0)) {
+        return `FL${String(Math.round(ft / 100)).padStart(3, '0')}`;
+    }
+    return `${ft} ft${lim.referenceDatum === 1 ? ' AGL' : ''}`;
+}
+
+function _baseFt(as) {
+    return _limitFt(as.lowerLimit ?? as.lower) ?? 0;
 }
 
 function _geometryToLatLngs(geometry, radiusKm = 5) {
@@ -236,6 +270,8 @@ function _pointInRing(lat, lng, ring) {
 export function createAirspaceController(map) {
     let layerGroup = L.layerGroup().addTo(map);
     let visible = false;
+    let activeGroups = new Set(Object.keys(AIRSPACE_GROUPS));   // tout coché
+    let lastItems = null;                                          // rejouer sans refetch
     let loaded = false;
     let controlsEl = null;
     let lastBboxKey = null;
@@ -249,44 +285,59 @@ export function createAirspaceController(map) {
         let maxLat = bounds.getNorth();
         let maxLon = bounds.getEast();
 
+        // Quantifie la zone demandée à la GRILLE 1° (cellule contenant la
+        // vue) : un déplacement de carte reste dans la même cellule la
+        // plupart du temps → rendu INSTANTANÉ depuis le cache IndexedDB,
+        // et les cellules voisines déjà visitées ne re-téléchargent rien.
+        const q = (x) => Math.floor(x);
+        minLat = q(minLat); minLon = q(minLon);
+        maxLat = Math.ceil(maxLat); maxLon = Math.ceil(maxLon);
+
         // OpenAIP rejette les bbox de plus de 5° de large (HTTP 400).
-        // On écrête la zone à 5° centrée sur le milieu de la vue actuelle.
         const MAX_DEG = 5;
-        const centerLat = (minLat + maxLat) / 2;
-        const centerLon = (minLon + maxLon) / 2;
-        if (maxLat - minLat > MAX_DEG) { minLat = centerLat - MAX_DEG/2; maxLat = centerLat + MAX_DEG/2; }
-        if (maxLon - minLon > MAX_DEG) { minLon = centerLon - MAX_DEG/2; maxLon = centerLon + MAX_DEG/2; }
+        if (maxLat - minLat > MAX_DEG) maxLat = minLat + MAX_DEG;
+        if (maxLon - minLon > MAX_DEG) maxLon = minLon + MAX_DEG;
 
         const key = _bboxKey(minLat, minLon, maxLat, maxLon);
 
         if (key === lastBboxKey && loaded) return;
 
-        let cached = await _idbGet(key);
+        // Rendu immédiat depuis le cache (même périmé) : la carte suit le
+        // déplacement sans attendre le réseau ; le rafraîchissement, lui,
+        // n'a lieu que pour une cellule jamais vue ou de plus de 30 jours.
+        const cached = await _idbGet(key);
         let items = cached?.data;
-        if (!items || Date.now() - cached.ts > TTL_MS) {
+        if (items && cached.ts > Date.now() - TTL_MS) {
+            lastBboxKey = key; loaded = true; lastItems = items;
+            _render(items);
+            return;
+        }
+        if (items) {
+            lastBboxKey = key; loaded = true; lastItems = items;
+            _render(items);   // affiche le périmé pendant le téléchargement
+        }
 
-            try {
-
-                const url = `${BASE_URL}?bbox=${minLon},${minLat},${maxLon},${maxLat}&limit=200`;
-                const res = await fetch(url, {
-                    headers: { 'x-openaip-api-key': OPENAIP_API_KEY },
-                    signal: AbortSignal.timeout(12000),
-                });
-                if (!res.ok) {
-                    console.warn('Airspaces fetch failed:', res.status);
-                    return;
-                }
-                const data = await res.json();
-                items = data.items || [];
-                _idbPut(key, items);
-            } catch (e) {
-                console.warn('Airspaces fetch error:', e.message);
+        try {
+            const url = `${BASE_URL}?bbox=${minLon},${minLat},${maxLon},${maxLat}&limit=200`;
+            const res = await fetch(url, {
+                headers: { 'x-openaip-api-key': OPENAIP_API_KEY },
+                signal: AbortSignal.timeout(12000),
+            });
+            if (!res.ok) {
+                console.warn('Airspaces fetch failed:', res.status);
                 return;
             }
+            const data = await res.json();
+            items = data.items || [];
+            _idbPut(key, items);
+        } catch (e) {
+            console.warn('Airspaces fetch error:', e.message);
+            return;
         }
 
         lastBboxKey = key;
         loaded = true;
+        lastItems = items;
         _render(items);
     }
 
@@ -304,22 +355,33 @@ export function createAirspaceController(map) {
             const baseFt = _baseFt(as);
             if (baseFt > MAX_BASE_FT) return;
 
+            // Zones ADMINISTRATIVES nationales (FIR, UIR, LTA « FRANCE »…)
+            // tracées comme de grands cadres orange : inutiles en VFR —
+            // on ne les dessine pas du tout.
+            if (/\bFIR\b|\bUIR\b|\bLTA\b/.test(String(as.name || as.designator || '').toUpperCase())) return;
+
             const kind = _decodeAirspace(as);
+            if (!activeGroups.has(_KIND_TO_GROUP[kind.kind] || 'autres')) return;
             const style = AIRSPACE_STYLE[kind.kind] || AIRSPACE_STYLE.OTHER;
             const radiusKm = (as.radius && typeof as.radius.value === 'number') ? as.radius.value : 5;
             const rings = _geometryToLatLngs(as.geometry, radiusKm);
 
             const name = as.name || as.designator || style.label;
-            const lower = as.lower?.value ? `${Math.round(as.lower.value * 3.28084)} ft` : 'SFC';
-            const upper = as.upper?.value ? `${Math.round(as.upper.value * 3.28084)} ft` : '∞';
+            const lower = _limitTxt(as.lowerLimit ?? as.lower) ?? 'SFC';
+            const upper = _limitTxt(as.upperLimit ?? as.upper) ?? '∞';
             const cls = kind.classLetter;
-            const country = as.country || '';
 
             const clsDisplay = /^[A-G]$/.test(cls) ? ` · classe ${cls}` : '';
+            // Fréquences openAIP (SIV « XX INFORMATION », CTR…) : affichées
+            // dans l'infobulle et le popup quand elles sont renseignées.
+            const freqTxt = (Array.isArray(as.frequencies) ? as.frequencies : [])
+                .filter(f => f && f.value)
+                .map(f => `${f.value}${f.name ? ` ${escapeHtml(f.name)}` : ''}`)
+                .join('<br>');
             const tooltip = `<strong>${escapeHtml(name)}</strong><br>
                 <span style="color:${style.color};font-weight:700;">${style.label}</span>${clsDisplay}<br>
                 ${isFr ? 'Alt.' : 'Alt.'}: ${lower} → ${upper}
-                ${country ? `<br>${country}` : ''}`;
+                ${freqTxt ? `<br><span style="font-family:'DM Mono',monospace;">${freqTxt}</span>` : ''}`;
 
             rings.forEach((ring, ringIdx) => {
                 if (ring.length < 2) return;
@@ -338,8 +400,9 @@ export function createAirspaceController(map) {
                     L.DomEvent.stopPropagation(e);
                     const latlng = e.latlng;
                     _highlightPoly(poly);
-                    const stacked = _findStackedAt(latlng.lat, latlng.lng);
-                    if (stacked.length > 1) {
+                    let stacked = _findStackedAt(latlng.lat, latlng.lng);
+                    if (!stacked.length) stacked = [{ poly, ...(polyMeta.get(poly) || {}) }];
+                    if (stacked.length) {
                         _showStackPopup(latlng, stacked, isFr);
                     }
                 });
@@ -385,6 +448,16 @@ export function createAirspaceController(map) {
     }
 
     function _showStackPopup(latlng, stacked, isFr) {
+        // Zone unique sous le clic : son détail directement (le contour
+        // seul sans popup prêtait à confusion — le « rectangle » de la
+        // liste n'apparaissait qu'au 2e clic, sur un chevauchement).
+        if (stacked.length === 1) {
+            L.popup({ className: 'airspace-popup', maxWidth: 280, closeButton: true })
+                .setLatLng(latlng)
+                .setContent(stacked[0].tooltip)
+                .openOn(map);
+            return;
+        }
         const html = `
             <div class="airspace-stack">
                 <div class="airspace-stack-title">${isFr ? `${stacked.length} zones superposées — cliquez pour sélectionner` : `${stacked.length} overlapping zones — click to select`}</div>
@@ -473,8 +546,21 @@ export function createAirspaceController(map) {
     map.on('zoomend', onMapMove);
     map.on('click', onMapClick);
 
+    function setGroup(g, on) {
+        if (!AIRSPACE_GROUPS[g]) return;
+        if (on) activeGroups.add(g); else activeGroups.delete(g);
+        if (lastItems) _render(lastItems);   // re-filtre sans re-télécharger
+    }
+    function getGroups() {
+        const out = {};
+        for (const g of Object.keys(AIRSPACE_GROUPS)) out[g] = activeGroups.has(g);
+        return out;
+    }
+
     return {
         mountControls,
+        setGroup,
+        getGroups,
         loadForBounds,
         toggle,
         get visible() { return visible; },
