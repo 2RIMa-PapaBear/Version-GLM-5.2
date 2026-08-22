@@ -46,12 +46,16 @@ const CLIMB_RISE = (RWY_Y - 3) - (FT50_Y + 7); // hauteur px du segment de mont�
 const LEVEL_COLORS = { ok: '#10B981', caution: '#F59E0B', danger: '#EF4444', unknown: '#38BDF8' };
 const MONO = "'DM Mono',monospace";
 
-// Silhouette d'avion de profil (nez à droite, ~22 unités de long,
-// origine = centre du fuselage, y vers le bas). Une seule couleur de
-// remplissage pour rester lisible petite.
-const PLANE_BODY = 'M11 0C10.8-1.5 8.6-2.5 6-2.5C2.8-2.5-1-1.9-4.6-1.2L-9.2-5.1L-9.8-1'
-    + 'C-10-.2-9.8.5-8.8.7C-5 1.5 1 2.1 5 1.9C8 1.8 10.4 1.1 11 0Z';
-const PLANE_WING = 'M2.6-.7L-3.3 2.7L-1.2 3.1L4 .4Z';
+// Icône d'avion de profil en montée — tracé « plane-takeoff » de la
+// bibliothèque Lucide déjà bundled (vendor/lucide.min.js, Apache-2.0),
+// corps seul : la ligne de sol de l'icône est retirée, la piste du
+// schéma tient ce rôle. Vue 24×24, origine ramenée au centre (12,12).
+// Le ventre monte nativement de PLANE_TILT degrés vers la droite.
+const PLANE_ICON_D = 'M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z';
+const PLANE_TILT = 26.4; // inclinaison native du ventre (nez haut)
+const PLANE_DROP = 2.7;  // étendue sous le centre une fois mise à plat
+const PLANE_TAIL = 3.55; // point le plus bas (empennage) SOUS la ligne de ventre
+const PLANE_LIFT = 4;    // garde ventre ↔ trait (piste ou montée), idem PDF
 
 /**
  * Calcule le layout (positions en px) du schéma pour un résultat
@@ -92,13 +96,19 @@ export function takeoffProfileLayout(r, width = 340) {
     // Pente du segment de montée (assiette de l'avion en vol).
     const climbAngle = Math.atan2(CLIMB_RISE, Math.max(1, fiftyX - liftX)) * 180 / Math.PI;
 
-    // Étiquette « 50 ft · X m » : ancrée à droite du point ; si le
-    // texte déborde à gauche (piste très longue, point 50ft proche du
-    // seuil), on l'ancre à gauche du cadre.
+    // Étiquette « 50 ft · X m » : À DROITE du repère vertical, posée au
+    // bout du trait (juste au-dessus de son extrémité haute, comme le
+    // PDF p3) ; bascule à gauche SOUS la montée, sur la rangée du bas
+    // (même hauteur que marge/manque, cf. danger) si elle déborderait du
+    // bord droit (marge faible — l'avion occupe la zone du repère).
     const fiftyTxt = `50 ft · ${ftToM(r.fiftyFt)} m`;
     const estW = fiftyTxt.length * 6.2; // DM Mono 10 px ≈ 6,2 px/car.
-    let fiftyLblX = Math.min(fiftyX + 2, XR - 1), fiftyLblAnchor = 'end';
-    if (fiftyLblX - estW < 1) { fiftyLblAnchor = 'start'; fiftyLblX = 2; }
+    let fiftyLblX, fiftyLblAnchor, fiftyLblY;
+    if (fiftyX + 6 + estW <= XR - 1) {
+        fiftyLblAnchor = 'start'; fiftyLblX = fiftyX + 6; fiftyLblY = FT50_Y + 5;
+    } else {
+        fiftyLblAnchor = 'end'; fiftyLblX = Math.min(fiftyX - 3, XR - 1); fiftyLblY = RWY_Y - 12;
+    }
 
     // Les avions grossissent un peu sur les panneaux larges (borné).
     const planeScale = 1.18 * Math.min(1.5, Math.max(1, W / 340));
@@ -106,7 +116,7 @@ export function takeoffProfileLayout(r, width = 340) {
     return {
         W, H, x0: 0, xR: XR, rwyY: RWY_Y, fiftyY: FT50_Y,
         pxPerFt, liftX, fiftyX, fiftyDrawX, rwyEndX, labelLiftX,
-        fiftyLblX, fiftyLblAnchor, climbAngle, planeScale,
+        fiftyLblX, fiftyLblAnchor, fiftyLblY, climbAngle, planeScale,
         col: LEVEL_COLORS[r.level] || LEVEL_COLORS.unknown,
     };
 }
@@ -156,6 +166,26 @@ export function takeoffProfileSvg(r, isFr = true, width = 340) {
         p.push(`<line x1="${L.fiftyX}" y1="${FT50_Y + 8}" x2="${L.fiftyX}" y2="${RWY_Y}" stroke="${muted}" stroke-width="1" stroke-dasharray="2 3" opacity="0.6"/>`);
     }
 
+    // ---- Positions des avions (calculées avant les étiquettes : le
+    // « manque » se place AU-DESSUS de l'avion en vol) ----
+    const s = L.planeScale;
+    // Posé : icône mise à plat (ventre parallèle à la piste), flottant de
+    // PLANE_LIFT au-dessus du trait — même écart que l'avion au 50 ft.
+    const groundedY = RWY_Y - 1 - (PLANE_DROP + PLANE_LIFT) * s;
+    let airX, airY;
+    if (inFrame) {
+        // En vol : assiette alignée sur la pente de montée.
+        airX = L.fiftyX - 10.5 * s; airY = FT50_Y - 2.1 * s;
+    } else {
+        // Fin de segment tronqué : centre à distance perpendiculaire
+        // constante du trait de montée (garde du posé + point bas de
+        // l'empennage) — sinon l'icône recouvre le trait.
+        const th = L.climbAngle * Math.PI / 180;
+        airX = L.fiftyDrawX - 12 * s;
+        airY = climbEndY - ((PLANE_DROP + PLANE_TAIL + PLANE_LIFT) * s
+            + (airX - L.fiftyDrawX) * Math.sin(th)) / Math.cos(th);
+    }
+
     // ---- Marge restante / manque ----
     if (known && r.margin != null) {
         if (r.margin >= 0) {
@@ -168,26 +198,23 @@ export function takeoffProfileSvg(r, isFr = true, width = 340) {
             }
         } else {
             // Tout le « manque » est au-delà du bord droit : chiffre
-            // l'écart, le rouge marque la fin de piste atteinte.
-            p.push(`<text x="${L.fiftyDrawX + 2}" y="${RWY_Y - 12}" text-anchor="end" font-family="${MONO}" font-size="10" fill="#EF4444">${isFr ? 'manque' : 'short'} ${ftToM(Math.abs(r.margin))} m</text>`);
+            // l'écart AU-DESSUS de l'avion (zone dégagée en haut de la
+            // montée tronquée ; en bas l'étiquette croisait la pente et
+            // l'avion), borné au cadre.
+            const manqueY = Math.max(11, airY - 12 * s);
+            p.push(`<text x="${L.fiftyDrawX + 2}" y="${manqueY}" text-anchor="end" font-family="${MONO}" font-size="10" fill="#EF4444">${isFr ? 'manque' : 'short'} ${ftToM(Math.abs(r.margin))} m</text>`);
         }
     }
 
     // ---- Avions ----
-    const s = L.planeScale;
-    p.push(planeGrounded(16 * s / 1.18, RWY_Y - 6.2 * s / 1.18, s));
-    if (inFrame) {
-        p.push(planeAirborne(L.fiftyX - 11 * s, FT50_Y - 2.1 * s, s, L.col, L.climbAngle));
-    } else {
-        // Avion en fin de segment tronqué, assiette sur la pente réelle.
-        p.push(planeAirborne(L.fiftyDrawX - 11 * s, climbEndY + 2, s, L.col, L.climbAngle));
-    }
+    p.push(planeGrounded(15 * s, groundedY, s));
+    p.push(planeAirborne(airX, airY, s, L.col, L.climbAngle));
 
     // ---- Étiquettes (10 px, comme la barre ; « 0 » et longueur
     // viennent de la barre elle-même, juste dessous) ----
     p.push(`<text x="${L.labelLiftX}" y="${RWY_Y + 20}" text-anchor="middle" font-family="${MONO}" font-size="10" fill="${muted}">${ftToM(Math.min(r.groundRoll, r.fiftyFt))} m</text>`);
     if (inFrame) {
-        p.push(`<text x="${L.fiftyLblX}" y="${FT50_Y - 13}" text-anchor="${L.fiftyLblAnchor}" font-family="${MONO}" font-size="10" fill="${L.col}">50 ft · ${ftToM(r.fiftyFt)} m</text>`);
+        p.push(`<text x="${L.fiftyLblX}" y="${L.fiftyLblY}" text-anchor="${L.fiftyLblAnchor}" font-family="${MONO}" font-size="10" fill="${L.col}">50 ft · ${ftToM(r.fiftyFt)} m</text>`);
     }
     if (!known) {
         p.push(`<text x="${L.xR - 1}" y="${RWY_Y + 20}" text-anchor="end" font-family="'DM Sans',sans-serif" font-size="10" font-style="italic" fill="${muted}">${isFr ? 'longueur piste ?' : 'runway length ?'}</text>`);
@@ -228,20 +255,24 @@ export function mountTakeoffProfile(host, r, isFr = true) {
     }
 }
 
-/** Avion posé (train sorti, roues au sol) — origine = contact roues. */
+/**
+ * Avion posé au seuil — icône Lucide tournée de PLANE_TILT pour être
+ * parallèle à la piste, ventre sur la ligne (origine = centre icône).
+ */
 function planeGrounded(x, y, scale) {
-    const c = 'var(--text-color)';
-    return `<g transform="translate(${x} ${y}) scale(${scale})" fill="${c}" opacity="0.85">`
-        + `<path d="${PLANE_BODY}"/><path d="${PLANE_WING}"/>`
-        + `<path d="M3.4 1.6L4.4 4M-.6 1.8L-.9 4" stroke="${c}" stroke-width="0.9" fill="none"/>`
-        + `<circle cx="4.4" cy="4.6" r="1.4"/><circle cx="-1" cy="4.8" r="1.5"/>`
-        + `<path d="M-8.4 1.2L-8.8 2.6" stroke="${c}" stroke-width="0.8" fill="none"/><circle cx="-8.9" cy="3.1" r="0.7"/>`
-        + `</g>`;
+    return `<g transform="translate(${x} ${y}) rotate(${PLANE_TILT}) scale(${scale}) translate(-12 -12)"`
+        + ` fill="none" stroke="var(--text-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.9">`
+        + `<path d="${PLANE_ICON_D}"/></g>`;
 }
 
-/** Avion en vol (train rentré, assiette = pente de montée). */
+/**
+ * Avion en vol au 50 ft — même icône, assiette alignée sur la pente de
+ * montée (l'inclinaison native est compensée : rotation ≈ 0 quand la
+ * pente vaut PLANE_TILT).
+ */
 function planeAirborne(x, y, scale, col, angle) {
-    return `<g transform="translate(${x} ${y}) rotate(${-angle.toFixed(1)}) scale(${scale})" fill="${col}">`
-        + `<path d="${PLANE_BODY}"/><path d="${PLANE_WING}"/>`
-        + `</g>`;
+    const r = (PLANE_TILT - angle).toFixed(1);
+    return `<g transform="translate(${x} ${y}) rotate(${r}) scale(${scale}) translate(-12 -12)"`
+        + ` fill="none" stroke="${col}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">`
+        + `<path d="${PLANE_ICON_D}"/></g>`;
 }
