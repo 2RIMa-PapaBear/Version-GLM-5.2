@@ -101,15 +101,24 @@ test('svg : étiquette 50 ft affichée seulement si le point est dans le cadre',
     assert.doesNotMatch(takeoffProfileSvg(CASES.danger, true), /50 ft ·/, 'danger : pas d\'étiquette 50ft (hors cadre)');
 });
 
-test('layout : étiquette 50 ft bascule à gauche si elle déborderait', () => {
-    // Cas nominal : point 50ft assez loin du seuil → ancre à droite.
+test('layout : étiquette 50 ft à droite du repère, repli à gauche si débordement', () => {
+    // Cas nominal : de la place à droite → texte au bout du repère,
+    // juste au-dessus de son extrémité haute (y = fiftyY + 5).
     const nom = takeoffProfileLayout(CASES.ok, 354);
-    assert.equal(nom.fiftyLblAnchor, 'end');
-    // Piste très longue, point 50ft proche du seuil → ancre à gauche.
+    assert.equal(nom.fiftyLblAnchor, 'start', 'ancre début (droite)');
+    assert.ok(Math.abs(nom.fiftyLblX - (nom.fiftyX + 6)) < 0.01, 'collée à droite du repère');
+    assert.equal(nom.fiftyLblY, 31, 'hauteur = bout du repère (fiftyY+5)');
+    // Marge faible : point 50ft près du bord droit → repli à gauche,
+    // SOUS la montée sur la rangée du bas (même hauteur que la marge).
+    const caut = takeoffProfileLayout(CASES.caution, 354);
+    assert.equal(caut.fiftyLblAnchor, 'end', 'bascule d ancrage');
+    assert.equal(caut.fiftyLblY, 64, 'repli sous la montée (rwyY−12)');
+    assert.ok(caut.fiftyLblX <= caut.fiftyX - 3 + 0.01 && caut.fiftyLblX - 81 > 0, 'à gauche du point, dans le cadre');
+    // Piste très longue, point proche du seuil : reste à droite, en bas.
     const far = takeoffProfileLayout({ groundRoll: 700, fiftyFt: 1250, runwayLength: 8000, margin: 6750, level: 'ok' }, 354);
-    assert.equal(far.fiftyLblAnchor, 'start', 'bascule d ancrage');
-    assert.equal(far.fiftyLblX, 2, 'collée au bord gauche');
-    assert.ok(far.fiftyLblX >= 0 && far.fiftyLblX < far.fiftyX, 'à gauche du point 50ft');
+    assert.equal(far.fiftyLblAnchor, 'start', 'pas de bascule');
+    assert.ok(far.fiftyLblX > far.fiftyX, 'à droite du point 50ft');
+    assert.equal(far.fiftyLblY, 31, 'hauteur = bout du repère');
 });
 
 test('svg : invite de saisie si piste inconnue', () => {
@@ -120,6 +129,9 @@ test('svg : invite de saisie si piste inconnue', () => {
 test('svg : verdicts danger et marge', () => {
     assert.match(takeoffProfileSvg(CASES.danger, true), new RegExp(`manque ${ftToM(180)} m`), 'manque FR');
     assert.match(takeoffProfileSvg(CASES.danger, false), new RegExp(`short ${ftToM(180)} m`), 'manque EN');
+    // « manque » AU-DESSUS de l'avion en vol (zone haute, dégagée).
+    const yManque = takeoffProfileSvg(CASES.danger, true).match(/<text x="[\d.]+" y="([\d.]+)"[^>]*>manque/)?.[1];
+    assert.ok(yManque != null && +yManque < 50, `manque au-dessus de l'avion (y=${yManque})`);
     assert.match(takeoffProfileSvg(CASES.ok, true), new RegExp(`\\+${ftToM(1620)} m`), 'marge positive');
 });
 

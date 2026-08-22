@@ -114,7 +114,13 @@ function _render(body, ac, isFr) {
             <input type="range" class="wb-load-range" data-key="st:${escapeHtml(s.name)}" min="0" max="${s.maxKg ? Math.max(1, Math.round(massFromKg(s.maxKg, u.mass))) : 150}" step="1" value="${Math.round(massFromKg(loads.masses[s.name] || 0, u.mass))}">
         </label>`;
     const fuelCell = fuelSt ? `
-        <label class="wb-load wb-load-fuel" title="${isFr ? 'Quantité totale embarquée au décollage — pré-remplie du plan de nav (trajet + réserve), modifiable.' : 'Total fuel at takeoff — pre-filled from the nav plan (trip + reserve), editable.'}">
+        <label class="wb-load wb-load-fuel" title="${isFr
+            ? (isNav
+                ? 'Quantité totale embarquée au décollage — pré-remplie du plan de nav (trajet + réserve), modifiable.'
+                : 'Quantité totale embarquée au décollage — saisie libre, mémorisée pour cet avion.')
+            : (isNav
+                ? 'Total fuel at takeoff — pre-filled from the nav plan (trip + reserve), editable.'
+                : 'Total fuel at takeoff — free entry, saved for this aircraft.')}">
             <span class="wb-load-lab"><span class="lab">${isFr ? 'Carburant embarqué (L)' : 'Fuel on board (L)'}</span>${fuelSt.maxKg ? ` <span class="val">Max ${fuelSt.maxKg}</span>` : ''}</span>
             <input type="number" step="any" min="0" id="wb-fuel-l" data-key="fuel" data-max="${fuelSt.maxKg || ''}" value="${loads.fuelL || ''}" placeholder="0">
             <input type="range" class="wb-load-range" data-key="fuel" min="0" max="${fuelSt.maxKg ? Math.max(1, Math.round(fuelSt.maxKg)) : 200}" step="1" value="${Math.round(loads.fuelL || 0)}">
@@ -148,10 +154,10 @@ function _render(body, ac, isFr) {
             ${isFr
                 ? (isNav
                     ? 'Carburant embarqué pré-rempli du plan de nav (modifiable) ; essence consommée = trajet du plan de vol (non modifiable). Point Arrivée = carburant embarqué − essence consommée. Enveloppe, postes et masse à vide : fenêtre Flotte.'
-                    : 'Carburant embarqué pré-rempli du plan de nav (modifiable). Enveloppe, postes et masse à vide : fenêtre Flotte.')
+                    : 'Carburant embarqué : saisie libre, mémorisée pour cet avion. Enveloppe, postes et masse à vide : fenêtre Flotte.')
                 : (isNav
                     ? 'Fuel on board pre-filled from the nav plan (editable); fuel burned = flight plan trip (read-only). Landing point = fuel on board − fuel burned. Envelope, stations and empty weight: Fleet window.'
-                    : 'Fuel on board pre-filled from the nav plan (editable). Envelope, stations and empty weight: Fleet window.')}
+                    : 'Fuel on board: free entry, saved for this aircraft. Envelope, stations and empty weight: Fleet window.')}
         </div>
     `;
     if (window.lucide) window.lucide.createIcons({ root: body });

@@ -782,33 +782,43 @@ function _drawPerfPage(doc, p) {
 // schématique, montée tronquée au bord en danger. Retourne l'ordonnée Y
 // après le schéma.
 // ---------------------------------------------------------------------------
-// Silhouette d'avion de profil (polygones remplis), en unités locales avec
-// y vers le HAUT et l'origine au niveau du train principal — le même avion
-// est posé au seuil et en montée au point 50 ft (tourné de la pente).
-const PLANE_BODY = [[-8, 1.1], [6, 0.9], [7.6, 2.1], [7.2, 3.6], [4.6, 4.5], [-1, 4.3], [-4.2, 3.1], [-8, 2.7]];
-const PLANE_FIN = [[-8, 2.8], [-6, 3], [-8.4, 7.2], [-10.6, 6.8]];
-const PLANE_WING = [[-1.6, 4.6], [3.6, 4.8], [3.6, 5.5], [-1.6, 5.3]];
+// Icône d'avion de profil — tracé « plane-takeoff » de Lucide (Apache-2.0)
+// aplatî en polyligne (arcs et cubiques échantillonnés), centré sur
+// l'origine, y vers le BAS (repère écran PDF). Le ventre monte
+// nativement de 26,4° vers la droite ; PLANE_DROP = étendue sous le
+// centre une fois l'icône mise à plat (posée sur la piste).
+const PLANE_ICON_PTS = [
+    [-5.64, 5.4], [-8, 5], [-10, 1], [-8.9, 0.45], [-8.69, 0.36], [-8.46, 0.29],
+    [-8.23, 0.25], [-8, 0.24], [-7.77, 0.25], [-7.54, 0.29], [-7.31, 0.36],
+    [-7.1, 0.45], [-6.93, 0.55], [-6.72, 0.64], [-6.49, 0.71], [-6.26, 0.75],
+    [-6.03, 0.76], [-5.8, 0.75], [-5.57, 0.71], [-5.34, 0.64], [-5.13, 0.55],
+    [-4, 0], [-7, -6], [-6.1, -6.45], [-5.84, -6.55], [-5.58, -6.62],
+    [-5.3, -6.65], [-5.03, -6.65], [-4.75, -6.6], [-4.49, -6.52], [-4.24, -6.4],
+    [-4.01, -6.25], [0.01, -3.25], [0.24, -3.1], [0.49, -2.98], [0.76, -2.9],
+    [1.03, -2.85], [1.31, -2.84], [1.58, -2.87], [1.85, -2.94], [2.11, -3.05],
+    [6.3, -5.11], [6.5, -5.2], [6.71, -5.27], [6.93, -5.32], [7.15, -5.36],
+    [7.37, -5.37], [7.59, -5.36], [7.81, -5.33], [8.03, -5.28], [9, -5],
+    [9.29, -4.88], [9.54, -4.71], [9.75, -4.48], [9.91, -4.21], [10, -3.92],
+    [10.02, -3.61], [9.98, -3.3], [9.87, -3.01], [9.49, -2.25], [9.4, -2.08],
+    [9.29, -1.92], [9.17, -1.77], [9.05, -1.63], [8.9, -1.5], [8.75, -1.38],
+    [8.59, -1.27], [8.42, -1.17], [-4.42, 5.2], [-4.56, 5.26], [-4.71, 5.32],
+    [-4.86, 5.36], [-5.02, 5.39], [-5.17, 5.4], [-5.33, 5.41], [-5.48, 5.4],
+    [-5.64, 5.38],
+];
+const PLANE_TILT = 26.4;
+const PLANE_DROP = 2.7;
+const PLANE_TAIL = 3.55; // point le plus bas (empennage) SOUS la ligne de ventre
+const PLANE_LIFT = 4;    // garde ventre ↔ trait (piste ou montée), idem écran
 
-function _planeProfile(doc, cx, cy, scale, climbDeg) {
-    const th = (climbDeg || 0) * Math.PI / 180;
-    const cos = Math.cos(th), sin = Math.sin(th);
-    // Repère écran (y vers le bas) : silhouette définie y vers le haut.
-    const tx = (x, y) => [cx + (x * cos - y * sin) * scale, cy - (x * sin + y * cos) * scale];
-    const poly = (pts) => {
-        const p = pts.map(([x, y]) => tx(x, y));
-        const segs = p.slice(1).map((q, i) => [q[0] - p[i][0], q[1] - p[i][1]]);
-        doc.lines(segs, p[0][0], p[0][1], [1, 1], 'F', true);
-    };
-    doc.setFillColor(...INK);
-    poly(PLANE_BODY); poly(PLANE_FIN); poly(PLANE_WING);
-    // Train principal + roulette avant (traits + roues pleines).
-    doc.setDrawColor(...INK); doc.setLineWidth(0.7);
-    const [ax1, ay1] = tx(0.5, 1), [ax2, ay2] = tx(0.5, -1.2);
-    doc.line(ax1, ay1, ax2, ay2);
-    doc.circle(ax2, ay2, 0.9 * scale, 'F');
-    const [bx1, by1] = tx(5.2, 1), [bx2, by2] = tx(5.2, -0.4);
-    doc.line(bx1, by1, bx2, by2);
-    doc.circle(bx2, by2, 0.55 * scale, 'F');
+function _planeIcon(doc, cx, cy, scale, rotDeg) {
+    const th = (rotDeg * Math.PI) / 180, cos = Math.cos(th), sin = Math.sin(th);
+    const p = PLANE_ICON_PTS.map(([x, y]) =>
+        [cx + (x * cos - y * sin) * scale, cy + (x * sin + y * cos) * scale]);
+    const segs = p.slice(1).map((q, k) => [q[0] - p[k][0], q[1] - p[k][1]]);
+    doc.setDrawColor(...INK);
+    doc.setLineWidth(1.15 * scale);            // ≈ Lucide : 2/24 de la taille
+    doc.setLineJoin('round'); doc.setLineCap('round');
+    doc.lines(segs, p[0][0], p[0][1], [1, 1], 'S', true);
 }
 
 function _drawTakeoffProfile(doc, t, L, R, yTop, fr) {
@@ -816,7 +826,10 @@ function _drawTakeoffProfile(doc, t, L, R, yTop, fr) {
     const lvlColor = lvl === 'danger' ? REDTX : (lvl === 'caution' ? AMBER : GREEN);
     const W = R - L;
     const yBase = yTop + 44;                    // ligne de piste
-    const TOP50 = yTop + 6;                     // hauteur schématique du 50 ft
+    const TOP50 = yTop + 12;                    // hauteur 50 ft (laisse la
+                                                // place au « manque » au-
+                                                // dessus de l'avion, comme
+                                                // à l'écran)
     const pxPerM = W / t.runwayLengthM;
     const rollX = L + t.groundRollM * pxPerM;
     const fiftyDrawX = Math.min(L + t.fiftyFtM * pxPerM, R - 6);   // tronquée au bord en danger
@@ -838,26 +851,35 @@ function _drawTakeoffProfile(doc, t, L, R, yTop, fr) {
     doc.line(fiftyDrawX, TOP50 + 3, fiftyDrawX, yBase);
     doc.setLineDashPattern([], 0);
 
-    // Avions : posé au seuil, puis en montée au point 50 ft (tourné de la
-    // pente réelle du tracé, décalé pour ne pas mordre le bord droit).
-    _planeProfile(doc, L + 16, yBase - 1.4, 1, 0);
+    // Avions : posé au seuil (icône à plat, ventre flottant de PLANE_LIFT
+    // au-dessus du trait — même écart qu'à l'écran), puis en montée au
+    // point 50 ft : assiette sur la pente réelle, centre à distance
+    // perpendiculaire constante du trait (garde du posé + empennage),
+    // décalé pour ne pas mordre le bord droit.
+    _planeIcon(doc, L + 16, yBase - 0.35 - (PLANE_DROP + PLANE_LIFT), 1, PLANE_TILT);
     const climbDeg = Math.atan2(yBase - TOP50, Math.max(10, fiftyDrawX - rollX)) * 180 / Math.PI;
-    _planeProfile(doc, Math.min(fiftyDrawX - 5, R - 18), TOP50 + 2.5, 0.9, climbDeg);
+    const ax = Math.min(fiftyDrawX - 10, R - 16);
+    const thP = climbDeg * Math.PI / 180;
+    const ay = TOP50 - ((PLANE_DROP + PLANE_TAIL + PLANE_LIFT) * 0.9
+        + (ax - fiftyDrawX) * Math.sin(thP)) / Math.cos(thP);
+    _planeIcon(doc, ax, ay, 0.9, PLANE_TILT - climbDeg);
 
-    // Étiquettes : roulement sous la piste à gauche, 50 ft près du point
-    // (bascule à gauche si elle déborderait du cadre), marge à droite.
+    // Étiquettes : roulement sous la piste à gauche, 50 ft au bout du
+    // repère (bascule à gauche SOUS la montée si elle déborderait du
+    // cadre, même hauteur relative que l'écran), marge : positive sous
+    // la piste, négative AU-DESSUS de l'avion (comme « manque » écran).
     doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); _setInk(doc, INK);
     doc.text(`${fr ? 'Roulement' : 'Roll'} ${t.groundRollM} m`, L + 1.5, yBase + 14);
     const lbl50 = `${fr ? 'Franch. 50 ft' : '50 ft obstacle'} : ${t.fiftyFtM} m`;
     if (fiftyDrawX + 6 + doc.getTextWidth(lbl50) <= R - 2) {
         doc.text(lbl50, fiftyDrawX + 6, TOP50 + 2.5);
     } else {
-        doc.text(lbl50, fiftyDrawX - 5, TOP50 + 2.5, { align: 'right' });
+        doc.text(lbl50, fiftyDrawX - 5, yBase - 12, { align: 'right' });
     }
     if (t.marginM != null) {
         const marge = `${fr ? 'Marge' : 'Margin'} ${t.marginM >= 0 ? '+' : ''}${t.marginM} m · ${fr ? 'piste' : 'runway'} ${t.runwayLengthM} m`;
         _setInk(doc, t.marginM >= 0 ? lvlColor : REDTX);
-        doc.text(marge, R - 2, yBase + 14, { align: 'right' });
+        doc.text(marge, R - 2, t.marginM >= 0 ? yBase + 14 : ay - 12 * 0.9, { align: 'right' });
     }
 
     return yBase + 20;
