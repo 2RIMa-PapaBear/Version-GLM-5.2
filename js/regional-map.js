@@ -5,12 +5,14 @@ import { HAZARD_COLORS } from './sigmet.js';
 import { showRouteWeather, resetRouteFit } from './route-weather.js';
 import { createPrecipController } from './radar-layer.js';
 import { createAirspaceController } from './airspaces.js';
+import { createRadioPointsController } from './radio-points-layer.js';
 import { fetchPireps, pirepDisplayMeta } from './pireps.js';
 import { getRunwayThresholds } from './runways-geo.js';
 
 let _map = null;
 let _precip = null;
 let _airspaces = null;
+let _radioPoints = null;   // couches VOR/NDB/points VFR (menu « Espaces »).
 let _sigmetLayer = null;
 let _currentBaseLayer = null;
 let _pirepMarkers = [];
@@ -313,6 +315,18 @@ function _initLayerControls() {
 
     _airspaces = createAirspaceController(_map);
     _airspaces.mountControls(bar);
+
+    // Radiophares (VOR/NDB) + points VFR : couches ouvertes via le menu
+    // déroulant du bouton « Espaces » (monté APRÈS le bouton qu'il promeut).
+    // createWaypoint = repère nommé du pipeline existant (enrichAirport +
+    // insertion intelligente du plan).
+    try {
+        _radioPoints = createRadioPointsController(_map, {
+            airspace: _airspaces,
+            createWaypoint: (lat, lon, name) => _createFreeWaypoint(lat, lon, name),
+        });
+        _radioPoints.mountControls(bar);
+    } catch (e) { console.error('radio points layer failed:', e.message); }
 
     _sigmetLayer = createSigmetController(_map);
     _sigmetLayer.mountControls(bar);
