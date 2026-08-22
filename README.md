@@ -6,6 +6,16 @@ dans une PWA installable qui fonctionne aussi hors ligne.
 
 🌐 **Application en ligne :** <http://papabear56.free.fr/>
 
+## Captures d'écran
+
+| Météo & rose des vents | Performance décollage |
+|:---:|:---:|
+| ![METAR décodé, rose des vents et widgets météo](docs/capture-meteo.png) | ![Panneau performance décollage avec schéma en coupe](docs/capture-perfs-decollage.png) |
+
+| Calcul de navigation | Carte régionale & profil d'élévation |
+|:---:|:---:|
+| ![Calcul de navigation LFPB → LFRM](docs/capture-navigation.png) | ![Carte régionale avec route et profil d'élévation](docs/capture-carte-regionale.png) |
+
 ---
 
 ## Fonctionnalités
