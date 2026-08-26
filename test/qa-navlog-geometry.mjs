@@ -31,8 +31,8 @@ const EXPECT = {
     3: ['Performances et terrain', 'PERFORMANCES DE DÉCOLLAGE — LFPB · RWY 28', 'ROULEMENT', 'FRANCH. 50 FT',
         'DENSITÉ-ALT.', 'RÉF. AVION (M)', 'LONGUEUR PISTE', 'REVÊTEMENT', 'Herbe +15 %', 'MARGE (50 FT)',
         '+605 m', 'Roulement 280 m', 'Franch. 50 ft : 495 m', 'Marge +605 m · piste 1100 m',
-        'PROFIL D’ÉLÉVATION — LFPB - LFRM'.replace('’', "'"), 'ALTERNATES LE LONG DE LA ROUTE (± 50 NM)',
-        'Terrain', 'LFPT', 'Pontoise-Cormeilles', '14 NM D', 'LFOB', '3500 ft'],
+        'PROFIL D’ÉLÉVATION — LFPB - LFRM'.replace('’', "'"), 'ALTERNATES LE LONG DE LA ROUTE (± 25 NM)',
+        'Terrain', 'LFPT', 'Pontoise-Cormeilles', '14 NM D', 'LFPK*', '· METAR LFPB', 'LFOB', '3500 ft'],
 };
 
 // Passe ANGLAISE : même fixture avec isFr=false partout → page 1 doit être
@@ -44,8 +44,8 @@ const EXPECT_EN = {
     2: ['Flight plan', 'MAGNETIC HEADING', 'WIND AT 3500 FT', 'TOTAL', 'LEG DETAILS'],
     3: ['Performance & terrain', 'TAKEOFF PERFORMANCE — LFPB · RWY 28', 'GROUND ROLL', '50 FT OBSTACLE',
         'DENSITY ALT.', 'Roll 280 m', '50 ft obstacle : 495 m', 'Margin +605 m · runway 1100 m',
-        'ELEVATION PROFILE — LFPB - LFRM', 'EN-ROUTE ALTERNATES (± 50 NM)',
-        'AIRFIELD', '14 NM D', '3500 ft'],
+        'ELEVATION PROFILE — LFPB - LFRM', 'EN-ROUTE ALTERNATES (± 25 NM)',
+        'AIRFIELD', '14 NM D', '3500 ft', '· METAR LFPB'],
 };
 
 // ---- Constructeur enregistrant les appels text() ----

@@ -343,15 +343,17 @@ async function _generateNavLogPdfInto(tab) {
         };
     }
 
-    // Alternates viables à ± 50 NM de la route (départ → waypoints → dest.).
+    // Alternates viables à ± 25 NM de la route (départ → waypoints → dest.),
+    // tous aérodromes (openAIP) — METAR de la station la plus proche si le
+    // terrain n'en émet pas (marqué « * » dans le PDF).
     const routePts = (isMulti && plan.waypoints?.length)
         ? plan.waypoints.map(w => ({ icao: w.icao, lat: w.lat, lon: w.lon }))
         : [plan.from, plan.to].map(a => ({ icao: a.icao, lat: a.lat, lon: a.lon }));
-    const altRows = await getEnRouteAlternates(routePts, 50, 6).catch(() => null);
+    const altRows = await getEnRouteAlternates(routePts, 25, 6).catch(() => null);
     let alternates = null;
     if (altRows?.length) {
         alternates = {
-            maxOffsetNm: 50,
+            maxOffsetNm: 25,
             rows: altRows.map(r => ({
                 code: r.code, name: r.name, cat: r.cat.cat,
                 visiStr: r.cat.visiM >= 10000 ? '>10 km' : `${r.cat.visiM} m`,
@@ -361,6 +363,7 @@ async function _generateNavLogPdfInto(tab) {
                     : '—',
                 offsetNm: Math.round(r.offsetNm),
                 side: r.side >= 0 ? (isFr3 ? 'D' : 'R') : (isFr3 ? 'G' : 'L'),
+                metarFrom: r.metarFrom || null, metarDistNm: r.metarDistNm ?? null,
             })),
         };
     }

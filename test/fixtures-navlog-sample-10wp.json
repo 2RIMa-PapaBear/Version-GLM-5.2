@@ -561,7 +561,7 @@
       ]
     },
     "alternates": {
-      "maxOffsetNm": 50,
+      "maxOffsetNm": 25,
       "rows": [
         {
           "code": "LFPT",
@@ -581,7 +581,9 @@
           "ceilStr": "—",
           "windStr": "290° 6 kt",
           "offsetNm": 21,
-          "side": "D"
+          "side": "D",
+          "metarFrom": "LFPB",
+          "metarDistNm": 21
         },
         {
           "code": "LFPO",

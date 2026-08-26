@@ -739,12 +739,21 @@ function _drawPerfPage(doc, p) {
         const ROW_H = 15;
         al.rows.forEach((r, i) => {
             const base = headBot + i * ROW_H + ROW_H - 4;
-            // Code OACI gras + nom tronqué en gris.
+            // Code OACI gras (« * » si le METAR vient de la station la plus
+            // proche, terrain sans émission propre) + nom tronqué en gris,
+            // suivi du tag « · METAR LFxx » de substitution (le nom est
+            // tronqué en priorité pour que le tag reste entier).
+            const code = r.code ? r.code + (r.metarFrom ? '*' : '') : '';
             doc.setFont('courier', 'bold'); doc.setFontSize(8); _setInk(doc, INK);
-            doc.text(r.code, L + 1.5, base);
-            const nameX = L + 1.5 + doc.getTextWidth(r.code) + 5;
+            doc.text(code, L + 1.5, base);
+            const nameX = L + 1.5 + doc.getTextWidth(code) + 5;
             doc.setFont('helvetica', 'normal'); doc.setFontSize(7); _setInk(doc, MUTED);
-            doc.text(_trunc(doc, r.name, CX.cat - 6 - nameX), nameX, base);
+            const maxW = CX.cat - 6 - nameX;
+            const tag = r.metarFrom ? ` · METAR ${r.metarFrom}` : '';
+            const nameTxt = tag
+                ? _trunc(doc, r.name, Math.max(14, maxW - doc.getTextWidth(tag))) + tag
+                : _trunc(doc, r.name, maxW);
+            doc.text(nameTxt, nameX, base);
             // Catégorie colorée (palette écran adaptée au papier).
             doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
             _setInk(doc, CAT_PRINT[r.cat] || MUTED);
