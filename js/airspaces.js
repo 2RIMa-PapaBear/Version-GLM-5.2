@@ -147,6 +147,38 @@ function _bboxKey(minLat, minLon, maxLat, maxLon) {
     return `bbox_${r(minLat)}_${r(minLon)}_${r(maxLat)}_${r(maxLon)}`;
 }
 
+/**
+ * Charge les zones aériennes d'une bbox SANS carte (profil d'élévation,
+ * log de nav) : quantification 1° et cache IndexedDB PARTAGÉS avec la
+ * carte — la bbox d'une route déjà consultée ne re-télécharge rien.
+ * Retourne les items openAIP bruts ([] si indisponible).
+ */
+export async function fetchAirspacesForBbox(minLat, minLon, maxLat, maxLon) {
+    const q = (x) => Math.floor(x);
+    const cl = (x) => Math.ceil(x);
+    const b = [q(minLat), q(minLon), cl(maxLat), cl(maxLon)];
+    if (b[2] - b[0] > 5) b[2] = b[0] + 5;   // limite API openAIP
+    if (b[3] - b[1] > 5) b[3] = b[1] + 5;
+    const key = _bboxKey(b[0], b[1], b[2], b[3]);
+
+    const cached = await _idbGet(key);
+    if (cached?.data && cached.ts > Date.now() - TTL_MS) return cached.data;
+
+    try {
+        const url = `${BASE_URL}?bbox=${b[1]},${b[0]},${b[3]},${b[2]}&limit=200`;
+        const res = await fetch(url, {
+            headers: { 'x-openaip-api-key': OPENAIP_API_KEY },
+            signal: AbortSignal.timeout(12000),
+        });
+        if (!res.ok) return cached?.data || [];
+        const items = (await res.json()).items || [];
+        _idbPut(key, items);
+        return items;
+    } catch {
+        return cached?.data || [];
+    }
+}
+
 function _decodeAirspace(as) {
     const typeName = _decodeType(as);
     const classLetter = _decodeIcaoClass(as);

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<!-- Aperçu autonome du profil d'élévation avec zones aériennes traversées
+     (rectangles d'altitude + infobulle de survol). QA : aucun script en
+     erreur, pixels bleus SIV présents, infobulle dessinée au survol. -->
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Aperçu — profil + zones traversées</title>
+<style>
+    :root { --text-color:#E2E8F0; --text-muted:#94A3B8; }
+    body { background:#0B1220; color:var(--text-color); font-family:'DM Sans',sans-serif; margin:0; padding:14px; }
+    .panel { background:#0F172A; border:1px solid #334155; border-radius:10px; padding:12px; margin-bottom:14px; }
+    .panel h3 { margin:0 0 8px; font-size:12px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; }
+    #elevation-profile-container { display:none; }
+    #qa-result { font-family:monospace; font-size:11px; white-space:pre-wrap; color:#4ADE80; }
+    #qa-result.err { color:#F87171; }
+</style>
+</head>
+<body>
+<div class="panel" style="width:820px">
+    <h3>Profil LFPB → LFRM — zones traversées (survol SEINE attendu)</h3>
+    <div id="elevation-profile-container"></div>
+</div>
+<pre id="qa-result">QA en cours…</pre>
+
+<script type="module">
+import { renderElevationChart } from '../js/elevation-chart.js';
+
+// Route LFPB → LFRM (107,7 NM) : terrain synthétique, fracs réguliers.
+const N = 120, TOTAL_NM = 107.7;
+const LFPB = [48.9694, 2.4414], LFRM = [47.9475, 0.2628];
+const points = [];
+for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    const lat = LFPB[0] + (LFRM[0] - LFPB[0]) * t;
+    const lon = LFPB[1] + (LFRM[1] - LFPB[1]) * t;
+    const nm = t * TOTAL_NM;
+    points.push({
+        frac: t, lat, lon,
+        elevFt: 150 + 1650 * Math.exp(-(((nm - 20) / 26) ** 2))
+            + 900 * Math.exp(-(((nm - 70) / 18) ** 2))
+            + 700 * Math.exp(-(((nm - 100) / 14) ** 2)),
+    });
+}
+const profile = {
+    points,
+    minFt: Math.min(...points.map(p => p.elevFt)),
+    maxFt: Math.max(...points.map(p => p.elevFt)),
+};
+
+// Groupes réels du corridor (openAIP 26/08), fracs = NM / 107,7.
+const f = nm => nm / TOTAL_NM;
+const up = segs => Math.max(...segs.map(s => s.up));
+const mk = (name, freq, segs, ranges) => ({
+    name, freq, lo: 0, up: up(segs), ranges, segs, span: Math.max(...ranges.map(r => r[1] - r[0])),
+});
+const ZONES = [
+    mk('PARIS SUD INFO', '126.100', [{ fa: f(0), fb: f(30), up: 19500 }], [[f(0), f(30)]]),
+    mk('PARIS OUEST INFO', '129.625', [{ fa: f(31), fb: f(107.7), up: 19500 }], [[f(31), f(107.7)]]),
+    mk('SEINE INFO', '127.815', [
+        { fa: f(40), fb: f(59), up: 6500 }, { fa: f(60), fb: f(84), up: 8500 }, { fa: f(85), fb: f(96), up: 11500 },
+    ], [[f(40), f(96)]]),
+    mk('NANTES INFO', '130.275', [{ fa: f(96), fb: f(107.7), up: 11500 }], [[f(96), f(107.7)]]),
+    mk('CHEVREUSE INFO', '119.305', [{ fa: f(22), fb: f(30), up: 2000 }], [[f(22), f(30)]]),
+    mk('LE BOURGET INFO', '123.835', [{ fa: f(16), fb: f(21), up: 4500 }], [[f(16), f(21)]]),
+];
+ZONES.sort((a, b) => b.span - a.span);
+
+renderElevationChart('elevation-profile-container', profile, 2500, 'LFPB', 'LFRM', null, ZONES);
+
+// ---- QA après stabilisation ----
+await new Promise(r => setTimeout(r, 300));
+
+const problems = [];
+const canvas = document.getElementById('elevation-canvas');
+if (!canvas) problems.push('canvas absent');
+window.onerror = (m) => { problems.push('erreur JS : ' + m); return false; };
+
+function countPixels(pred) {
+    const dpr = window.devicePixelRatio || 1;
+    const img = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    let n = 0;
+    for (let i = 0; i < img.length; i += 4) if (pred(img[i], img[i + 1], img[i + 2])) n++;
+    return n;
+}
+const near = (a, b) => Math.abs(a - b);
+const sivBorder = countPixels((r, g, b) => near(r, 56) < 30 && near(g, 189) < 30 && near(b, 248) < 30);
+if (sivBorder < 200) problems.push(`cadres SIV quasi absents (${sivBorder} px bleus)`);
+
+// Survol du centre SEINE (frac ~0.63 → x = PAD.left + 0.63*plotW ; y = mi-hauteur de bande).
+const rect = canvas.getBoundingClientRect();
+const PADL = 52, PADR = 16;
+const plotW = rect.width - PADL - PADR;
+const hx = rect.left + PADL + 0.63 * plotW;
+const hy = rect.top + 18 + 30;   // haut d'une bande clamped (croisière 2500 domine peu : bande ~y 30-60)
+canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: hx, clientY: hy, bubbles: true }));
+await new Promise(r => setTimeout(r, 150));
+
+const tip = countPixels((r, g, b) => near(r, 15) < 12 && near(g, 23) < 12 && near(b, 42) < 12);
+if (tip < 800) problems.push(`infobulle zone non dessinée au survol (${tip} px sombres carte)`);
+
+const out = document.getElementById('qa-result');
+const qaText = problems.length
+    ? 'QA: KO\n' + problems.join('\n') + `\n(px bord SIV=${sivBorder}, carte=${tip})`
+    : `QA: OK — ${sivBorder} px de cadres SIV, infobulle survol dessinée (${tip} px)`;
+out.className = problems.length ? 'err' : '';
+out.textContent = qaText;
+document.title = problems.length ? 'QA KO' : 'QA OK';
+fetch('/qa-report', { method: 'POST', body: qaText }).catch(() => {});
+</script>
+</body>
+</html>

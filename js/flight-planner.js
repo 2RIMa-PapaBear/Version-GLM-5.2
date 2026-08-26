@@ -4,6 +4,22 @@ import { getActiveAircraft } from './aircraft-fleet.js';
 import { getDeclinationForIcao } from './magvar.js';
 import { fetchWindsAloft, getWindAtAltitude } from './winds-aloft.js';
 import { fetchRouteElevation, evaluateClearance, fetchMultiSegmentElevation } from './route-elevation.js';
+import { computeRouteAirspaces, routeBbox } from './airspace-profile.js';
+import { fetchAirspacesForBbox } from './airspaces.js';
+
+// Zones aériennes traversées par la route (rectangles d'altitude du profil
+// d'élévation) : bbox du corridor → items openAIP → groupes. Non bloquant —
+// null silencieux si l'API/cache est indisponible.
+async function loadRouteAirspaces(elevProfile) {
+    try {
+        if (!elevProfile?.points?.length) return null;
+        const bbox = routeBbox(elevProfile.points);
+        if (!bbox) return null;
+        const items = await fetchAirspacesForBbox(bbox[0], bbox[1], bbox[2], bbox[3]);
+        if (!items?.length) return null;
+        return computeRouteAirspaces(elevProfile.points, items);
+    } catch { return null; }
+}
 
 const RESERVE_MIN_DAY = 30;
 const RESERVE_MIN_NIGHT = 45;
@@ -153,6 +169,7 @@ export async function computeFlightPlan(fromIcao, toIcao, params) {
     const clearance = elevProfile
         ? evaluateClearance(elevProfile, params.cruiseAltFt)
         : null;
+    const routeAirspaces = await loadRouteAirspaces(elevProfile);
 
     return {
         from: { icao: fromIcao, lat: fromLat, lon: fromLon, elevFt: fromApt?.elevation ?? null },
@@ -172,6 +189,7 @@ export async function computeFlightPlan(fromIcao, toIcao, params) {
         tasKt: params.tasKt,
         elevationProfile: elevProfile,
         clearance,
+        routeAirspaces,
     };
 }
 
@@ -262,6 +280,7 @@ export async function computeMultiLegFlightPlan(route, params) {
     }
     const elevProfile = await fetchMultiSegmentElevation(legCoords);
     const clearance = elevProfile ? evaluateClearance(elevProfile, params.cruiseAltFt) : null;
+    const routeAirspaces = await loadRouteAirspaces(elevProfile);
 
     const totalReserveL = (reserveMin / 60) * params.fuelBurnLph;
     return {
@@ -281,6 +300,7 @@ export async function computeMultiLegFlightPlan(route, params) {
         tasKt: params.tasKt,
         elevationProfile: elevProfile,
         clearance,
+        routeAirspaces,
         isMultiLeg: true,
     };
 }

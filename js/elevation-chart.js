@@ -23,7 +23,9 @@ let _cruiseFt = 0;
 let _fromIcao = '';
 let _toIcao = '';
 let _waypoints = null;        // [{icao, lat, lon}] waypoints intermédiaires (ou null).
+let _zones = null;            // groupes d'espaces aériens traversés (airspace-profile.js).
 let _hoverFrac = null;       // position du curseur (0-1), null si hors canvas.
+let _hoverY = null;          // ordonnée du curseur (px CSS), pour le survol des zones.
 let _zoomMin = null;         // min Y affiché (ft), null = auto.
 let _zoomMax = null;
 let _dragging = false;
@@ -39,8 +41,10 @@ let _distTotalKm = 0;
  * @param {string} fromIcao Code OACI départ.
  * @param {string} toIcao Code OACI destination.
  * @param {Array|null} waypoints Waypoints intermédiaires [{icao, lat, lon}] pour multi-leg.
+ * @param {Array|null} routeAirspaces Groupes de zones traversées (airspace-profile.js) —
+ *        rectangles d'altitude + infobulle au survol.
  */
-export function renderElevationChart(containerId, profile, cruiseAltFt, fromIcao, toIcao, waypoints = null) {
+export function renderElevationChart(containerId, profile, cruiseAltFt, fromIcao, toIcao, waypoints = null, routeAirspaces = null) {
     const container = document.getElementById(containerId);
     if (!container || !profile?.points?.length) {
         clearElevationChart(containerId);
@@ -51,11 +55,13 @@ export function renderElevationChart(containerId, profile, cruiseAltFt, fromIcao
     _profile = profile;
     _cruiseFt = cruiseAltFt || 0;
     _waypoints = (waypoints && waypoints.length > 2) ? waypoints : null;
+    _zones = routeAirspaces || null;
     _fromIcao = fromIcao || '';
     _toIcao = toIcao || '';
     _zoomMin = null;
     _zoomMax = null;
     _hoverFrac = null;
+    _hoverY = null;
 
     // Distance totale (km) depuis le premier/dernier point.
     const pts = profile.points;
@@ -180,6 +186,11 @@ function _draw() {
         _ctx.stroke();
         _ctx.fillText(Math.round(elev) + ' ft', PAD.left - 6, y + 3);
     }
+
+    // --- Rectangles d'altitude des zones traversées (sous le terrain) ---
+    // Conteneurs d'abord, imbriqués par-dessus ; plafond au-dessus de
+    // l'échelle → bord haut pointillé (il continue au-dessus du graphe).
+    const hoveredZone = _drawZones(xOf, yOf, yMax, plotW, plotH);
 
     // --- Aire sous la courbe ---
     _ctx.beginPath();
@@ -335,6 +346,107 @@ function _draw() {
             });
         }
     }
+
+    // --- Infobulle de la zone survolée (nom, ALT MIN/ALT MAX, fréquence) ---
+    if (hoveredZone) _drawZoneTooltip(hoveredZone, cw, xOf);
+}
+
+/** « SFC », « FL065 », « 2500 ft » — mêmes règles que la carte. */
+function _altTxt(ft) {
+    if (ft <= 0) return 'SFC';
+    if (ft >= 4000 && ft % 500 === 0) return 'FL' + String(Math.round(ft / 100)).padStart(3, '0');
+    return `${Math.round(ft)} ft`;
+}
+
+/** Rectangles des zones traversées ; renvoie la zone survolée (ou null). */
+function _drawZones(xOf, yOf, yMax, plotW, plotH) {
+    if (!_zones?.length) return null;
+    let hovered = null;
+    for (const g of _zones) {
+        const clamped = g.up > yMax;
+        const yT = yOf(Math.min(g.up, yMax));
+        const yB = yOf(g.lo);
+        if (yB - yT < 3) continue;
+        for (const [fa, fb] of g.ranges) {
+            const x0 = Math.max(xOf(fa), PAD.left);
+            const x1 = Math.min(xOf(fb), PAD.left + plotW);
+            if (x1 - x0 < 2) continue;
+
+            _ctx.fillStyle = 'rgba(56,189,248,0.10)';
+            _ctx.fillRect(x0, yT, x1 - x0, yB - yT);
+            _ctx.strokeStyle = 'rgba(56,189,248,0.85)';
+            _ctx.lineWidth = 1.2;
+            _ctx.strokeRect(x0 + 0.5, yT + 0.5, x1 - x0 - 1, yB - yT - 1);
+            if (clamped) {   // plafond au-dessus de l'échelle : bord haut pointillé
+                _ctx.setLineDash([4, 3]);
+                _ctx.beginPath();
+                _ctx.moveTo(x0 + 1, yT + 0.5);
+                _ctx.lineTo(x1 - 1, yT + 0.5);
+                _ctx.stroke();
+                _ctx.setLineDash([]);
+            }
+            // Séparateurs entre secteurs du même organisme (ex. SEINE 6/7/8).
+            for (let i = 1; i < g.segs.length; i++) {
+                const sx = xOf((g.segs[i - 1].fb + g.segs[i].fa) / 2);
+                if (sx <= x0 || sx >= x1) continue;
+                _ctx.setLineDash([3, 3]);
+                _ctx.strokeStyle = 'rgba(56,189,248,0.5)';
+                _ctx.lineWidth = 1;
+                _ctx.beginPath();
+                _ctx.moveTo(sx, yT + 1);
+                _ctx.lineTo(sx, yB - 1);
+                _ctx.stroke();
+                _ctx.setLineDash([]);
+            }
+            // Survol : curseur dans ce rectangle → zone la plus spécifique.
+            if (_hoverFrac != null && _hoverY != null &&
+                _hoverFrac >= fa && _hoverFrac <= fb && _hoverY >= yT && _hoverY <= yB) {
+                if (!hovered || g.span < hovered.g.span) {
+                    const seg = g.segs.find(s => _hoverFrac >= s.fa && _hoverFrac <= s.fb) || g.segs[0];
+                    hovered = { g, seg };
+                }
+            }
+        }
+    }
+    return hovered;
+}
+
+/** Carte sombre au-dessus du curseur : nom, ALT MIN/ALT MAX (du secteur
+ *  survolé), fréquence — même style que l'infobulle du terrain. */
+function _drawZoneTooltip({ g, seg }, cw, xOf) {
+    const nm = Math.round(_hoverFrac * _distTotalKm / 1.852);
+    const lines = [
+        g.name,
+        `ALT MIN : ${_altTxt(g.lo)}   ALT MAX : ${_altTxt(seg.up)}`,
+        g.freq ? `${g.freq} MHz` : `${nm} NM`,
+    ];
+    _ctx.font = 'bold 10px "DM Sans", sans-serif';
+    const w0 = _ctx.measureText(lines[0]).width;
+    _ctx.font = '9.5px "DM Mono", monospace';
+    const w12 = Math.max(_ctx.measureText(lines[1]).width, _ctx.measureText(lines[2]).width);
+    const tipW = Math.max(w0, w12) + 14, tipH = 46;
+    const hx = xOf(_hoverFrac);
+    let tipX = hx + 12;
+    if (tipX + tipW > cw - PAD.right - 2) tipX = hx - tipW - 12;
+    if (tipX < PAD.left + 2) tipX = PAD.left + 2;
+    const tipY = Math.max(PAD.top + 2, (_hoverY ?? PAD.top) - tipH - 10);
+
+    _ctx.fillStyle = 'rgba(15,23,42,0.95)';
+    _ctx.strokeStyle = 'rgba(56,189,248,0.5)';
+    _ctx.lineWidth = 1;
+    _roundRect(tipX, tipY, tipW, tipH, 5);
+    _ctx.fill();
+    _ctx.stroke();
+
+    _ctx.textAlign = 'left';
+    _ctx.font = 'bold 10px "DM Sans", sans-serif';
+    _ctx.fillStyle = '#E2E8F0';
+    _ctx.fillText(lines[0], tipX + 7, tipY + 13);
+    _ctx.font = '9.5px "DM Mono", monospace';
+    _ctx.fillStyle = 'rgba(226,232,240,0.75)';
+    _ctx.fillText(lines[1], tipX + 7, tipY + 26);
+    _ctx.fillStyle = '#60A5FA';
+    _ctx.fillText(lines[2], tipX + 7, tipY + 39);
 }
 
 function _roundRect(x, y, w, h, r) {
@@ -403,8 +515,13 @@ function _fracFromX(clientX) {
     return Math.max(0, Math.min(1, (x - PAD.left) / plotW));
 }
 
+function _yFromClient(clientY) {
+    return clientY - _canvas.getBoundingClientRect().top;
+}
+
 function _onMove(e) {
     _hoverFrac = _fracFromX(e.clientX);
+    _hoverY = _yFromClient(e.clientY);
     if (_dragging) {
         const rect = _canvas.getBoundingClientRect();
         const dx = e.clientX - _dragStartX;
@@ -417,6 +534,7 @@ function _onMove(e) {
 
 function _onLeave() {
     _hoverFrac = null;
+    _hoverY = null;
     _draw();
     _emitHover();
 }
@@ -468,6 +586,7 @@ function _onTouchStart(e) {
         e.preventDefault();
         _lastTouchX = e.touches[0].clientX;
         _hoverFrac = _fracFromX(e.touches[0].clientX);
+        _hoverY = _yFromClient(e.touches[0].clientY);
         _draw();
         _emitHover();
     }
@@ -477,6 +596,7 @@ function _onTouchMove(e) {
     if (e.touches.length === 1) {
         e.preventDefault();
         _hoverFrac = _fracFromX(e.touches[0].clientX);
+        _hoverY = _yFromClient(e.touches[0].clientY);
         _draw();
         _emitHover();
     }
