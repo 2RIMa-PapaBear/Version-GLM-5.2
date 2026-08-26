@@ -170,7 +170,7 @@ function render(lat, lon) {
 
     container.innerHTML = `
         <div class="flight-window-content" style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
-            <div class="flight-window-status" style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
+            <div class="flight-window-status" style="display:flex; align-items:center; gap:10px; min-width:0;">
                 <div class="flight-window-icon" style="width:42px; height:42px; border-radius:50%; background:${cfg.bg}; border:2px solid ${cfg.color}; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
                     <i data-lucide="${cfg.icon}" style="width:22px; height:22px; color:${cfg.color};"></i>
                 </div>
@@ -179,7 +179,7 @@ function render(lat, lon) {
                     <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">${cfg.detail}</div>
                 </div>
             </div>
-            <div class="flight-window-times" style="display:flex; gap:16px; font-size:11px; flex-wrap:wrap;">
+            <div class="flight-window-times" style="display:flex; gap:16px; font-size:11px; flex-wrap:wrap; margin-left:6px; flex:1; justify-content:space-evenly; min-width:0;">
                 <div style="text-align:center;">
                     <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px; margin-bottom:2px;">${srLabel}</div>
                     <div style="font-family:'DM Mono', monospace; font-weight:500; color:var(--text-color); font-size:14px;">${fmt(w.sunrise)}</div>
@@ -190,7 +190,7 @@ function render(lat, lon) {
                 </div>
                 <div style="text-align:center;">
                     <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px; margin-bottom:2px;">${aeroLabel}</div>
-                    <div style="font-family:'DM Mono', monospace; font-weight:500; color:var(--primary); font-size:14px;">${fmt(w.aeroStart)}<br>${fmt(w.aeroEnd)}</div>
+                    <div style="font-family:'DM Mono', monospace; font-weight:500; color:var(--primary); font-size:14px; white-space:nowrap;">${fmt(w.aeroStart)} · ${fmt(w.aeroEnd)}</div>
                 </div>
             </div>
         </div>

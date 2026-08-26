@@ -277,6 +277,8 @@ export function createAirspaceController(map) {
     let lastBboxKey = null;
 
     let highlighted = null;
+    let openZonePopup = null;   // fiche de zone ouverte (bascule au 2e clic)
+    let openZonePoly = null;
     let polyMeta = new Map();
 
     async function loadForBounds(bounds) {
@@ -399,11 +401,17 @@ export function createAirspaceController(map) {
                 poly.on('click', (e) => {
                     L.DomEvent.stopPropagation(e);
                     const latlng = e.latlng;
+                    // 2e clic sur la même zone alors que sa fiche est
+                    // ouverte → on la FERME (bascule), on ne la rouvre pas.
+                    if (openZonePoly === poly && openZonePopup) {
+                        map.closePopup(openZonePopup);
+                        return;
+                    }
                     _highlightPoly(poly);
                     let stacked = _findStackedAt(latlng.lat, latlng.lng);
                     if (!stacked.length) stacked = [{ poly, ...(polyMeta.get(poly) || {}) }];
                     if (stacked.length) {
-                        _showStackPopup(latlng, stacked, isFr);
+                        _showStackPopup(latlng, stacked, isFr, poly);
                     }
                 });
 
@@ -447,15 +455,16 @@ export function createAirspaceController(map) {
         return found;
     }
 
-    function _showStackPopup(latlng, stacked, isFr) {
+    function _showStackPopup(latlng, stacked, isFr, fromPoly = null) {
         // Zone unique sous le clic : son détail directement (le contour
         // seul sans popup prêtait à confusion — le « rectangle » de la
         // liste n'apparaissait qu'au 2e clic, sur un chevauchement).
         if (stacked.length === 1) {
-            L.popup({ className: 'airspace-popup', maxWidth: 280, closeButton: true })
+            const p = L.popup({ className: 'airspace-popup', maxWidth: 280, closeButton: true })
                 .setLatLng(latlng)
                 .setContent(stacked[0].tooltip)
                 .openOn(map);
+            openZonePopup = p; openZonePoly = fromPoly;
             return;
         }
         const html = `
@@ -472,6 +481,7 @@ export function createAirspaceController(map) {
             .setLatLng(latlng)
             .setContent(html)
             .openOn(map);
+        openZonePopup = popup; openZonePoly = fromPoly;
 
         const root = popup.getElement();
         root?.querySelectorAll('.airspace-stack-item').forEach(el => {
@@ -545,6 +555,9 @@ export function createAirspaceController(map) {
     map.on('moveend', onMapMove);
     map.on('zoomend', onMapMove);
     map.on('click', onMapClick);
+    // Fiche fermée par ailleurs (clic carte, croix, Échap) : réinitialise
+    // l'état de bascule, sinon le prochain clic sur la même zone serait avalé.
+    map.on('popupclose', () => { openZonePopup = null; openZonePoly = null; });
 
     function setGroup(g, on) {
         if (!AIRSPACE_GROUPS[g]) return;
