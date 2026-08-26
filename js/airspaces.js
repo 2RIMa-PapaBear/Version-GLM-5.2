@@ -203,7 +203,9 @@ function _limitFt(lim) {
     return Math.round(lim.value);                                    // ft
 }
 
-/** Texte d'une borne : « SFC », « FL065 », « 2500 ft AGL »… */
+/** Texte d'une borne : « SFC », « FL065 », « 2500 ft AMSL »… (les limites
+ *  verticales des zones sont publiées AMSL ; le referenceDatum openAIP
+ *  « AGL » est erroné sur les CTR/TMA — retour utilisateur 2026-08-26). */
 function _limitTxt(lim) {
     const ft = _limitFt(lim);
     if (ft == null) return null;
@@ -211,7 +213,7 @@ function _limitTxt(lim) {
     if (lim.unit === 6 || (ft >= 4000 && ft % 500 === 0)) {
         return `FL${String(Math.round(ft / 100)).padStart(3, '0')}`;
     }
-    return `${ft} ft${lim.referenceDatum === 1 ? ' AGL' : ''}`;
+    return `${ft} ft AMSL`;
 }
 
 function _baseFt(as) {
