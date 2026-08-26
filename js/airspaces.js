@@ -151,32 +151,51 @@ function _bboxKey(minLat, minLon, maxLat, maxLon) {
  * Charge les zones aériennes d'une bbox SANS carte (profil d'élévation,
  * log de nav) : quantification 1° et cache IndexedDB PARTAGÉS avec la
  * carte — la bbox d'une route déjà consultée ne re-télécharge rien.
+ * Une bbox plus large que la limite API openAIP (5°) est DÉCOUPÉE EN
+ * TUILES agrégées : sans ça, l'écrêtage rognait un côté de la route et
+ * les zones traversées disparaissaient au changement de plan.
  * Retourne les items openAIP bruts ([] si indisponible).
  */
 export async function fetchAirspacesForBbox(minLat, minLon, maxLat, maxLon) {
     const q = (x) => Math.floor(x);
     const cl = (x) => Math.ceil(x);
     const b = [q(minLat), q(minLon), cl(maxLat), cl(maxLon)];
-    if (b[2] - b[0] > 5) b[2] = b[0] + 5;   // limite API openAIP
-    if (b[3] - b[1] > 5) b[3] = b[1] + 5;
-    const key = _bboxKey(b[0], b[1], b[2], b[3]);
 
-    const cached = await _idbGet(key);
-    if (cached?.data && cached.ts > Date.now() - TTL_MS) return cached.data;
-
-    try {
-        const url = `${BASE_URL}?bbox=${b[1]},${b[0]},${b[3]},${b[2]}&limit=200`;
-        const res = await fetch(url, {
-            headers: { 'x-openaip-api-key': OPENAIP_API_KEY },
-            signal: AbortSignal.timeout(12000),
-        });
-        if (!res.ok) return cached?.data || [];
-        const items = (await res.json()).items || [];
-        _idbPut(key, items);
-        return items;
-    } catch {
-        return cached?.data || [];
+    const tiles = [];
+    for (let lat = b[0]; lat < b[2]; lat += 5) {
+        for (let lon = b[1]; lon < b[3]; lon += 5) {
+            tiles.push([lat, lon, Math.min(lat + 5, b[2]), Math.min(lon + 5, b[3])]);
+        }
     }
+
+    const byId = new Map();
+    const absorb = (items) => {
+        for (const it of (items || [])) byId.set(it._id ?? JSON.stringify(it.name) + byId.size, it);
+    };
+
+    for (const [t0, t1, t2, t3] of tiles) {
+        const key = _bboxKey(t0, t1, t2, t3);
+        const cached = await _idbGet(key);
+        if (cached?.data && cached.ts > Date.now() - TTL_MS) {
+            absorb(cached.data);
+            continue;
+        }
+        if (cached?.data) absorb(cached.data);   // périmé : gardé en repli
+        try {
+            const url = `${BASE_URL}?bbox=${t1},${t0},${t3},${t2}&limit=200`;
+            const res = await fetch(url, {
+                headers: { 'x-openaip-api-key': OPENAIP_API_KEY },
+                signal: AbortSignal.timeout(12000),
+            });
+            if (res.ok) {
+                const items = (await res.json()).items || [];
+                _idbPut(key, items);
+                absorb(items);
+            }
+        } catch { /* tuile indisponible : on garde ce qu'on a */ }
+        await new Promise(r => setTimeout(r, 200));   // ménage le débit openAIP
+    }
+    return [...byId.values()];
 }
 
 function _decodeAirspace(as) {
