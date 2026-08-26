@@ -62,12 +62,12 @@ function makeRecordingCtor(store) {
             if (opt?.align === 'right') bx = x - w;
             else if (opt?.align === 'center') bx = x - w / 2;
             if (opt?.angle) {
-                // Texte tourné (titre d'axe Y, angle 90) : la largeur devient
-                // verticale — la boîte horizontale se réduit à la hauteur de police.
+                // Texte tourné (angle 90 : étiquettes de zones verticales) :
+                // il progresse vers le HAUT depuis l'ancre (matrice Tm 0 1 -1 0).
                 store.push({
                     s, page: doc.internal.getCurrentPageInfo().pageNumber,
                     x: x - size * 0.36, w: size * 0.72, size,
-                    top: y - w / 2, bot: y + w / 2,
+                    top: y - w, bot: y,
                 });
             } else {
                 store.push({

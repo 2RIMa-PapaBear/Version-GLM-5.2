@@ -125,7 +125,7 @@ export async function showFlightPlanner(fromIcao, toIcao) {
         const waypoints = (plan.isMultiLeg && plan.waypoints)
             ? plan.waypoints.map(w => ({ icao: w.icao, lat: w.lat, lon: w.lon }))
             : null;
-        renderElevationChart('elevation-profile-container', plan.elevationProfile, cruiseAlt, fromIcao, toIcao, waypoints);
+        renderElevationChart('elevation-profile-container', plan.elevationProfile, cruiseAlt, fromIcao, toIcao, waypoints, plan.routeAirspaces);
     } else {
         clearElevationChart('elevation-profile-container');
     }
@@ -339,6 +339,7 @@ async function _generateNavLogPdfInto(tab) {
                     return { icao: w.icao, frac };
                 }).filter(w => w.frac != null)
                 : [],
+            routeAirspaces: plan.routeAirspaces ?? null,
         };
     }
 

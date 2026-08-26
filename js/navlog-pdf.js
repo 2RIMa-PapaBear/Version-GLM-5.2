@@ -71,6 +71,9 @@ const ORANGE_BG = [254, 234, 215];   // aire sous la courbe (#FB923C 35 % → or
 const ORANGE = [234, 88, 12];        // ligne de terrain (#FB923C → orange-600)
 const AMBER_LN = [245, 158, 11];     // marqueurs waypoints (#FBBF24 → amber-500)
 const PLOT_BG = [248, 250, 252];     // fond du graphique
+const SIV_LN = [13, 110, 180];       // cadre des zones traversées (bleu SIV)
+const SIV_FILL = [226, 242, 252];    // remplissage des zones (blue-50)
+const SIV_TX = [10, 80, 140];        // étiquettes des zones
 const CAT_PRINT = {                  // CAT_COLORS écran → équivalents papier
     VFR: [5, 150, 105], MVFR: [2, 132, 199], IFR: [185, 28, 28], LIFR: [146, 22, 138],
 };
@@ -1160,6 +1163,47 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr) {
     const xOf = f => xL + f * plotW;
     const yOf = e => yT + (1 - (e - yMin) / (yMax - yMin)) * CH;
 
+    // Croisière + rangée des codes OACI (sous la ligne de croisière) —
+    // calculées tôt : les étiquettes des zones doivent éviter cette rangée.
+    const cruiseDrawn = pr.cruiseAltFt > yMin && pr.cruiseAltFt < yMax;
+    const yc = cruiseDrawn ? yOf(pr.cruiseAltFt) : null;
+    const codeY = cruiseDrawn ? Math.min(yc + 12, yB - 6) : yT + 9;
+
+    // Zones aériennes traversées : rectangles d'altitude nichés sous le
+    // terrain (maquette validée 26/08 — façon EFB) ; plafond au-dessus de
+    // l'échelle → bord haut pointillé. Groupes déjà triés conteneur → imbriqué.
+    const zones = Array.isArray(pr.routeAirspaces) ? pr.routeAirspaces : null;
+    const zoneGeo = [];
+    if (zones) {
+        for (const g of zones) {
+            const clamped = g.up > yMax;
+            const yTopBand = yOf(clamped ? yMax : g.up), yBotBand = yOf(g.lo);
+            let widest = null;
+            for (const [fa, fb] of g.ranges) {
+                const x0 = Math.max(xOf(fa), xL), x1 = Math.min(xOf(fb), xR);
+                if (x1 - x0 < 3) continue;
+                if (!widest || fb - fa > widest[1] - widest[0]) widest = [fa, fb, x0, x1];
+
+                doc.setFillColor(...SIV_FILL);
+                doc.setDrawColor(...SIV_LN); doc.setLineWidth(0.8);
+                doc.rect(x0 + 0.5, yTopBand, x1 - x0 - 1, yBotBand - yTopBand, 'FD');
+                if (clamped) {   // plafond hors échelle : bord haut en pointillés
+                    doc.setLineDashPattern([2.5, 2], 0); doc.setLineWidth(1);
+                    doc.line(x0 + 0.5, yT + 0.7, x1 - 0.5, yT + 0.7);
+                    doc.setLineDashPattern([], 0);
+                }
+                // Séparateurs entre secteurs du même organisme (ex. SEINE 6/7/8).
+                doc.setLineDashPattern([2, 2], 0); doc.setLineWidth(0.6);
+                for (let i = 1; i < g.segs.length; i++) {
+                    const sx = xOf((g.segs[i - 1].fb + g.segs[i].fa) / 2);
+                    if (sx > x0 + 1 && sx < x1 - 1) doc.line(sx, yTopBand, sx, yBotBand);
+                }
+                doc.setLineDashPattern([], 0);
+            }
+            if (widest) zoneGeo.push({ g, clamped, yTopBand, yBotBand, widest });
+        }
+    }
+
     // Fond + grille horizontale avec labels (5 lignes).
     doc.setFillColor(...PLOT_BG);
     doc.rect(xL, yT, plotW, CH, 'F');
@@ -1218,8 +1262,6 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr) {
     // Labels OACI (départ/arrivée/waypoints) posés SOUS la ligne de croisière
     // pointillée — posés en haut du graphe ils la chevauchaient (elle est haute
     // quand la croisière domine largement le relief).
-    const cruiseDrawn = pr.cruiseAltFt > yMin && pr.cruiseAltFt < yMax;
-    const codeY = cruiseDrawn ? Math.min(yOf(pr.cruiseAltFt) + 12, yB - 6) : yT + 9;
     if (pr.waypoints?.length) {
         for (const wp of pr.waypoints) {
             if (wp.frac == null) continue;
@@ -1237,7 +1279,6 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr) {
 
     // Ligne altitude de croisière (pointillée bleue) + label au-dessus.
     if (cruiseDrawn) {
-        const yc = yOf(pr.cruiseAltFt);
         doc.setDrawColor(...BLUE); doc.setLineWidth(1.2);
         doc.setLineDashPattern([6, 4], 0);
         doc.line(xL, yc, xR, yc);
@@ -1251,5 +1292,93 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr) {
     doc.text(pr.fromIcao, xL + 3, codeY);
     doc.text(pr.toIcao, xR - 3, codeY, { align: 'right' });
 
+    // Étiquettes compactes des zones traversées, par-dessus le terrain
+    // (plafond par secteur en haut, nom + fréquence à l'intérieur).
+    if (zoneGeo.length) {
+        _drawZoneLabels(doc, zoneGeo, { xOf, yOf, xL, yT, yB, yMax, yc, codeY });
+    }
+
     return yB + 16;
+}
+
+// « SFC », « FL065 », « 2500 ft » — mêmes règles que la carte (airspaces.js).
+function _altLabel(ft) {
+    if (ft <= 0) return 'SFC';
+    if (ft >= 4000 && ft % 500 === 0) return 'FL' + String(Math.round(ft / 100)).padStart(3, '0');
+    return `${Math.round(ft)} ft`;
+}
+
+/** Étiquettes compactes des zones (maquette validée 26/08) : zone englobante
+ *  → nom + fréquence sur 2 lignes en haut à gauche, plafond ancré à gauche ;
+ *  zone imbriquée large → nom + fréquence centrés, plafond par secteur ;
+ *  bande étroite → texte vertical (2 colonnes nom | fréquence si besoin).
+ *  Les lignes occupées (croisière, codes OACI, plafonds) sont évitées. */
+function _drawZoneLabels(doc, zoneGeo, env) {
+    const { xOf, yOf, xL, yT, yMax, yc, codeY } = env;
+
+    const covers = (outer, inner) =>
+        inner.widest[0] >= outer.widest[0] - 0.002 && inner.widest[1] <= outer.widest[1] + 0.002;
+
+    for (let i = 0; i < zoneGeo.length; i++) {
+        const z = zoneGeo[i];
+        const g = z.g;
+        const [fa, fb, x0, x1] = z.widest;
+        const nested = zoneGeo.some((o, j) => j !== i && o !== z && covers(o, z));
+        const wPx = x1 - x0;
+        const segs = g.segs.filter(s => s.fa < fb && s.fb > fa);
+
+        // Plafond par secteur (haut du rectangle).
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(5.5); _setInk(doc, SIV_TX);
+        const ceilRow = s => (s.up > yMax ? yT + 6.5 : yOf(s.up) + 6);
+        if (!nested && wPx >= 34) {
+            const s = segs[0];
+            if (s) {
+                const txt = (s.up > yMax ? '> ' : '') + _altLabel(s.up);
+                // Le label de croisière (« 3500 ft ») occupe le coin haut
+                // gauche quand la croisière domine l'échelle : dans ce cas le
+                // plafond s'ancre à DROITE de la bande pour ne pas le percuter.
+                const clashLeft = x0 + 3 < xL + 34 && Math.abs(ceilRow(s) - (yc != null ? yc - 4 : -99)) < 8;
+                doc.text(txt, clashLeft ? x1 - 3 : x0 + 3, ceilRow(s), clashLeft ? { align: 'right' } : undefined);
+            }
+        } else {
+            for (const s of segs) {
+                const cx = (xOf(s.fa) + xOf(s.fb)) / 2;
+                doc.text((s.up > yMax ? '> ' : '') + _altLabel(s.up), cx, ceilRow(s), { align: 'center' });
+            }
+        }
+
+        // Nom + fréquence.
+        const shortName = g.name.replace(/ INFO$/, '');
+        doc.setFont('helvetica', 'bold'); _setInk(doc, SIV_TX);
+        if (wPx < 34) {
+            // Bande étroite : texte vertical lu de bas en haut ; nom+fréquence
+            // sur 2 colonnes si une seule ne tient pas dans la hauteur.
+            doc.setFontSize(5.5);
+            const label = g.freq ? `${shortName} ${g.freq}` : shortName;
+            const hBand = z.yBotBand - z.yTopBand;
+            if (hBand > doc.getTextWidth(label) + 6) {
+                doc.text(label, x0 + 5, z.yBotBand - 3, { angle: 90 });
+            } else if (hBand > doc.getTextWidth(shortName) + 6) {
+                doc.text(shortName, x0 + 5, z.yBotBand - 3, { angle: 90 });
+                if (g.freq) doc.text(g.freq, x0 + 11, z.yBotBand - 3, { angle: 90 });
+            }
+        } else if (!nested) {
+            // Zone englobante : 2 lignes en haut à gauche (reste avant les
+            // bandes étroites imbriquées), sous la rangée des codes OACI.
+            doc.setFontSize(6);
+            let ny = z.clamped ? yT + 24 : z.yTopBand + 17;
+            if (Math.abs(ny - codeY) < 8) ny = codeY + 10;
+            doc.text(shortName, x0 + 3, ny);
+            if (g.freq) doc.text(g.freq, x0 + 3, ny + 7.5);
+        } else {
+            // Zone imbriquée large : nom + fréquence centrés, lignes occupées
+            // évitées par décalage (croisière, codes OACI, plafonds).
+            doc.setFontSize(6.5);
+            const label = g.freq ? `${shortName} ${g.freq}` : shortName;
+            let ny = (z.yTopBand + z.yBotBand) / 2 + 2;
+            const rows = [yc, codeY, ...segs.map(ceilRow)].filter(r => r != null);
+            for (const r of rows) if (Math.abs(ny - r) < 8) ny = r + 10;
+            doc.text(label, (x0 + x1) / 2, ny, { align: 'center' });
+        }
+    }
 }
