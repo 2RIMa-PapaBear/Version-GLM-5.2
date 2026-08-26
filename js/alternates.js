@@ -1,15 +1,18 @@
 import { state, I18N, fetchAvecRelais, memoGet } from './core.js';
 import { getAirportByICAO } from './ui-module.js';
 import { parseVisiToMeters, getCeiling, CAT_COLORS } from './core.js';
+import { OPENAIP_API_KEY } from './config.local.js';
 
 // ====================================================================
-// ALTERNATES DE ROUTE — terrains à ± maxOffsetNm de la route prévue.
+// ALTERNATES DE ROUTE — TOUS les aérodromes à ± maxOffsetNm de la route
+// prévue (openAIP), avec ou sans METAR : si le terrain n'émet pas de
+// METAR, on reprend celui de la STATION ÉMETTRICE LA PLUS PROCHE
+// (substitution marquée « * » dans le log de nav).
 //
 // Utilisé par le log de nav PDF (page « Performances et terrain ») :
 // le pilote veut savoir où se dérouter en cours de route, pas seulement
-// autour du départ. On récupère les stations dans la bbox englobante de
-// la route (marge en degrés), puis on ne garde que celles dont la
-// distance à la polyligne de la route est ≤ maxOffsetNm.
+// autour du départ. On ne garde que les terrains dont la distance à la
+// polyligne de la route est ≤ maxOffsetNm.
 // ====================================================================
 
 const R_NM = 3440.065;
@@ -58,19 +61,69 @@ export function _distToSegmentNm(p, a, b) {
 }
 
 /**
+ * Pour chaque candidat : son METAR s'il émet, sinon celui de la STATION
+ * émettrice la plus proche (substitution marquée metarFrom/metarDistNm).
+ * Fonction pure — testée sous Node.
+ * @param {Array} candidates terrains [{code, name, lat, lon, offsetNm, side}]
+ * @param {Object} metarByCode METAR bruts par code OACI de station.
+ * @param {Array} pool stations émettrices [{code, lat, lon}].
+ */
+export function _attachMetars(candidates, metarByCode, pool) {
+    const emitters = pool.filter(s => s.code && metarByCode[s.code]);
+    return candidates.map(c => {
+        if (c.code && metarByCode[c.code]) {
+            return { ...c, raw: metarByCode[c.code], metarFrom: null, metarDistNm: null };
+        }
+        let best = null;
+        for (const s of emitters) {
+            const d = _haversineNm(c.lat, c.lon, s.lat, s.lon);
+            if (!best || d < best.d) best = { s, d };
+        }
+        if (!best) return null;
+        return {
+            ...c,
+            raw: metarByCode[best.s.code],
+            metarFrom: best.s.code,
+            metarDistNm: Math.round(best.d),
+        };
+    }).filter(Boolean);
+}
+
+// Types openAIP à exclure : 0 = aerodrome fermé, 7 = hélisurface.
+const OPENAIP_TYPE_EXCLUDED = new Set([0, 7]);
+
+/** Tous les aérodromes openAIP d'une bbox (couloir) — avec ou sans METAR.
+ *  Hélisurfaces, terrains fermés et plateformes treuil exclus. */
+async function _fetchOpenAipAirports(minLat, minLon, maxLat, maxLon) {
+    // Bbox arrondie au quart de degré : meilleure réutilisation du cache relais.
+    const q = x => (Math.round(x * 4) / 4).toFixed(2);
+    const url = `https://api.core.openaip.net/api/airports?bbox=${q(minLon)},${q(minLat)},${q(maxLon)},${q(maxLat)}&limit=1000`;
+    try {
+        const res = await fetch(url, {
+            headers: { 'x-openaip-api-key': OPENAIP_API_KEY },
+            signal: AbortSignal.timeout(12000),
+        });
+        if (!res.ok) return null;
+        return (await res.json()).items || null;
+    } catch { return null; }
+}
+
+/**
  * Alternates viables le long d'une route.
  * @param {Array<{icao:string, lat:number, lon:number}>} routePts points de la
  *   route (départ, waypoints éventuels, destination).
- * @param {number} [maxOffsetNm=50] écart max à gauche ou à droite de la route.
+ * @param {number} [maxOffsetNm=25] écart max à gauche ou à droite de la route.
  * @param {number} [maxRows=6] nombre de terrains retenus.
- * @returns {Promise<Array<{code,name,cat,visiM,ceilHund,wind,offsetNm,side}>|null>}
- *   null si les données ne sont pas récupérables (la section est alors omise
- *   du PDF) ; sinon les terrains triés par viabilité (catégorie puis écart).
+ * @returns {Promise<Array<{code,name,cat,visiM,ceilHund,wind,offsetNm,side,
+ *   metarFrom,metarDistNm}>|null>} null si les données ne sont pas
+ *   récupérables (la section est alors omise du PDF) ; sinon les terrains
+ *   triés par viabilité (catégorie puis écart). metarFrom non nul = METAR
+ *   repris de la station émettrice la plus proche (à metarDistNm).
  */
-export async function getEnRouteAlternates(routePts, maxOffsetNm = 50, maxRows = 6) {
+export async function getEnRouteAlternates(routePts, maxOffsetNm = 25, maxRows = 6) {
     if (!Array.isArray(routePts) || routePts.length < 2) return null;
     try {
-        // Bbox englobante de la route + marge maxOffsetNm (corrigée en longitude
+        // Bbox englobante de la route + marge couloir (corrigée en longitude
         // par la latitude médiane : 1° de lon ≈ cos(lat) × 60 NM).
         const lats = routePts.map(p => p.lat), lons = routePts.map(p => p.lon);
         const latMargin = maxOffsetNm / 60;
@@ -81,48 +134,82 @@ export async function getEnRouteAlternates(routePts, maxOffsetNm = 50, maxRows =
             Math.max(...lats) + latMargin, Math.max(...lons) + lonMargin,
         ].map(v => v.toFixed(3)).join(',');
 
-        const stationsUrl = `https://aviationweather.gov/api/data/stationinfo?bbox=${bbox}&format=json`;
-        const stations = await fetchAvecRelais(stationsUrl, 'json', 3600);
-        if (!Array.isArray(stations)) return null;
-
-        const routeIcaos = new Set(routePts.map(p => p.icao.toUpperCase()));
+        // ---- Terrains du couloir : openAIP (tous aérodromes), repli sur
+        // les stations aviationweather si openAIP est indisponible.
+        const routeIcaos = new Set(routePts.map(p => String(p.icao || '').toUpperCase()).filter(Boolean));
         const candidates = [];
-        for (const s of stations) {
-            const code = (s.icaoId || s.id || '').toUpperCase();
-            if (!/^[A-Z][A-Z0-9]{3}$/.test(code) || routeIcaos.has(code)) continue;
-            if (s.lat == null || s.lon == null) continue;
-            // Distance à la polyligne = min sur tous les segments.
+
+        const aipItems = await _fetchOpenAipAirports(
+            Math.min(...lats) - latMargin, Math.min(...lons) - lonMargin,
+            Math.max(...lats) + latMargin, Math.max(...lons) + lonMargin);
+        if (aipItems) {
+            for (const a of aipItems) {
+                if (OPENAIP_TYPE_EXCLUDED.has(a.type) || a.winchOnly) continue;
+                const [lon, lat] = a.geometry?.coordinates || [];
+                if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+                candidates.push({ aip: true, code: _validIcao(a.icaoCode), name: a.name || '', lat, lon });
+            }
+        } else {
+            const stationsUrl = `https://aviationweather.gov/api/data/stationinfo?bbox=${bbox}&format=json`;
+            const stations = await fetchAvecRelais(stationsUrl, 'json', 3600);
+            if (!Array.isArray(stations)) return null;
+            for (const s of stations) {
+                if (s.lat == null || s.lon == null) continue;
+                candidates.push({ aip: false, code: _validIcao(s.icaoId || s.id), name: s.site || s.name || '', lat: s.lat, lon: s.lon });
+            }
+        }
+
+        // ---- Couloir : distance à la polyligne ≤ maxOffsetNm ; on écarte
+        // aussi les terrains confondus avec un point de la route (départ,
+        // arrivée, waypoints) même sans code OACI commun.
+        const kept = [];
+        for (const c of candidates) {
+            if (c.code && routeIcaos.has(c.code)) continue;
+            if (routePts.some(p => _haversineNm(c.lat, c.lon, p.lat, p.lon) < 1.5)) continue;
             let best = null;
             for (let i = 0; i < routePts.length - 1; i++) {
-                const d = _distToSegmentNm(s, routePts[i], routePts[i + 1]);
+                const d = _distToSegmentNm(c, routePts[i], routePts[i + 1]);
                 if (!best || d.nm < best.nm) best = d;
             }
             if (best.nm <= maxOffsetNm) {
-                candidates.push({ code, name: s.site || s.name || '', lat: s.lat, lon: s.lon, offsetNm: best.nm, side: best.side });
+                kept.push({ ...c, offsetNm: Math.round(best.nm), side: best.side });
             }
         }
-        if (!candidates.length) return null;
-        candidates.sort((a, b) => a.offsetNm - b.offsetNm);
+        if (!kept.length) return null;
+        kept.sort((a, b) => a.offsetNm - b.offsetNm);
 
-        // METAR en masse sur les 24 plus proches de la route (limite l'URL).
-        const metarUrl = `https://aviationweather.gov/api/data/metar?ids=${candidates.slice(0, 24).map(s => s.code).join(',')}&format=json`;
+        // ---- METAR : pool des stations émettrices du couloir élargi, puis
+        // substitution par la plus proche pour les terrains sans METAR.
+        const poolMargin = latMargin + 25 / 60;
+        const poolBbox = [
+            Math.min(...lats) - poolMargin, Math.min(...lons) - lonMargin - 25 / 60 / Math.max(0.2, Math.cos(_toRad(midLat))),
+            Math.max(...lats) + poolMargin, Math.max(...lons) + lonMargin + 25 / 60 / Math.max(0.2, Math.cos(_toRad(midLat))),
+        ].map(v => v.toFixed(3)).join(',');
+        const poolUrl = `https://aviationweather.gov/api/data/stationinfo?bbox=${poolBbox}&format=json`;
+        const stations = await fetchAvecRelais(poolUrl, 'json', 3600);
+        if (!Array.isArray(stations)) return null;
+        const pool = stations
+            .map(s => ({ code: _validIcao(s.icaoId || s.id), name: s.site || s.name || '', lat: s.lat, lon: s.lon }))
+            .filter(s => s.code && s.lat != null && s.lon != null);
+
+        const metarIds = [...new Set([...pool.map(s => s.code), ...kept.slice(0, 24).map(c => c.code).filter(Boolean)])].slice(0, 60);
+        const metarUrl = `https://aviationweather.gov/api/data/metar?ids=${metarIds.join(',')}&format=json`;
         const metars = await fetchAvecRelais(metarUrl, 'json');
         if (!Array.isArray(metars)) return null;
         const metarByCode = {};
         metars.forEach(m => {
-            const code = (m.icaoId || m.stationId || '').toUpperCase();
+            const code = _validIcao(m.icaoId || m.stationId);
             if (code) metarByCode[code] = m.rawOb || m.rawMetar || m.rawText || '';
         });
 
-        const rows = candidates
+        const rows = _attachMetars(kept.slice(0, 60), metarByCode, pool)
             .map(s => {
-                const raw = metarByCode[s.code];
-                if (!raw) return null;
-                const cat = _categoryFromMetar(raw);
+                const cat = _categoryFromMetar(s.raw);
                 if (!cat) return null;
-                return { ...s, cat, raw };
+                return { ...s, cat, raw: s.raw };
             })
             .filter(Boolean);
+        if (!rows.length) return null;
 
         const catPriority = { VFR: 0, MVFR: 1, IFR: 2, LIFR: 3 };
         rows.sort((a, b) => (catPriority[a.cat.cat] ?? 9) - (catPriority[b.cat.cat] ?? 9) || a.offsetNm - b.offsetNm);
@@ -131,6 +218,11 @@ export async function getEnRouteAlternates(routePts, maxOffsetNm = 50, maxRows =
         console.warn('En-route alternates load failed:', e);
         return null;
     }
+}
+
+function _validIcao(v) {
+    const s = String(v || '').toUpperCase();
+    return /^[A-Z][A-Z0-9]{3}$/.test(s) ? s : '';
 }
 
 export async function showAlternates(icao) {

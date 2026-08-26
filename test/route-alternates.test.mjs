@@ -1,8 +1,9 @@
-// Tests de la géométrie « alternates le long de la route » et de la détection
-// humidité/contamination par tokens METAR (évaluée pour la page 3 du log de nav).
+// Tests de la géométrie « alternates le long de la route », de la
+// substitution METAR (terrain sans émission → station la plus proche) et de
+// la détection humidité/contamination par tokens METAR (page 3 du log de nav).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { _distToSegmentNm } from '../js/alternates.js';
+import { _distToSegmentNm, _attachMetars } from '../js/alternates.js';
 import { _wetFromTokens } from '../js/takeoff-performance.js';
 
 // ---------------------------------------------------------------- géométrie
@@ -42,6 +43,33 @@ test('segment oblique : côté cohérent avec le cap', () => {
     const r = _distToSegmentNm({ lat: 1, lon: 1 }, { lat: 0, lon: 0 }, { lat: 2, lon: 0 });
     assert.equal(r.side, 1);
     assert.ok(Math.abs(r.nm - 60) < 1, `nm=${r.nm}`);
+});
+
+// ---------------------------------------------------------------- substitution METAR
+const METARS = { LFPB: 'LFPB 260800Z 27010KT 9999 FEW040 22/12 Q1018', LFRM: 'LFRM 260800Z 00000KT 8000 SCT030 20/11 Q1017' };
+const POOL = [
+    { code: 'LFPB', lat: 48.97, lon: 2.44 },
+    { code: 'LFRM', lat: 47.95, lon: 0.26 },
+];
+
+test('terrain émetteur → son propre METAR, sans marque de substitution', () => {
+    const rows = _attachMetars([{ code: 'LFPB', name: 'LE BOURGET', lat: 48.97, lon: 2.44, offsetNm: 3, side: 1 }], METARS, POOL);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].raw, METARS.LFPB);
+    assert.equal(rows[0].metarFrom, null);
+    assert.equal(rows[0].metarDistNm, null);
+});
+
+test('terrain SANS METAR (petit terrain sans code) → METAR de la station la plus proche, marquée', () => {
+    const rows = _attachMetars([{ code: '', name: 'LOGNES', lat: 48.83, lon: 2.63, offsetNm: 5, side: -1 }], METARS, POOL);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].metarFrom, 'LFPB');          // Le Bourget est plus proche que Le Mans
+    assert.equal(rows[0].raw, METARS.LFPB);
+    assert.ok(rows[0].metarDistNm > 5 && rows[0].metarDistNm < 15, `dist=${rows[0].metarDistNm}`);
+});
+
+test('aucune station émettrice disponible → candidat écarté', () => {
+    assert.deepEqual(_attachMetars([{ code: '', name: 'X', lat: 48, lon: 2, offsetNm: 1, side: 1 }], {}, []), []);
 });
 
 // ---------------------------------------------------------------- tokens METAR
