@@ -93,19 +93,35 @@ export function _attachMetars(candidates, metarByCode, pool) {
 const OPENAIP_TYPE_EXCLUDED = new Set([0, 7]);
 
 /** Tous les aérodromes openAIP d'une bbox (couloir) — avec ou sans METAR.
- *  Hélisurfaces, terrains fermés et plateformes treuil exclus. */
+ *  Hélisurfaces, terrains fermés et plateformes treuil exclus. Bbox
+ *  découpée en tuiles ≤ 5° (limite openAIP) pour couvrir les routes
+ *  longues sans écrêtage d'un côté. */
 async function _fetchOpenAipAirports(minLat, minLon, maxLat, maxLon) {
-    // Bbox arrondie au quart de degré : meilleure réutilisation du cache relais.
+    // Arrondi au quart de degré : meilleure réutilisation du cache relais.
     const q = x => (Math.round(x * 4) / 4).toFixed(2);
-    const url = `https://api.core.openaip.net/api/airports?bbox=${q(minLon)},${q(minLat)},${q(maxLon)},${q(maxLat)}&limit=1000`;
-    try {
-        const res = await fetch(url, {
-            headers: { 'x-openaip-api-key': OPENAIP_API_KEY },
-            signal: AbortSignal.timeout(12000),
-        });
-        if (!res.ok) return null;
-        return (await res.json()).items || null;
-    } catch { return null; }
+    const tiles = [];
+    for (let lat = minLat; lat < maxLat; lat += 5) {
+        for (let lon = minLon; lon < maxLon; lon += 5) {
+            tiles.push([lat, lon, Math.min(lat + 5, maxLat), Math.min(lon + 5, maxLon)]);
+        }
+    }
+    const byId = new Map();
+    for (const [t0, t1, t2, t3] of tiles) {
+        const url = `https://api.core.openaip.net/api/airports?bbox=${q(t1)},${q(t0)},${q(t3)},${q(t2)}&limit=1000`;
+        try {
+            const res = await fetch(url, {
+                headers: { 'x-openaip-api-key': OPENAIP_API_KEY },
+                signal: AbortSignal.timeout(12000),
+            });
+            if (res.ok) {
+                for (const a of ((await res.json()).items || [])) {
+                    byId.set(a._id ?? JSON.stringify(a.name) + byId.size, a);
+                }
+            }
+        } catch { /* tuile indisponible : on garde les autres */ }
+        if (tiles.length > 1) await new Promise(r => setTimeout(r, 200));
+    }
+    return byId.size ? [...byId.values()] : null;
 }
 
 /**

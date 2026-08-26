@@ -139,9 +139,37 @@ const tip = countPixels((r, g, b) => near(r, 15) < 12 && near(g, 23) < 12 && nea
 if (tip < 800) problems.push(`infobulle zone non dessinée au survol (${tip} px sombres carte)`);
 
 const out = document.getElementById('qa-result');
+
+// ---- Changement de plan : le re-rendu DOUT remplacer les zones (les SIV
+// de l'ancienne route ne doivent pas rester). Route B : une seule zone,
+// moitié droite du graphe.
+function sivBorderInX(x0, x1) {
+    // Re-requête le canvas : un re-rendu RECREE l'élément (l'ancienne
+    // référence garderait le bitmap de la route précédente). « Bleu SIV » =
+    // dominante bleue nette et opaque (fond/remplissage des zones), ni le
+    // fond quasi transparent, ni la carte sombre, ni le terrain orange.
+    const cv = document.getElementById('elevation-canvas');
+    const dpr = window.devicePixelRatio || 1;
+    const img = cv.getContext('2d').getImageData(x0 * dpr, 18 * dpr, (x1 - x0) * dpr, 110 * dpr).data;
+    let n = 0;
+    for (let i = 0; i < img.length; i += 4) {
+        const r = img[i], g = img[i + 1], b = img[i + 2], a = img[i + 3];
+        if (a > 20 && b > 200 && g > 140 && r < 170 && b > r + 40) n++;
+    }
+    return n;
+}
+const midX = PADL + plotW / 2;
+const before = { left: sivBorderInX(PADL, midX), right: sivBorderInX(midX, rect.width - PADR) };
+const ZONES_B = [{ name: 'RENNES INFO', freq: '125.5', lo: 0, up: 11500, span: 0.35, ranges: [[0.6, 0.95]], segs: [{ fa: 0.6, fb: 0.95, up: 11500 }] }];
+renderElevationChart('elevation-profile-container', profile, 2500, 'LFPB', 'LFRU', null, ZONES_B);
+await new Promise(r => setTimeout(r, 350));
+const after = { left: sivBorderInX(PADL, midX), right: sivBorderInX(midX, rect.width - PADR) };
+if (after.left > before.left * 0.5) problems.push(`zones de l'ancienne route restées à gauche (${after.left} px, avant ${before.left})`);
+if (after.right < 200) problems.push(`nouvelle zone absente à droite (${after.right} px, avant ${before.right})`);
+
 const qaText = problems.length
-    ? 'QA: KO\n' + problems.join('\n') + `\n(px bord SIV=${sivBorder}, carte=${tip})`
-    : `QA: OK — ${sivBorder} px de cadres SIV, infobulle survol dessinée (${tip} px)`;
+    ? 'QA: KO\n' + problems.join('\n') + `\n(px bord SIV=${sivBorder}, carte=${tip}; G/D avant=[${before.left},${before.right}] après=[${after.left},${after.right}])`
+    : `QA: OK — ${sivBorder} px de cadres SIV, infobulle survol dessinée (${tip} px) ; changement de plan : zones remplacées (G ${before.left}→${after.left}, D ${before.right}→${after.right})`;
 out.className = problems.length ? 'err' : '';
 out.textContent = qaText;
 document.title = problems.length ? 'QA KO' : 'QA OK';
