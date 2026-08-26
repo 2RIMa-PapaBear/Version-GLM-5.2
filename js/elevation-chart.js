@@ -26,12 +26,12 @@ let _waypoints = null;        // [{icao, lat, lon}] waypoints intermédiaires (o
 let _zones = null;            // groupes d'espaces aériens traversés (airspace-profile.js).
 let _hoverFrac = null;       // position du curseur (0-1), null si hors canvas.
 let _hoverY = null;          // ordonnée du curseur (px CSS), pour le survol des zones.
-let _zoomMin = null;         // min Y affiché (ft), null = auto.
-let _zoomMax = null;
+let _zoomMax = null;         // plafond de l'échelle Y (ft), null = auto ; la base est fixée au sol.
 let _dragging = false;
 let _dragStartX = 0;
 let _dragOffset = 0;
 let _distTotalKm = 0;
+let _lastScale = null;        // dernière échelle dessinée (QA : sol ancré en bas).
 
 /**
  * Affiche le profil d'élévation dans le conteneur donné.
@@ -58,7 +58,6 @@ export function renderElevationChart(containerId, profile, cruiseAltFt, fromIcao
     _zones = routeAirspaces || null;
     _fromIcao = fromIcao || '';
     _toIcao = toIcao || '';
-    _zoomMin = null;
     _zoomMax = null;
     _hoverFrac = null;
     _hoverY = null;
@@ -86,6 +85,9 @@ export function renderElevationChart(containerId, profile, cruiseAltFt, fromIcao
 export function refreshElevationChart() {
     _draw();
 }
+
+/** Échelle Y du dernier dessin — réservé aux tests (sol ancré en bas). */
+export function _debugScale() { return _lastScale; }
 
 /**
  * Masque et vide le graphique.
@@ -158,10 +160,14 @@ function _draw() {
     const plotW = cw - PAD.left - PAD.right;
     const plotH = ch - PAD.top - PAD.bottom;
 
-    // Échelle Y (altitude) : englobe le terrain + l'altitude de croisière.
-    let yMin = _zoomMin ?? Math.min(_profile.minFt, _cruiseFt) - 200;
-    let yMax = _zoomMax ?? Math.max(_profile.maxFt, _cruiseFt) + 200;
+    // Échelle Y (altitude) : le SOL reste collé en bas du graphe — la base
+    // est 0 ft (ou le relief le plus bas s'il est négatif) et ne bouge
+    // JAMAIS au zoom ; seul le plafond de la fenêtre change. La marge de
+    // tête (× 1,2) garde la ligne de croisière sous les codes OACI du haut.
+    const yMin = Math.min(0, _profile.minFt);
+    let yMax = _zoomMax ?? Math.max(_profile.maxFt, _cruiseFt) * 1.2 + 100;
     if (yMax - yMin < 500) yMax = yMin + 500; // évite une échelle trop plate.
+    _lastScale = { yMin, yMax };
 
     const xOf = frac => PAD.left + frac * plotW;
     const yOf = elev => PAD.top + (1 - (elev - yMin) / (yMax - yMin)) * plotH;
@@ -228,7 +234,10 @@ function _draw() {
         _ctx.fillStyle = '#38BDF8';
         _ctx.font = '9px "DM Sans", sans-serif';
         _ctx.textAlign = 'left';
-        _ctx.fillText(Math.round(_cruiseFt) + ' ft', PAD.left + 4, yc - 4);
+        // Ligne haute (croisière qui domine) : le libellé passe SOUS la
+        // ligne pour ne pas se coller aux codes OACI du coin haut gauche.
+        const ly = yc < PAD.top + 30 ? yc + 11 : yc - 4;
+        _ctx.fillText(Math.round(_cruiseFt) + ' ft', PAD.left + 4, ly);
     }
 
     // --- Axe X : distance de chaque tronçon (entre waypoints), en NM ---
@@ -554,14 +563,13 @@ function _emitHover() {
 function _onWheel(e) {
     e.preventDefault();
     if (!_profile) return;
-    // Zoom vertical : resserre l'échelle Y autour du curseur.
-    const factor = e.deltaY > 0 ? 1.15 : 0.87;
-    let yMin = _zoomMin ?? Math.min(_profile.minFt, _cruiseFt) - 200;
-    let yMax = _zoomMax ?? Math.max(_profile.maxFt, _cruiseFt) + 200;
-    const mid = (yMin + yMax) / 2;
-    const half = (yMax - yMin) / 2 * factor;
-    _zoomMin = mid - half;
-    _zoomMax = mid + half;
+    // Zoom vertical ANCRÉ AU SOL : la base de l'échelle (0 ft) reste en bas
+    // du graphe, seul le plafond de la fenêtre se resserre ou s'étend.
+    const base = Math.min(0, _profile.minFt);
+    const defMax = Math.max(_profile.maxFt, _cruiseFt) * 1.2 + 100;
+    let yMax = _zoomMax ?? defMax;
+    yMax = base + (yMax - base) * (e.deltaY > 0 ? 1.15 : 0.87);
+    _zoomMax = Math.max(base + 500, Math.min(base + 120000, yMax));
     _draw();
 }
 

@@ -24,7 +24,7 @@
 <pre id="qa-result">QA en cours…</pre>
 
 <script type="module">
-import { renderElevationChart } from '../js/elevation-chart.js';
+import { renderElevationChart, _debugScale } from '../js/elevation-chart.js';
 
 // Route LFPB → LFRM (107,7 NM) : terrain synthétique, fracs réguliers.
 const N = 120, TOTAL_NM = 107.7;
@@ -76,6 +76,10 @@ const canvas = document.getElementById('elevation-canvas');
 if (!canvas) problems.push('canvas absent');
 window.onerror = (m) => { problems.push('erreur JS : ' + m); return false; };
 
+const rect = canvas.getBoundingClientRect();
+const PADL = 52, PADR = 16;
+const plotW = rect.width - PADL - PADR;
+
 function countPixels(pred) {
     const dpr = window.devicePixelRatio || 1;
     const img = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
@@ -87,12 +91,47 @@ const near = (a, b) => Math.abs(a - b);
 const sivBorder = countPixels((r, g, b) => near(r, 56) < 30 && near(g, 189) < 30 && near(b, 248) < 30);
 if (sivBorder < 200) problems.push(`cadres SIV quasi absents (${sivBorder} px bleus)`);
 
-// Survol du centre SEINE (frac ~0.63 → x = PAD.left + 0.63*plotW ; y = mi-hauteur de bande).
-const rect = canvas.getBoundingClientRect();
-const PADL = 52, PADR = 16;
-const plotW = rect.width - PADL - PADR;
+// ---- À l'ouverture : la ligne de croisière (pointillés bleu plein #38BDF8)
+// ne doit pas traverser la bande des codes OACI (haut du graphe, zone
+// centrale). Tolérance serrée : les bords de zones (alpha 0,85 → couleur
+// fondue) ne doivent pas compter.
+function bluePixelsInRows(y0, y1, x0, x1) {
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const img = ctx.getImageData(x0 * dpr, y0 * dpr, (x1 - x0) * dpr, (y1 - y0) * dpr).data;
+    let n = 0;
+    for (let i = 0; i < img.length; i += 4) if (near(img[i], 56) < 8 && near(img[i + 1], 189) < 8 && near(img[i + 2], 248) < 8) n++;
+    return n;
+}
+// ---- À l'ouverture : la ligne de croisière (pointillés bleu plein #38BDF8,
+// ~330 px/rangée) ne doit pas traverser la bande des codes OACI (rangées CSS
+// 20-33). Les traits verticaux des bordures de zones (~13 px/rangée) et les
+// bords rabattus empilés (rangées 17-19, légitimes) sont ignorés.
+const rowHits = [];
+for (let y = 20; y <= 33; y++) {
+    const n = bluePixelsInRows(y, y + 1, PADL + 110, rect.width - PADR - 110);
+    if (n > 60) rowHits.push(`${y}:${n}`);
+}
+if (rowHits.length) problems.push(`ligne croisière dans la bande des codes OACI (rangées ${rowHits.join(', ')})`);
+const sc0 = _debugScale();
+if (!sc0 || sc0.yMin !== 0) problems.push(`base de l'échelle ≠ sol (${JSON.stringify(sc0)})`);
+
+// ---- Zoom molette : le sol reste ancré en bas (yMin inchangé, seul yMax bouge).
+const yMax0 = sc0.yMax;
+for (let i = 0; i < 3; i++) canvas.dispatchEvent(new WheelEvent('wheel', { deltaY: -120, cancelable: true, bubbles: true }));
+await new Promise(r => setTimeout(r, 100));
+const scIn = _debugScale();
+if (scIn.yMin !== 0 || scIn.yMax >= yMax0) problems.push(`zoom avant : sol déplacé (${JSON.stringify(scIn)})`);
+for (let i = 0; i < 5; i++) canvas.dispatchEvent(new WheelEvent('wheel', { deltaY: 120, cancelable: true, bubbles: true }));
+await new Promise(r => setTimeout(r, 100));
+const scOut = _debugScale();
+if (scOut.yMin !== 0 || scOut.yMax <= yMax0) problems.push(`zoom arrière : sol déplacé (${JSON.stringify(scOut)})`);
+
+
+// Survol du centre SEINE (frac ~0.63) : les bandes restent clamped après le
+// zoom arrière (plafonds 11500/19500 > yMax), le curseur reste dans la bande.
 const hx = rect.left + PADL + 0.63 * plotW;
-const hy = rect.top + 18 + 30;   // haut d'une bande clamped (croisière 2500 domine peu : bande ~y 30-60)
+const hy = rect.top + 18 + 30;
 canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: hx, clientY: hy, bubbles: true }));
 await new Promise(r => setTimeout(r, 150));
 
