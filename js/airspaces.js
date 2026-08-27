@@ -147,6 +147,53 @@ function _bboxKey(minLat, minLon, maxLat, maxLon) {
     return `bbox_${r(minLat)}_${r(minLon)}_${r(maxLat)}_${r(maxLon)}`;
 }
 
+// File d'attente openAIP PARTAGÉE par toute l'app (carte, corridor du
+// profil, aérodromes des alternates) : l'API refuse les rafales — ~4
+// requêtes rapprochées → 429 SERVI PAR CLOUDFLARE SANS EN-TÊTES CORS, que
+// le navigateur affiche comme un blocage CORS (retour utilisateur 27/08).
+// Toutes les requêtes passent donc ici : sérialisées, espacées, avec une
+// unique reprise après temporisation sur 429.
+let _oaQueue = Promise.resolve();
+let _oaLastReq = 0;
+const OA_MIN_SPACING_MS = 1500;
+const OA_BACKOFF_MS = 20000;
+
+export function fetchOpenAipItems(url) {
+    const run = async () => {
+        const wait = _oaLastReq + OA_MIN_SPACING_MS - Date.now();
+        if (wait > 0) await new Promise(r => setTimeout(r, wait));
+        _oaLastReq = Date.now();
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                const res = await fetch(url, {
+                    headers: { 'x-openaip-api-key': OPENAIP_API_KEY },
+                    signal: AbortSignal.timeout(15000),
+                });
+                if (res.ok) {
+                    const d = await res.json();
+                    return Array.isArray(d?.items) ? d.items : null;
+                }
+                if (res.status === 429 && attempt === 0) {
+                    await new Promise(r => setTimeout(r, OA_BACKOFF_MS));
+                    _oaLastReq = Date.now();
+                    continue;
+                }
+                return null;   // erreur définitive (403/404…)
+            } catch {
+                if (attempt === 0) {   // réseau : une reprise rapprochée
+                    await new Promise(r => setTimeout(r, 1500));
+                    _oaLastReq = Date.now();
+                    continue;
+                }
+                return null;
+            }
+        }
+        return null;
+    };
+    _oaQueue = _oaQueue.then(run, run);
+    return _oaQueue;
+}
+
 // Cache mémoire de session des tuiles openAIP : si l'API limite le débit
 // (429 en rafale : carte + zones + aérodromes au même changement de plan),
 // le profil garde les dernières zones connues au lieu de disparaître.
@@ -179,20 +226,6 @@ export async function fetchAirspacesForBbox(minLat, minLon, maxLat, maxLon) {
     const absorb = (items) => {
         for (const it of (items || [])) byId.set(it._id ?? JSON.stringify(it.name) + byId.size, it);
     };
-    const _tryFetch = async (url) => {
-        for (let attempt = 0; attempt < 2; attempt++) {
-            try {
-                const res = await fetch(url, {
-                    headers: { 'x-openaip-api-key': OPENAIP_API_KEY },
-                    signal: AbortSignal.timeout(12000),
-                });
-                if (res.ok) return (await res.json()).items || [];
-                if (res.status !== 429 && res.status < 500) return null;   // erreur définitive
-            } catch { /* réseau : on retente une fois */ }
-            await new Promise(r => setTimeout(r, 900));
-        }
-        return null;
-    };
 
     for (const [t0, t1, t2, t3] of tiles) {
         const key = _bboxKey(t0, t1, t2, t3);
@@ -203,7 +236,9 @@ export async function fetchAirspacesForBbox(minLat, minLon, maxLat, maxLon) {
             continue;
         }
         if (cached?.data) absorb(cached.data);   // périmé : gardé en repli
-        const items = await _tryFetch(`${BASE_URL}?bbox=${t1},${t0},${t3},${t2}&limit=200`);
+        // File partagée : sérialisée, espacée, reprise sur 429 (l'API refuse
+        // les rafales et les sert en erreurs sans en-têtes CORS).
+        const items = await fetchOpenAipItems(`${BASE_URL}?bbox=${t1},${t0},${t3},${t2}&limit=200`);
         if (items) {
             _idbPut(key, items);
             _memTiles.set(key, items);
@@ -211,7 +246,6 @@ export async function fetchAirspacesForBbox(minLat, minLon, maxLat, maxLon) {
         } else if (_memTiles.has(key)) {
             absorb(_memTiles.get(key));          // dernière valeur connue
         }
-        await new Promise(r => setTimeout(r, 200));   // ménage le débit openAIP
     }
     return [...byId.values()];
 }
@@ -394,50 +428,35 @@ export function createAirspaceController(map) {
             _render(lastItems);
         }
 
-        // 2. Cellules jamais vues : téléchargées une par une (budget limit=200
-        //    PAR CELLULE — plus complet qu'une grande bbox tronquée à 200),
-        //    rendu réactualisé après chacune dès que la vue est encore la même.
+        // 2. Cellules jamais vues : UNE SEULE requête fusionnée pour toute
+        //    la zone manquante (l'API refuse les rafales — file partagée
+        //    fetchOpenAipItems), réponse répartie par centroïde dans chaque
+        //    cellule de la vue pour les réutilisations futures.
         if (missing.length) {
-            for (const [lat, lon] of missing) {
-                try {
-                    const res = await fetch(`${BASE_URL}?bbox=${lon},${lat},${lon + 1},${lat + 1}&limit=200`, {
-                        headers: { 'x-openaip-api-key': OPENAIP_API_KEY },
-                        signal: AbortSignal.timeout(12000),
-                    });
-                    if (res.ok) {
-                        const items = (await res.json()).items || [];
-                        _idbPut(`cell_${lat}_${lon}`, items);
-                        absorb(items);
-                    }
-                } catch (e) { console.warn('Airspaces fetch error:', e.message); }
-                if (epoch !== _loadEpoch) return;   // la vue a changé : abandonne
+            const mLat0 = Math.min(...missing.map(c => c[0]));
+            const mLat1 = Math.max(...missing.map(c => c[0])) + 1;
+            const mLon0 = Math.min(...missing.map(c => c[1]));
+            const mLon1 = Math.max(...missing.map(c => c[1])) + 1;
+            const items = await fetchOpenAipItems(`${BASE_URL}?bbox=${mLon0},${mLat0},${mLon1},${mLat1}&limit=200`);
+            if (epoch !== _loadEpoch) return;   // la vue a changé : abandonne
+            if (items) {
+                const missingKeys = new Set(missing.map(c => c.join('_')));
+                const buckets = new Map([...missingKeys].map(k => [k, []]));
+                for (const it of items) {
+                    // Centroïde approximatif : 1er point du 1er anneau
+                    // (ou position directe pour les géométries Point).
+                    const g = it.geometry?.coordinates;
+                    const first = Array.isArray(g?.[0]?.[0]) ? g[0][0] : g;
+                    const lon = Number(first?.[0]), lat = Number(first?.[1]);
+                    const ck = Number.isFinite(lat) && Number.isFinite(lon)
+                        ? `${Math.floor(lat)}_${Math.floor(lon)}` : null;
+                    (ck && buckets.has(ck) ? buckets.get(ck) : buckets.get([...missingKeys][0])).push(it);
+                }
+                for (const [ck, arr] of buckets) _idbPut(`cell_${ck}`, arr);
+                absorb(items);
                 lastItems = [...byId.values()];
                 _render(lastItems);
-                await new Promise(r => setTimeout(r, 120));   // ménage le débit
             }
-        }
-
-        // 3. Précharge en silence les 4 cellules adjacentes à la cellule
-        //    centrale : le prochain déplacement d'une cellule sera instantané.
-        _prefetchNeighbors(minLat, minLon, maxLat, maxLon);
-    }
-
-    async function _prefetchNeighbors(minLat, minLon, maxLat, maxLon) {
-        const cLat = Math.floor((minLat + maxLat) / 2);
-        const cLon = Math.floor((minLon + maxLon) / 2);
-        for (const [lat, lon] of [[cLat + 1, cLon], [cLat - 1, cLon], [cLat, cLon + 1], [cLat, cLon - 1]]) {
-            if (lat >= minLat && lat < maxLat && lon >= minLon && lon < maxLon) continue;   // déjà dans la vue
-            const key = `cell_${lat}_${lon}`;
-            const cached = await _idbGet(key);
-            if (cached?.data && cached.ts > Date.now() - TTL_MS) continue;
-            try {
-                const res = await fetch(`${BASE_URL}?bbox=${lon},${lat},${lon + 1},${lat + 1}&limit=200`, {
-                    headers: { 'x-openaip-api-key': OPENAIP_API_KEY },
-                    signal: AbortSignal.timeout(12000),
-                });
-                if (res.ok) _idbPut(key, (await res.json()).items || []);
-            } catch { /* silencieux : simple anticipation */ }
-            await new Promise(r => setTimeout(r, 150));
         }
     }
 
