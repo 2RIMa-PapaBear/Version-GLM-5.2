@@ -589,6 +589,13 @@ header.card > .route-planner {
     position: relative;
     z-index: 20;
 }
+/* Bandeau « Fenêtre de vol » déplacé sous la rangée titre (les deux modes) :
+   même crénelage vertical que la barre de route ci-dessus. */
+header.card > .flight-window {
+    margin: 0 0 10px;
+    position: relative;
+    z-index: 1;
+}
 .route-planner input:focus { border-color: var(--primary); }
 .route-planner .route-to-wrapper { flex: 1 1 170px; max-width: 320px; }
 /* Nom du terrain destination (confirmation visuelle du code saisi). */

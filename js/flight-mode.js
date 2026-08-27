@@ -79,6 +79,16 @@ export function setFlightMode(mode) {
         }
     }
 
+    // Le bandeau « Fenêtre de vol » monte lui aussi dans la carte d'en-tête,
+    // JUSTE SOUS la rangée titre, dans les DEUX modes : en navigation il
+    // s'intercale entre le titre et la barre Départ → Destination, en vol
+    // local entre le titre et la rangée Code OACI / METAR-TAF.
+    const banner = document.getElementById('flight-window-banner');
+    const headerRow = document.querySelector('.center-column > header.card .header-row');
+    if (banner && headerRow && banner.parentElement !== headerRow.parentElement) {
+        headerRow.parentElement.insertBefore(banner, headerRow.nextSibling);
+    }
+
     // Met à jour le toggle.
     const toggle = document.getElementById('flight-mode-toggle');
     if (toggle) {
