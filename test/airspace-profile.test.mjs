@@ -98,6 +98,10 @@ test('computeRouteAirspaces : nichage, fusion de secteurs, tri conteneur d\u2019
     assert.equal(seine.up, 8500);
     assert.equal(seine.segs.length, 2);
     assert.equal(seine.ranges.length, 1);
+    // Chaque tronçon porte le NOM openAIP de son secteur (survol précis :
+    // « SIV RENNES SUD A » vs « RENNES INFO »).
+    assert.equal(seine.segs[0].zone, 'SEINE 6');
+    assert.equal(seine.segs[1].zone, 'SEINE 7');
 
     // Conteneur : plafond repris de sa limite haute.
     assert.equal(groups.find(g => g.name === 'PARIS OUEST INFO').up, 19500);

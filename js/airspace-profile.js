@@ -138,7 +138,8 @@ function _mergeRanges(ranges) {
  * @param {Array} items  Zones openAIP brutes (bbox de la route chargée).
  * @returns {Array|null} Groupes triés conteneur → imbriqué :
  *   [{ name, freq, lo, up (plafond max), ranges: [[fa,fb]],
- *      segs: [{fa, fb, up}] }] ou null si aucun.
+ *      segs: [{fa, fb, up, zone}] }] — zone = nom openAIP du SECTEUR
+ *   (ex. « SIV RENNES SUD A ») porté par chaque tronçon, ou null si aucun.
  */
 export function computeRouteAirspaces(points, items) {
     if (!Array.isArray(points) || points.length < 2 || !Array.isArray(items)) return null;
@@ -158,13 +159,17 @@ export function computeRouteAirspaces(points, items) {
 
         const name = serviceDisplayName(as);
         const freq = serviceFreq(as);
+        // Nom du secteur (zone openAIP brute) : le groupe porte le nom de
+        // l'organisme (« RENNES INFO ») mais le survol doit dire LEQUEL
+        // des secteurs (Sud A, Nord, Cotentin…) est sous le curseur.
+        const zone = String(as.name || as.designator || '').trim();
         const key = `${freq ?? '-'}|${name}`;
         let g = byKey.get(key);
         if (!g) { g = { name, freq, lo: Infinity, up: -Infinity, ranges: [], segs: [] }; byKey.set(key, g); }
         g.lo = Math.min(g.lo, lo);
         g.up = Math.max(g.up, up);
         g.ranges.push(...ranges);
-        for (const [fa, fb] of ranges) g.segs.push({ fa, fb, up });
+        for (const [fa, fb] of ranges) g.segs.push({ fa, fb, up, zone });
     }
 
     const groups = [...byKey.values()].map(g => {

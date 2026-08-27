@@ -420,10 +420,14 @@ function _drawZones(xOf, yOf, yMax, plotW, plotH) {
     return hovered;
 }
 
-/** Carte sombre au-dessus du curseur : nom, ALT MIN/ALT MAX (du secteur
- *  survolé), fréquence — même style que l'infobulle du terrain. */
+/** Carte sombre au-dessus du curseur : organisme, SECTEUR survolé (nom
+ *  openAIP : « SIV RENNES SUD A »…), ALT MIN/ALT MAX, fréquence — même
+ *  style que l'infobulle du terrain. */
 function _drawZoneTooltip({ g, seg }, cw, xOf) {
     const nm = Math.round(_hoverFrac * _distTotalKm / 1.852);
+    // Secteur affiché seulement s'il précise l'organisme (un groupe sans
+    // fréquence porte déjà le nom de SA zone : pas de doublon).
+    const zone = seg.zone && seg.zone.toUpperCase() !== g.name.toUpperCase() ? seg.zone : null;
     const lines = [
         g.name,
         `ALT MIN : ${_altTxt(g.lo)}   ALT MAX : ${_altTxt(seg.up)}`,
@@ -432,8 +436,9 @@ function _drawZoneTooltip({ g, seg }, cw, xOf) {
     _ctx.font = 'bold 10px "DM Sans", sans-serif';
     const w0 = _ctx.measureText(lines[0]).width;
     _ctx.font = '9.5px "DM Mono", monospace';
-    const w12 = Math.max(_ctx.measureText(lines[1]).width, _ctx.measureText(lines[2]).width);
-    const tipW = Math.max(w0, w12) + 14, tipH = 46;
+    let wRest = Math.max(_ctx.measureText(lines[1]).width, _ctx.measureText(lines[2]).width);
+    if (zone) wRest = Math.max(wRest, _ctx.measureText(zone).width);
+    const tipW = Math.max(w0, wRest) + 14, tipH = zone ? 58 : 46;
     const hx = xOf(_hoverFrac);
     let tipX = hx + 12;
     if (tipX + tipW > cw - PAD.right - 2) tipX = hx - tipW - 12;
@@ -451,11 +456,18 @@ function _drawZoneTooltip({ g, seg }, cw, xOf) {
     _ctx.font = 'bold 10px "DM Sans", sans-serif';
     _ctx.fillStyle = '#E2E8F0';
     _ctx.fillText(lines[0], tipX + 7, tipY + 13);
+    let y = tipY + 26;
     _ctx.font = '9.5px "DM Mono", monospace';
+    if (zone) {
+        _ctx.fillStyle = 'rgba(226,232,240,0.55)';
+        _ctx.fillText(zone, tipX + 7, y);
+        y += 12;
+    }
     _ctx.fillStyle = 'rgba(226,232,240,0.75)';
-    _ctx.fillText(lines[1], tipX + 7, tipY + 26);
+    _ctx.fillText(lines[1], tipX + 7, y);
+    y += 13;
     _ctx.fillStyle = '#60A5FA';
-    _ctx.fillText(lines[2], tipX + 7, tipY + 39);
+    _ctx.fillText(lines[2], tipX + 7, y);
 }
 
 function _roundRect(x, y, w, h, r) {
