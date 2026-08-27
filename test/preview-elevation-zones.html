@@ -61,8 +61,8 @@ const ZONES = [
         { fa: f(40), fb: f(59), up: 6500, zone: 'SIV SEINE 6' }, { fa: f(60), fb: f(84), up: 8500, zone: 'SIV SEINE 7' }, { fa: f(85), fb: f(96), up: 11500, zone: 'SIV SEINE 8' },
     ], [[f(40), f(96)]]),
     mk('NANTES INFO', '130.275', [{ fa: f(96), fb: f(107.7), up: 11500 }], [[f(96), f(107.7)]]),
-    mk('CHEVREUSE INFO', '119.305', [{ fa: f(22), fb: f(30), up: 2000 }], [[f(22), f(30)]]),
-    mk('LE BOURGET INFO', '123.835', [{ fa: f(16), fb: f(21), up: 4500 }], [[f(16), f(21)]]),
+    // CHEVREUSE (SFC-2000) absente : sous l'altitude de croisière 2500 ft.
+    mk('LE BOURGET INFO', '123.835', [{ fa: f(16), fb: f(21), up: 4500, zone: 'CTR LE BOURGET' }], [[f(16), f(21)]]),
 ];
 ZONES.sort((a, b) => b.span - a.span);
 

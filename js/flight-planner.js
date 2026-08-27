@@ -10,14 +10,14 @@ import { fetchAirspacesForBbox } from './airspaces.js';
 // Zones aériennes traversées par la route (rectangles d'altitude du profil
 // d'élévation) : bbox du corridor → items openAIP → groupes. Non bloquant —
 // null silencieux si l'API/cache est indisponible.
-async function loadRouteAirspaces(elevProfile) {
+async function loadRouteAirspaces(elevProfile, cruiseAltFt) {
     try {
         if (!elevProfile?.points?.length) return null;
         const bbox = routeBbox(elevProfile.points);
         if (!bbox) return null;
         const items = await fetchAirspacesForBbox(bbox[0], bbox[1], bbox[2], bbox[3]);
         if (!items?.length) return null;
-        return computeRouteAirspaces(elevProfile.points, items);
+        return computeRouteAirspaces(elevProfile.points, items, { cruiseAltFt });
     } catch { return null; }
 }
 
@@ -169,7 +169,7 @@ export async function computeFlightPlan(fromIcao, toIcao, params) {
     const clearance = elevProfile
         ? evaluateClearance(elevProfile, params.cruiseAltFt)
         : null;
-    const routeAirspaces = await loadRouteAirspaces(elevProfile);
+    const routeAirspaces = await loadRouteAirspaces(elevProfile, params.cruiseAltFt);
 
     return {
         from: { icao: fromIcao, lat: fromLat, lon: fromLon, elevFt: fromApt?.elevation ?? null },
@@ -280,7 +280,7 @@ export async function computeMultiLegFlightPlan(route, params) {
     }
     const elevProfile = await fetchMultiSegmentElevation(legCoords);
     const clearance = elevProfile ? evaluateClearance(elevProfile, params.cruiseAltFt) : null;
-    const routeAirspaces = await loadRouteAirspaces(elevProfile);
+    const routeAirspaces = await loadRouteAirspaces(elevProfile, params.cruiseAltFt);
 
     const totalReserveL = (reserveMin / 60) * params.fuelBurnLph;
     return {

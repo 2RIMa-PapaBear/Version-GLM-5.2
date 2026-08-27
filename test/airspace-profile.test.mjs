@@ -122,3 +122,25 @@ test('computeRouteAirspaces : entrées invalides → null', () => {
     assert.equal(computeRouteAirspaces(ROUTE, null), null);
     assert.equal(computeRouteAirspaces(ROUTE, []), null);
 });
+
+test('computeRouteAirspaces : filtre altitude du vol (croisière 3500 ft)', () => {
+    const items = [
+        zone('CTR RENNES', '120.500', 0, 1500, SQ(0.5, 1.5), 'RENNES TWR'),        // SOUS le vol → écartée
+        zone('SIV RENNES SUD A', '134.000', 0, 11500, SQ(0.5, 1.5), 'RENNES INFORMATION'),  // englobe 3500 → gardée
+        zone('TMA HAUTE', '125.000', 5500, 11500, SQ(0.5, 1.5), 'HAUTE INFORMATION'),      // AU-DESSUS → écartée
+        zone('TMA STRADDLE', '126.000', 2500, 4500, SQ(0.5, 1.5), 'STRADDLE INFORMATION'), // à cheval sur 3500 → gardée
+    ];
+    const names = computeRouteAirspaces(ROUTE, items, { cruiseAltFt: 3500 }).map(g => g.name);
+    assert.ok(names.includes('RENNES INFO'));
+    assert.ok(names.includes('STRADDLE INFO'));
+    assert.ok(!names.includes('RENNES TWR'), 'CTR sous le vol ne doit pas apparaître');
+    assert.ok(!names.some(n => n.includes('HAUTE')), 'zone au-dessus du vol ne doit pas apparaître');
+
+    // Sans altitude (0/null) : tout est conservé (comportement antérieur —
+    // TMA HAUTE reste écartée par le filtre plancher > 5000 ft, sans rapport).
+    const all = computeRouteAirspaces(ROUTE, items).map(g => g.name);
+    assert.equal(all.length, 3);
+    assert.ok(all.includes('RENNES TWR'), 'sans altitude, la CTR est conservée');
+    const zero = computeRouteAirspaces(ROUTE, items, { cruiseAltFt: 0 }).map(g => g.name);
+    assert.equal(zero.length, 3);
+});
