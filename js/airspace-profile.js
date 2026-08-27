@@ -136,13 +136,18 @@ function _mergeRanges(ranges) {
  * Calcule les groupes de zones traversées par la route.
  * @param {Array} points Points du profil d'élévation [{frac, lat, lon}].
  * @param {Array} items  Zones openAIP brutes (bbox de la route chargée).
+ * @param {Object} [opts] {cruiseAltFt} : si fournie (> 0), seules les zones
+ *   RELEVANTES pour l'altitude du vol sont retenues — la croisière doit être
+ *   DANS la tranche verticale (lo ≤ croisière ≤ plafond). Une CTR SFC-1500
+ *   survolée à 3500 ft n'apparaît pas (retour utilisateur 27/08).
  * @returns {Array|null} Groupes triés conteneur → imbriqué :
  *   [{ name, freq, lo, up (plafond max), ranges: [[fa,fb]],
  *      segs: [{fa, fb, up, zone}] }] — zone = nom openAIP du SECTEUR
  *   (ex. « SIV RENNES SUD A ») porté par chaque tronçon, ou null si aucun.
  */
-export function computeRouteAirspaces(points, items) {
+export function computeRouteAirspaces(points, items, opts) {
     if (!Array.isArray(points) || points.length < 2 || !Array.isArray(items)) return null;
+    const cruise = Number.isFinite(opts?.cruiseAltFt) && opts.cruiseAltFt > 0 ? opts.cruiseAltFt : null;
 
     const byKey = new Map();
     for (const as of items) {
@@ -152,6 +157,9 @@ export function computeRouteAirspaces(points, items) {
         if (up == null || up <= 0) continue;            // plafond inconnu : on ignore
         if (lo > MAX_BASE_FT) continue;                  // plancher trop haut pour du VFR
         if (up <= lo) continue;
+        // Altitude du vol : hors tranche verticale → la zone ne concerne
+        // pas ce vol (entièrement au-dessus ou en dessous de la croisière).
+        if (cruise != null && (up < cruise || lo > cruise)) continue;
 
         const ranges = crossedRanges(points, as.geometry,
             (as.radius && Number.isFinite(as.radius.value)) ? as.radius.value : 5);
