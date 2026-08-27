@@ -574,11 +574,21 @@ body.mode-nav .dep-dest-toggle { display: flex; }
     z-index: 20;
 }
 body.mode-nav .route-planner { display: flex; }
-/* En navigation, la barre Départ → Destination passe AU-DESSUS du cadre
-   Code OACI / METAR / TAF (retour utilisateur 27/08) — la colonne centrale
-   est en flex column, un simple ordre négatif suffit, sans déplacer le DOM
-   (les écouteurs et le dropdown d'autocomplétion restent en place). */
-body.mode-nav .route-planner { order: -1; }
+/* En navigation, la barre Départ → Destination vit DANS la carte d'en-tête
+   (déplacée par flight-mode.js), entre le titre et la rangée Code OACI /
+   METAR-TAF qui descend d'un cran : style « boîte interne » aligné sur la
+   rangée de recherche. Le débordement de la carte devient visible pour que
+   l'autocomplétion et le menu de sauvegarde du plan ne soient pas rognés. */
+body.mode-nav header.card { overflow: visible; }
+header.card > .route-planner {
+    background: var(--inner-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 8px 12px;
+    margin: 0 0 10px;
+    position: relative;
+    z-index: 20;
+}
 .route-planner input:focus { border-color: var(--primary); }
 .route-planner .route-to-wrapper { flex: 1 1 170px; max-width: 320px; }
 /* Nom du terrain destination (confirmation visuelle du code saisi). */

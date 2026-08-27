@@ -62,6 +62,23 @@ export function setFlightMode(mode) {
     document.body.classList.remove('mode-local', 'mode-nav');
     document.body.classList.add(mode === 'nav' ? 'mode-nav' : 'mode-local');
 
+    // En navigation, la barre Départ → Destination PREND LA PLACE de la
+    // rangée Code OACI / METAR-TAF (qui descend d'un cran) : on la déplace
+    // DANS la carte d'en-tête, entre le titre et le champ OACI. En vol
+    // local, elle retourne à sa place d'origine dans la colonne (les
+    // écouteurs suivent l'élément, aucun recâblage nécessaire).
+    const rp = document.getElementById('route-planner');
+    const search = document.querySelector('.center-column > header.card .hpp-group.search-group');
+    if (rp && search) {
+        if (mode === 'nav') {
+            rp._homeParent ??= rp.parentElement;
+            rp._homeNext ??= rp.nextSibling;
+            search.parentElement.insertBefore(rp, search);
+        } else if (rp._homeParent && rp.parentElement !== rp._homeParent) {
+            rp._homeParent.insertBefore(rp, rp._homeNext);
+        }
+    }
+
     // Met à jour le toggle.
     const toggle = document.getElementById('flight-mode-toggle');
     if (toggle) {
