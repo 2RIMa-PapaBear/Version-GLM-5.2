@@ -1,15 +1,19 @@
 # ============================================================================
-# RADIO POINTS — mise à jour hebdomadaire du fichier data/radio-points.json.
+# DONNÉES OPENAIP LOCALES — mise à jour hebdomadaire.
 #
-# Chaque lundi 05:30 UTC : régénère le fichier mondial des radiophares
-# (VOR/DME/NDB) et points de repère VFR depuis l'API openAIP, puis commit et
-# appelle le déploiement FTP (un push au GITHUB_TOKEN n'amorce pas de
-# workflow : c'est le « needs/uses » qui enchaîne).
+# Chaque lundi 05:30 UTC :
+#   1. data/radio-points.json — radiophares + points VFR (mondial)
+#   2. data/airspaces/*.json  — espaces aériens France élargie PAR FAMILLE
+#      (ctr/tma/siv/atz/rpd/tmz/autres) : servies par notre serveur, elles
+#      remplacent l'API pour toute vue dans la couverture (l'API refuse les
+#      rafales : ~4 req/min puis 429 sans en-têtes CORS).
+# Puis commit et appel du déploiement FTP (un push au GITHUB_TOKEN n'amorce
+# pas de workflow : c'est le « needs/uses » qui enchaîne).
 #
 # Secret requis (Settings → Secrets and variables → Actions) :
 #   OPENAIP_API_KEY  clé openAIP (déjà utilisée par l'app)
 # ============================================================================
-name: Radio points (maj hebdo)
+name: Données openAIP (maj hebdo)
 
 on:
   schedule:
@@ -38,15 +42,20 @@ jobs:
           OPENAIP_API_KEY: ${{ secrets.OPENAIP_API_KEY }}
         run: node scripts/fetch-radio-points.mjs
 
+      - name: Régénère data/airspaces/*.json (France élargie, par famille)
+        env:
+          OPENAIP_API_KEY: ${{ secrets.OPENAIP_API_KEY }}
+        run: node scripts/fetch-airspaces.mjs
+
       - name: Commit + push si changement
         run: |
           git config user.name "radio-points-bot"
           git config user.email "radio-points-bot@users.noreply.github.com"
-          git add data/radio-points.json
+          git add data/radio-points.json data/airspaces/
           if git diff --cached --quiet; then
             echo "Aucun changement openAIP cette semaine."
           else
-            git commit -m "radio-points: mise à jour hebdomadaire openAIP ($(date -u +%F))"
+            git commit -m "openAIP: mise à jour hebdomadaire radio-points + espaces ($(date -u +%F))"
             git push
           fi
 
