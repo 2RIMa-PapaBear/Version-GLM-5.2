@@ -18,6 +18,9 @@ const FT_PER_M = 3.28084;
 // Filtres identiques au rendu de la carte (airspaces.js).
 const ADMIN_NAME_RE = /\bFIR\b|\bUIR\b|\bLTA\b/;
 const MAX_BASE_FT = 5000;
+// Tolérance autour de l'altitude de croisière : une limite de zone à moins
+// de 500 ft du niveau de vol reste affichée (marge d'anticipation).
+export const ALT_TOLERANCE_FT = 500;
 // Tronçon minimal pour dessiner une zone (en fraction de route) : écarte
 // les coins à peine effleurés (≈ 1,5 NM sur une navigation de 100 NM).
 const MIN_SPAN_FRAC = 0.012;
@@ -157,9 +160,9 @@ export function computeRouteAirspaces(points, items, opts) {
         if (up == null || up <= 0) continue;            // plafond inconnu : on ignore
         if (lo > MAX_BASE_FT) continue;                  // plancher trop haut pour du VFR
         if (up <= lo) continue;
-        // Altitude du vol : hors tranche verticale → la zone ne concerne
-        // pas ce vol (entièrement au-dessus ou en dessous de la croisière).
-        if (cruise != null && (up < cruise || lo > cruise)) continue;
+        // Altitude du vol : hors tranche verticale (marge 500 ft) → la zone
+        // ne concerne pas ce vol (entièrement au-dessus ou en dessous).
+        if (cruise != null && (up < cruise - ALT_TOLERANCE_FT || lo > cruise + ALT_TOLERANCE_FT)) continue;
 
         const ranges = crossedRanges(points, as.geometry,
             (as.radius && Number.isFinite(as.radius.value)) ? as.radius.value : 5);
