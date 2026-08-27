@@ -352,66 +352,93 @@ export function createAirspaceController(map) {
     let openZonePoly = null;
     let polyMeta = new Map();
 
+    let _loadEpoch = 0;   // annule les rendus d'un chargement dépassé (pan rapide)
+
     async function loadForBounds(bounds) {
-        let minLat = bounds.getSouth();
-        let minLon = bounds.getWest();
-        let maxLat = bounds.getNorth();
-        let maxLon = bounds.getEast();
+        const epoch = ++_loadEpoch;
 
-        // Quantifie la zone demandée à la GRILLE 1° (cellule contenant la
-        // vue) : un déplacement de carte reste dans la même cellule la
-        // plupart du temps → rendu INSTANTANÉ depuis le cache IndexedDB,
-        // et les cellules voisines déjà visitées ne re-téléchargent rien.
+        // GRILLE 1° : la vue est couverte par des CELLULES indépendantes,
+        // chacune cachée séparément dans IndexedDB. Un déplacement ne
+        // retélécharge que les cellules réellement NOUVELLES : les zones
+        // déjà consultées s'affichent immédiatement, sans attendre le
+        // réseau (avant : la clé = bbox entière de la vue, donc chaque
+        // nouveau cadrage repartait du réseau même en terrain connu).
         const q = (x) => Math.floor(x);
-        minLat = q(minLat); minLon = q(minLon);
-        maxLat = Math.ceil(maxLat); maxLon = Math.ceil(maxLon);
+        const minLat = q(bounds.getSouth()), minLon = q(bounds.getWest());
+        let maxLat = Math.ceil(bounds.getNorth()), maxLon = Math.ceil(bounds.getEast());
+        if (maxLat - minLat > 5) maxLat = minLat + 5;   // limite API openAIP
+        if (maxLon - minLon > 5) maxLon = minLon + 5;
 
-        // OpenAIP rejette les bbox de plus de 5° de large (HTTP 400).
-        const MAX_DEG = 5;
-        if (maxLat - minLat > MAX_DEG) maxLat = minLat + MAX_DEG;
-        if (maxLon - minLon > MAX_DEG) maxLon = minLon + MAX_DEG;
+        const cells = [];
+        for (let lat = minLat; lat < maxLat; lat++)
+            for (let lon = minLon; lon < maxLon; lon++) cells.push([lat, lon]);
+        if (!cells.length) return;
+        const viewKey = cells.map(c => c.join('_')).join('|');
+        if (viewKey === lastBboxKey && loaded) return;
 
-        const key = _bboxKey(minLat, minLon, maxLat, maxLon);
-
-        if (key === lastBboxKey && loaded) return;
-
-        // Rendu immédiat depuis le cache (même périmé) : la carte suit le
-        // déplacement sans attendre le réseau ; le rafraîchissement, lui,
-        // n'a lieu que pour une cellule jamais vue ou de plus de 30 jours.
-        const cached = await _idbGet(key);
-        let items = cached?.data;
-        if (items && cached.ts > Date.now() - TTL_MS) {
-            lastBboxKey = key; loaded = true; lastItems = items;
-            _render(items);
-            return;
+        // 1. Union des cellules déjà en cache (fraîches d'abord, périmées en
+        //    repli) → rendu immédiat si elle n'est pas vide.
+        const byId = new Map();
+        const absorb = (items) => {
+            for (const it of (items || [])) byId.set(it._id ?? JSON.stringify(it.name) + byId.size, it);
+        };
+        const missing = [];
+        for (const [lat, lon] of cells) {
+            const cached = await _idbGet(`cell_${lat}_${lon}`);
+            if (cached?.data && cached.ts > Date.now() - TTL_MS) absorb(cached.data);
+            else { missing.push([lat, lon]); if (cached?.data) absorb(cached.data); }
         }
-        if (items) {
-            lastBboxKey = key; loaded = true; lastItems = items;
-            _render(items);   // affiche le périmé pendant le téléchargement
+        lastBboxKey = viewKey; loaded = true;
+        if (byId.size) {
+            lastItems = [...byId.values()];
+            _render(lastItems);
         }
 
-        try {
-            const url = `${BASE_URL}?bbox=${minLon},${minLat},${maxLon},${maxLat}&limit=200`;
-            const res = await fetch(url, {
-                headers: { 'x-openaip-api-key': OPENAIP_API_KEY },
-                signal: AbortSignal.timeout(12000),
-            });
-            if (!res.ok) {
-                console.warn('Airspaces fetch failed:', res.status);
-                return;
+        // 2. Cellules jamais vues : téléchargées une par une (budget limit=200
+        //    PAR CELLULE — plus complet qu'une grande bbox tronquée à 200),
+        //    rendu réactualisé après chacune dès que la vue est encore la même.
+        if (missing.length) {
+            for (const [lat, lon] of missing) {
+                try {
+                    const res = await fetch(`${BASE_URL}?bbox=${lon},${lat},${lon + 1},${lat + 1}&limit=200`, {
+                        headers: { 'x-openaip-api-key': OPENAIP_API_KEY },
+                        signal: AbortSignal.timeout(12000),
+                    });
+                    if (res.ok) {
+                        const items = (await res.json()).items || [];
+                        _idbPut(`cell_${lat}_${lon}`, items);
+                        absorb(items);
+                    }
+                } catch (e) { console.warn('Airspaces fetch error:', e.message); }
+                if (epoch !== _loadEpoch) return;   // la vue a changé : abandonne
+                lastItems = [...byId.values()];
+                _render(lastItems);
+                await new Promise(r => setTimeout(r, 120));   // ménage le débit
             }
-            const data = await res.json();
-            items = data.items || [];
-            _idbPut(key, items);
-        } catch (e) {
-            console.warn('Airspaces fetch error:', e.message);
-            return;
         }
 
-        lastBboxKey = key;
-        loaded = true;
-        lastItems = items;
-        _render(items);
+        // 3. Précharge en silence les 4 cellules adjacentes à la cellule
+        //    centrale : le prochain déplacement d'une cellule sera instantané.
+        _prefetchNeighbors(minLat, minLon, maxLat, maxLon);
+    }
+
+    async function _prefetchNeighbors(minLat, minLon, maxLat, maxLon) {
+        const cLat = Math.floor((minLat + maxLat) / 2);
+        const cLon = Math.floor((minLon + maxLon) / 2);
+        for (const [lat, lon] of [[cLat + 1, cLon], [cLat - 1, cLon], [cLat, cLon + 1], [cLat, cLon - 1]]) {
+            if (lat >= minLat && lat < maxLat && lon >= minLon && lon < maxLon) continue;   // déjà dans la vue
+            const key = `cell_${lat}_${lon}`;
+            const cached = await _idbGet(key);
+            if (cached?.data && cached.ts > Date.now() - TTL_MS) continue;
+            try {
+                const res = await fetch(`${BASE_URL}?bbox=${lon},${lat},${lon + 1},${lat + 1}&limit=200`, {
+                    headers: { 'x-openaip-api-key': OPENAIP_API_KEY },
+                    signal: AbortSignal.timeout(12000),
+                });
+                if (res.ok) _idbPut(key, (await res.json()).items || []);
+            } catch { /* silencieux : simple anticipation */ }
+            await new Promise(r => setTimeout(r, 150));
+        }
     }
 
     function _render(items) {
