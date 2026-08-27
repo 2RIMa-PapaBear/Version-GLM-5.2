@@ -95,7 +95,8 @@ const OPENAIP_TYPE_EXCLUDED = new Set([0, 7]);
 /** Tous les aérodromes openAIP d'une bbox (couloir) — avec ou sans METAR.
  *  Hélisurfaces, terrains fermés et plateformes treuil exclus. Bbox
  *  découpée en tuiles ≤ 5° (limite openAIP) pour couvrir les routes
- *  longues sans écrêtage d'un côté. */
+ *  longues sans écrêtage d'un côté ; une tuile refusée (429/5xx, rafale
+ *  au changement de plan) est réessayée une fois. */
 async function _fetchOpenAipAirports(minLat, minLon, maxLat, maxLon) {
     // Arrondi au quart de degré : meilleure réutilisation du cache relais.
     const q = x => (Math.round(x * 4) / 4).toFixed(2);
@@ -108,17 +109,22 @@ async function _fetchOpenAipAirports(minLat, minLon, maxLat, maxLon) {
     const byId = new Map();
     for (const [t0, t1, t2, t3] of tiles) {
         const url = `https://api.core.openaip.net/api/airports?bbox=${q(t1)},${q(t0)},${q(t3)},${q(t2)}&limit=1000`;
-        try {
-            const res = await fetch(url, {
-                headers: { 'x-openaip-api-key': OPENAIP_API_KEY },
-                signal: AbortSignal.timeout(12000),
-            });
-            if (res.ok) {
-                for (const a of ((await res.json()).items || [])) {
-                    byId.set(a._id ?? JSON.stringify(a.name) + byId.size, a);
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                const res = await fetch(url, {
+                    headers: { 'x-openaip-api-key': OPENAIP_API_KEY },
+                    signal: AbortSignal.timeout(12000),
+                });
+                if (res.ok) {
+                    for (const a of ((await res.json()).items || [])) {
+                        byId.set(a._id ?? JSON.stringify(a.name) + byId.size, a);
+                    }
+                    break;
                 }
-            }
-        } catch { /* tuile indisponible : on garde les autres */ }
+                if (res.status !== 429 && res.status < 500) break;   // erreur définitive
+            } catch { /* réseau : on retente une fois */ }
+            await new Promise(r => setTimeout(r, 900));
+        }
         if (tiles.length > 1) await new Promise(r => setTimeout(r, 200));
     }
     return byId.size ? [...byId.values()] : null;
