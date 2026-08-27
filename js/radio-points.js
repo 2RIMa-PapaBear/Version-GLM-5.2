@@ -27,12 +27,15 @@
 export const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 export const RADIO_POINTS_URL = 'data/radio-points.json';
 
-/** Seuils de zoom (déclutter) : sous ces niveaux, la couche est vide. */
-export const LAYER_MIN_ZOOM = { vor: 6, ndb: 8, vrp: 10 };
+/** Seuils de zoom (déclutter) : VOR, NDB et points VFR apparaissent AU
+ * MÊME niveau de zoom (retour utilisateur 27/08 — avant : 6/8/10). */
+export const LAYER_MIN_ZOOM = { vor: 6, ndb: 6, vrp: 6 };
 /** Seuils de zoom pour afficher les étiquettes (icône seule en dessous). */
 export const LABEL_MIN_ZOOM = { vor: 7, ndb: 10, vrp: 11 };
-/** Nombre maximal de marqueurs rendus par couche et par cadrage. */
-export const LAYER_MAX_POINTS = { vor: 400, ndb: 400, vrp: 400 };
+/** Nombre maximal de marqueurs rendus par couche et par cadrage. VRP 800 :
+ * la France seule en compte 675 — un plafond inférieur tronquait
+ * arbitrairement (ordre du fichier) dès la vue nationale. */
+export const LAYER_MAX_POINTS = { vor: 400, ndb: 400, vrp: 800 };
 
 /**
  * Classe un radiophare par bande de fréquence.
