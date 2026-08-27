@@ -55,12 +55,11 @@ test('filterBbox : cadre simple et antiméridien (est < ouest)', () => {
     deepStrictEqual(filterBbox(pts, 170, -5, -170, 5).map(p => p.lon), [178, -178], 'antiméridien');
 });
 
-test('visibleKinds : seuils de déclutter', () => {
+test('visibleKinds : VOR, NDB et points VFR AU MÊME niveau de zoom', () => {
     deepStrictEqual(visibleKinds(5), { vor: false, ndb: false, vrp: false }, 'z5 : rien');
-    deepStrictEqual(visibleKinds(6), { vor: true, ndb: false, vrp: false }, 'z6 : VOR');
-    deepStrictEqual(visibleKinds(8), { vor: true, ndb: true, vrp: false }, 'z8 : +NDB');
-    deepStrictEqual(visibleKinds(10), { vor: true, ndb: true, vrp: true }, 'z10 : +points VFR');
-    ok(LAYER_MIN_ZOOM.vrp > LAYER_MIN_ZOOM.ndb, 'VRP plus tardif que NDB');
+    deepStrictEqual(visibleKinds(6), { vor: true, ndb: true, vrp: true }, 'z6 : les trois couches');
+    const zs = [LAYER_MIN_ZOOM.vor, LAYER_MIN_ZOOM.ndb, LAYER_MIN_ZOOM.vrp];
+    ok(new Set(zs).size === 1, `seuils identiques (${zs.join('/')})`);
 });
 
 test('formatFreq : kHz entiers, MHz à 1-2 décimales', () => {
