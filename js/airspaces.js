@@ -158,6 +158,96 @@ let _oaLastReq = 0;
 const OA_MIN_SPACING_MS = 1500;
 const OA_BACKOFF_MS = 20000;
 
+// ---------------------------------------------------------------------------
+// SOURCE FICHIER — espaces aériens de la couverture France élargie servis
+// par NOTRE serveur (data/airspaces/<famille>.json, régénérés chaque semaine
+// par le cron GitHub scripts/fetch-airspaces.mjs). Toute vue dans la
+// couverture s'affiche depuis ces fichiers : instantané, aucune requête
+// API (donc aucun 429). L'API ne sert que les vues hors couverture.
+// ---------------------------------------------------------------------------
+const FILE_FAMILIES = ['ctr', 'tma', 'siv', 'atz', 'rpd', 'tmz', 'autres'];
+const FILE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const _fileItems = new Map();        // id → item openAIP-shape (familles chargées)
+const _fileLoaded = new Set();       // familles déjà en mémoire
+const _filePending = new Map();      // famille → promesse
+let _fileCoverage = null;            // [minLat, minLon, maxLat, maxLon]
+
+/** Convertit un item compact du fichier en forme openAIP (tout le reste du
+ *  module — rendu, filtres, corridor du profil — travaille ainsi).
+ *  Exporté pour les tests. */
+export function _expandFileItem(c) {
+    const g = c.g;
+    let geometry = null;
+    if (g) {
+        if (g.t === 0) geometry = { type: 'Point', coordinates: g.c };
+        else if (g.t === 1) geometry = { type: 'Polygon', coordinates: g.c };
+        else if (g.t === 2) geometry = { type: 'MultiPolygon', coordinates: g.c };
+        else if (g.t === 3) geometry = { type: 'LineString', coordinates: g.c };
+    }
+    const lim = (l) => (Array.isArray(l) ? { value: l[0], unit: l[1] } : null);
+    return {
+        _id: c.i, name: c.n, type: c.ty, icaoClass: c.ic,
+        lowerLimit: lim(c.lo), upperLimit: lim(c.up),
+        frequencies: c.f || [], radius: Array.isArray(c.r) ? { value: c.r[0] } : null,
+        geometry,
+    };
+}
+
+async function _ensureFileIndex() {
+    if (_fileCoverage) return;
+    const d = await _fetchJsonWithCache('data/airspaces/index.json', 'file:index');
+    if (d?.coverage) _fileCoverage = d.coverage;
+}
+
+async function _fetchJsonWithCache(url, idbKey) {
+    const cached = await _idbGet(idbKey);
+    if (cached?.data && Date.now() - cached.ts < FILE_TTL_MS) return cached.data;
+    try {
+        const res = await fetch(url + `?t=${(cached?.ts || 0)}`, { signal: AbortSignal.timeout(15000) });
+        if (!res.ok) return cached?.data || null;
+        const data = await res.json();
+        _idbPut(idbKey, data);
+        return data;
+    } catch { return cached?.data || null; }
+}
+
+/** Charge (une fois) les familles demandées depuis le serveur. Retourne le
+ *  nombre total d'items disponibles (toutes familles chargées). */
+async function _ensureFileFamilies(families) {
+    const wanted = families || FILE_FAMILIES;
+    await Promise.all(wanted.filter(f => !_fileLoaded.has(f)).map(async (fam) => {
+        if (!_filePending.has(fam)) {
+            _filePending.set(fam, (async () => {
+                const d = await _fetchJsonWithCache(`data/airspaces/${fam}.json`, `file:${fam}`);
+                if (d?.coverage) _fileCoverage = d.coverage;
+                for (const c of (d?.items || [])) {
+                    const it = _expandFileItem(c);
+                    _fileItems.set(it._id, it);
+                }
+                if (d) _fileLoaded.add(fam);
+                _filePending.delete(fam);
+            })());
+        }
+        await _filePending.get(fam);
+    }));
+    return _fileItems.size;
+}
+
+/** La bbox est-elle entièrement dans la couverture du fichier ? (null si
+ *  la couverture n'est pas encore connue → considérée hors couverture.)
+ *  Exporté pour les tests. */
+export function _withinFileCoverage(minLat, minLon, maxLat, maxLon) {
+    if (!_fileCoverage) return false;
+    const [a, b, c, d] = _fileCoverage;
+    return minLat >= a && maxLat <= c && minLon >= b && maxLon <= d;
+}
+
+/** Items fichier pour une bbox (bbox d'ESSAI grossière : on retourne tout —
+ *  le rendu et le corridor filtrent géométriquement de toute façon). */
+function _fileItemsForArea() {
+    return [..._fileItems.values()];
+}
+
 export function fetchOpenAipItems(url) {
     const run = async () => {
         const wait = _oaLastReq + OA_MIN_SPACING_MS - Date.now();
@@ -211,6 +301,14 @@ const _memTiles = new Map();
  * Retourne les items openAIP bruts ([] si indisponible).
  */
 export async function fetchAirspacesForBbox(minLat, minLon, maxLat, maxLon) {
+    // Source fichier (couverture France élargie) : AUCUNE requête API pour
+    // les routes nationales — instantané et immunisé contre les 429.
+    await _ensureFileIndex();
+    const fq = (x) => Math.floor(x);
+    if (_withinFileCoverage(fq(minLat), fq(minLon), Math.ceil(maxLat), Math.ceil(maxLon))) {
+        await _ensureFileFamilies();
+        if (_fileItems.size) return _fileItemsForArea();
+    }
     const q = (x) => Math.floor(x);
     const cl = (x) => Math.ceil(x);
     const b = [q(minLat), q(minLon), cl(maxLat), cl(maxLon)];
@@ -391,13 +489,34 @@ export function createAirspaceController(map) {
     async function loadForBounds(bounds) {
         const epoch = ++_loadEpoch;
 
+        // SOURCE FICHIER (couverture France élargie, servie par notre
+        // serveur) : familles actives chargées une fois puis cachées —
+        // affichage instantané, ZÉRO requête API (donc aucun 429). Hors
+        // couverture, l'API prend le relais et les fichiers complètent la
+        // partie française de la vue.
+        await _ensureFileIndex();
+        const q = (x) => Math.floor(x);
+        const vMinLat = q(bounds.getSouth()), vMinLon = q(bounds.getWest());
+        const vMaxLat = Math.ceil(bounds.getNorth()), vMaxLon = Math.ceil(bounds.getEast());
+        const fams = [...activeGroups];
+        if (_withinFileCoverage(vMinLat, vMinLon, vMaxLat, vMaxLon)) {
+            const fileKey = 'file:' + fams.slice().sort().join(',');
+            if (fileKey !== lastBboxKey || !loaded) {
+                await _ensureFileFamilies(fams);
+                if (epoch !== _loadEpoch) return;
+                lastBboxKey = fileKey; loaded = true;
+                lastItems = _fileItemsForArea();
+                _render(lastItems);
+            }
+            return;
+        }
+
         // GRILLE 1° : la vue est couverte par des CELLULES indépendantes,
         // chacune cachée séparément dans IndexedDB. Un déplacement ne
         // retélécharge que les cellules réellement NOUVELLES : les zones
         // déjà consultées s'affichent immédiatement, sans attendre le
         // réseau (avant : la clé = bbox entière de la vue, donc chaque
         // nouveau cadrage repartait du réseau même en terrain connu).
-        const q = (x) => Math.floor(x);
         const minLat = q(bounds.getSouth()), minLon = q(bounds.getWest());
         let maxLat = Math.ceil(bounds.getNorth()), maxLon = Math.ceil(bounds.getEast());
         if (maxLat - minLat > 5) maxLat = minLat + 5;   // limite API openAIP
@@ -411,11 +530,20 @@ export function createAirspaceController(map) {
         if (viewKey === lastBboxKey && loaded) return;
 
         // 1. Union des cellules déjà en cache (fraîches d'abord, périmées en
-        //    repli) → rendu immédiat si elle n'est pas vide.
+        //    repli) → rendu immédiat si elle n'est pas vide. Les items du
+        //    FICHIER couvrant la partie française de la vue s'y ajoutent.
         const byId = new Map();
         const absorb = (items) => {
             for (const it of (items || [])) byId.set(it._id ?? JSON.stringify(it.name) + byId.size, it);
         };
+        if (_fileCoverage) {
+            const [fa, fb_, fc, fd] = _fileCoverage;
+            if (vMinLat <= fc && vMaxLat >= fa && vMinLon <= fd && vMaxLon >= fb_) {
+                await _ensureFileFamilies(fams);
+                if (epoch !== _loadEpoch) return;
+                absorb(_fileItemsForArea());
+            }
+        }
         const missing = [];
         for (const [lat, lon] of cells) {
             const cached = await _idbGet(`cell_${lat}_${lon}`);
@@ -679,7 +807,21 @@ export function createAirspaceController(map) {
     function setGroup(g, on) {
         if (!AIRSPACE_GROUPS[g]) return;
         if (on) activeGroups.add(g); else activeGroups.delete(g);
-        if (lastItems) _render(lastItems);   // re-filtre sans re-télécharger
+        const rerender = () => { if (lastItems) _render(lastItems); };
+        if (on && _fileLoaded && !_fileLoaded.has(g)) {
+            // Famille nouvellement cochée en mode fichier : charge son
+            // fichier puis re-rend (les autres familles ne retéléchargent rien).
+            _ensureFileFamilies([g]).then(() => {
+                if (_fileItems.size && lastItems) {
+                    const byId = new Map(lastItems.map(it => [it._id, it]));
+                    for (const it of _fileItemsForArea()) byId.set(it._id, it);
+                    lastItems = [...byId.values()];
+                }
+                rerender();
+            });
+        } else {
+            rerender();   // re-filtre sans re-télécharger
+        }
     }
     function getGroups() {
         const out = {};
