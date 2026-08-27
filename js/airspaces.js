@@ -147,6 +147,11 @@ function _bboxKey(minLat, minLon, maxLat, maxLon) {
     return `bbox_${r(minLat)}_${r(minLon)}_${r(maxLat)}_${r(maxLon)}`;
 }
 
+// Cache mémoire de session des tuiles openAIP : si l'API limite le débit
+// (429 en rafale : carte + zones + aérodromes au même changement de plan),
+// le profil garde les dernières zones connues au lieu de disparaître.
+const _memTiles = new Map();
+
 /**
  * Charge les zones aériennes d'une bbox SANS carte (profil d'élévation,
  * log de nav) : quantification 1° et cache IndexedDB PARTAGÉS avec la
@@ -154,6 +159,8 @@ function _bboxKey(minLat, minLon, maxLat, maxLon) {
  * Une bbox plus large que la limite API openAIP (5°) est DÉCOUPÉE EN
  * TUILES agrégées : sans ça, l'écrêtage rognait un côté de la route et
  * les zones traversées disparaissaient au changement de plan.
+ * Une tuile refusée (429/5xx) est réessayée une fois, puis servie depuis
+ * le cache mémoire/IDB si elle a déjà été vue dans la session.
  * Retourne les items openAIP bruts ([] si indisponible).
  */
 export async function fetchAirspacesForBbox(minLat, minLon, maxLat, maxLon) {
@@ -172,27 +179,38 @@ export async function fetchAirspacesForBbox(minLat, minLon, maxLat, maxLon) {
     const absorb = (items) => {
         for (const it of (items || [])) byId.set(it._id ?? JSON.stringify(it.name) + byId.size, it);
     };
+    const _tryFetch = async (url) => {
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                const res = await fetch(url, {
+                    headers: { 'x-openaip-api-key': OPENAIP_API_KEY },
+                    signal: AbortSignal.timeout(12000),
+                });
+                if (res.ok) return (await res.json()).items || [];
+                if (res.status !== 429 && res.status < 500) return null;   // erreur définitive
+            } catch { /* réseau : on retente une fois */ }
+            await new Promise(r => setTimeout(r, 900));
+        }
+        return null;
+    };
 
     for (const [t0, t1, t2, t3] of tiles) {
         const key = _bboxKey(t0, t1, t2, t3);
         const cached = await _idbGet(key);
         if (cached?.data && cached.ts > Date.now() - TTL_MS) {
             absorb(cached.data);
+            _memTiles.set(key, cached.data);
             continue;
         }
         if (cached?.data) absorb(cached.data);   // périmé : gardé en repli
-        try {
-            const url = `${BASE_URL}?bbox=${t1},${t0},${t3},${t2}&limit=200`;
-            const res = await fetch(url, {
-                headers: { 'x-openaip-api-key': OPENAIP_API_KEY },
-                signal: AbortSignal.timeout(12000),
-            });
-            if (res.ok) {
-                const items = (await res.json()).items || [];
-                _idbPut(key, items);
-                absorb(items);
-            }
-        } catch { /* tuile indisponible : on garde ce qu'on a */ }
+        const items = await _tryFetch(`${BASE_URL}?bbox=${t1},${t0},${t3},${t2}&limit=200`);
+        if (items) {
+            _idbPut(key, items);
+            _memTiles.set(key, items);
+            absorb(items);
+        } else if (_memTiles.has(key)) {
+            absorb(_memTiles.get(key));          // dernière valeur connue
+        }
         await new Promise(r => setTimeout(r, 200));   // ménage le débit openAIP
     }
     return [...byId.values()];
