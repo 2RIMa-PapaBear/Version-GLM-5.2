@@ -1304,7 +1304,7 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr) {
     // Étiquettes compactes des zones traversées, par-dessus le terrain
     // (plafond par secteur en haut, nom + fréquence à l'intérieur).
     if (zoneGeo.length) {
-        _drawZoneLabels(doc, zoneGeo, { xOf, yOf, xL, yT, yB, yMax, yc, codeY });
+        _drawZoneLabels(doc, zoneGeo, { xOf, yOf, xL, xR, yT, yB, yMax, yc, codeY });
     }
 
     return yB + 16;
@@ -1317,13 +1317,16 @@ function _altLabel(ft) {
     return `${Math.round(ft)} ft`;
 }
 
-/** Étiquettes compactes des zones (maquette validée 26/08) : zone englobante
- *  → nom + fréquence sur 2 lignes en haut à gauche, plafond ancré à gauche ;
- *  zone imbriquée large → nom + fréquence centrés, plafond par secteur ;
- *  bande étroite → texte vertical (2 colonnes nom | fréquence si besoin).
- *  Les lignes occupées (croisière, codes OACI, plafonds) sont évitées. */
+/** Étiquettes compactes des zones (retour utilisateur 27/08 : le SECTEUR
+ *  prime sur l'organisme — « SIV RENNES SUD A 134.000 », pas « RENNES
+ *  INFO ») : un libellé par SECTEUR du groupe — secteur + fréquence en
+ *  2 lignes si le tronçon est assez large, sinon texte vertical le long
+ *  du bord gauche du secteur (2 colonnes secteur | fréquence si besoin,
+ *  arrêté sous la rangée des codes OACI). Plafond par secteur en haut,
+ *  comme validé. Les lignes occupées (croisière, codes OACI, plafonds)
+ *  restent évitées. */
 function _drawZoneLabels(doc, zoneGeo, env) {
-    const { xOf, yOf, xL, yT, yMax, yc, codeY } = env;
+    const { xOf, yOf, xL, xR, yT, yB, yMax, yc, codeY } = env;
 
     const covers = (outer, inner) =>
         inner.widest[0] >= outer.widest[0] - 0.002 && inner.widest[1] <= outer.widest[1] + 0.002;
@@ -1331,63 +1334,72 @@ function _drawZoneLabels(doc, zoneGeo, env) {
     for (let i = 0; i < zoneGeo.length; i++) {
         const z = zoneGeo[i];
         const g = z.g;
-        const [fa, fb, x0, x1] = z.widest;
+        const [fa, fb] = z.widest;
         const nested = zoneGeo.some((o, j) => j !== i && o !== z && covers(o, z));
-        const wPx = x1 - x0;
         const segs = g.segs.filter(s => s.fa < fb && s.fb > fa);
+        if (!segs.length) continue;
 
-        // Plafond par secteur (haut du rectangle).
+        // Plafond par secteur (haut du rectangle), centré sur le secteur.
         doc.setFont('helvetica', 'bold'); doc.setFontSize(5.5); _setInk(doc, SIV_TX);
         const ceilRow = s => (s.up > yMax ? yT + 6.5 : yOf(s.up) + 6);
-        if (!nested && wPx >= 34) {
-            const s = segs[0];
-            if (s) {
-                const txt = (s.up > yMax ? '> ' : '') + _altLabel(s.up);
-                // Le label de croisière (« 3500 ft ») occupe le coin haut
-                // gauche quand la croisière domine l'échelle : dans ce cas le
-                // plafond s'ancre à DROITE de la bande pour ne pas le percuter.
-                const clashLeft = x0 + 3 < xL + 34 && Math.abs(ceilRow(s) - (yc != null ? yc - 4 : -99)) < 8;
-                doc.text(txt, clashLeft ? x1 - 3 : x0 + 3, ceilRow(s), clashLeft ? { align: 'right' } : undefined);
-            }
-        } else {
-            for (const s of segs) {
-                const cx = (xOf(s.fa) + xOf(s.fb)) / 2;
-                doc.text((s.up > yMax ? '> ' : '') + _altLabel(s.up), cx, ceilRow(s), { align: 'center' });
+        for (const s of segs) {
+            const sx0 = Math.max(xOf(s.fa), xL), sx1 = Math.min(xOf(s.fb), xR);
+            if (sx1 - sx0 < 3) continue;
+            const txt = (s.up > yMax ? '> ' : '') + _altLabel(s.up);
+            const cx = (sx0 + sx1) / 2;
+            // Zone englobante : plafond ancré à GAUCHE (libère la rangée
+            // haute pour les secteurs imbriqués) — à DROITE si le label de
+            // croisière occupe le coin haut gauche (croisière dominante).
+            const first = s === segs[0];
+            if (!nested && first) {
+                const clashLeft = sx0 + 3 < xL + 34 && Math.abs(ceilRow(s) - (yc != null ? yc - 4 : -99)) < 8;
+                doc.text(txt, clashLeft ? sx1 - 3 : sx0 + 3, ceilRow(s), clashLeft ? { align: 'right' } : undefined);
+            } else {
+                doc.text(txt, cx, ceilRow(s), { align: 'center' });
             }
         }
 
-        // Nom + fréquence.
-        const shortName = g.name.replace(/ INFO$/, '');
+        // Secteur + fréquence, un libellé par secteur.
         doc.setFont('helvetica', 'bold'); _setInk(doc, SIV_TX);
-        if (wPx < 34) {
-            // Bande étroite : texte vertical lu de bas en haut ; nom+fréquence
-            // sur 2 colonnes si une seule ne tient pas dans la hauteur.
-            doc.setFontSize(5.5);
-            const label = g.freq ? `${shortName} ${g.freq}` : shortName;
-            const hBand = z.yBotBand - z.yTopBand;
-            if (hBand > doc.getTextWidth(label) + 6) {
-                doc.text(label, x0 + 5, z.yBotBand - 3, { angle: 90 });
-            } else if (hBand > doc.getTextWidth(shortName) + 6) {
-                doc.text(shortName, x0 + 5, z.yBotBand - 3, { angle: 90 });
-                if (g.freq) doc.text(g.freq, x0 + 11, z.yBotBand - 3, { angle: 90 });
-            }
-        } else if (!nested) {
-            // Zone englobante : 2 lignes en haut à gauche (reste avant les
-            // bandes étroites imbriquées), sous la rangée des codes OACI.
+        for (const s of segs) {
+            const zone = (s.zone && s.zone.toUpperCase() !== g.name.toUpperCase()) ? s.zone : g.name.replace(/ INFO$/, '');
+            if (!zone) continue;
+            const sx0 = Math.max(xOf(s.fa), xL), sx1 = Math.min(xOf(s.fb), xR);
+            const wSeg = sx1 - sx0;
+            if (wSeg < 3) continue;
+
             doc.setFontSize(6);
-            let ny = z.clamped ? yT + 24 : z.yTopBand + 17;
-            if (Math.abs(ny - codeY) < 8) ny = codeY + 10;
-            doc.text(shortName, x0 + 3, ny);
-            if (g.freq) doc.text(g.freq, x0 + 3, ny + 7.5);
-        } else {
-            // Zone imbriquée large : nom + fréquence centrés, lignes occupées
-            // évitées par décalage (croisière, codes OACI, plafonds).
-            doc.setFontSize(6.5);
-            const label = g.freq ? `${shortName} ${g.freq}` : shortName;
-            let ny = (z.yTopBand + z.yBotBand) / 2 + 2;
-            const rows = [yc, codeY, ...segs.map(ceilRow)].filter(r => r != null);
-            for (const r of rows) if (Math.abs(ny - r) < 8) ny = r + 10;
-            doc.text(label, (x0 + x1) / 2, ny, { align: 'center' });
+            const zoneW = doc.getTextWidth(zone);
+            const freqW = g.freq ? doc.getTextWidth(g.freq) : 0;
+            if (wSeg > zoneW + 8 && (!g.freq || wSeg > freqW + 8)) {
+                // Horizontal : 2 lignes centrées dans le secteur ; zone
+                // englobante → sous la rangée des codes OACI (les bandes
+                // étroites imbriquées occupent le milieu), imbriquée → au
+                // centre en évitant les lignes occupées.
+                let ny = nested ? (z.yTopBand + z.yBotBand) / 2 + 2
+                                : Math.max(z.clamped ? yT + 24 : z.yTopBand + 17, ceilRow(s) + 12);
+                if (Math.abs(ny - codeY) < 8) ny = codeY + 10;
+                if (nested) {
+                    const rows = [yc, codeY, ...segs.map(ceilRow)].filter(r => r != null);
+                    for (const r of rows) if (Math.abs(ny - r) < 8) ny = r + 10;
+                }
+                doc.text(zone, (sx0 + sx1) / 2, ny, { align: 'center' });
+                if (g.freq) doc.text(g.freq, (sx0 + sx1) / 2, ny + 7.5, { align: 'center' });
+            } else {
+                // Vertical le long du bord gauche du secteur, lu de bas en
+                // haut ; s'arrête sous la rangée des codes OACI ; 2 colonnes
+                // (secteur | fréquence) si la hauteur ne suffit pas.
+                doc.setFontSize(5.5);
+                const label = g.freq ? `${zone} ${g.freq}` : zone;
+                const maxTop = Math.max(z.yTopBand + 5, codeY + 8);
+                const avail = z.yBotBand - 3 - maxTop;
+                if (avail > doc.getTextWidth(label) + 6) {
+                    doc.text(label, sx0 + 5, z.yBotBand - 3, { angle: 90 });
+                } else if (avail > Math.max(zoneW, freqW) + 6) {
+                    doc.text(zone, sx0 + 5, z.yBotBand - 3, { angle: 90 });
+                    if (g.freq) doc.text(g.freq, sx0 + 11, z.yBotBand - 3, { angle: 90 });
+                }
+            }
         }
     }
 }
