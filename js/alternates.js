@@ -1,7 +1,7 @@
 import { state, I18N, fetchAvecRelais, memoGet } from './core.js';
 import { getAirportByICAO } from './ui-module.js';
 import { parseVisiToMeters, getCeiling, CAT_COLORS } from './core.js';
-import { OPENAIP_API_KEY } from './config.local.js';
+import { fetchOpenAipItems } from './airspaces.js';
 
 // ====================================================================
 // ALTERNATES DE ROUTE — TOUS les aérodromes à ± maxOffsetNm de la route
@@ -109,23 +109,12 @@ async function _fetchOpenAipAirports(minLat, minLon, maxLat, maxLon) {
     const byId = new Map();
     for (const [t0, t1, t2, t3] of tiles) {
         const url = `https://api.core.openaip.net/api/airports?bbox=${q(t1)},${q(t0)},${q(t3)},${q(t2)}&limit=1000`;
-        for (let attempt = 0; attempt < 2; attempt++) {
-            try {
-                const res = await fetch(url, {
-                    headers: { 'x-openaip-api-key': OPENAIP_API_KEY },
-                    signal: AbortSignal.timeout(12000),
-                });
-                if (res.ok) {
-                    for (const a of ((await res.json()).items || [])) {
-                        byId.set(a._id ?? JSON.stringify(a.name) + byId.size, a);
-                    }
-                    break;
-                }
-                if (res.status !== 429 && res.status < 500) break;   // erreur définitive
-            } catch { /* réseau : on retente une fois */ }
-            await new Promise(r => setTimeout(r, 900));
+        // File partagée openAIP (airspaces.js) : sérialisée et espacée —
+        // l'API refuse les rafales (429 sans en-têtes CORS).
+        const items = await fetchOpenAipItems(url);
+        for (const a of (items || [])) {
+            byId.set(a._id ?? JSON.stringify(a.name) + byId.size, a);
         }
-        if (tiles.length > 1) await new Promise(r => setTimeout(r, 200));
     }
     return byId.size ? [...byId.values()] : null;
 }
