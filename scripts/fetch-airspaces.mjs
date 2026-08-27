@@ -1,25 +1,29 @@
 #!/usr/bin/env node
 // ============================================================================
-// FETCH AIRSPACES — régénère data/airspaces/<famille>.json depuis openAIP.
+// FETCH AIRSPACES — base mondiale d'espaces aériens, cellule par cellule.
 //
-//   node scripts/fetch-airspaces.mjs
+//   node scripts/fetch-airspaces.mjs [--budget-minutes=300]
 //
-// Exporte les espaces aériens de la FRANCE ÉLARGIE (lat 41..52, lon -6..10 :
-// France + Benelux + ouest Suisse + Channel) répartis PAR FAMILLE — la même
-// classification que le menu « Espaces » de l'app (js/airspaces.js) :
-//   ctr.json  tma.json  siv.json  atz.json  rpd.json  tmz.json  autres.json
-// plus index.json (couverture + compteurs + date).
+// Objectif : remplacer TOTALEMENT l'API openAIP côté client (elle refuse
+// les rafales : ~4 requêtes/minute puis 429 sans en-têtes CORS). Deux modes
+// de sortie complémentaires dans data/airspaces/ :
 //
-// Servis par notre serveur (comme data/radio-points.json), ces fichiers
-// remplacent l'API openAIP pour toute vue dans la couverture : l'API refuse
-// les rafales (~4 requêtes par fenêtre glissante → 429 sans en-têtes CORS),
-// ces fichiers rendent la carte instantanée et silencieuse.
+//   1. cells/{lat}_{lon}.json — MONDE ENTIER découpé en cellules 1°,
+//      chargées à la demande par la carte (comme des tuiles). Chaque cellule
+//      contient toutes les familles (le rendu filtre selon les cases).
+//   2. {ctr,tma,siv,atz,rpd,tmz,autres}.json — France élargie par famille
+//      (couverture 41-52N/-6-10E) : chemin instantané pour la France,
+//      familles chargées selon les cases cochées.
 //
-// Filtres à l'export (les mêmes que le client) : zones administratives
-// FIR/UIR/LTA et planchers > 5000 ft écartés. Coordonnées arrondies à
-// 4 décimales (~10 m). Format compact {i,n,ty,ic,lo,up,f,r,g} détaillé
-// dans _expandFileItem() côté client.
+// Le crawl mondial est INCRÉMENTAL : l'état (data/airspaces/.crawl.json,
+// committé) mémorise le curseur ; chaque exécution avance pendant le budget
+// imparti puis s'arrête proprement (cron quotidien → le monde est couvert en
+// quelques jours, puis rafraîchi en continu). Les cellules d'une tuile 5°
+// sont intégralement remplacées à chaque passage (une cellule 1° appartient
+// à une seule tuile 5° → pas de fusion ambiguë).
 //
+// Filtres à l'export (identiques au client) : FIR/UIR/LTA et planchers
+// > 5000 ft écartés. Coordonnées arrondies à 4 décimales (~10 m).
 // Clé API : env OPENAIP_API_KEY (GitHub Actions), à défaut config.local.js.
 // ============================================================================
 import fs from 'node:fs';
@@ -27,14 +31,16 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const OUT_DIR = path.join(ROOT, 'data', 'airspaces');
+const DIR = path.join(ROOT, 'data', 'airspaces');
+const CELLS_DIR = path.join(DIR, 'cells');
+const CRAWL_STATE = path.join(DIR, '.crawl.json');
 const BASE = 'https://api.core.openaip.net/api/airspaces';
 const LIMIT = 200;
-const DELAY_MS = 2500;      // l'API refuse les rafales (429 Cloudflare)
-const MAX_RETRIES = 5;
+const DELAY_MS = 2500;
 
-// Couverture France élargie.
-const COVERAGE = [41, -6, 52, 10];
+const args = Object.fromEntries(process.argv.slice(2).map(a => a.replace(/^--/, '').split('=')));
+const BUDGET_MIN = Number(args['budget-minutes'] || 0) || 0;
+const DEADLINE = BUDGET_MIN ? Date.now() + BUDGET_MIN * 60000 : Infinity;
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -48,9 +54,9 @@ async function getKey() {
     }
 }
 
-// --- Classification type → famille : RÉPLIQUE EXACTE de js/airspaces.js
-// (TYPE_MAP + _decodeType + _KIND_TO_GROUP). Toute évolution du menu
-// « Espaces » côté client doit être reportée ici. ---
+// Classification type → famille : RÉPLIQUE EXACTE de js/airspaces.js
+// (TYPE_MAP + _decodeType + _KIND_TO_GROUP) — toute évolution du menu
+// « Espaces » côté client doit être reportée ici.
 const TYPE_MAP = {
     0: 'OTHER', 1: 'DROP', 2: 'DANGER', 3: 'PROHIBITED', 4: 'CTR', 5: 'TMA',
     6: 'ATZ', 7: 'TMA', 8: 'TMA', 9: 'TMA', 10: 'TMA', 11: 'TMZ', 12: 'RMZ',
@@ -60,13 +66,6 @@ const TYPE_MAP = {
     26: 'GLIDER', 27: 'GLIDER', 28: 'ACRO', 29: 'DROP', 30: 'OTHER',
     31: 'OTHER', 32: 'OTHER', 33: 'SIV', 34: 'CTA', 35: 'OTHER', 36: 'OTHER',
 };
-const KIND_TO_FAMILY = {
-    CTR: 'ctr', TMA: 'tma', CTA: 'tma', SIV: 'siv', ATZ: 'atz',
-    RESTRICTED: 'rpd', PROHIBITED: 'rpd', DANGER: 'rpd', DROP: 'rpd',
-    TMZ: 'tmz', RMZ: 'tmz', GLIDER: 'autres', ACRO: 'autres', OTHER: 'autres',
-};
-const FAMILIES = ['ctr', 'tma', 'siv', 'atz', 'rpd', 'tmz', 'autres'];
-
 function decodeKind(as) {
     if (typeof as.type === 'number' && TYPE_MAP[as.type]) return TYPE_MAP[as.type];
     const t = String(as.type || '').toUpperCase();
@@ -94,7 +93,6 @@ function decodeKind(as) {
     if (/GLIDER|PLANEUR|VOL.A.VOILE/.test(name)) return 'GLIDER';
     return 'OTHER';
 }
-
 const ADMIN_RE = /\bFIR\b|\bUIR\b|\bLTA\b/;
 function limitToFt(lim) {
     if (!lim || !Number.isFinite(lim.value)) return null;
@@ -103,20 +101,50 @@ function limitToFt(lim) {
     return Math.round(lim.value);
 }
 
-// Tuiles ≤ 5° couvrant la zone (limite bbox openAIP).
-function tilesFor(cov) {
-    const [lat0, lon0, lat1, lon1] = cov;
+// Tuiles 5° du monde, filtrées par un masque continental GROSSIER (les
+// tuiles pleine mer renverraient 0 item — une requête économisée chacune).
+const LAND_MASK = [
+    [-58, -125, 72, -52],    // Amérique du Nord (contiguë + Alaska est)
+    [15, -95, 33, -60],      // Caraïbes / golfe du Mexique
+    [-56, -82, 13, -34],     // Amérique du Sud
+    [-48, 167, -33, 179],    // Nouvelle-Zélande
+    [34, -10, 72, 42],       // Europe (jusqu'à l'Oural)
+    [71, 25, 78, 60],        // Nouvelle-Zemble / nord Russie
+    [12, -18, 38, 52],       // Afrique nord-ouest + Proche-Orient
+    [-36, 8, 12, 52],        // Afrique subsaharienne + corne
+    [-11, 90, 60, 128],      // Asie (Russie sud, Chine, Inde, SE asiatique)
+    [-9, 92, -1, 120],       // Indonésie
+    [47, 127, 54, 143],      // Japon / Sakhaline
+    [63, 165, 72, 180],      // Extrême-Orient russe
+    [-48, 110, 0, 155],      // Australie + Mélanésie
+    [47, -8, 61, -1],        // Royaume-Uni / Irlande
+    [-55, -75, -63, -57],    // Géorgie du Sud (pouches australes)
+    [60, -50, 84, -20],      // Groenland
+    [-80, -180, -62, -160],  // Antarctique péninsule (ouest)
+    [-85, -10, -70, 60],     // Antarctique (est + côte)
+    [63, 10, 71, 30],        // Scandinavie nord
+    [70, 42, 73, 75],        // Sibérie nord-est
+    [24, 44, 42, 63],        // Moyen-Orient / Caucase
+];
+function tilesWorld() {
     const tiles = [];
-    for (let lat = lat0; lat < lat1; lat += 5) {
-        for (let lon = lon0; lon < lon1; lon += 5) {
-            tiles.push([lat, lon, Math.min(lat + 5, lat1), Math.min(lon + 5, lon1)]);
+    for (let lat = -85; lat < 85; lat += 5) {
+        for (let lon = -180; lon < 180; lon += 5) {
+            const inLand = LAND_MASK.some(([a, b, c, d]) =>
+                lat + 5 > a && lat < c && lon + 5 > b && lon < d);
+            if (inLand) tiles.push([lat, lon, lat + 5, lon + 5]);
         }
     }
+    // Priorité au Europe/France : le premier passage du crawl couvre d'abord
+    // la zone de vol de l'utilisateur, le monde se complète ensuite.
+    const d = (t) => Math.abs(t[0] + 2.5 - 47) + Math.abs(((t[1] + 2.5 - 2 + 540) % 360) - 180) * 0.5;
+    tiles.sort((a, b) => d(a) - d(b));
     return tiles;
 }
 
 async function fetchPage(key, bbox, page) {
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    for (let attempt = 0; attempt < 5; attempt++) {
+        if (Date.now() > DEADLINE) return 'budget';
         try {
             const url = `${BASE}?bbox=${bbox[1]},${bbox[0]},${bbox[3]},${bbox[2]}&limit=${LIMIT}&page=${page}`;
             const res = await fetch(url, { headers: { 'x-openaip-api-key': key } });
@@ -125,17 +153,17 @@ async function fetchPage(key, bbox, page) {
                 await sleep(20000);
                 continue;
             }
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            if (res.status === 524 || res.status === 502 || res.status === 503) throw new Error('HTTP ' + res.status);
+            if (!res.ok) return null;   // définitif
             return (await res.json()).items || [];
         } catch (e) {
-            console.log(`  erreur page ${page} : ${e.message} — nouvelle tentative`);
-            await sleep(5000);
+            console.log(`  erreur page ${page} : ${e.message} — retente`);
+            await sleep(8000);
         }
     }
     return null;
 }
 
-// Compacte une zone : champs utiles seulement, géométrie arrondie 4 déc.
 const R4 = (v) => Math.round(v * 1e4) / 1e4;
 function compactItem(it) {
     const g = it.geometry;
@@ -146,66 +174,87 @@ function compactItem(it) {
     else if (g?.type === 'LineString') geom = { t: 3, c: g.coordinates.map(([lon, lat]) => [R4(lon), R4(lat)]) };
     const lim = (l) => l && Number.isFinite(l.value) ? [l.value, l.unit ?? 1] : null;
     return {
-        i: it._id,
-        n: it.name || it.designator || '',
-        ty: it.type ?? null,
-        ic: it.icaoClass ?? null,
-        lo: lim(it.lowerLimit),
-        up: lim(it.upperLimit),
+        i: it._id, n: it.name || it.designator || '', ty: it.type ?? null,
+        ic: it.icaoClass ?? null, lo: lim(it.lowerLimit), up: lim(it.upperLimit),
         f: Array.isArray(it.frequencies) && it.frequencies.length ? it.frequencies : null,
         r: it.radius && Number.isFinite(it.radius.value) ? [it.radius.value] : null,
         g: geom,
     };
 }
 
+// Cellule 1° d'une zone : centroïde approximatif (1er point du 1er anneau).
+function cellOf(it) {
+    const g = it.geometry?.coordinates;
+    const first = Array.isArray(g?.[0]?.[0]) ? g[0][0] : g;
+    const lon = Number(first?.[0]), lat = Number(first?.[1]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    return [Math.floor(lat), Math.floor(lon)];
+}
+
 async function main() {
     const key = await getKey();
-    const byId = new Map();
-    const tiles = tilesFor(COVERAGE);
-    console.log(`Export espaces ${FAMILIES.length} familles, couverture ${COVERAGE} — ${tiles.length} tuiles ≤ 5°`);
+    fs.mkdirSync(CELLS_DIR, { recursive: true });
 
-    for (const bbox of tiles) {
-        let page = 1;
-        while (page < 30) {
+    let state = { cursor: 0, updated: 0 };
+    try { state = { ...state, ...JSON.parse(fs.readFileSync(CRAWL_STATE, 'utf8')) }; } catch { /* premier run */ }
+    const tiles = tilesWorld();
+    console.log(`Crawl mondial : ${tiles.length} tuiles 5° (masque continental), curseur ${state.cursor}, budget ${BUDGET_MIN || '∞'} min`);
+
+    const now = new Date().toISOString();
+    let touched = 0;
+    for (let ti = state.cursor; ti < tiles.length; ti++) {
+        const bbox = tiles[ti];
+        // items valides, groupés par cellule 1°
+        const byCell = new Map();
+        let page = 1, failed = false;
+        while (page < 40) {
             const items = await fetchPage(key, bbox, page);
-            if (!items) { console.log(`  tuile ${bbox} page ${page} : abandon après ${MAX_RETRIES} essais`); break; }
+            if (items === 'budget') { console.log('Budget épuisé — arrêt propre.'); failed = 'budget'; break; }
+            if (items === null) { console.log(`  tuile ${bbox.join(',')} page ${page} : abandon`); failed = true; break; }
             for (const it of items) {
                 const nm = String(it.name || it.designator || '').toUpperCase();
-                if (ADMIN_RE.test(nm)) continue;                      // FIR/UIR/LTA
-                const loFt = limitToFt(it.lowerLimit) ?? 0;
-                if (loFt > 5000) continue;                            // hors VFR
-                if (limitToFt(it.upperLimit) == null) continue;       // plafond inconnu
-                byId.set(it._id, it);
+                if (ADMIN_RE.test(nm)) continue;
+                if ((limitToFt(it.lowerLimit) ?? 0) > 5000) continue;
+                if (limitToFt(it.upperLimit) == null) continue;
+                const cell = cellOf(it);
+                if (!cell) continue;
+                const k = cell.join('_');
+                (byCell.get(k) ?? byCell.set(k, new Map()).get(k)).set(it._id, compactItem(it));
             }
-            console.log(`  tuile ${bbox.join(',')} page ${page} : ${items.length} items (total ${byId.size})`);
             if (items.length < LIMIT) break;
             page++;
             await sleep(DELAY_MS);
         }
+        if (failed === 'budget') { state.cursor = ti; break; }
+        if (!failed) {
+            // Remplace les cellules couvertes par cette tuile (une cellule
+            // 1° appartient à une seule tuile 5°) ; cellule vide → fichier
+            // vide (cache négatif côté client).
+            for (let lat = bbox[0]; lat < bbox[2]; lat++) {
+                for (let lon = bbox[1]; lon < bbox[3]; lon++) {
+                    const k = `${lat}_${lon}`;
+                    const arr = byCell.has(k) ? [...byCell.get(k).values()] : [];
+                    fs.writeFileSync(path.join(CELLS_DIR, `${k}.json`), JSON.stringify({ ts: now, n: arr.length, items: arr }));
+                    touched++;
+                }
+            }
+            console.log(`  tuile ${bbox.join(',')} : ${[...byCell.values()].reduce((a, m) => a + m.size, 0)} zones → ${touched} cellules écrites`);
+        } else {
+            // Tuile abandonnée (pages en échec) : on AVANCE quand même — le
+            // cycle suivant du crawl la retentera (sinon une tuile malade
+            // bloquerait le curseur indéfiniment).
+            console.log(`  tuile ${bbox.join(',')} : partielle/échec, avancée (retentée au prochain cycle)`);
+        }
+        state.cursor = ti + 1;
+        state.updated = touched;
+        fs.writeFileSync(CRAWL_STATE, JSON.stringify(state));
+        if (Date.now() > DEADLINE) { console.log('Budget épuisé — arrêt propre.'); break; }
         await sleep(DELAY_MS);
     }
 
-    // Répartition par famille (classification client).
-    const byFamily = Object.fromEntries(FAMILIES.map(f => [f, []]));
-    for (const it of byId.values()) {
-        const fam = KIND_TO_FAMILY[decodeKind(it)] || 'autres';
-        byFamily[fam].push(compactItem(it));
-    }
-
-    fs.mkdirSync(OUT_DIR, { recursive: true });
-    const generatedAt = new Date().toISOString();
-    const counts = {};
-    for (const fam of FAMILIES) {
-        counts[fam] = byFamily[fam].length;
-        fs.writeFileSync(path.join(OUT_DIR, `${fam}.json`), JSON.stringify({
-            generatedAt, coverage: COVERAGE, count: byFamily[fam].length, items: byFamily[fam],
-        }));
-    }
-    fs.writeFileSync(path.join(OUT_DIR, 'index.json'), JSON.stringify({ generatedAt, coverage: COVERAGE, counts }));
-    const total = Object.values(counts).reduce((a, b) => a + b, 0);
-    const size = FAMILIES.reduce((a, f) => a + fs.statSync(path.join(OUT_DIR, `${fam2file(f)}`)).size, 0);
-    function fam2file(f) { return `${f}.json`; }
-    console.log(`OK : ${total} zones — ${JSON.stringify(counts)} — ${(size / 1024 / 1024).toFixed(2)} Mo au total`);
+    if (state.cursor >= tiles.length) state.cursor = 0;   // cycle suivant
+    fs.writeFileSync(CRAWL_STATE, JSON.stringify(state));
+    console.log(`OK : curseur ${state.cursor}/${tiles.length}, ${touched} cellules écrites ce run.`);
 }
 
 main().catch(e => { console.error(e); process.exit(1); });

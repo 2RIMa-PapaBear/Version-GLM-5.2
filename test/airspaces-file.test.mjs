@@ -1,8 +1,8 @@
-// Tests de la source FICHIER des espaces aériens (data/airspaces/*.json) :
-// expansion du format compact et test de couverture France élargie.
+// Tests de la source FICHIER des espaces aériens (data/airspaces/cells/) :
+// expansion du format compact en forme openAIP.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { _expandFileItem, _withinFileCoverage } from '../js/airspaces.js';
+import { _expandFileItem } from '../js/airspaces.js';
 
 test('_expandFileItem : polygone compact → forme openAIP complète', () => {
     const c = {
@@ -31,12 +31,4 @@ test('_expandFileItem : Point+rayon et champs absents', () => {
 
     const vide = _expandFileItem({ i: 'y', n: 'W', ty: 0, lo: null, up: null, f: null, g: null });
     assert.equal(vide.geometry, null);
-});
-
-test('_withinFileCoverage : couverture France élargie [41,-6,52,10]', () => {
-    // La couverture n'étant chargée qu'au runtime (index.json), le test
-    // simule via réassignation du module impossible — on teste la fonction
-    // pure sur la valeur documentée en l'injectant par son état interne :
-    // sans couverture connue → toujours faux (chemin API).
-    assert.equal(_withinFileCoverage(48, 2, 49, 3), false);
 });
