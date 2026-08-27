@@ -159,18 +159,17 @@ const OA_MIN_SPACING_MS = 1500;
 const OA_BACKOFF_MS = 20000;
 
 // ---------------------------------------------------------------------------
-// SOURCE FICHIER — espaces aériens de la couverture France élargie servis
-// par NOTRE serveur (data/airspaces/<famille>.json, régénérés chaque semaine
-// par le cron GitHub scripts/fetch-airspaces.mjs). Toute vue dans la
-// couverture s'affiche depuis ces fichiers : instantané, aucune requête
-// API (donc aucun 429). L'API ne sert que les vues hors couverture.
+// SOURCE FICHIER — espaces aériens MONDIAUX par cellule 1°, servis par
+// NOTRE serveur (data/airspaces/cells/{lat}_{lon}.json, régénérés par le
+// crawl quotidien du cron GitHub scripts/fetch-airspaces.mjs). Une vue est
+// couverte par sa grille de cellules : chargement à la demande (comme des
+// tuiles de carte), aucune requête API → aucun 429. Un fichier vide = zone
+// crawlée sans espaces ; une absence de fichier (404) = zone pas encore
+// crawlée → repli API pour ces cellules seulement.
 // ---------------------------------------------------------------------------
-const FILE_FAMILIES = ['ctr', 'tma', 'siv', 'atz', 'rpd', 'tmz', 'autres'];
-const FILE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const _fileItems = new Map();        // id → item openAIP-shape (familles chargées)
-const _fileLoaded = new Set();       // familles déjà en mémoire
-const _filePending = new Map();      // famille → promesse
-let _fileCoverage = null;            // [minLat, minLon, maxLat, maxLon]
+const CELL_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const _cellCache = new Map();        // "lat_lon" → items[] | null (404)
+const _cellPending = new Map();
 
 /** Convertit un item compact du fichier en forme openAIP (tout le reste du
  *  module — rendu, filtres, corridor du profil — travaille ainsi).
@@ -193,59 +192,59 @@ export function _expandFileItem(c) {
     };
 }
 
-async function _ensureFileIndex() {
-    if (_fileCoverage) return;
-    const d = await _fetchJsonWithCache('data/airspaces/index.json', 'file:index');
-    if (d?.coverage) _fileCoverage = d.coverage;
-}
-
-async function _fetchJsonWithCache(url, idbKey) {
-    const cached = await _idbGet(idbKey);
-    if (cached?.data && Date.now() - cached.ts < FILE_TTL_MS) return cached.data;
-    try {
-        const res = await fetch(url + `?t=${(cached?.ts || 0)}`, { signal: AbortSignal.timeout(15000) });
-        if (!res.ok) return cached?.data || null;
-        const data = await res.json();
-        _idbPut(idbKey, data);
-        return data;
-    } catch { return cached?.data || null; }
-}
-
-/** Charge (une fois) les familles demandées depuis le serveur. Retourne le
- *  nombre total d'items disponibles (toutes familles chargées). */
-async function _ensureFileFamilies(families) {
-    const wanted = families || FILE_FAMILIES;
-    await Promise.all(wanted.filter(f => !_fileLoaded.has(f)).map(async (fam) => {
-        if (!_filePending.has(fam)) {
-            _filePending.set(fam, (async () => {
-                const d = await _fetchJsonWithCache(`data/airspaces/${fam}.json`, `file:${fam}`);
-                if (d?.coverage) _fileCoverage = d.coverage;
-                for (const c of (d?.items || [])) {
-                    const it = _expandFileItem(c);
-                    _fileItems.set(it._id, it);
+/** Items d'une cellule 1° : depuis le cache IndexedDB (7 j) ou notre serveur.
+ *  Retourne items[] (vide si crawlée sans zones) ou null si le fichier
+ *  n'existe pas encore (404 : zone non crawlée → repli API). */
+function _loadCellItems(lat, lon) {
+    const k = `${lat}_${lon}`;
+    if (_cellCache.has(k)) return Promise.resolve(_cellCache.get(k));
+    if (!_cellPending.has(k)) {
+        _cellPending.set(k, (async () => {
+            const idbKey = `cellfile:${k}`;
+            const cached = await _idbGet(idbKey);
+            if (cached?.data && Date.now() - cached.ts < CELL_TTL_MS) {
+                _cellCache.set(k, cached.data);
+                return cached.data;
+            }
+            try {
+                const res = await fetch(`data/airspaces/cells/${k}.json?t=${cached?.ts || 0}`, {
+                    signal: AbortSignal.timeout(12000),
+                });
+                if (res.status === 404) {
+                    _cellCache.set(k, null);   // pas encore crawlée (mémoire seulement : re-essaiera)
+                    return null;
                 }
-                if (d) _fileLoaded.add(fam);
-                _filePending.delete(fam);
-            })());
-        }
-        await _filePending.get(fam);
-    }));
-    return _fileItems.size;
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const items = (await res.json()).items.map(_expandFileItem);
+                _idbPut(idbKey, items);
+                _cellCache.set(k, items);
+                return items;
+            } catch {
+                _cellCache.set(k, cached?.data || null);
+                return cached?.data || null;
+            } finally {
+                _cellPending.delete(k);
+            }
+        })());
+    }
+    return _cellPending.get(k);
 }
 
-/** La bbox est-elle entièrement dans la couverture du fichier ? (null si
- *  la couverture n'est pas encore connue → considérée hors couverture.)
- *  Exporté pour les tests. */
-export function _withinFileCoverage(minLat, minLon, maxLat, maxLon) {
-    if (!_fileCoverage) return false;
-    const [a, b, c, d] = _fileCoverage;
-    return minLat >= a && maxLat <= c && minLon >= b && maxLon <= d;
-}
-
-/** Items fichier pour une bbox (bbox d'ESSAI grossière : on retourne tout —
- *  le rendu et le corridor filtrent géométriquement de toute façon). */
-function _fileItemsForArea() {
-    return [..._fileItems.values()];
+/** Charge les cellules 1° couvrant une bbox quantifiée. Retourne
+ *  { items, missing } : union des items fichier + cellules sans fichier. */
+async function _loadCellsGrid(minLat, minLon, maxLat, maxLon) {
+    const cells = [];
+    for (let lat = Math.floor(minLat); lat < Math.ceil(maxLat); lat++)
+        for (let lon = Math.floor(minLon); lon < Math.ceil(maxLon); lon++)
+            cells.push([lat, lon]);
+    const results = await Promise.all(cells.map(([la, lo]) => _loadCellItems(la, lo)));
+    const items = [];
+    const missing = [];
+    results.forEach((r, i) => {
+        if (r) items.push(...r);
+        else missing.push(cells[i]);
+    });
+    return { items, missing };
 }
 
 export function fetchOpenAipItems(url) {
@@ -301,13 +300,24 @@ const _memTiles = new Map();
  * Retourne les items openAIP bruts ([] si indisponible).
  */
 export async function fetchAirspacesForBbox(minLat, minLon, maxLat, maxLon) {
-    // Source fichier (couverture France élargie) : AUCUNE requête API pour
-    // les routes nationales — instantané et immunisé contre les 429.
-    await _ensureFileIndex();
-    const fq = (x) => Math.floor(x);
-    if (_withinFileCoverage(fq(minLat), fq(minLon), Math.ceil(maxLat), Math.ceil(maxLon))) {
-        await _ensureFileFamilies();
-        if (_fileItems.size) return _fileItemsForArea();
+    // SOURCE FICHIER MONDIALE : les cellules 1° du corridor sont chargées
+    // depuis notre serveur (cache IndexedDB) — aucune requête API pour les
+    // zones crawlées. Repli API (tuiles ≤ 5°, file sérialisée) seulement
+    // pour les cellules sans fichier.
+    {
+        const lat0 = Math.floor(minLat), lon0 = Math.floor(minLon);
+        let lat1 = Math.ceil(maxLat), lon1 = Math.ceil(maxLon);
+        if (lat1 - lat0 > 12) lat1 = lat0 + 12;   // garde-fou corridor très long
+        if (lon1 - lon0 > 12) lon1 = lon0 + 12;
+        const { items, missing } = await _loadCellsGrid(lat0, lon0, lat1, lon1);
+        if (items.length && !missing.length) return items;
+        if (items.length && missing.length) {
+            // Mélange : complète par l'API sur la zone manquante.
+            const api = await fetchAirspacesForBbox(missing[0][0], Math.min(...missing.map(c => c[1])), Math.max(...missing.map(c => c[0])) + 1, Math.max(...missing.map(c => c[1])) + 1);
+            const byId = new Map(items.map(it => [it._id, it]));
+            for (const it of (api || [])) byId.set(it._id, it);
+            return [...byId.values()];
+        }
     }
     const q = (x) => Math.floor(x);
     const cl = (x) => Math.ceil(x);
@@ -488,78 +498,32 @@ export function createAirspaceController(map) {
 
     async function loadForBounds(bounds) {
         const epoch = ++_loadEpoch;
-
-        // SOURCE FICHIER (couverture France élargie, servie par notre
-        // serveur) : familles actives chargées une fois puis cachées —
-        // affichage instantané, ZÉRO requête API (donc aucun 429). Hors
-        // couverture, l'API prend le relais et les fichiers complètent la
-        // partie française de la vue.
-        await _ensureFileIndex();
-        const q = (x) => Math.floor(x);
-        const vMinLat = q(bounds.getSouth()), vMinLon = q(bounds.getWest());
-        const vMaxLat = Math.ceil(bounds.getNorth()), vMaxLon = Math.ceil(bounds.getEast());
-        const fams = [...activeGroups];
-        if (_withinFileCoverage(vMinLat, vMinLon, vMaxLat, vMaxLon)) {
-            const fileKey = 'file:' + fams.slice().sort().join(',');
-            if (fileKey !== lastBboxKey || !loaded) {
-                await _ensureFileFamilies(fams);
-                if (epoch !== _loadEpoch) return;
-                lastBboxKey = fileKey; loaded = true;
-                lastItems = _fileItemsForArea();
-                _render(lastItems);
-            }
-            return;
-        }
-
-        // GRILLE 1° : la vue est couverte par des CELLULES indépendantes,
-        // chacune cachée séparément dans IndexedDB. Un déplacement ne
-        // retélécharge que les cellules réellement NOUVELLES : les zones
-        // déjà consultées s'affichent immédiatement, sans attendre le
-        // réseau (avant : la clé = bbox entière de la vue, donc chaque
-        // nouveau cadrage repartait du réseau même en terrain connu).
-        const minLat = q(bounds.getSouth()), minLon = q(bounds.getWest());
+        const minLat = Math.floor(bounds.getSouth()), minLon = Math.floor(bounds.getWest());
         let maxLat = Math.ceil(bounds.getNorth()), maxLon = Math.ceil(bounds.getEast());
-        if (maxLat - minLat > 5) maxLat = minLat + 5;   // limite API openAIP
+        if (maxLat - minLat > 5) maxLat = minLat + 5;   // limite API openAIP (repli)
         if (maxLon - minLon > 5) maxLon = minLon + 5;
-
-        const cells = [];
-        for (let lat = minLat; lat < maxLat; lat++)
-            for (let lon = minLon; lon < maxLon; lon++) cells.push([lat, lon]);
-        if (!cells.length) return;
-        const viewKey = cells.map(c => c.join('_')).join('|');
+        const viewKey = `${minLat}_${minLon}_${maxLat}_${maxLon}`;
         if (viewKey === lastBboxKey && loaded) return;
 
-        // 1. Union des cellules déjà en cache (fraîches d'abord, périmées en
-        //    repli) → rendu immédiat si elle n'est pas vide. Les items du
-        //    FICHIER couvrant la partie française de la vue s'y ajoutent.
+        // SOURCE FICHIER MONDIALE : la grille de cellules 1° de la vue est
+        // chargée depuis NOTRE serveur (cache IndexedDB 7 j — un déplacement
+        // en terrain connu n'importe plus rien). Les cellules SANS fichier
+        // (404 : pas encore crawlées) passent par l'API en repli, en UNE
+        // requête fusionnée à travers la file sérialisée.
+        const { items: fileItems, missing } = await _loadCellsGrid(minLat, minLon, maxLat, maxLon);
+        if (epoch !== _loadEpoch) return;
+        lastBboxKey = viewKey; loaded = true;
+
         const byId = new Map();
         const absorb = (items) => {
             for (const it of (items || [])) byId.set(it._id ?? JSON.stringify(it.name) + byId.size, it);
         };
-        if (_fileCoverage) {
-            const [fa, fb_, fc, fd] = _fileCoverage;
-            if (vMinLat <= fc && vMaxLat >= fa && vMinLon <= fd && vMaxLon >= fb_) {
-                await _ensureFileFamilies(fams);
-                if (epoch !== _loadEpoch) return;
-                absorb(_fileItemsForArea());
-            }
-        }
-        const missing = [];
-        for (const [lat, lon] of cells) {
-            const cached = await _idbGet(`cell_${lat}_${lon}`);
-            if (cached?.data && cached.ts > Date.now() - TTL_MS) absorb(cached.data);
-            else { missing.push([lat, lon]); if (cached?.data) absorb(cached.data); }
-        }
-        lastBboxKey = viewKey; loaded = true;
+        absorb(fileItems);
         if (byId.size) {
             lastItems = [...byId.values()];
             _render(lastItems);
         }
 
-        // 2. Cellules jamais vues : UNE SEULE requête fusionnée pour toute
-        //    la zone manquante (l'API refuse les rafales — file partagée
-        //    fetchOpenAipItems), réponse répartie par centroïde dans chaque
-        //    cellule de la vue pour les réutilisations futures.
         if (missing.length) {
             const mLat0 = Math.min(...missing.map(c => c[0]));
             const mLat1 = Math.max(...missing.map(c => c[0])) + 1;
@@ -567,21 +531,8 @@ export function createAirspaceController(map) {
             const mLon1 = Math.max(...missing.map(c => c[1])) + 1;
             const items = await fetchOpenAipItems(`${BASE_URL}?bbox=${mLon0},${mLat0},${mLon1},${mLat1}&limit=200`);
             if (epoch !== _loadEpoch) return;   // la vue a changé : abandonne
-            if (items) {
-                const missingKeys = new Set(missing.map(c => c.join('_')));
-                const buckets = new Map([...missingKeys].map(k => [k, []]));
-                for (const it of items) {
-                    // Centroïde approximatif : 1er point du 1er anneau
-                    // (ou position directe pour les géométries Point).
-                    const g = it.geometry?.coordinates;
-                    const first = Array.isArray(g?.[0]?.[0]) ? g[0][0] : g;
-                    const lon = Number(first?.[0]), lat = Number(first?.[1]);
-                    const ck = Number.isFinite(lat) && Number.isFinite(lon)
-                        ? `${Math.floor(lat)}_${Math.floor(lon)}` : null;
-                    (ck && buckets.has(ck) ? buckets.get(ck) : buckets.get([...missingKeys][0])).push(it);
-                }
-                for (const [ck, arr] of buckets) _idbPut(`cell_${ck}`, arr);
-                absorb(items);
+            if (items) absorb(items);
+            if (byId.size) {
                 lastItems = [...byId.values()];
                 _render(lastItems);
             }
@@ -807,21 +758,7 @@ export function createAirspaceController(map) {
     function setGroup(g, on) {
         if (!AIRSPACE_GROUPS[g]) return;
         if (on) activeGroups.add(g); else activeGroups.delete(g);
-        const rerender = () => { if (lastItems) _render(lastItems); };
-        if (on && _fileLoaded && !_fileLoaded.has(g)) {
-            // Famille nouvellement cochée en mode fichier : charge son
-            // fichier puis re-rend (les autres familles ne retéléchargent rien).
-            _ensureFileFamilies([g]).then(() => {
-                if (_fileItems.size && lastItems) {
-                    const byId = new Map(lastItems.map(it => [it._id, it]));
-                    for (const it of _fileItemsForArea()) byId.set(it._id, it);
-                    lastItems = [...byId.values()];
-                }
-                rerender();
-            });
-        } else {
-            rerender();   // re-filtre sans re-télécharger
-        }
+        if (lastItems) _render(lastItems);   // re-filtre sans re-télécharger
     }
     function getGroups() {
         const out = {};

@@ -1,23 +1,23 @@
 # ============================================================================
-# DONNÉES OPENAIP LOCALES — mise à jour hebdomadaire.
+# DONNÉES OPENAIP LOCALES — mises à jour automatiques.
 #
-# Chaque lundi 05:30 UTC :
-#   1. data/radio-points.json — radiophares + points VFR (mondial)
-#   2. data/airspaces/*.json  — espaces aériens France élargie PAR FAMILLE
-#      (ctr/tma/siv/atz/rpd/tmz/autres) : servies par notre serveur, elles
-#      remplacent l'API pour toute vue dans la couverture (l'API refuse les
-#      rafales : ~4 req/min puis 429 sans en-têtes CORS).
+#   1. QUOTIDIEN 05:30 UTC — crawl MONDIAL incrémental des espaces aériens
+#      par cellule 1° (data/airspaces/cells/, budget 4 h par run via
+#      .crawl.json : le monde est couvert en quelques jours puis rafraîchi
+#      en continu ; l'API refuse les rafales, d'où le rythme).
+#   2. LUNDI 05:30 UTC — data/radio-points.json (radiophares + points VFR
+#      mondiaux).
 # Puis commit et appel du déploiement FTP (un push au GITHUB_TOKEN n'amorce
 # pas de workflow : c'est le « needs/uses » qui enchaîne).
 #
 # Secret requis (Settings → Secrets and variables → Actions) :
 #   OPENAIP_API_KEY  clé openAIP (déjà utilisée par l'app)
 # ============================================================================
-name: Données openAIP (maj hebdo)
+name: Données openAIP (maj auto)
 
 on:
   schedule:
-    - cron: '30 5 * * 1'   # lundi 05:30 UTC ≈ 07:30 Paris (été)
+    - cron: '30 5 * * *'   # quotidien 05:30 UTC ≈ 07:30 Paris (été)
   workflow_dispatch:
 
 permissions:
@@ -37,15 +37,16 @@ jobs:
         with:
           node-version: 20
 
-      - name: Régénère data/radio-points.json (openAIP mondial)
+      - name: Crawl mondial des espaces aériens (cellules 1°, budget 4 h)
+        env:
+          OPENAIP_API_KEY: ${{ secrets.OPENAIP_API_KEY }}
+        run: node scripts/fetch-airspaces.mjs --budget-minutes=240
+
+      - name: Radiophares + points VFR (lundi seulement)
+        if: github.event.schedule == '30 5 * * 1' || github.event_name == 'workflow_dispatch'
         env:
           OPENAIP_API_KEY: ${{ secrets.OPENAIP_API_KEY }}
         run: node scripts/fetch-radio-points.mjs
-
-      - name: Régénère data/airspaces/*.json (France élargie, par famille)
-        env:
-          OPENAIP_API_KEY: ${{ secrets.OPENAIP_API_KEY }}
-        run: node scripts/fetch-airspaces.mjs
 
       - name: Commit + push si changement
         run: |
@@ -53,9 +54,9 @@ jobs:
           git config user.email "radio-points-bot@users.noreply.github.com"
           git add data/radio-points.json data/airspaces/
           if git diff --cached --quiet; then
-            echo "Aucun changement openAIP cette semaine."
+            echo "Aucun changement openAIP aujourd'hui."
           else
-            git commit -m "openAIP: mise à jour hebdomadaire radio-points + espaces ($(date -u +%F))"
+            git commit -m "openAIP: maj automatique espaces (crawl) + radio-points ($(date -u +%F))"
             git push
           fi
 
