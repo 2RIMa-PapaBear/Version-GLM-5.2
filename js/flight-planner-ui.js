@@ -141,9 +141,10 @@ export async function showFlightPlanner(fromIcao, toIcao) {
     }
 
     if (plan.elevationProfile) {
-        // En multi-leg, passe les waypoints intermédiaires pour les afficher sur le profil.
+        // En multi-leg, passe les waypoints intermédiaires pour les afficher
+        // sur le profil — sous leur vrai nom pour les repères ZZxx.
         const waypoints = (plan.isMultiLeg && plan.waypoints)
-            ? plan.waypoints.map(w => ({ icao: w.icao, lat: w.lat, lon: w.lon }))
+            ? plan.waypoints.map(w => ({ icao: w.icao, name: _wpDisplayName(w.icao), lat: w.lat, lon: w.lon }))
             : null;
         renderElevationChart('elevation-profile-container', plan.elevationProfile, cruiseAlt, fromIcao, toIcao, waypoints, plan.routeAirspaces);
     } else {

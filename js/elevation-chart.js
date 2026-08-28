@@ -296,7 +296,7 @@ function _draw() {
             _ctx.fillStyle = '#FBBF24';
             _ctx.font = 'bold 9px "DM Mono", monospace';
             _ctx.textAlign = 'center';
-            _ctx.fillText(wp.icao, wx, PAD.top - 4 > 0 ? PAD.top - 4 : PAD.top + 14);
+            _ctx.fillText(wp.name || wp.icao, wx, PAD.top - 4 > 0 ? PAD.top - 4 : PAD.top + 14);
         }
     }
 
