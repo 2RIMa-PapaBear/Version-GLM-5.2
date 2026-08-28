@@ -24,7 +24,7 @@ import { preloadDeclination } from './magvar.js';
 import { showTakeoffWidget } from './takeoff-ui.js';
 import { refreshWbWidget } from './wb-ui.js';
 import { showFrequenciesWidget } from './frequencies-ui.js';
-import { showFlightPlanner } from './flight-planner-ui.js';
+import { showFlightPlanner, parseWaypointsField, formatWaypointsField } from './flight-planner-ui.js';
 import { clearElevationChart, refreshElevationChart } from './elevation-chart.js';
 import { greatCircleDistanceNm, cheapestWaypointInsertion } from './flight-planner.js';
 import { initCockpitMode, toggleCockpitMode } from './cockpit-mode.js';
@@ -32,6 +32,7 @@ import { openShareModal, hasPermalink, readPermalink } from './permalink.js';
 import { initWatchdog, openWatchdogPanel, getWatchdogSettings } from './watchdog.js';
 import { fetchAirportByIcao } from './openaip.js';
 import { initPlanIo } from './flight-plan-io.js';
+import { loadFreqSources, getSiaAirac } from './freq-sia.js';
 
 const lastFetchTime = {};
 
@@ -621,6 +622,13 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     sanitizeStorage(); await initAirportsDB();
+    // Paternité de l'Information SIA réutilisée (pied de page) : la date
+    // AIRAC vient du fichier régénéré à chaque cycle — plus de mise à jour manuelle.
+    loadFreqSources().then(() => {
+        const airac = getSiaAirac();
+        const el = document.getElementById('sia-airac');
+        if (el) el.textContent = airac ? ` — dernière mise à jour : ${airac}` : '';
+    }).catch(() => {});
     state.refreshCallback = genererGraphique; setLanguage('fr');
 
     // Effet d'ondulation (ripple) au clic sur les boutons principaux.
@@ -755,8 +763,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         if (!icao) return;
         const wpInput = document.getElementById('fp-waypoints');
         if (!wpInput) return;
-        const wps = wpInput.value.trim().toUpperCase().split(/\s+/).filter(w => /^[A-Z][A-Z0-9]{3}$/.test(w) && w !== icao);
-        wpInput.value = wps.join(' ');
+        const wps = parseWaypointsField(wpInput.value).filter(w => w !== icao);
+        wpInput.value = formatWaypointsField(wps);
         wpInput.dispatchEvent(new Event('change'));
     });
 
@@ -796,13 +804,13 @@ document.addEventListener('DOMContentLoaded', async function () {
         if (!icao) return;
         const wpInput = document.getElementById('fp-waypoints');
         if (!wpInput) return;   // pas de plan affiché : rien à ajouter
-        const wps = wpInput.value.trim().toUpperCase().split(/\s+/).filter(w => /^[A-Z][A-Z0-9]{3}$/.test(w));
+        const wps = parseWaypointsField(wpInput.value);
         if (wps.includes(icao)) return;   // déjà dans la liste : rien à faire
         const toIcao = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
         const idx = cheapestWaypointInsertion(_navDepRef(), wps, toIcao, icao, _icaoCoords);
         const at = (idx == null) ? wps.length : idx;   // coords manquantes → en fin
         const next = [...wps.slice(0, at), icao, ...wps.slice(at)];
-        wpInput.value = next.join(' ');
+        wpInput.value = formatWaypointsField(next);
         wpInput.dispatchEvent(new Event('change'));
     });
 

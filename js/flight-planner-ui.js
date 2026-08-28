@@ -280,7 +280,7 @@ async function _generateNavLogPdfInto(tab) {
         fromName: getAirportByICAO(fromIcao)?.name || fromIcao,
         toName: getAirportByICAO(toIcao)?.name || toIcao,
         waypoints: (isMulti && plan.waypoints?.length > 2)
-            ? plan.waypoints.slice(1, -1).map(w => w.icao).join(' ') : '',
+            ? plan.waypoints.slice(1, -1).map(w => _wpDisplayName(w.icao)).join(' ') : '',
         cruiseAltFt: stash.alt ?? plan.cruiseAltFt, tasKt: tas,
         fuelBurnLph: stash.burn ?? '', isNight: !!stash.isNight,
         distanceNm: totalNm != null ? Math.round(totalNm) : '',
@@ -728,7 +728,7 @@ function _renderError(container, from, to, isFr) {
 
 // Nom d'affichage d'une étape : les repères libres (pseudo-codes ZZxx)
 // s'affichent sous leur VRAI nom (VOR « BNE », NDB, point VFR « E2 »…),
-// le code restant technique (champ waypoints, permalien, pipeline).
+// le code restant technique (permalien, pipeline).
 // Exporté pour navlog-pdf via le sample (rows/waypoints portent `name`).
 export function _wpDisplayName(code) {
     if (!/^ZZ[A-Z]{2}$/.test(code)) return code;
@@ -740,9 +740,36 @@ export function _wpDisplayName(code) {
     return (first || code).toUpperCase().slice(0, 9);
 }
 
+// Le champ Waypoints affiche les VRAIS noms des repères libres (VOR, NDB,
+// points VFR…) au lieu de leurs codes techniques ZZxx. Le parse inverse
+// (nom saisi → code) s'appuie sur le registre des repères de la carte,
+// injecté ici par regional-map (pas d'import croisé).
+let _resolveFreeWpToken = null;
+export function registerFreeWpResolver(fn) { _resolveFreeWpToken = fn; }
+
+/** Valeur du champ Waypoints → codes (OACI ou ZZxx), sans doublon.
+ *  Un token invalide qui ne résout aucun repère connu est écarté. */
+export function parseWaypointsField(value) {
+    const out = [];
+    for (const t of String(value || '').toUpperCase().split(/\s+/)) {
+        if (!t) continue;
+        if (/^[A-Z][A-Z0-9]{3}$/.test(t)) { out.push(t); continue; }
+        const code = _resolveFreeWpToken?.(t);
+        if (code && /^[A-Z][A-Z0-9]{3}$/.test(code)) out.push(code);
+    }
+    return [...new Set(out)];
+}
+
+/** Codes → valeur affichée dans le champ (noms réels des repères ZZxx). */
+export function formatWaypointsField(codes) {
+    return (Array.isArray(codes) ? codes : [])
+        .map(c => /^[A-Z][A-Z0-9]{3}$/.test(c) ? c : _wpDisplayName(c))
+        .join(' ');
+}
+
 function _renderInputs(from, to, fromName, toName, alt, tas, burn, isNight, isFr) {
     const waypointsValue = (state.route && state.route.length > 2)
-        ? state.route.slice(1, -1).join(' ') : '';
+        ? formatWaypointsField(state.route.slice(1, -1)) : '';
     // Liste lisible des étapes : code + nom de l'aérodrome (ou nom du repère),
     // avec crayon de renommage pour les repères libres (pseudo-codes ZZxx).
     const wps = (state.route && state.route.length > 2) ? state.route.slice(1, -1) : [];
@@ -808,10 +835,11 @@ function _wireInputs(container, from, to) {
         if (_recalculating) return;   // évite la récursion pendant le re-render
         _recalculating = true;
         try {
-            // Lit les waypoints saisis et peuple state.route pour le multi-leg.
+            // Lit les waypoints saisis (codes OACI ou noms de repères libres
+            // affichés dans le champ) et peuple state.route pour le multi-leg.
             const wpInput = container.querySelector('#fp-waypoints');
             if (wpInput) {
-                const wps = wpInput.value.trim().toUpperCase().split(/\s+/).filter(w => /^[A-Z][A-Z0-9]{3}$/.test(w));
+                const wps = parseWaypointsField(wpInput.value);
                 state.route = wps.length ? [from, ...wps, to] : null;
             }
             showFlightPlanner(from, to);
@@ -855,8 +883,8 @@ function _wireInputs(container, from, to) {
             const icao = btn.dataset.icao;
             const wpInput = container.querySelector('#fp-waypoints');
             if (!icao || !wpInput) return;
-            const wps = wpInput.value.trim().toUpperCase().split(/\s+/).filter(w => /^[A-Z][A-Z0-9]{3}$/.test(w) && w !== icao);
-            wpInput.value = wps.join(' ');
+            const wps = parseWaypointsField(wpInput.value).filter(w => w !== icao);
+            wpInput.value = formatWaypointsField(wps);
             wpInput.dispatchEvent(new Event('change'));
         });
     });

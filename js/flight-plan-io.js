@@ -22,6 +22,7 @@
 
 import { state, memoGet } from './core.js';
 import { getAirportByICAO } from './ui-module.js';
+import { parseWaypointsField } from './flight-planner-ui.js';
 
 const DB_NAME = 'mt-plan-io';
 const DIR_STORE = 'handles';
@@ -36,7 +37,9 @@ export function readCurrentPlan() {
     const dep = (state.requestedIcao || '').toUpperCase();
     const wps = [];
     const wpInput = document.getElementById('fp-waypoints');
-    const codes = (wpInput?.value || '').trim().toUpperCase().split(/\s+/).filter(Boolean);
+    // Le champ affiche les VRAIS noms des repères libres : le parse partagé
+    // restitue les codes (OACI ou ZZxx) du plan.
+    const codes = wpInput ? parseWaypointsField(wpInput.value) : [];
     for (const code of codes) {
         const apt = getAirportByICAO(code);
         if (/^ZZ[A-Z]{2}$/.test(code) && apt?.lat != null) {

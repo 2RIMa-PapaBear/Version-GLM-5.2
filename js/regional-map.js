@@ -1,5 +1,6 @@
 import { state, I18N, fetchAvecRelais, memoGet, memoSet, surfaceLabel } from './core.js';
 import { getAirportByICAO, getAirportsInBbox, enrichAirport } from './ui-module.js';
+import { parseWaypointsField, formatWaypointsField, registerFreeWpResolver, _wpDisplayName } from './flight-planner-ui.js';
 import { parseVisiToMeters, getCeiling } from './core.js';
 import { HAZARD_COLORS } from './sigmet.js';
 import { showRouteWeather, resetRouteFit } from './route-weather.js';
@@ -558,7 +559,7 @@ function _nextFreeWpCode() {
 
 function _freeWpInPlan(code) {
     const wpInput = document.getElementById('fp-waypoints');
-    return (wpInput?.value || '').toUpperCase().split(/\s+/).includes(code);
+    return !!wpInput && parseWaypointsField(wpInput.value).includes(code);
 }
 
 // Popup d'édition d'un repère existant (renommage).
@@ -641,14 +642,19 @@ function _createFreeWaypoint(lat, lon, name, freq, kind) {
 function _renameFreeWaypoint(code, name) {
     const wp = _freeWaypoints.get(code);
     if (!wp) return;
+    // Préserve le plan : parse du champ AVANT le renommage (l'ancien nom
+    // ne résoudrait plus ensuite), champ réécrit en noms à jour puis recalculé.
+    const wpInput = document.getElementById('fp-waypoints');
+    const codes = wpInput?.value.trim() ? parseWaypointsField(wpInput.value) : null;
     wp.name = name;
     enrichAirport(code, { name });
     memoSet(code, { name, lat: wp.lat, lon: wp.lon });
     wp.marker.setTooltipContent(escapeHtml(name));
     // (le popup est bindé avec une fonction : il se re-rendra à la prochaine ouverture)
-    // Re-rend le plan de navigation pour afficher le nouveau nom (liste des étapes).
-    const wpInput = document.getElementById('fp-waypoints');
-    if (wpInput) wpInput.dispatchEvent(new Event('change'));
+    if (wpInput && codes) {
+        wpInput.value = formatWaypointsField(codes);
+        wpInput.dispatchEvent(new Event('change'));
+    }
 }
 
 function _deleteFreeWaypoint(code) {
@@ -658,14 +664,26 @@ function _deleteFreeWaypoint(code) {
     _freeWaypoints.delete(code);
     const wpInput = document.getElementById('fp-waypoints');
     if (wpInput && wpInput.value.trim()) {
-        const wps = wpInput.value.trim().toUpperCase().split(/\s+/).filter(w => /^[A-Z][A-Z0-9]{3}$/.test(w) && w !== code);
-        wpInput.value = wps.join(' ');
+        const wps = parseWaypointsField(wpInput.value).filter(w => w !== code);
+        wpInput.value = formatWaypointsField(wps);
         wpInput.dispatchEvent(new Event('change'));
     }
 }
 
 // Renommage d'un repère depuis le plan de vol (flight-planner-ui émet l'événement).
 if (typeof document !== 'undefined') {
+    // Résolution nom affiché → code ZZxx pour le champ Waypoints du planner
+    // (le champ montre les VRAIS noms : « DIN », « LOR », « E2 »…).
+    registerFreeWpResolver((token) => {
+        const t = String(token || '').trim().toUpperCase();
+        if (!t) return null;
+        for (const [code, wp] of _freeWaypoints) {
+            const full = String(wp.name || '').trim().toUpperCase();
+            if (_wpDisplayName(code) === t || full === t) return code;
+        }
+        return null;
+    });
+
     document.addEventListener('rename-free-waypoint', (e) => {
         const icao = e.detail?.icao;
         const name = (e.detail?.name || '').trim().slice(0, 24);

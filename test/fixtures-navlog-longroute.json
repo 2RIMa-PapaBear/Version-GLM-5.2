@@ -1,0 +1,710 @@
+{
+ "isFr": true,
+ "aircraftType": "DR400-140",
+ "aircraftReg": "F-XXXX",
+ "qnh": "1013",
+ "windDir": 250,
+ "windKt": 12,
+ "runway": "36",
+ "distanceNm": 193,
+ "timeLabel": "1h41",
+ "metarRaw": "METAR LFRV 282030Z AUTO 16004KT 9999 BKN015 OVC023 18/15 Q1013",
+ "rows": [
+  {
+   "from": "LFRV",
+   "to": "LFER",
+   "distRemain": 193,
+   "dist": 28,
+   "zSecu": 2000,
+   "zRet": 3500,
+   "rm": "091",
+   "cm": "091",
+   "tsv": 15,
+   "tav": 14
+  },
+  {
+   "from": "LFER",
+   "to": "LFTQ",
+   "distRemain": 165,
+   "dist": 34,
+   "zSecu": 2000,
+   "zRet": 3500,
+   "rm": "085",
+   "cm": "085",
+   "tsv": 19,
+   "tav": 17
+  },
+  {
+   "from": "LFTQ",
+   "to": "LFOV",
+   "distRemain": 131,
+   "dist": 25,
+   "zSecu": 2000,
+   "zRet": 3500,
+   "rm": "045",
+   "cm": "045",
+   "tsv": 14,
+   "tav": 13
+  },
+  {
+   "from": "LFOV",
+   "to": "LFRW",
+   "distRemain": 106,
+   "dist": 46,
+   "zSecu": 2000,
+   "zRet": 3500,
+   "rm": "324",
+   "cm": "324",
+   "tsv": 25,
+   "tav": 26
+  },
+  {
+   "from": "LFRW",
+   "to": "LFOM",
+   "distRemain": 60,
+   "dist": 33,
+   "zSecu": 2000,
+   "zRet": 3500,
+   "rm": "352",
+   "cm": "352",
+   "tsv": 18,
+   "tav": 18
+  },
+  {
+   "from": "LFOM",
+   "to": "LFRC",
+   "distRemain": 27,
+   "dist": 27,
+   "zSecu": 2000,
+   "zRet": 3500,
+   "rm": "001",
+   "cm": "001",
+   "tsv": 15,
+   "tav": 14
+  }
+ ],
+ "calc": {
+  "isFr": true,
+  "fromIcao": "LFRV",
+  "toIcao": "LFRC",
+  "fromName": "Vannes Golfe Du Morbihan",
+  "toName": "Cherbourg Manche",
+  "waypoints": "LFER LFTQ LFOV LFRW LFOM",
+  "cruiseAltFt": 3500,
+  "tasKt": 110,
+  "fuelBurnLph": 30,
+  "isNight": false,
+  "distanceNm": 193,
+  "distanceKm": 357,
+  "trueCourse": 92,
+  "magHeading": 91,
+  "declination": 1,
+  "wind": {
+   "dir": 250,
+   "speedKt": 12
+  },
+  "driftDeg": 4,
+  "groundSpeed": 119,
+  "timeLabel": "1h41",
+  "fuel": {
+   "tripL": 51,
+   "reserveL": 15,
+   "totalL": 66,
+   "reserveMin": 30
+  },
+  "clearance": {
+   "maxFt": 666,
+   "minClearanceFt": 2834,
+   "level": "ok"
+  },
+  "isMultiLeg": true,
+  "legs": [
+   {
+    "from": "LFRV",
+    "to": "LFER",
+    "dist": 28,
+    "hdg": 91,
+    "eteLabel": "14 min",
+    "fuelL": 7,
+    "freq": "120.200 TWR"
+   },
+   {
+    "from": "LFER",
+    "to": "LFTQ",
+    "dist": 34,
+    "hdg": 85,
+    "eteLabel": "17 min",
+    "fuelL": 9,
+    "freq": ""
+   },
+   {
+    "from": "LFTQ",
+    "to": "LFOV",
+    "dist": 25,
+    "hdg": 45,
+    "eteLabel": "13 min",
+    "fuelL": 6,
+    "freq": ""
+   },
+   {
+    "from": "LFOV",
+    "to": "LFRW",
+    "dist": 46,
+    "hdg": 324,
+    "eteLabel": "26 min",
+    "fuelL": 13,
+    "freq": ""
+   },
+   {
+    "from": "LFRW",
+    "to": "LFOM",
+    "dist": 33,
+    "hdg": 352,
+    "eteLabel": "18 min",
+    "fuelL": 9,
+    "freq": ""
+   },
+   {
+    "from": "LFOM",
+    "to": "LFRC",
+    "dist": 27,
+    "hdg": 1,
+    "eteLabel": "14 min",
+    "fuelL": 7,
+    "freq": "118.300 AFIS"
+   }
+  ]
+ },
+ "perf": {
+  "isFr": true,
+  "fromIcao": "LFRV",
+  "toIcao": "LFRC",
+  "runway": "36",
+  "takeoff": {
+   "da": 860,
+   "groundRollM": 205,
+   "fiftyFtM": 405,
+   "runwayLengthM": 1250,
+   "marginM": 845,
+   "level": "ok",
+   "message": "Marge confortable",
+   "refLabel": "170/335",
+   "surfaceLabel": "Dure",
+   "surfaceSoft": false,
+   "surfacePct": 0
+  },
+  "profile": {
+   "fromIcao": "LFRV",
+   "toIcao": "LFRC",
+   "distTotalKm": 357,
+   "minFt": 7,
+   "maxFt": 666,
+   "cruiseAltFt": 3500,
+   "points": [
+    {
+     "frac": 0,
+     "elevFt": 423
+    },
+    {
+     "frac": 0.01104414029131209,
+     "elevFt": 515
+    },
+    {
+     "frac": 0.02208828058262418,
+     "elevFt": 466
+    },
+    {
+     "frac": 0.033132420873936266,
+     "elevFt": 489
+    },
+    {
+     "frac": 0.04417656116524836,
+     "elevFt": 223
+    },
+    {
+     "frac": 0.055220701456560446,
+     "elevFt": 331
+    },
+    {
+     "frac": 0.06626484174787253,
+     "elevFt": 125
+    },
+    {
+     "frac": 0.07730898203918463,
+     "elevFt": 56
+    },
+    {
+     "frac": 0.08835312233049672,
+     "elevFt": 49
+    },
+    {
+     "frac": 0.09939726262180879,
+     "elevFt": 26
+    },
+    {
+     "frac": 0.11044140291312089,
+     "elevFt": 105
+    },
+    {
+     "frac": 0.12148554320443297,
+     "elevFt": 177
+    },
+    {
+     "frac": 0.13252968349574507,
+     "elevFt": 180
+    },
+    {
+     "frac": 0.14357382378705716,
+     "elevFt": 210
+    },
+    {
+     "frac": 0.1572573574809004,
+     "elevFt": 7
+    },
+    {
+     "frac": 0.17094089117474362,
+     "elevFt": 49
+    },
+    {
+     "frac": 0.18462442486858688,
+     "elevFt": 16
+    },
+    {
+     "frac": 0.19830795856243014,
+     "elevFt": 75
+    },
+    {
+     "frac": 0.21199149225627337,
+     "elevFt": 102
+    },
+    {
+     "frac": 0.22567502595011663,
+     "elevFt": 151
+    },
+    {
+     "frac": 0.23935855964395988,
+     "elevFt": 82
+    },
+    {
+     "frac": 0.25304209333780314,
+     "elevFt": 226
+    },
+    {
+     "frac": 0.2667256270316464,
+     "elevFt": 154
+    },
+    {
+     "frac": 0.2804091607254896,
+     "elevFt": 223
+    },
+    {
+     "frac": 0.2940926944193329,
+     "elevFt": 207
+    },
+    {
+     "frac": 0.3077762281131761,
+     "elevFt": 266
+    },
+    {
+     "frac": 0.32145976180701935,
+     "elevFt": 315
+    },
+    {
+     "frac": 0.33149275568041825,
+     "elevFt": 322
+    },
+    {
+     "frac": 0.3415257495538171,
+     "elevFt": 331
+    },
+    {
+     "frac": 0.3515587434272159,
+     "elevFt": 200
+    },
+    {
+     "frac": 0.3615917373006148,
+     "elevFt": 266
+    },
+    {
+     "frac": 0.37162473117401357,
+     "elevFt": 148
+    },
+    {
+     "frac": 0.38165772504741247,
+     "elevFt": 200
+    },
+    {
+     "frac": 0.39169071892081125,
+     "elevFt": 246
+    },
+    {
+     "frac": 0.40172371279421015,
+     "elevFt": 246
+    },
+    {
+     "frac": 0.41175670666760894,
+     "elevFt": 292
+    },
+    {
+     "frac": 0.4217897005410078,
+     "elevFt": 335
+    },
+    {
+     "frac": 0.4318226944144066,
+     "elevFt": 276
+    },
+    {
+     "frac": 0.4418556882878055,
+     "elevFt": 262
+    },
+    {
+     "frac": 0.45188868216120437,
+     "elevFt": 325
+    },
+    {
+     "frac": 0.4702583273809719,
+     "elevFt": 315
+    },
+    {
+     "frac": 0.4886279726007395,
+     "elevFt": 433
+    },
+    {
+     "frac": 0.5069976178205071,
+     "elevFt": 564
+    },
+    {
+     "frac": 0.5253672630402747,
+     "elevFt": 581
+    },
+    {
+     "frac": 0.5437369082600423,
+     "elevFt": 377
+    },
+    {
+     "frac": 0.5621065534798098,
+     "elevFt": 666
+    },
+    {
+     "frac": 0.5804761986995773,
+     "elevFt": 630
+    },
+    {
+     "frac": 0.598845843919345,
+     "elevFt": 486
+    },
+    {
+     "frac": 0.6172154891391126,
+     "elevFt": 479
+    },
+    {
+     "frac": 0.6355851343588801,
+     "elevFt": 436
+    },
+    {
+     "frac": 0.6539547795786477,
+     "elevFt": 348
+    },
+    {
+     "frac": 0.6723244247984154,
+     "elevFt": 213
+    },
+    {
+     "frac": 0.690694070018183,
+     "elevFt": 20
+    },
+    {
+     "frac": 0.7037686024406948,
+     "elevFt": 92
+    },
+    {
+     "frac": 0.7168431348632068,
+     "elevFt": 279
+    },
+    {
+     "frac": 0.7299176672857186,
+     "elevFt": 443
+    },
+    {
+     "frac": 0.7429921997082306,
+     "elevFt": 390
+    },
+    {
+     "frac": 0.7560667321307425,
+     "elevFt": 361
+    },
+    {
+     "frac": 0.7691412645532545,
+     "elevFt": 95
+    },
+    {
+     "frac": 0.7822157969757663,
+     "elevFt": 135
+    },
+    {
+     "frac": 0.7952903293982783,
+     "elevFt": 66
+    },
+    {
+     "frac": 0.8083648618207901,
+     "elevFt": 249
+    },
+    {
+     "frac": 0.8214393942433021,
+     "elevFt": 302
+    },
+    {
+     "frac": 0.834513926665814,
+     "elevFt": 226
+    },
+    {
+     "frac": 0.847588459088326,
+     "elevFt": 115
+    },
+    {
+     "frac": 0.8606629915108378,
+     "elevFt": 89
+    },
+    {
+     "frac": 0.8713812229330811,
+     "elevFt": 131
+    },
+    {
+     "frac": 0.8820994543553243,
+     "elevFt": 269
+    },
+    {
+     "frac": 0.8928176857775676,
+     "elevFt": 161
+    },
+    {
+     "frac": 0.9035359171998107,
+     "elevFt": 59
+    },
+    {
+     "frac": 0.9142541486220541,
+     "elevFt": 43
+    },
+    {
+     "frac": 0.9249723800442973,
+     "elevFt": 89
+    },
+    {
+     "frac": 0.9356906114665405,
+     "elevFt": 118
+    },
+    {
+     "frac": 0.9464088428887839,
+     "elevFt": 59
+    },
+    {
+     "frac": 0.9571270743110271,
+     "elevFt": 135
+    },
+    {
+     "frac": 0.9678453057332702,
+     "elevFt": 305
+    },
+    {
+     "frac": 0.9785635371555136,
+     "elevFt": 400
+    },
+    {
+     "frac": 0.9892817685777568,
+     "elevFt": 249
+    },
+    {
+     "frac": 1,
+     "elevFt": 449
+    },
+    {
+     "frac": 1,
+     "elevFt": 449
+    }
+   ],
+   "waypoints": [
+    {
+     "icao": "LFER",
+     "name": "LFER",
+     "frac": 0.14357382378705716
+    },
+    {
+     "icao": "LFTQ",
+     "name": "LFTQ",
+     "frac": 0.32145976180701935
+    },
+    {
+     "icao": "LFOV",
+     "name": "LFOV",
+     "frac": 0.45188868216120437
+    },
+    {
+     "icao": "LFRW",
+     "name": "LFRW",
+     "frac": 0.690694070018183
+    },
+    {
+     "icao": "LFOM",
+     "name": "LFOM",
+     "frac": 0.8606629915108378
+    }
+   ],
+   "routeAirspaces": [
+    {
+     "name": "RENNES INFO",
+     "freq": "134.000",
+     "lo": 0,
+     "up": 1150000,
+     "span": 0.5140995911544471,
+     "ranges": [
+      [
+       0.12148554320443297,
+       0.6355851343588801
+      ]
+     ],
+     "segs": [
+      {
+       "fa": 0.12148554320443297,
+       "fb": 0.6355851343588801,
+       "up": 1150000,
+       "zone": "SIV RENNES SUD partie A"
+      }
+     ]
+    },
+    {
+     "name": "RENNES INFO",
+     "freq": "134.200",
+     "lo": 0,
+     "up": 1150000,
+     "span": 0.19163513817920985,
+     "ranges": [
+      [
+       0.8083648618207901,
+       1
+      ]
+     ],
+     "segs": [
+      {
+       "fa": 0.8083648618207901,
+       "fb": 1,
+       "up": 1150000,
+       "zone": "SIV RENNES COTENTIN partie A"
+      }
+     ]
+    },
+    {
+     "name": "RENNES INFO",
+     "freq": "126.950",
+     "lo": 0,
+     "up": 1150000,
+     "span": 0.17277972746191006,
+     "ranges": [
+      [
+       0.6355851343588801,
+       0.8083648618207901
+      ]
+     ],
+     "segs": [
+      {
+       "fa": 0.6355851343588801,
+       "fb": 0.8083648618207901,
+       "up": 1150000,
+       "zone": "SIV RENNES NORD"
+      }
+     ]
+    },
+    {
+     "name": "SIV NANTES 1",
+     "freq": "122.800",
+     "lo": 0,
+     "up": 1150000,
+     "span": 0.12148554320443297,
+     "ranges": [
+      [
+       0,
+       0.12148554320443297
+      ]
+     ],
+     "segs": [
+      {
+       "fa": 0,
+       "fb": 0.12148554320443297,
+       "up": 1150000,
+       "zone": "SIV NANTES 1"
+      }
+     ]
+    },
+    {
+     "name": "R 279",
+     "freq": null,
+     "lo": 2500,
+     "up": 1450000,
+     "span": 0.033132420873936266,
+     "ranges": [
+      [
+       0,
+       0.033132420873936266
+      ]
+     ],
+     "segs": [
+      {
+       "fa": 0,
+       "fb": 0.033132420873936266,
+       "up": 1450000,
+       "zone": "R 279"
+      }
+     ]
+    }
+   ]
+  },
+  "alternates": {
+   "maxOffsetNm": 25,
+   "rows": [
+    {
+     "code": "LFRN",
+     "name": "Rennes St Jacques",
+     "cat": "VFR",
+     "visiStr": ">10 km",
+     "ceilStr": "—",
+     "windStr": "250° 12 kt",
+     "offsetNm": 22,
+     "side": "E",
+     "metarFrom": ""
+    },
+    {
+     "code": "LFRD",
+     "name": "Dinan Trelivan",
+     "cat": "VFR",
+     "visiStr": ">10 km",
+     "ceilStr": "4500 ft",
+     "windStr": "250° 11 kt",
+     "offsetNm": 18,
+     "side": "N",
+     "metarFrom": ""
+    },
+    {
+     "code": "LFRB",
+     "name": "Brest Guipavas",
+     "cat": "MVFR",
+     "visiStr": "8000 m",
+     "ceilStr": "2200 ft",
+     "windStr": "250° 16 kt",
+     "offsetNm": 48,
+     "side": "O",
+     "metarFrom": ""
+    },
+    {
+     "code": "LFOH",
+     "name": "Le Havre Octeville",
+     "cat": "VFR",
+     "visiStr": ">10 km",
+     "ceilStr": "5000 ft",
+     "windStr": "250° 13 kt",
+     "offsetNm": 55,
+     "side": "E",
+     "metarFrom": ""
+    }
+   ]
+  }
+ }
+}
