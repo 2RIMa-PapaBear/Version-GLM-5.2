@@ -622,12 +622,12 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     sanitizeStorage(); await initAirportsDB();
-    // Paternité de l'Information SIA réutilisée (pied de page) : la date
-    // AIRAC vient du fichier régénéré à chaque cycle — plus de mise à jour manuelle.
+    // Paternité de l'Information SIA réutilisée (pied de page) : cycle AIRAC
+    // en vigueur, lu dans le fichier régénéré à chaque cycle — jamais saisi à la main.
     loadFreqSources().then(() => {
         const airac = getSiaAirac();
         const el = document.getElementById('sia-airac');
-        if (el) el.textContent = airac ? ` — dernière mise à jour : ${airac}` : '';
+        if (el) el.textContent = airac ? ` · cycle AIRAC ${airac}` : '';
     }).catch(() => {});
     state.refreshCallback = genererGraphique; setLanguage('fr');
 
