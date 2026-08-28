@@ -1282,7 +1282,7 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr) {
             doc.setFillColor(...AMBER_LN);
             doc.circle(wx, yT + 3, 2.2, 'F');
             doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); _setInk(doc, AMBER);
-            doc.text(wp.icao, wx, codeY, { align: 'center' });
+            doc.text(wp.name || wp.icao, wx, codeY, { align: 'center' });
         }
     }
 
