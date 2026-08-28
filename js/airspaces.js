@@ -232,19 +232,83 @@ function _loadCellItems(lat, lon) {
 }
 
 /** Charge les cellules 1° couvrant une bbox quantifiée. Retourne
- *  { items, missing } : union des items fichier + cellules sans fichier. */
+ *  { items, missing } : union des items fichier + cellules sans fichier.
+ *  La base OFFICIELLE SIA (data/sia-airspaces.json, export XML AIRAC)
+ *  PRIME sur openAIP pour toute vue dans la couverture SIA : les zones
+ *  openAIP de la même zone sont alors écartées (doublons évités). */
+const SIA_COVERAGE = [41, -63, 52, 12];   // France métropole + DOM proches
+let _siaItems = null;
+let _siaPending = null;
+
+async function _loadSiaItems() {
+    if (_siaItems) return _siaItems;
+    _siaPending ??= (async () => {
+        const cached = await _idbGet('sia:airspaces');
+        if (cached?.data && Date.now() - cached.ts < CELL_TTL_MS) { _siaItems = cached.data; return _siaItems; }
+        try {
+            const res = await fetch(`data/sia-airspaces.json?t=${cached?.ts || 0}`, { signal: AbortSignal.timeout(15000) });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const d = await res.json();
+            _siaItems = d.items.map(_expandFileItem);
+            _idbPut('sia:airspaces', _siaItems);
+        } catch { _siaItems = cached?.data || []; }
+        return _siaItems;
+    })();
+    return _siaPending;
+}
+
+function _bboxInSia(minLat, minLon, maxLat, maxLon) {
+    return minLat >= SIA_COVERAGE[0] && maxLat <= SIA_COVERAGE[2]
+        && minLon >= SIA_COVERAGE[1] && maxLon <= SIA_COVERAGE[3];
+}
+function _bboxOverlapsSia(minLat, minLon, maxLat, maxLon) {
+    return minLat <= SIA_COVERAGE[2] && maxLat >= SIA_COVERAGE[0]
+        && minLon <= SIA_COVERAGE[3] && maxLon >= SIA_COVERAGE[1];
+}
+/** Les items SIA intersectant grossièrement la bbox (test bbox par zone). */
+function _siaItemsForArea(minLat, minLon, maxLat, maxLon) {
+    if (!_siaItems) return [];
+    const out = [];
+    for (const it of _siaItems) {
+        const ring = it.geometry?.coordinates?.[0];
+        if (!Array.isArray(ring) || !ring.length) continue;
+        let a = 90, b = -90, c = 180, d2 = -180;
+        for (const [lon, lat] of ring) {
+            if (lat < a) a = lat; if (lat > b) b = lat;
+            if (lon < c) c = lon; if (lon > d2) d2 = lon;
+        }
+        if (b >= minLat && a <= maxLat && d2 >= minLon && c <= maxLon) out.push(it);
+    }
+    return out;
+}
+
 async function _loadCellsGrid(minLat, minLon, maxLat, maxLon) {
+    // Base officielle SIA : prioritaire dans la couverture (France), et
+    // complémentaire en bordure (les zones openAIP non-SIA sont gardées
+    // seulement si la vue déborde de la couverture).
+    await _loadSiaItems();
+    const sia = _siaItemsForArea(minLat, minLon, maxLat, maxLon);
+    const fullyInSia = _bboxInSia(minLat, minLon, maxLat, maxLon);
+    if (fullyInSia && sia.length) return { items: sia, missing: [] };
+
     const cells = [];
     for (let lat = Math.floor(minLat); lat < Math.ceil(maxLat); lat++)
         for (let lon = Math.floor(minLon); lon < Math.ceil(maxLon); lon++)
             cells.push([lat, lon]);
     const results = await Promise.all(cells.map(([la, lo]) => _loadCellItems(la, lo)));
-    const items = [];
+    const items = [...sia];
     const missing = [];
     results.forEach((r, i) => {
         if (r) items.push(...r);
         else missing.push(cells[i]);
     });
+    // Dé-duploupe : si SIA couvre la vue, on écarte les zones openAIP dont
+    // le NOM correspond à une zone SIA (même type d'espace).
+    if (sia.length && _bboxOverlapsSia(minLat, minLon, maxLat, maxLon)) {
+        const siaNames = new Set(sia.map(z => String(z.name || '').toUpperCase()));
+        const filtered = items.filter(z => !siaNames.has(String(z.name || '').toUpperCase()) || sia.includes(z));
+        return { items: filtered, missing };
+    }
     return { items, missing };
 }
 

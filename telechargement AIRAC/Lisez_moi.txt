@@ -1,0 +1,66 @@
+Depuis la mise en service de son outil de production de l’information aéronautique NOPIA, le SIA met à la disposition de ses clients, à chaque cycle AIRAC, deux jeux de données aéronautiques correspondant aux AIP France et outre-mer :
+
+- Fichier « XML-SIA » : ce fichier de données permet d’alimenter les outils QGIS-DSNA, ACADEMIC et GeodEasy. Il permet également de générer la carte data pour l’outil GeoTitan et est utilisé pour la production des grandes cartes par le SIA.
+La définition de cet export est non évolutive.
+
+- Fichier AIXM 4.5 : le format AIXM (Aeronautical Information Exchange Model) est un standard pour les échanges de données aéronautiques.
+
+Le fichier export_xml_bd_SIA_aaaa-mm-jj-vxx.zip (où xx représente le numéro de version ex: v02.zip) contient les deux jeux de données ainsi que ce fichier Lisez-moi.txt
+
+Le guide d'utilisation de ces fichiers est disponible dans la rubrique FAQs du site Internet du SIA :
+https://www.sia.aviation-civile.gouv.fr/faqs
+
+
+************************
+***** Nouveautés ******* 
+************************
+
+Les nouveautés précisées ci-après concernent des changements importants de données dans les exports AIXM 4.5 & XML-SIA du BMJ cité ci-dessous : 
+1) Modification de la structure : création/suppression d'une entité ou d'un attribut
+2) Complétion de certains attributs : ajout de valeurs pour un attribut dont toutes les occurences étaient vides
+3) Redressements de certains attributs : modification de toutes les valeurs d'un attribut
+
+Ces nouveautés ont un caractère informatif et ne traduisent pas l'exhaustivité des Mises à Jour (MAJ) AIP incluses dans ce BMJ. 
+L'ensemble de ces MAJ sont contenues dans l'AMDT du cycle AIRAC concerné et accessible dans la rubrique "Mises à jour contenues dans cet eAIP" du site Internet du SIA.
+
+****BMJ 09/2026****
+La nouvelle version export_xml_bd_SIA_2026-09-03-v04.zip contient l'obstacle 74011 qui en raison d'un problème technique, n'était pas présent dans les versions précédentes de ce BMJ.
+
+****BMJ 02/2026****
+- Mise à jour de l'orientation magnétique de tous les segments des routes.
+- Dans le XML AIXM4.5, pour certains Dpn (de type ICAO), DME et VOR, changement de format des coordonnées en degrés décimaux pour une mise en cohérence avec l'EAD SDO (exemple avec DME HOC en Suisse 47.46654728N 007.66545889E).
+
+****BMJ 01/2026****
+Dans la v2 suppression du DME GVA et correction du plancher de LFMLFS5.
+
+****BMJ 13/2025****
+Pas de mises à jour de données avec préavis AIRAC. Seulement quelques mises à jour de données avec préavis non-AIRAC.
+
+****BMJ 08/2025**** 
+Modification concernant l’Entité Obstacles : 
+Pour les nouveaux Obstacles et ceux mis à jour, l'éventuelle remarque est uniquement disponible dans le fichier XML AIXM, entité "Obs" puis l'attribut "txtRmk". La valeur est composée de la version en français, séparées par "\\" de l'anglais. 
+
+
+****BMJ 06/2025****
+
+Identifiant des Hélistations et FATO/TLOF (Uniquement pour les hélistations qui n’ont pas d’indicateur d’emplacement OACI) : 
+1) Modification des identifiants des hélistations selon la règle :  « 2 lettres correspondant au code organisation + 3 chiffres » (ex : « LF153 » pour une hélistation en France métropolitaine)
+2) Modification des designator des FATO & TLOF selon la règle  « identifiant-TLOF » ou « identifiant-FATO » (ex : « LF153-TLOF » ou « LF153-FATO »).
+
+ADHP Usage (Uniquement pour l’export AIXM 4.5) : modification des règles d’encodage des Usage limitation dans l’entité <Ahu>. Pour plus de détails se référer à la FAQ.
+
+
+****BMJ 05/2024****
+
+- Dans l'entité ASE : ajout du localtype "RMZ-TMZ"
+
+
+****BMJ 04/2025****
+
+Modification du codage des espaces SIV : 
+1)	Changement de l’attribut <codeType> de « D-OTHER » vers "RAS" 
+2)	Changement de l’attribut <txtLocalType> de « SIV » vers "FLIGHT INFORMATION SECTOR"
+3)	Standardisation de l’attribut <codeId> selon les règles DHO : code OACI à 4 lettres + 2 lettres « FS » + 1 à 4 chiffres
+Par exemple : « LFKJFS » pour SIV AJACCIO, « LFRNFSCTNA » pour SIV RENNES COTENTIN A et « LFMTFS2P1 » pour SIV MONTPELLIER 2.1
+
+
