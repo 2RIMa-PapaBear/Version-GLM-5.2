@@ -78,7 +78,13 @@ const toFt = (val, unit) => {
     return v;
 };
 
-const TYPE_NUM = { CTR: 4, TMA: 5, CTA: 34, SIV: 33, ATZ: 6 };
+const TYPE_NUM = {
+    CTR: 4, TMA: 5, CTA: 34, SIV: 33, ATZ: 6,
+    P: 3, R: 15, D: 2,          // interdite / réglementée / dangereuse
+    Pje: 1,                      // parachutage
+    Vol: 14, TrPla: 14, TrPVL: 14, TrVL: 14,   // planeurs / vol à voile
+    TMZ: 11, RMZ: 12, 'RMZ-TMZ': 11,
+};
 const zonesOut = [];
 each('Volume', (attrs, body) => {
     const partieLk = attr((body.match(/<Partie [^>]*\/>/) || body.match(/<Partie [^>]*>/) || [''])[0], 'lk');
