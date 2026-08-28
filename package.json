@@ -1,16 +1,16 @@
 {
-    "name": "metar-taf-visualiseur",
-    "version": "3.0.0",
-    "description": "Visualiseur METAR/TAF — Météo aéronautique en temps réel",
-    "private": true,
-    "type": "module",
-    "scripts": {
-        "test": "node --test test/core.test.mjs test/flight-planner.test.mjs test/relais-cache.test.mjs test/fleet.test.mjs test/route-alternates.test.mjs test/bump-version.test.mjs test/route-labels.test.mjs test/takeoff-profile.test.mjs test/wb-core.test.mjs test/flight-plan-io.test.mjs test/radio-points.test.mjs test/airspace-profile.test.mjs test/airspaces-file.test.mjs test/freq-sia.test.mjs",
-        "deploy": "node scripts/deploy-ftp.mjs",
-        "deploy:dry": "node scripts/deploy-ftp.mjs --dry-run",
-        "pub": "node scripts/pub.mjs"
-    },
-    "devDependencies": {
-        "basic-ftp": "^6.2.0"
-    }
+  "name": "metar-taf-visualiseur",
+  "version": "3.0.0",
+  "description": "Visualiseur METAR/TAF — Météo aéronautique en temps réel",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/core.test.mjs test/flight-planner.test.mjs test/relais-cache.test.mjs test/fleet.test.mjs test/route-alternates.test.mjs test/bump-version.test.mjs test/route-labels.test.mjs test/takeoff-profile.test.mjs test/wb-core.test.mjs test/flight-plan-io.test.mjs test/radio-points.test.mjs test/airspace-profile.test.mjs test/airspaces-file.test.mjs test/freq-sia.test.mjs test/waypoints-field.test.mjs",
+    "deploy": "node scripts/deploy-ftp.mjs",
+    "deploy:dry": "node scripts/deploy-ftp.mjs --dry-run",
+    "pub": "node scripts/pub.mjs"
+  },
+  "devDependencies": {
+    "basic-ftp": "^6.2.0"
+  }
 }

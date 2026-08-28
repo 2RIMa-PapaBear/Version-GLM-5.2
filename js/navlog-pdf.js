@@ -71,8 +71,7 @@ const ORANGE_BG = [254, 234, 215];   // aire sous la courbe (#FB923C 35 % → or
 const ORANGE = [234, 88, 12];        // ligne de terrain (#FB923C → orange-600)
 const AMBER_LN = [245, 158, 11];     // marqueurs waypoints (#FBBF24 → amber-500)
 const PLOT_BG = [248, 250, 252];     // fond du graphique
-const SIV_LN = [13, 110, 180];       // cadre des zones traversées (bleu SIV)
-const SIV_FILL = [226, 242, 252];    // remplissage des zones (blue-50)
+const SIV_MAP_LN = [56, 189, 248];   // limites des zones sur le profil — bleu IDENTIQUE à la carte (#38BDF8)
 const SIV_TX = [10, 80, 140];        // étiquettes des zones
 const CAT_PRINT = {                  // CAT_COLORS écran → équivalents papier
     VFR: [5, 150, 105], MVFR: [2, 132, 199], IFR: [185, 28, 28], LIFR: [146, 22, 138],
@@ -1173,45 +1172,10 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr) {
     const yOf = e => yT + (1 - (e - yMin) / (yMax - yMin)) * CH;
 
     // Croisière + rangée des codes OACI (sous la ligne de croisière) —
-    // calculées tôt : les étiquettes des zones doivent éviter cette rangée.
+    // calculées tôt : les étiquettes verticales des zones doivent éviter cette rangée.
     const cruiseDrawn = pr.cruiseAltFt > yMin && pr.cruiseAltFt < yMax;
     const yc = cruiseDrawn ? yOf(pr.cruiseAltFt) : null;
     const codeY = cruiseDrawn ? Math.min(yc + 12, yB - 6) : yT + 9;
-
-    // Zones aériennes traversées : rectangles d'altitude nichés sous le
-    // terrain (maquette validée 26/08 — façon EFB) ; plafond au-dessus de
-    // l'échelle → bord haut pointillé. Groupes déjà triés conteneur → imbriqué.
-    const zones = Array.isArray(pr.routeAirspaces) ? pr.routeAirspaces : null;
-    const zoneGeo = [];
-    if (zones) {
-        for (const g of zones) {
-            const clamped = g.up > yMax;
-            const yTopBand = yOf(clamped ? yMax : g.up), yBotBand = yOf(g.lo);
-            let widest = null;
-            for (const [fa, fb] of g.ranges) {
-                const x0 = Math.max(xOf(fa), xL), x1 = Math.min(xOf(fb), xR);
-                if (x1 - x0 < 3) continue;
-                if (!widest || fb - fa > widest[1] - widest[0]) widest = [fa, fb, x0, x1];
-
-                doc.setFillColor(...SIV_FILL);
-                doc.setDrawColor(...SIV_LN); doc.setLineWidth(0.8);
-                doc.rect(x0 + 0.5, yTopBand, x1 - x0 - 1, yBotBand - yTopBand, 'FD');
-                if (clamped) {   // plafond hors échelle : bord haut en pointillés
-                    doc.setLineDashPattern([2.5, 2], 0); doc.setLineWidth(1);
-                    doc.line(x0 + 0.5, yT + 0.7, x1 - 0.5, yT + 0.7);
-                    doc.setLineDashPattern([], 0);
-                }
-                // Séparateurs entre secteurs du même organisme (ex. SEINE 6/7/8).
-                doc.setLineDashPattern([2, 2], 0); doc.setLineWidth(0.6);
-                for (let i = 1; i < g.segs.length; i++) {
-                    const sx = xOf((g.segs[i - 1].fb + g.segs[i].fa) / 2);
-                    if (sx > x0 + 1 && sx < x1 - 1) doc.line(sx, yTopBand, sx, yBotBand);
-                }
-                doc.setLineDashPattern([], 0);
-            }
-            if (widest) zoneGeo.push({ g, clamped, yTopBand, yBotBand, widest });
-        }
-    }
 
     // Fond + grille horizontale avec labels (5 lignes).
     doc.setFillColor(...PLOT_BG);
@@ -1270,7 +1234,9 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr) {
     // Waypoints intermédiaires : filet vertical pointillé + pastille + ICAO.
     // Labels OACI (départ/arrivée/waypoints) posés SOUS la ligne de croisière
     // pointillée — posés en haut du graphe ils la chevauchaient (elle est haute
-    // quand la croisière domine largement le relief).
+    // quand la croisière domine largement le relief). Anti-collision simple :
+    // deux étiquettes qui se chevauchent s'étagent sur une 2e rangée.
+    const wpLabels = [];
     if (pr.waypoints?.length) {
         for (const wp of pr.waypoints) {
             if (wp.frac == null) continue;
@@ -1281,8 +1247,7 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr) {
             doc.setLineDashPattern([], 0);
             doc.setFillColor(...AMBER_LN);
             doc.circle(wx, yT + 3, 2.2, 'F');
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); _setInk(doc, AMBER);
-            doc.text(wp.name || wp.icao, wx, codeY, { align: 'center' });
+            wpLabels.push({ txt: wp.name || wp.icao, x: wx, align: 'center' });
         }
     }
 
@@ -1297,109 +1262,80 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr) {
     }
 
     // Labels départ / arrivée, sous la ligne de croisière (comme les waypoints).
-    doc.setFont('courier', 'bold'); doc.setFontSize(7.5); _setInk(doc, INK);
-    doc.text(pr.fromIcao, xL + 3, codeY);
-    doc.text(pr.toIcao, xR - 3, codeY, { align: 'right' });
+    wpLabels.push({ txt: pr.fromIcao, x: xL + 3, align: 'left', font: 'courier', size: 7.5, ink: INK });
+    wpLabels.push({ txt: pr.toIcao, x: xR - 3, align: 'right', font: 'courier', size: 7.5, ink: INK });
+    wpLabels.forEach(l => {
+        l.font ??= 'helvetica'; l.size ??= 6.5; l.ink ??= AMBER;
+        doc.setFont(l.font, 'bold'); doc.setFontSize(l.size);
+        l.w = doc.getTextWidth(l.txt);
+    });
+    wpLabels.sort((a, b) => a.x - b.x);
+    let prevEdge = -Infinity;
+    for (const l of wpLabels) {
+        const lEdge = l.align === 'right' ? l.x - l.w : (l.align === 'center' ? l.x - l.w / 2 : l.x);
+        const clash = lEdge < prevEdge + 3;
+        doc.setFont(l.font, 'bold'); doc.setFontSize(l.size); _setInk(doc, l.ink);
+        doc.text(l.txt, l.x, clash ? codeY + 9 : codeY,
+            l.align === 'center' ? { align: 'center' } : (l.align === 'right' ? { align: 'right' } : undefined));
+        prevEdge = Math.max(prevEdge, lEdge + l.w);
+    }
 
-    // Étiquettes compactes des zones traversées, par-dessus le terrain
-    // (plafond par secteur en haut, nom + fréquence à l'intérieur).
-    if (zoneGeo.length) {
-        _drawZoneLabels(doc, zoneGeo, { xOf, yOf, xL, xR, yT, yB, yMax, yc, codeY });
+    // Zones aériennes traversées (SIV…) : LIMITES en traits verticaux pleins
+    // fins, bleu identique à la carte (#38BDF8), à chaque entrée/sortie de
+    // zone ; nom du secteur + fréquence en VERTICAL, centrés entre les
+    // limites et centrés en hauteur dans le graphe.
+    const zones = Array.isArray(pr.routeAirspaces) ? pr.routeAirspaces : null;
+    if (zones?.length) {
+        // Limites : débuts/fins de traversée (ranges fusionnés), doublons
+        // proches écartés (zones imbriquées qui partagent un bord).
+        const bxs = [];
+        for (const g of zones) {
+            for (const [fa, fb] of g.ranges) {
+                for (const f of [fa, fb]) {
+                    const x = Math.max(xL, Math.min(xOf(f), xR));
+                    if (!bxs.some(b => Math.abs(b - x) <= 1.5)) bxs.push(x);
+                }
+            }
+        }
+        bxs.sort((a, b) => a - b);
+        doc.setDrawColor(...SIV_MAP_LN); doc.setLineWidth(0.7);
+        for (const x of bxs) doc.line(x, yT, x, yB);
+
+        // Une étiquette par SECTEUR traversé (le secteur prime sur
+        // l'organisme : « SIV RENNES SUD A », pas « RENNES INFO »).
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(6);
+        const codesRowTop = codeY - 7;   // rangée des codes OACI à préserver
+        const labels = [];
+        for (const g of zones) {
+            for (const s of g.segs) {
+                const zone = (s.zone && s.zone.toUpperCase() !== g.name.toUpperCase())
+                    ? s.zone : g.name.replace(/ INFO$/, '');
+                if (!zone) continue;
+                const x0 = Math.max(xL, xOf(s.fa)), x1 = Math.min(xR, xOf(s.fb));
+                if (x1 - x0 < 3) continue;
+                // « partie A » → « A » (nom SIA compacté pour la colonne).
+                labels.push({ label: `${zone.replace(/\s+partie\s+/i, ' ')}${g.freq ? ' ' + g.freq : ''}`, x: (x0 + x1) / 2 });
+            }
+        }
+        // Anti-collision horizontale : deux étiquettes verticales à moins de
+        // 9 pt d'écart → la 2e est décalée à droite de la 1re.
+        labels.sort((a, b) => a.x - b.x);
+        for (let i = 1; i < labels.length; i++) {
+            if (labels[i].x - labels[i - 1].x < 9) labels[i].x = labels[i - 1].x + 9;
+        }
+        _setInk(doc, SIV_TX);
+        for (const l of labels) {
+            // Vertical (lu de bas en haut), ancre = BAS du texte : centré en
+            // hauteur quand ça tient, sinon calé au fond du graphe — le haut
+            // du texte ne remonte jamais au-dessus de la rangée des codes OACI.
+            const maxW = (yB - 3) - Math.max(yT + 3, codesRowTop);
+            const txt = doc.getTextWidth(l.label) > maxW ? _trunc(doc, l.label, maxW) : l.label;
+            const tw = doc.getTextWidth(txt);
+            const floorTop = Math.max(yT + 3, codesRowTop);
+            const yBot = Math.max(Math.min((yT + yB) / 2 + tw / 2, yB - 3), floorTop + tw);
+            doc.text(txt, Math.min(l.x, xR - 4), yBot, { angle: 90 });
+        }
     }
 
     return yB + 16;
-}
-
-// « SFC », « FL065 », « 2500 ft » — mêmes règles que la carte (airspaces.js).
-function _altLabel(ft) {
-    if (ft <= 0) return 'SFC';
-    if (ft >= 4000 && ft % 500 === 0) return 'FL' + String(Math.round(ft / 100)).padStart(3, '0');
-    return `${Math.round(ft)} ft`;
-}
-
-/** Étiquettes compactes des zones (retour utilisateur 27/08 : le SECTEUR
- *  prime sur l'organisme — « SIV RENNES SUD A 134.000 », pas « RENNES
- *  INFO ») : un libellé par SECTEUR du groupe — secteur + fréquence en
- *  2 lignes si le tronçon est assez large, sinon texte vertical le long
- *  du bord gauche du secteur (2 colonnes secteur | fréquence si besoin,
- *  arrêté sous la rangée des codes OACI). Plafond par secteur en haut,
- *  comme validé. Les lignes occupées (croisière, codes OACI, plafonds)
- *  restent évitées. */
-function _drawZoneLabels(doc, zoneGeo, env) {
-    const { xOf, yOf, xL, xR, yT, yB, yMax, yc, codeY } = env;
-
-    const covers = (outer, inner) =>
-        inner.widest[0] >= outer.widest[0] - 0.002 && inner.widest[1] <= outer.widest[1] + 0.002;
-
-    for (let i = 0; i < zoneGeo.length; i++) {
-        const z = zoneGeo[i];
-        const g = z.g;
-        const [fa, fb] = z.widest;
-        const nested = zoneGeo.some((o, j) => j !== i && o !== z && covers(o, z));
-        const segs = g.segs.filter(s => s.fa < fb && s.fb > fa);
-        if (!segs.length) continue;
-
-        // Plafond par secteur (haut du rectangle), centré sur le secteur.
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(5.5); _setInk(doc, SIV_TX);
-        const ceilRow = s => (s.up > yMax ? yT + 6.5 : yOf(s.up) + 6);
-        for (const s of segs) {
-            const sx0 = Math.max(xOf(s.fa), xL), sx1 = Math.min(xOf(s.fb), xR);
-            if (sx1 - sx0 < 3) continue;
-            const txt = (s.up > yMax ? '> ' : '') + _altLabel(s.up);
-            const cx = (sx0 + sx1) / 2;
-            // Zone englobante : plafond ancré à GAUCHE (libère la rangée
-            // haute pour les secteurs imbriqués) — à DROITE si le label de
-            // croisière occupe le coin haut gauche (croisière dominante).
-            const first = s === segs[0];
-            if (!nested && first) {
-                const clashLeft = sx0 + 3 < xL + 34 && Math.abs(ceilRow(s) - (yc != null ? yc - 4 : -99)) < 8;
-                doc.text(txt, clashLeft ? sx1 - 3 : sx0 + 3, ceilRow(s), clashLeft ? { align: 'right' } : undefined);
-            } else {
-                doc.text(txt, cx, ceilRow(s), { align: 'center' });
-            }
-        }
-
-        // Secteur + fréquence, un libellé par secteur.
-        doc.setFont('helvetica', 'bold'); _setInk(doc, SIV_TX);
-        for (const s of segs) {
-            const zone = (s.zone && s.zone.toUpperCase() !== g.name.toUpperCase()) ? s.zone : g.name.replace(/ INFO$/, '');
-            if (!zone) continue;
-            const sx0 = Math.max(xOf(s.fa), xL), sx1 = Math.min(xOf(s.fb), xR);
-            const wSeg = sx1 - sx0;
-            if (wSeg < 3) continue;
-
-            doc.setFontSize(6);
-            const zoneW = doc.getTextWidth(zone);
-            const freqW = g.freq ? doc.getTextWidth(g.freq) : 0;
-            if (wSeg > zoneW + 8 && (!g.freq || wSeg > freqW + 8)) {
-                // Horizontal : 2 lignes centrées dans le secteur ; zone
-                // englobante → sous la rangée des codes OACI (les bandes
-                // étroites imbriquées occupent le milieu), imbriquée → au
-                // centre en évitant les lignes occupées.
-                let ny = nested ? (z.yTopBand + z.yBotBand) / 2 + 2
-                                : Math.max(z.clamped ? yT + 24 : z.yTopBand + 17, ceilRow(s) + 12);
-                if (Math.abs(ny - codeY) < 8) ny = codeY + 10;
-                if (nested) {
-                    const rows = [yc, codeY, ...segs.map(ceilRow)].filter(r => r != null);
-                    for (const r of rows) if (Math.abs(ny - r) < 8) ny = r + 10;
-                }
-                doc.text(zone, (sx0 + sx1) / 2, ny, { align: 'center' });
-                if (g.freq) doc.text(g.freq, (sx0 + sx1) / 2, ny + 7.5, { align: 'center' });
-            } else {
-                // Vertical le long du bord gauche du secteur, lu de bas en
-                // haut ; s'arrête sous la rangée des codes OACI ; 2 colonnes
-                // (secteur | fréquence) si la hauteur ne suffit pas.
-                doc.setFontSize(5.5);
-                const label = g.freq ? `${zone} ${g.freq}` : zone;
-                const maxTop = Math.max(z.yTopBand + 5, codeY + 8);
-                const avail = z.yBotBand - 3 - maxTop;
-                if (avail > doc.getTextWidth(label) + 6) {
-                    doc.text(label, sx0 + 5, z.yBotBand - 3, { angle: 90 });
-                } else if (avail > Math.max(zoneW, freqW) + 6) {
-                    doc.text(zone, sx0 + 5, z.yBotBand - 3, { angle: 90 });
-                    if (g.freq) doc.text(g.freq, sx0 + 11, z.yBotBand - 3, { angle: 90 });
-                }
-            }
-        }
-    }
 }

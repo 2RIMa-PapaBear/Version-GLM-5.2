@@ -36,6 +36,7 @@
  * ================================================================ */
 
 import { state } from './core.js';
+import { parseWaypointsField } from './flight-planner-ui.js';
 
 /**
  * Construit l'URL de partage à partir de l'état courant.
@@ -64,8 +65,9 @@ export function buildPermalink() {
         const dest = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
         if (/^[A-Z][A-Z0-9]{3}$/.test(dest) && dest !== icaoU) {
             url.searchParams.set('dest', dest);
-            const wps = (document.getElementById('fp-waypoints')?.value || '').trim().toUpperCase();
-            if (/^([A-Z][A-Z0-9]{3}\s*)+$/.test(wps)) url.searchParams.set('wp', wps);
+            // Codes du plan (le champ affiche les noms réels des repères).
+            const wps = parseWaypointsField(document.getElementById('fp-waypoints')?.value || '').join(' ');
+            if (wps) url.searchParams.set('wp', wps);
         }
     }
 
