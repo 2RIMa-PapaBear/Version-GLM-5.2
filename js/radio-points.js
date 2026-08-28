@@ -26,16 +26,24 @@
 
 export const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 export const RADIO_POINTS_URL = 'data/radio-points.json';
+export const OBSTACLES_URL = 'data/obstacles.json';
 
 /** Seuils de zoom (déclutter) : VOR, NDB et points VFR apparaissent AU
- * MÊME niveau de zoom (retour utilisateur 27/08 — avant : 6/8/10). */
-export const LAYER_MIN_ZOOM = { vor: 6, ndb: 6, vrp: 6 };
+ * MÊME niveau de zoom (retour utilisateur 27/08 — avant : 6/8/10).
+ * Obstacles FRANCE (8 900 points, 91 % d'éoliennes en fermes denses) :
+ * couche plus locale, étiquettes de hauteur uniquement en vue rapprochée. */
+export const LAYER_MIN_ZOOM = { vor: 6, ndb: 6, vrp: 6, obstacle: 10 };
 /** Seuils de zoom pour afficher les étiquettes (icône seule en dessous). */
-export const LABEL_MIN_ZOOM = { vor: 7, ndb: 10, vrp: 11 };
+export const LABEL_MIN_ZOOM = { vor: 7, ndb: 10, vrp: 11, obstacle: 13 };
 /** Nombre maximal de marqueurs rendus par couche et par cadrage. VRP 800 :
  * la France seule en compte 675 — un plafond inférieur tronquait
  * arbitrairement (ordre du fichier) dès la vue nationale. */
-export const LAYER_MAX_POINTS = { vor: 400, ndb: 400, vrp: 800 };
+export const LAYER_MAX_POINTS = { vor: 400, ndb: 400, vrp: 800, obstacle: 800 };
+
+/** Catégories d'obstacles — 21 types SIA regroupés en 6 familles d'icônes
+ *  (cf. scripts/fetch-obstacles.mjs, export AIXM officiel du SIA ; le type
+ *  EXACT — « Pylône », « Château d'eau »… — reste porté par chaque item). */
+export const OBSTACLE_CATS = ['EOLIENNE', 'ANTENNE', 'CHEMINEE', 'CHATEAU_D_EAU', 'BATIMENT', 'AUTRE'];
 
 /**
  * Classe un radiophare par bande de fréquence.
@@ -91,13 +99,14 @@ export function filterBbox(items, west, south, east, north) {
 /**
  * Couches visibles à un zoom donné (déclutter).
  * @param {number} zoom Niveau de zoom Leaflet.
- * @returns {{vor:boolean, ndb:boolean, vrp:boolean}}
+ * @returns {{vor:boolean, ndb:boolean, vrp:boolean, obstacle:boolean}}
  */
 export function visibleKinds(zoom) {
     return {
         vor: zoom >= LAYER_MIN_ZOOM.vor,
         ndb: zoom >= LAYER_MIN_ZOOM.ndb,
         vrp: zoom >= LAYER_MIN_ZOOM.vrp,
+        obstacle: zoom >= LAYER_MIN_ZOOM.obstacle,
     };
 }
 
@@ -105,6 +114,33 @@ export function visibleKinds(zoom) {
 export function formatFreq(freq, unit) {
     if (freq == null) return '';
     return unit === 1 ? `${freq} kHz` : `${(+freq).toFixed(2).replace(/0$/, '')} MHz`;
+}
+
+/**
+ * Analyse data/obstacles.json (export AIXM officiel du SIA).
+ * Lignes compactes [cat, lat, lon, hFt, elevFt, lgt, name, type] :
+ * hFt = hauteur sol (ft), elevFt = altitude du SOMMET (ft AMSL),
+ * lgt = balisage lumineux (1/0), type = libellé exact SIA.
+ * @returns {{obstacles:Array<{cat:number,lat:number,lon:number,hFt:number|null,
+ *            elevFt:number|null,lgt:number,name:string,type:string}>,
+ *            generatedAt:string, airac:string}|null}
+ */
+export function parseObstacles(json) {
+    if (!json || !Array.isArray(json.obstacles)) return null;
+    const obstacles = [];
+    for (const [cat, lat, lon, hFt, elevFt, lgt, name, type] of json.obstacles) {
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+        const c = Number.isFinite(+cat) ? Math.min(5, Math.max(0, +cat)) : 5;
+        obstacles.push({
+            cat: c, lat, lon,
+            hFt: Number.isFinite(+hFt) && +hFt > 0 ? Math.round(+hFt) : null,
+            elevFt: Number.isFinite(+elevFt) ? Math.round(+elevFt) : null,
+            lgt: lgt === 1 || lgt === true ? 1 : 0,
+            name: name ? String(name) : '',
+            type: type ? String(type) : '',
+        });
+    }
+    return { obstacles, generatedAt: json.generatedAt || '', airac: json.airac || '' };
 }
 
 // ----------------------------------------------------------------
@@ -126,28 +162,33 @@ function _openDB() {
     });
 }
 
-async function _idbGet() {
+async function _idbGet(key = 'data') {
     try {
         const db = await _openDB();
         return await new Promise((resolve, reject) => {
-            const req = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get('data');
+            const req = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(key);
             req.onsuccess = () => { db.close(); resolve(req.result || null); };
-            req.onerror = () => { db.close(); reject(req.error); };
+            req.onerror = () => { db.close(); resolve(null); };
         });
     } catch { return null; }
 }
 
-async function _idbPut(entry) {
+async function _idbPut(entry, key = 'data') {
     try {
         const db = await _openDB();
         await new Promise((resolve, reject) => {
             const tx = db.transaction(IDB_STORE, 'readwrite');
-            tx.objectStore(IDB_STORE).put(entry, 'data');
+            tx.objectStore(IDB_STORE).put(entry, key);
             tx.oncomplete = () => { db.close(); resolve(); };
-            tx.onerror = () => { db.close(); reject(tx.error); };
+            tx.onerror = () => { db.close(); resolve(); };
         });
     } catch { /* quota : le cache HTTP fera le relais */ }
 }
+
+// Cache obstacles : même base IndexedDB, clé distincte — suffixée -sia pour
+// invalider le format openAIP précédent (jamais déployé, préversion locale).
+const _idbGetObstacles = () => _idbGet('obstacles-sia');
+const _idbPutObstacles = (entry) => _idbPut(entry, 'obstacles-sia');
 
 /**
  * Charge les points mondiaux : cache IndexedDB si frais (< 7 jours),
@@ -178,6 +219,37 @@ export async function loadRadioPoints(opts = {}) {
         return { ...parsed, stale: false };
     } catch {
         // Hors ligne / serveur injoignable : données périmées en repli.
+        return cached?.parsed ? { ...cached.parsed, stale: true } : null;
+    }
+}
+
+/**
+ * Charge les obstacles France : même politique de cache que les radiophares
+ * (IndexedDB 7 jours, contournement HTTP à l'expiration, repli périmé).
+ * Fichier indépendant (data/obstacles.json) : absent du serveur → null
+ * silencieux, la case reste simplement sans effet.
+ *
+ * @param {{fetchImpl?:Function, now?:number}} [opts] Injection pour tests.
+ * @returns {Promise<{obstacles:Array, generatedAt:string, stale:boolean}|null>}
+ */
+export async function loadObstacles(opts = {}) {
+    const doFetch = opts.fetchImpl ?? (typeof fetch === 'function' ? fetch : null);
+    const now = opts.now ?? Date.now();
+
+    const cached = await _idbGetObstacles();
+    if (cached?.parsed && (now - cached.ts) < WEEK_MS) {
+        return { ...cached.parsed, stale: false };
+    }
+    if (!doFetch) return cached?.parsed ? { ...cached.parsed, stale: true } : null;
+    try {
+        const bust = (now - (cached?.ts ?? 0)) >= WEEK_MS ? `?t=${now}` : '';
+        const res = await doFetch(OBSTACLES_URL + bust, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const parsed = parseObstacles(await res.json());
+        if (!parsed) throw new Error('format inattendu');
+        await _idbPutObstacles({ parsed, ts: now });
+        return { ...parsed, stale: false };
+    } catch {
         return cached?.parsed ? { ...cached.parsed, stale: true } : null;
     }
 }

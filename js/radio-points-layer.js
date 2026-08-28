@@ -19,11 +19,11 @@
 import { state } from './core.js';
 import { AIRSPACE_GROUPS } from './airspaces.js';
 import {
-    loadRadioPoints, filterBbox, visibleKinds,
-    LABEL_MIN_ZOOM, LAYER_MAX_POINTS, formatFreq,
+    loadRadioPoints, loadObstacles, filterBbox, visibleKinds,
+    LABEL_MIN_ZOOM, LAYER_MAX_POINTS, formatFreq, OBSTACLE_CATS,
 } from './radio-points.js';
 
-const COLORS = { vor: '#60A5FA', ndb: '#4ADE80', vrp: '#2563EB' };
+const COLORS = { vor: '#60A5FA', ndb: '#4ADE80', vrp: '#2563EB', obstacle: '#F87171' };
 
 const _esc = (s) => String(s ?? '').replace(/[&<>"']/g, c =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -50,15 +50,56 @@ function _icon(kind) {
     });
 }
 
+/** Symboles des obstacles — un par FAMILLE (0-5, 21 types SIA regroupés —
+ *  cf. fetch-obstacles.mjs) : éolienne (3 pales sur mât), pylône treillis
+ *  (pylône/mât/antenne), cheminée, château d'eau (réservoir sur pilotis),
+ *  bâtiment (carré plein), point générique. Famille en rouge : danger,
+ *  cohérent avec le balisage réel des mâts — lue sur les fonds satellite
+ *  et sombres. Le type EXACT SIA et le balisage lumineux sont dans le popup. */
+const OBST_COLORS = COLORS.obstacle;
+function _obstacleIcon(cat) {
+    const c = OBST_COLORS;
+    const svg = cat === 0
+        // Éolienne : mât + rotor 3 pales.
+        ? `<path d="M9 7.5 L9 16.5" stroke="${c}" stroke-width="1.6"/>`
+            + `<path d="M9 7 L9 1.5 M9 7 L4 10 M9 7 L14 10" stroke="${c}" stroke-width="1.7" stroke-linecap="round"/>`
+            + `<circle cx="9" cy="7" r="1.3" fill="${c}"/>`
+        : cat === 1
+            // Pylône / mât hertzien : treillis avec traverses.
+            ? `<path d="M5 16 L9 2.5 L13 16" fill="none" stroke="${c}" stroke-width="1.5" stroke-linejoin="round"/>`
+                + `<path d="M6.6 11.5 L11.4 11.5 M5.8 14 L12.2 14" stroke="${c}" stroke-width="1.1"/>`
+                + `<circle cx="9" cy="2.5" r="1.1" fill="${c}"/>`
+            : cat === 2
+                // Cheminée : fût + collerette sommitale.
+                ? `<path d="M7.3 16.5 L7.3 6 L10.7 6 L10.7 16.5 Z" fill="none" stroke="${c}" stroke-width="1.5" stroke-linejoin="round"/>`
+                    + `<path d="M6.4 6 L11.6 6" stroke="${c}" stroke-width="1.9" stroke-linecap="round"/>`
+                : cat === 3
+                    // Château d'eau / silo : réservoir plein sur pilotis.
+                    ? `<path d="M4.8 4.2 L13.2 4.2 L13.2 9 L4.8 9 Z" fill="${c}" opacity="0.85"/>`
+                        + `<path d="M5.8 9 L5.8 15.5 M12.2 9 L12.2 15.5 M9 9 L9 15.5" stroke="${c}" stroke-width="1.2"/>`
+                    : cat === 4
+                        // Bâtiment / tour : carré plein.
+                        ? `<rect x="5.5" y="5.5" width="7" height="7" fill="${c}" opacity="0.85"/>`
+                        // Autre : point obstacle (convention cartes VFR).
+                        : `<circle cx="9" cy="9" r="2.6" fill="${c}"/>`;
+    return L.divIcon({
+        className: 'rp-marker rp-obstacle',
+        html: `<svg width="18" height="18" viewBox="0 0 18 18" style="display:block;overflow:visible">${svg}</svg>`,
+        iconSize: [18, 18],
+        iconAnchor: cat === 0 || cat === 1 ? [9, 16] : [9, 9],   // éolienne/pylône ancrés au pied
+    });
+}
+
 export function createRadioPointsController(map, deps = {}) {
     let data = null, loadPromise = null;
+    let obstData = null, obstPromise = null;
     let layerGroup = null;
-    const enabled = { vor: false, ndb: false, vrp: false };
+    const enabled = { vor: false, ndb: false, vrp: false, obstacle: false };
     let refreshTimer = null;
     let menuEl = null;
 
     const isFr = () => state.lang === 'fr';
-    const anyEnabled = () => enabled.vor || enabled.ndb || enabled.vrp;
+    const anyEnabled = () => enabled.vor || enabled.ndb || enabled.vrp || enabled.obstacle;
 
     function ensureLayer() {
         layerGroup ??= L.layerGroup().addTo(map);
@@ -69,6 +110,12 @@ export function createRadioPointsController(map, deps = {}) {
         if (data) return Promise.resolve(data);
         loadPromise ??= loadRadioPoints().then((d) => { data = d; return d; }).catch(() => null);
         return loadPromise;
+    }
+
+    function ensureObstacles() {
+        if (obstData) return Promise.resolve(obstData);
+        obstPromise ??= loadObstacles().then((d) => { obstData = d; return d; }).catch(() => null);
+        return obstPromise;
     }
 
     function popupHtml(kind, it) {
@@ -90,14 +137,42 @@ export function createRadioPointsController(map, deps = {}) {
         return `<div class="fw-inner">${parts.join('')}</div>`;
     }
 
+    /** Infobulle popup d'un obstacle SIA : type exact, hauteur, sommet,
+     *  balisage lumineux. */
+    function obstaclePopupHtml(it) {
+        const fr = isFr();
+        const FT_TO_M = 0.3048;
+        const FAMILLES = ['Éolienne', 'Antenne / pylône', 'Cheminée', 'Château d\'eau / silo', 'Bâtiment / tour', 'Obstacle'];
+        const parts = [`<div class="fw-title"><strong style="color:${OBST_COLORS};">${_esc(it.name || it.type || 'Obstacle')}</strong></div>`];
+        parts.push(`<div style="font-size:11px;color:var(--text-muted,#94A3B8);">${_esc(it.type || FAMILLES[it.cat])}</div>`);
+        if (it.hFt != null) {
+            const m = Math.round(it.hFt * FT_TO_M);
+            parts.push(`<div style="font-size:11px;">${fr ? 'Hauteur' : 'Height'} : <b>${it.hFt} ft (${m} m)</b></div>`);
+        }
+        if (it.elevFt != null) {
+            const solFt = it.hFt != null ? it.elevFt - it.hFt : null;
+            const ligne = solFt != null
+                ? `${fr ? 'Sol' : 'Ground'} : ${solFt} ft · ${fr ? 'Sommet' : 'Top'} : <b>${it.elevFt} ft</b> AMSL`
+                : `${fr ? 'Sommet' : 'Top'} : <b>${it.elevFt} ft</b> AMSL`;
+            parts.push(`<div style="font-size:11px;color:var(--text-muted,#94A3B8);">${ligne}</div>`);
+        }
+        // Balisage lumineux (étoile des cartes VFR quand il est présent).
+        parts.push(`<div style="font-size:11px;">${fr ? 'Balisage lumineux' : 'Lighting'} : `
+            + (it.lgt
+                ? `<b style="color:${OBST_COLORS};">✶ ${fr ? 'oui' : 'yes'}</b>`
+                : (fr ? 'non' : 'no'))
+            + `</div>`);
+        return `<div class="fw-inner">${parts.join('')}</div>`;
+    }
+
     function refresh() {
         if (!layerGroup) return;
         layerGroup.clearLayers();               // toujours effacer, même si
-        if (!anyEnabled() || !data) return;     // plus aucune couche active
+        if (!anyEnabled()) return;              // plus aucune couche active
         const zoom = map.getZoom();
         const kinds = visibleKinds(zoom);
         const b = map.getBounds().pad(0.2);
-        for (const kind of ['vor', 'ndb', 'vrp']) {
+        if (data) for (const kind of ['vor', 'ndb', 'vrp']) {
             if (!enabled[kind] || !kinds[kind]) continue;
             let pts = filterBbox(data[kind], b.getWest(), b.getSouth(), b.getEast(), b.getNorth());
             if (pts.length > LAYER_MAX_POINTS[kind]) pts = pts.slice(0, LAYER_MAX_POINTS[kind]);
@@ -124,16 +199,44 @@ export function createRadioPointsController(map, deps = {}) {
                 m.addTo(layerGroup);
             }
         }
+
+        // Obstacles : fichier indépendant, icône par catégorie, étiquette de
+        // hauteur (quand elle est connue) en vue rapprochée uniquement.
+        if (enabled.obstacle && kinds.obstacle && obstData?.obstacles) {
+            let pts = filterBbox(obstData.obstacles, b.getWest(), b.getSouth(), b.getEast(), b.getNorth());
+            if (pts.length > LAYER_MAX_POINTS.obstacle) pts = pts.slice(0, LAYER_MAX_POINTS.obstacle);
+            const withLabels = zoom >= LABEL_MIN_ZOOM.obstacle;
+            for (const it of pts) {
+                const m = L.marker([it.lat, it.lon], {
+                    icon: _obstacleIcon(it.cat),
+                    keyboard: false,
+                    zIndexOffset: -250,
+                });
+                if (withLabels && it.hFt != null) {
+                    m.bindTooltip(`${Math.round(it.hFt * 0.3048)} m`, { permanent: true, direction: 'right', className: 'rp-label rp-label-obstacle' });
+                }
+                m.bindPopup(() => obstaclePopupHtml(it), { maxWidth: 250 });
+                m.addTo(layerGroup);
+            }
+        }
     }
 
     function scheduleRefresh() {
         clearTimeout(refreshTimer);
-        refreshTimer = setTimeout(() => { ensureData().then(refresh); }, 200);
+        refreshTimer = setTimeout(() => {
+            Promise.all([
+                ensureData().catch(() => null),
+                enabled.obstacle ? ensureObstacles().catch(() => null) : null,
+            ]).then(() => refresh());
+        }, 200);
     }
 
     function setKind(kind, on) {
         enabled[kind] = !!on;
-        if (on) { ensureLayer(); ensureData().then(refresh); }
+        if (on) {
+            ensureLayer();
+            (kind === 'obstacle' ? ensureObstacles() : ensureData()).then(() => refresh());
+        }
         else if (layerGroup) refresh();
     }
 
@@ -215,6 +318,7 @@ export function createRadioPointsController(map, deps = {}) {
             + row('data-rp-kind="vor"', 'VOR', COLORS.vor)
             + row('data-rp-kind="ndb"', 'NDB', COLORS.ndb)
             + row('data-rp-kind="vrp"', fr ? 'Points VFR' : 'VFR points', COLORS.vrp)
+            + row('data-rp-kind="obstacle"', fr ? 'Obstacles' : 'Obstacles', COLORS.obstacle)
             + `<div style="padding:4px 8px 2px;font-size:9px;color:var(--text-muted,#94A3B8);border-top:1px solid var(--border-color,#334155);margin-top:4px;">openAIP · ${fr ? 'maj' : 'upd'} <span class="rp-date">—</span></div>`;
     }
 
@@ -228,7 +332,7 @@ export function createRadioPointsController(map, deps = {}) {
                 if (el) el.checked = groups[g];
             }
         }
-        for (const k of ['vor', 'ndb', 'vrp']) {
+        for (const k of ['vor', 'ndb', 'vrp', 'obstacle']) {
             const el = menuEl?.querySelector(`[data-rp-kind="${k}"]`);
             if (el) el.checked = enabled[k];
         }
