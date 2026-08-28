@@ -323,7 +323,7 @@ function _initLayerControls() {
     try {
         _radioPoints = createRadioPointsController(_map, {
             airspace: _airspaces,
-            createWaypoint: (lat, lon, name) => _createFreeWaypoint(lat, lon, name),
+            createWaypoint: (lat, lon, name, freq, kind) => _createFreeWaypoint(lat, lon, name, freq, kind),
         });
         _radioPoints.mountControls(bar);
     } catch (e) { console.error('radio points layer failed:', e.message); }
@@ -611,12 +611,18 @@ function _openFreeWpEditor(latlng, code = null) {
         .openOn(_map);
 }
 
-function _createFreeWaypoint(lat, lon, name) {
+function _createFreeWaypoint(lat, lon, name, freq, kind) {
     const code = _nextFreeWpCode();
     // Enregistre le repère comme un « terrain » : tout le pipeline de nav
     // (planner, insertion intelligente, magvar, route, PDF) le résoudra.
-    enrichAirport(code, { lat, lon, name });
-    memoSet(code, { name, lat, lon });
+    // Une fréquence (VOR/NDB) est conservée : elle s'affichera dans le
+    // détail des waypoints, écran et log PDF.
+    const freqNum = parseFloat(freq);
+    const extras = (Number.isFinite(freqNum) && freqNum > 0)
+        ? { frequencies: [{ freq: freqNum, name: '', type: kind || 'COM', primary: true }] }
+        : {};
+    enrichAirport(code, { lat, lon, name, ...extras });
+    memoSet(code, { name, lat, lon, ...extras });
 
     const marker = L.circleMarker([lat, lon], {
         radius: 7, fillColor: '#FBBF24', color: '#fff',

@@ -83,7 +83,10 @@ export function createRadioPointsController(map, deps = {}) {
             if (it.freq != null) parts.push(`<div style="font-family:'DM Mono',monospace;font-size:12px;">${_esc(formatFreq(it.freq, kind === 'ndb' ? 1 : 2))}</div>`);
         }
         const wpName = kind === 'vrp' ? it.name : `${it.ident} (${kind === 'vor' ? 'VOR' : 'NDB'})`;
-        parts.push(`<div class="mp-btns"><button class="rp-wp-btn" data-lat="${it.lat}" data-lon="${it.lon}" data-name="${_esc(wpName)}" title="${fr ? 'Ajouter comme waypoint du plan de navigation' : 'Add as waypoint to the flight plan'}">+ Waypoint</button></div>`);
+        // Fréquence portée par le bouton : le waypoint créé la conservera
+        // (affichée dans le détail des waypoints, écran + log PDF).
+        const freqStr = it.freq != null ? formatFreq(it.freq, kind === 'ndb' ? 1 : 2) : '';
+        parts.push(`<div class="mp-btns"><button class="rp-wp-btn" data-lat="${it.lat}" data-lon="${it.lon}" data-name="${_esc(wpName)}" data-freq="${_esc(freqStr)}" data-kind="${kind === 'vrp' ? 'VRP' : kind.toUpperCase()}" title="${fr ? 'Ajouter comme waypoint du plan de navigation' : 'Add as waypoint to the flight plan'}">+ Waypoint</button></div>`);
         return `<div class="fw-inner">${parts.join('')}</div>`;
     }
 
@@ -142,7 +145,7 @@ export function createRadioPointsController(map, deps = {}) {
         if (!btn) return;
         btn.addEventListener('click', () => {
             map.closePopup();
-            deps.createWaypoint?.(+btn.dataset.lat, +btn.dataset.lon, btn.dataset.name);
+            deps.createWaypoint?.(+btn.dataset.lat, +btn.dataset.lon, btn.dataset.name, btn.dataset.freq, btn.dataset.kind);
         });
     });
 
