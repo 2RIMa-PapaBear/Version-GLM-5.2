@@ -375,7 +375,12 @@ export async function fetchAirspacesForBbox(minLat, minLon, maxLat, maxLon) {
         if (lat1 - lat0 > 12) lat1 = lat0 + 12;   // garde-fou corridor très long
         if (lon1 - lon0 > 12) lon1 = lon0 + 12;
         const { items, missing } = await _loadCellsGrid(lat0, lon0, lat1, lon1);
-        if (items.length && !missing.length) return items;
+        // La base SIA couvre toute la France : si le corridor y est contenu,
+        // les items (SIA + cellules openAIP existantes) suffisent — PAS de
+        // repli API (les cellules non crawlées n'y ajouteraient que des
+        // doublons, et la console se remplissait de 404 inutiles).
+        const inSia = _bboxInSia(lat0, lon0, lat1, lon1);
+        if (items.length && (!missing.length || inSia)) return items;
         if (items.length && missing.length) {
             // Mélange : complète par l'API sur la zone manquante.
             const api = await fetchAirspacesForBbox(missing[0][0], Math.min(...missing.map(c => c[1])), Math.max(...missing.map(c => c[0])) + 1, Math.max(...missing.map(c => c[1])) + 1);
