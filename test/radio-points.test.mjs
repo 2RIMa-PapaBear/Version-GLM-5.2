@@ -6,8 +6,9 @@ import test from 'node:test';
 import assert from 'node:test';
 import { strictEqual, deepStrictEqual, ok, equal } from 'node:assert';
 import {
-    classifyNavaid, parseRadioPoints, filterBbox, visibleKinds,
-    formatFreq, loadRadioPoints, WEEK_MS, LAYER_MIN_ZOOM,
+    classifyNavaid, parseRadioPoints, parseObstacles, filterBbox, visibleKinds,
+    formatFreq, loadRadioPoints, loadObstacles, WEEK_MS, LAYER_MIN_ZOOM,
+    OBSTACLE_CATS,
 } from '../js/radio-points.js';
 
 test('classifyNavaid : bande kHz = NDB, bande 108-118 MHz = VOR', () => {
@@ -55,11 +56,13 @@ test('filterBbox : cadre simple et antiméridien (est < ouest)', () => {
     deepStrictEqual(filterBbox(pts, 170, -5, -170, 5).map(p => p.lon), [178, -178], 'antiméridien');
 });
 
-test('visibleKinds : VOR, NDB et points VFR AU MÊME niveau de zoom', () => {
-    deepStrictEqual(visibleKinds(5), { vor: false, ndb: false, vrp: false }, 'z5 : rien');
-    deepStrictEqual(visibleKinds(6), { vor: true, ndb: true, vrp: true }, 'z6 : les trois couches');
+test('visibleKinds : VOR, NDB et points VFR AU MÊME niveau de zoom ; obstacles plus locaux', () => {
+    deepStrictEqual(visibleKinds(5), { vor: false, ndb: false, vrp: false, obstacle: false }, 'z5 : rien');
+    deepStrictEqual(visibleKinds(6), { vor: true, ndb: true, vrp: true, obstacle: false }, 'z6 : les trois couches, pas les obstacles');
+    deepStrictEqual(visibleKinds(LAYER_MIN_ZOOM.obstacle), { vor: true, ndb: true, vrp: true, obstacle: true }, 'z seuil obstacles : tout');
     const zs = [LAYER_MIN_ZOOM.vor, LAYER_MIN_ZOOM.ndb, LAYER_MIN_ZOOM.vrp];
     ok(new Set(zs).size === 1, `seuils identiques (${zs.join('/')})`);
+    ok(LAYER_MIN_ZOOM.obstacle > zs[0], 'obstacles = couche plus locale (8 900 points FR)');
 });
 
 test('formatFreq : kHz entiers, MHz à 1-2 décimales', () => {
@@ -108,4 +111,59 @@ test('le fichier data/radio-points.json généré est conforme et mondial', asyn
     // Points VFR français présents (échantillon Pays de la Loire).
     const fr = parsed.vrp.filter(p => p.cc === 'FR');
     ok(fr.length > 400, `points VFR France plausibles (${fr.length})`);
+});
+
+test('parseObstacles : familles SIA, balisage, rejets ; loadObstacles sans réseau', async () => {
+    equal(OBSTACLE_CATS.length, 6, '6 familles d\'obstacles');
+    const parsed = parseObstacles({
+        generatedAt: '2026-08-29T00:00:00.000Z',
+        airac: '2026-09-03',
+        obstacles: [
+            [0, 43.43, 2.23, 410, 1657, 1, '22033', 'Eolienne(s)'],   // éolienne éclairée
+            [1, 48.49, -1.92, 167, 318, 0, '12004', 'Pylône'],        // pylône non éclairé
+            [3, 47.5, -0.5, 98, 350, 1, null, 'Château d\'eau'],      // sans numéro
+            [4, 48.85, 2.35, null, 220, 0, 'T1', 'Tour'],             // sans hauteur
+            [9, 44.2, 4.2, 50, 300, 1, 'X', 'Derrick'],               // cat hors enum → AUTRE (5)
+            [0, null, 4.3, 50, 300, 1, 'Y', 'Eolienne(s)'],           // lat invalide → rejet
+        ],
+    });
+    equal(parsed.obstacles.length, 5, '5 valides sur 6');
+    deepStrictEqual(parsed.obstacles[0], { cat: 0, lat: 43.43, lon: 2.23, hFt: 410, elevFt: 1657, lgt: 1, name: '22033', type: 'Eolienne(s)' });
+    equal(parsed.obstacles[1].lgt, 0, 'balisage non → 0');
+    equal(parsed.obstacles[2].name, '', 'numéro absent → chaîne vide');
+    equal(parsed.obstacles[3].hFt, null, 'hauteur inconnue → null');
+    equal(parsed.obstacles[4].cat, 5, 'catégorie inconnue → AUTRE');
+    equal(parsed.airac, '2026-09-03', 'date AIRAC conservée');
+    equal(parseObstacles({}), null, 'format invalide → null');
+
+    // Chargeur : fetch injecté OK, puis repli null sans réseau (pas d'IDB sous Node).
+    const file = { generatedAt: 'x', obstacles: [[0, 1, 2, 80, 300, 1, 'E1', 'Eolienne(s)']] };
+    const r1 = await loadObstacles({ fetchImpl: async () => ({ ok: true, json: async () => file }), now: 1000 });
+    equal(r1.obstacles.length, 1, 'chargé');
+    equal(r1.stale, false, 'frais');
+    const r2 = await loadObstacles({ fetchImpl: () => Promise.reject(new Error('off')), now: 2000 });
+    equal(r2, null, 'échec sans cache → null');
+});
+
+test('le fichier data/obstacles.json généré est conforme (SIA officiel)', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const json = JSON.parse(await readFile(new URL('../data/obstacles.json', import.meta.url), 'utf8'));
+    const parsed = parseObstacles(json);
+    ok(parsed, 'parsable');
+    equal(json.source, 'SIA', 'source officielle SIA');
+    ok(json.airac, 'date AIRAC présente');
+    ok(parsed.obstacles.length > 10000, `volume France plausible (${parsed.obstacles.length})`);
+    ok(parsed.obstacles.length < 20000, 'pas de dérive mondiale');
+    const cats = new Map();
+    let lit = 0;
+    for (const o of parsed.obstacles) { cats.set(o.cat, (cats.get(o.cat) ?? 0) + 1); if (o.lgt) lit++; }
+    ok((cats.get(0) ?? 0) > 5000, `éoliennes dominantes (${cats.get(0)})`);
+    ok((cats.get(1) ?? 0) > 500, `pylônes/mâts présents (${cats.get(1)})`);
+    ok((cats.get(3) ?? 0) > 100, `châteaux d'eau présents (${cats.get(3)})`);
+    ok(lit > 5000, `balisage lumineux renseigné (${lit} éclairés)`);
+    // Coordonnées : grande majorité métropole + reste en territoires français
+    // (Réunion, Nouvelle-Calédonie, Polynésie, Antilles…).
+    const metro = parsed.obstacles.filter(o => o.lat > 40 && o.lat < 52 && o.lon > -6 && o.lon < 10).length;
+    ok(metro > parsed.obstacles.length * 0.9, `métropole dominante (${metro}/${parsed.obstacles.length})`);
+    ok(parsed.obstacles.every(o => Number.isFinite(o.lat) && Number.isFinite(o.lon)), 'coordonnées finies');
 });

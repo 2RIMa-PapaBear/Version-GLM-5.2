@@ -41,3 +41,6 @@ package-lock.json
 # eAIP téléchargé (local, jamais committé)
 eaip_06_aug_2026/
 *.zip
+
+# Captures QA locales (rendu navigateur — régénérables)
+test/render/

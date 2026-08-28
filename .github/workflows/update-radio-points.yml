@@ -53,6 +53,10 @@ jobs:
           OPENAIP_API_KEY: ${{ secrets.OPENAIP_API_KEY }}
         run: node scripts/fetch-radio-points.mjs
 
+      # Obstacles : base OFFICIELLE SIA (export AIXM OM) — mise à jour à chaque
+      # cycle AIRAC avec le reste de la base SIA (téléchargement manuel puis
+      # node scripts/fetch-obstacles.mjs), PAS dans ce cron openAIP.
+
       - name: Commit + push si changement
         run: |
           git config user.name "radio-points-bot"

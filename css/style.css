@@ -773,6 +773,8 @@ body.mode-local #alternates-container { display: none !important; }
 .leaflet-tooltip.rp-label-ndb { color: #4ADE80; border-color: #4ADE80; }
 .leaflet-tooltip.rp-label-vrp { color: #3B82F6; border-color: rgba(37,99,235,0.65);
     font-family: 'DM Sans', sans-serif; font-weight: 500; font-style: italic; }
+/* Hauteur des obstacles (m) : même mono, encre rouge danger. */
+.leaflet-tooltip.rp-label-obstacle { color: #F87171; border-color: rgba(248,113,113,0.65); font-size: 9px; padding: 1px 4px; }
 /* Étiquettes des extrémités de route : code OACI vert (départ) / rouge (arrivée). */
 .leaflet-tooltip.route-dep-label,
 .leaflet-tooltip.route-arr-label {
