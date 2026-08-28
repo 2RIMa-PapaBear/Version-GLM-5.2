@@ -286,13 +286,12 @@ function _siaItemsForArea(minLat, minLon, maxLat, maxLon) {
 }
 
 async function _loadCellsGrid(minLat, minLon, maxLat, maxLon) {
-    // Base officielle SIA : prioritaire dans la couverture (France), et
-    // complémentaire en bordure (les zones openAIP non-SIA sont gardées
-    // seulement si la vue déborde de la couverture).
+    // Base officielle SIA : prioritaire dans la couverture (France) — les
+    // zones openAIP homologues (même nom) sont écartées pour éviter les
+    // doublons — mais les familles que le SIA ne publie pas (ATZ…) et
+    // l'étranger viennent TOUJOURS des cellules openAIP.
     await _loadSiaItems();
     const sia = _siaItemsForArea(minLat, minLon, maxLat, maxLon);
-    const fullyInSia = _bboxInSia(minLat, minLon, maxLat, maxLon);
-    if (fullyInSia && sia.length) return { items: sia, missing: [] };
 
     const cells = [];
     for (let lat = Math.floor(minLat); lat < Math.ceil(maxLat); lat++)
@@ -305,11 +304,9 @@ async function _loadCellsGrid(minLat, minLon, maxLat, maxLon) {
         if (r) items.push(...r);
         else missing.push(cells[i]);
     });
-    // Dé-duploupe : si SIA couvre la vue, on écarte les zones openAIP dont
-    // le NOM correspond à une zone SIA (même type d'espace).
-    if (sia.length && _bboxOverlapsSia(minLat, minLon, maxLat, maxLon)) {
+    if (sia.length) {
         const siaNames = new Set(sia.map(z => String(z.name || '').toUpperCase()));
-        const filtered = items.filter(z => !siaNames.has(String(z.name || '').toUpperCase()) || sia.includes(z));
+        const filtered = items.filter(z => sia.includes(z) || !siaNames.has(String(z.name || '').toUpperCase()));
         return { items: filtered, missing };
     }
     return { items, missing };
