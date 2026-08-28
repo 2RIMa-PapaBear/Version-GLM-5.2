@@ -976,6 +976,15 @@ html.night-mode .flight-mode-toggle .seg-slider {
     .header-controls { flex-wrap: wrap; }
     .flight-mode-toggle { width: 100%; justify-content: center; }
     .flight-mode-toggle .seg { flex: 1; justify-content: center; width: auto; }
+    /* Bannière fenêtre de vol : la rangée d'heures passe SOUS le statut,
+       pleine largeur — la valeur aéro (nowrap « 04:53 Z · 19:34 Z »)
+       débordait de la carte à droite sur téléphone. */
+    .flight-window-times {
+        flex-basis: 100%;
+        margin-left: 0;
+        justify-content: space-between;
+        gap: 8px;
+    }
 }
 
 /* ================================================================
