@@ -15,6 +15,7 @@ import { state, escapeHtml } from './core.js';
 import { getAirportByICAO } from './ui-module.js';
 import { fetchAtis, getVacLink } from './atc-info.js';
 import { makeCollapsible } from './collapsible.js';
+import { loadFreqSources, getAirportFreqs, getSiaAirac } from './freq-sia.js';
 
 /**
  * Affiche/masque le widget fréquences pour le terrain courant.
@@ -30,7 +31,13 @@ export async function showFrequenciesWidget(icao) {
     }
 
     const apt = getAirportByICAO(icao);
-    const hasFreqs = apt && Array.isArray(apt.frequencies) && apt.frequencies.length > 0;
+
+    // Source des fréquences : corrections manuelles > eAIP officiel SIA
+    // (France métropole) > openAIP. Le premier affichage attend le chargement
+    // (120 Ko, puis cache IndexedDB) pour ne jamais montrer openAIP par erreur.
+    await loadFreqSources();
+    const { source, freqs } = getAirportFreqs(icao, apt?.frequencies);
+    const hasFreqs = freqs.length > 0;
 
     // Lien VAC officiel (peut être null si le pays n'est pas reconnu).
     const vac = getVacLink(icao);
@@ -47,22 +54,21 @@ export async function showFrequenciesWidget(icao) {
 
     // Affiche immédiatement les fréquences + VAC, puis complète l'ATIS
     // en arrière-plan (non bloquant).
-    render(body, apt, vac, null, isFr);
+    render(body, freqs, source, vac, null, isFr);
     container.style.display = 'block';
 
     // Récupère l'ATIS en arrière-plan.
     const atis = await fetchAtis(icao);
     if (atis) {
-        render(body, apt, vac, atis, isFr);
+        render(body, freqs, source, vac, atis, isFr);
     }
 }
 
 /**
  * Génère le HTML du widget (fréquences + ATIS + lien VAC).
  */
-function render(container, apt, vac, atis, isFr) {
+function render(container, freqs, source, vac, atis, isFr) {
     // Sépare les fréquences principales des secondaires.
-    const freqs = apt?.frequencies || [];
     const primary = freqs.filter(f => f.primary);
     const others = freqs.filter(f => !f.primary);
 
@@ -122,9 +128,23 @@ function render(container, apt, vac, atis, isFr) {
 
     html += `<div style="font-size:10px; color:var(--text-muted); margin-top:8px;">
         <i data-lucide="info" style="width:11px;height:11px;vertical-align:middle;"></i>
-        ${isFr ? 'Fréquences : OpenAIP · ATIS : AviationWeather' : 'Frequencies: OpenAIP · ATIS: AviationWeather'}
+        ${sourceNote(source, isFr)}
     </div>`;
 
     container.innerHTML = html;
     if (window.lucide) window.lucide.createIcons({ root: container });
+}
+
+/** Mention de source du pied de page (SIA officiel / corrections / openAIP). */
+function sourceNote(source, isFr) {
+    if (source === 'sia') {
+        const airac = getSiaAirac();
+        return isFr
+            ? `Fréquences : SIA · eAIP France${airac ? ' (AIRAC ' + airac + ')' : ''} · ATIS : AviationWeather`
+            : `Frequencies: SIA French AIP${airac ? ' (AIRAC ' + airac + ')' : ''} · ATIS: AviationWeather`;
+    }
+    if (source === 'overrides') {
+        return isFr ? 'Fréquences : corrections manuelles' : 'Frequencies: manual corrections';
+    }
+    return isFr ? 'Fréquences : OpenAIP · ATIS : AviationWeather' : 'Frequencies: OpenAIP · ATIS: AviationWeather';
 }

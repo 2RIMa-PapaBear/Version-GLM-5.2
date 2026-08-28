@@ -37,3 +37,7 @@ deploy.state.json
 
 # Dépendances npm (projet sans lock tracé)
 package-lock.json
+
+# eAIP téléchargé (local, jamais committé)
+eaip_06_aug_2026/
+*.zip

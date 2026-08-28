@@ -1,5 +1,6 @@
 import { OPENAIP_API_KEY } from './config.local.js';
 import { state } from './core.js';
+import { getServiceFreq } from './freq-sia.js';
 
 const BASE_URL = 'https://api.core.openaip.net/api/airspaces';
 
@@ -571,10 +572,15 @@ export function createAirspaceController(map) {
 
             const clsDisplay = /^[A-G]$/.test(cls) ? ` · classe ${cls}` : '';
             // Fréquences openAIP (SIV « XX INFORMATION », CTR…) : affichées
-            // dans l'infobulle et le popup quand elles sont renseignées.
+            // dans l'infobulle et le popup quand elles sont renseignées —
+            // une correction manuelle (freq-overrides.json, par INDICATIF)
+            // prime sur la valeur openAIP.
             const freqTxt = (Array.isArray(as.frequencies) ? as.frequencies : [])
                 .filter(f => f && f.value)
-                .map(f => `${f.value}${f.name ? ` ${escapeHtml(f.name)}` : ''}`)
+                .map(f => {
+                    const fixed = f.name ? getServiceFreq(f.name) : null;
+                    return `${fixed || f.value}${f.name ? ` ${escapeHtml(f.name)}` : ''}`;
+                })
                 .join('<br>');
             const tooltip = `<strong>${escapeHtml(name)}</strong><br>
                 <span style="color:${style.color};font-weight:700;">${style.label}</span>${clsDisplay}<br>

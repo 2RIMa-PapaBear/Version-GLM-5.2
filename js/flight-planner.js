@@ -6,10 +6,12 @@ import { fetchWindsAloft, getWindAtAltitude } from './winds-aloft.js';
 import { fetchRouteElevation, evaluateClearance, fetchMultiSegmentElevation } from './route-elevation.js';
 import { computeRouteAirspaces, routeBbox } from './airspace-profile.js';
 import { fetchAirspacesForBbox } from './airspaces.js';
+import { loadFreqSources, getServiceFreq } from './freq-sia.js';
 
 // Zones aériennes traversées par la route (rectangles d'altitude du profil
 // d'élévation) : bbox du corridor → items openAIP → groupes. Non bloquant —
-// null silencieux si l'API/cache est indisponible.
+// null silencieux si l'API/cache est indisponible. Une correction manuelle
+// de fréquence (freq-overrides.json, par INDICATIF) prime sur openAIP.
 async function loadRouteAirspaces(elevProfile, cruiseAltFt) {
     try {
         if (!elevProfile?.points?.length) return null;
@@ -17,7 +19,13 @@ async function loadRouteAirspaces(elevProfile, cruiseAltFt) {
         if (!bbox) return null;
         const items = await fetchAirspacesForBbox(bbox[0], bbox[1], bbox[2], bbox[3]);
         if (!items?.length) return null;
-        return computeRouteAirspaces(elevProfile.points, items, { cruiseAltFt });
+        loadFreqSources();
+        const groups = computeRouteAirspaces(elevProfile.points, items, { cruiseAltFt });
+        for (const g of groups || []) {
+            const fixed = getServiceFreq(g.name);
+            if (fixed) g.freq = fixed;
+        }
+        return groups;
     } catch { return null; }
 }
 
