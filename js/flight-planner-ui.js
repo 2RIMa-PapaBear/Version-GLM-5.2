@@ -10,6 +10,7 @@ import { getActiveRunwaySurfaceInfo, isSoftSurface } from './runway-surface.js';
 import { getEnRouteAlternates } from './alternates.js';
 import { renderElevationChart, clearElevationChart } from './elevation-chart.js';
 import { fetchAirportByIcao } from './openaip.js';
+import { loadFreqSources, getAirportFreqs } from './freq-sia.js';
 
 const LS_PERF_PREFIX = 'ac-perf-';
 
@@ -19,6 +20,24 @@ function _getMainFreq(icao) {
     if (!apt?.frequencies?.length) return null;
     const primary = apt.frequencies.find(f => f.primary) || apt.frequencies.find(f => f.type === 'TWR' || f.type === 'AFIS');
     return primary || apt.frequencies[0];
+}
+
+/** Meilleure fréquence d'une étape pour le « Détail des waypoints » :
+ *  SIA officiel en priorité (types RÉELS : TWR, AFIS, APP, FIS, ATIS…),
+ *  à défaut openAIP (types souvent génériques COM/UNK). Retourne
+ *  { freq, type } ou null. */
+function _legMainFreq(icao) {
+    const { source, freqs } = getAirportFreqs(icao, getAirportByICAO(icao)?.frequencies || []);
+    if (freqs.length) {
+        // Ordre de préférence : tour/AFIS du terrain, puis approche, puis FIS.
+        const prio = ['TWR', 'AFIS', 'APP', 'FIS', 'ATIS'];
+        for (const t of prio) {
+            const f = freqs.find(x => x.type === t);
+            if (f) return f;
+        }
+        return freqs[0];
+    }
+    return null;
 }
 
 // Charge les fréquences manquantes des waypoints en arrière-plan, puis re-rend le panneau.
@@ -71,6 +90,7 @@ let _recalculating = false;
 export async function showFlightPlanner(fromIcao, toIcao) {
     const container = document.getElementById('flight-planner-panel');
     if (!container) return;
+    loadFreqSources();   // SIA + overrides : fréquences réelles des étapes
 
     if (!fromIcao || !toIcao || fromIcao === toIcao) {
         container.style.display = 'none';
@@ -250,7 +270,7 @@ async function _generateNavLogPdfInto(tab) {
         return eh > 0 ? `${eh}h${String(em).padStart(2, '0')}` : `${em} min`;
     };
     const legFreq = (icao) => {
-        const f = _getMainFreq(icao);
+        const f = _legMainFreq(icao);
         return f ? `${f.freq.toFixed(3)} ${f.type}` : '';
     };
     const calc = {
@@ -569,7 +589,7 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
                     </thead>
                     <tbody>
                         ${plan.legs.map(lg => {
-                            const f = _getMainFreq(lg.to.icao);
+                            const f = _legMainFreq(lg.to.icao);
                             return `
                             <tr>
                                 <td><b>${escapeHtml(_wpDisplayName(lg.from.icao))}</b> → <b>${escapeHtml(_wpDisplayName(lg.to.icao))}</b></td>
