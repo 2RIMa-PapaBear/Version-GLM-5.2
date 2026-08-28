@@ -190,7 +190,7 @@ function render(lat, lon) {
                 </div>
                 <div style="text-align:center;">
                     <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px; margin-bottom:2px;">${aeroLabel}</div>
-                    <div style="font-family:'DM Mono', monospace; font-weight:500; color:var(--primary); font-size:14px; white-space:nowrap;">${fmt(w.aeroStart)} · ${fmt(w.aeroEnd)}</div>
+                    <div class="fw-aero"><span>${fmt(w.aeroStart)}</span><i>·</i><span>${fmt(w.aeroEnd)}</span></div>
                 </div>
             </div>
         </div>

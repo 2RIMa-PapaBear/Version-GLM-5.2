@@ -984,20 +984,35 @@ html.night-mode .flight-mode-toggle .seg-slider {
     justify-content: space-evenly;
     min-width: 0;
 }
+/* Valeur aéro « 04:53 Z · 19:34 Z » : une ligne sur grand écran ; les
+   SPAN permettront au téléphone de la replier sur deux lignes centrées
+   au lieu de déborder de la carte (styles inline interdits ici). */
+.fw-aero {
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+    color: var(--primary);
+    font-size: 14px;
+    white-space: nowrap;
+}
+.fw-aero i { font-style: normal; margin: 0 4px; }
 
 @media (max-width: 600px) {
     .header-controls { flex-wrap: wrap; }
     .flight-mode-toggle { width: 100%; justify-content: center; }
     .flight-mode-toggle .seg { flex: 1; justify-content: center; width: auto; }
     /* Bannière fenêtre de vol : la rangée d'heures passe SOUS le statut,
-       pleine largeur — la valeur aéro (nowrap « 04:53 Z · 19:34 Z »)
-       débordait de la carte à droite sur téléphone. */
+       pleine largeur — et la valeur aéro se replie sur DEUX lignes
+       centrées (séparateur · masqué) : quel que soit le téléphone, la
+       police système ou la taille d'écriture, elle ne peut plus déborder. */
     .flight-window-times {
         flex-basis: 100%;
         margin-left: 0;
         justify-content: space-between;
         gap: 8px;
     }
+    .fw-aero { white-space: normal; }
+    .fw-aero span { display: block; }
+    .fw-aero i { display: none; }
 }
 
 /* ================================================================
