@@ -80,7 +80,7 @@ export async function showRouteWeather(map, fromIcao, toIcao, opts = {}) {
             radius: 5, color: '#FBBF24', weight: 2, fillColor: '#FBBF24', fillOpacity: 0.4,
         }).addTo(map).bindPopup(`
             <div class="mp-inner">
-                <div class="mp-title"><strong>${escapeHtml(p[2])}</strong>${name ? ' · ' + escapeHtml(name) : ''}</div>
+                <div class="mp-title"><strong>${escapeHtml(name || p[2])}</strong>${name && name !== p[2] ? ` · <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted,#94A3B8);">${escapeHtml(p[2])}</span>` : ''}</div>
                 <div class="mp-btns">
                     ${isFreeWp ? `<button class="mp-renamewp-btn" data-icao="${escapeHtml(p[2])}">${isFr ? 'Renommer' : 'Rename'}</button>` : ''}
                     <button class="mp-rmwp-btn" data-icao="${escapeHtml(p[2])}" title="${isFr ? 'Retire cette étape du plan de vol' : 'Remove this leg from the flight plan'}">${isFr ? 'Retirer du plan' : 'Remove from plan'}</button>

@@ -225,7 +225,7 @@ async function _generateNavLogPdfInto(tab) {
     const rows = legs.map((lg, i) => {
         const rm = ((Math.round((lg.trueCourse ?? 0) - decl) % 360) + 360) % 360;
         const row = {
-            from: lg.from.icao, to: lg.to.icao,
+            from: _wpDisplayName(lg.from.icao), to: _wpDisplayName(lg.to.icao),
             // Distances arrondies au NM entier — lisibilité du log papier.
             distRemain: Math.round(remain), dist: Math.round(lg.distanceNm),
             zSecu: zSecuFor(i), zRet: zRet ?? '',
@@ -279,7 +279,7 @@ async function _generateNavLogPdfInto(tab) {
         } : null,
         isMultiLeg: isMulti,
         legs: legs.map(lg => ({
-            from: lg.from.icao, to: lg.to.icao, dist: Math.round(lg.distanceNm),
+            from: _wpDisplayName(lg.from.icao), to: _wpDisplayName(lg.to.icao), dist: Math.round(lg.distanceNm),
             hdg: lg.magHeading, eteLabel: fmtEte(lg.legTimeMin),
             fuelL: lg.fuel?.tripFuelL ?? '', freq: legFreq(lg.to.icao),
         })),
@@ -336,7 +336,7 @@ async function _generateNavLogPdfInto(tab) {
                         const d = greatCircleDistanceNm(pt.lat, pt.lon, w.lat, w.lon);
                         if (d < bestD) { bestD = d; frac = pt.frac; }
                     }
-                    return { icao: w.icao, frac };
+                    return { icao: w.icao, name: _wpDisplayName(w.icao), frac };
                 }).filter(w => w.frac != null)
                 : [],
             routeAirspaces: plan.routeAirspaces ?? null,
@@ -572,7 +572,7 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
                             const f = _getMainFreq(lg.to.icao);
                             return `
                             <tr>
-                                <td><b>${escapeHtml(lg.from.icao)}</b> → <b>${escapeHtml(lg.to.icao)}</b></td>
+                                <td><b>${escapeHtml(_wpDisplayName(lg.from.icao))}</b> → <b>${escapeHtml(_wpDisplayName(lg.to.icao))}</b></td>
                                 <td>${lg.distanceNm} NM</td>
                                 <td>${String(lg.magHeading).padStart(3,'0')}°</td>
                                 <td>${fmtTime(lg.legTimeMin)}</td>
@@ -705,6 +705,20 @@ function _renderError(container, from, to, isFr) {
     if (window.lucide) window.lucide.createIcons({ root: container });
 }
 
+// Nom d'affichage d'une étape : les repères libres (pseudo-codes ZZxx)
+// s'affichent sous leur VRAI nom (VOR « BNE », NDB, point VFR « E2 »…),
+// le code restant technique (champ waypoints, permalien, pipeline).
+// Exporté pour navlog-pdf via le sample (rows/waypoints portent `name`).
+export function _wpDisplayName(code) {
+    if (!/^ZZ[A-Z]{2}$/.test(code)) return code;
+    const apt = getAirportByICAO(code);
+    const n = (apt?.name || '').trim();
+    if (!n || n === code) return code;
+    // Premier mot utile, majuscules, ≤ 9 caractères (colonnes du log).
+    const first = n.split(/\s+/)[0].replace(/[^\w-]/g, '');
+    return (first || code).toUpperCase().slice(0, 9);
+}
+
 function _renderInputs(from, to, fromName, toName, alt, tas, burn, isNight, isFr) {
     const waypointsValue = (state.route && state.route.length > 2)
         ? state.route.slice(1, -1).join(' ') : '';
@@ -717,10 +731,11 @@ function _renderInputs(from, to, fromName, toName, alt, tas, burn, isNight, isFr
                 const apt = getAirportByICAO(code);
                 const name = apt?.name || code;
                 const renamable = /^ZZ[A-Z]{2}$/.test(code);
+                const display = renamable ? _wpDisplayName(code) : code;
                 return `<div class="fp-wp-row">
                     <span class="fp-wp-num">${i + 1}.</span>
-                    <span class="fp-wp-code">${escapeHtml(code)}</span>
-                    <span class="fp-wp-name">${escapeHtml(name)}</span>
+                    <span class="fp-wp-code">${escapeHtml(display)}</span>
+                    ${renamable && display !== name ? `<span class="fp-wp-name">${escapeHtml(name)}</span>` : (renamable ? '' : `<span class="fp-wp-name">${escapeHtml(name)}</span>`)}
                     ${renamable ? `<button class="fp-wp-rename" data-icao="${escapeHtml(code)}" title="${isFr ? 'Renommer ce repère' : 'Rename this waypoint'}"><i data-lucide="pencil" style="width:12px;height:12px;"></i></button>` : ''}
                     <button class="fp-wp-del" data-icao="${escapeHtml(code)}" title="${isFr ? 'Retirer ce waypoint du plan' : 'Remove this waypoint from the plan'}"><i data-lucide="x" style="width:12px;height:12px;"></i></button>
                 </div>`;
