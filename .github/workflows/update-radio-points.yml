@@ -73,3 +73,24 @@ jobs:
     needs: update
     uses: ./.github/workflows/deploy-ftp.yml
     secrets: inherit
+
+  # Garde-fou obstacles SIA (29/08, demande utilisateur) : la base obstacles
+  # vient d'un export AIXM OM téléchargé MANUELLEMENT — ce job échoue (→
+  # notification GitHub) tant qu'elle est en retard sur le cycle AIRAC en
+  # vigueur. Job SÉPARÉ et sans needs : son échec n'entrave ni le crawl,
+  # ni le commit, ni le déploiement.
+  airac-obstacles:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: Version-2.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Fraîcheur obstacles SIA vs cycle AIRAC
+        run: node scripts/check-obstacles-airac.mjs
