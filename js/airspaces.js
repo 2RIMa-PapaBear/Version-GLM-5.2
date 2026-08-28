@@ -9,10 +9,10 @@ const IDB_STORE = 'airspaces';
 const IDB_VERSION = 1;
 const TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-// Seuil abaissé à 5 : une route longue (LFRV-LFST ≈ 200 NM) cadre la carte
-// à zoom ~6-7 et les zones ne se chargeaient JAMAIS (retour 28/08) ; la
-// base SIA officielle (212 Ko locaux) rend un affichage bas-zoom trivial.
-const MIN_ZOOM = 5;
+// Seuil à 4 (retour 28/08) : les cadres de routes longues et écrans
+// étroits descendent bas ; la base SIA officielle (212 Ko locaux) rend un
+// affichage bas-zoom trivial, openAIP reste clampé par la bbox 5°.
+const MIN_ZOOM = 4;
 
 const MAX_BASE_FT = 5000;
 
