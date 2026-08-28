@@ -179,7 +179,7 @@ function render(lat, lon) {
                     <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">${cfg.detail}</div>
                 </div>
             </div>
-            <div class="flight-window-times" style="display:flex; gap:16px; font-size:11px; flex-wrap:wrap; margin-left:6px; flex:1; justify-content:space-evenly; min-width:0;">
+            <div class="flight-window-times">
                 <div style="text-align:center;">
                     <div style="color:var(--text-muted); text-transform:uppercase; font-size:9px; letter-spacing:1px; margin-bottom:2px;">${srLabel}</div>
                     <div style="font-family:'DM Mono', monospace; font-weight:500; color:var(--text-color); font-size:14px;">${fmt(w.sunrise)}</div>

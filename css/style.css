@@ -972,6 +972,19 @@ html.night-mode .flight-mode-toggle .seg-slider {
     }
     .flight-mode-toggle .seg { width: 75px; font-size: 11px; }
 }
+/* Rangée d'heures de la bannière fenêtre de vol. Styles en CLASSE (pas en
+   inline) pour que la variante téléphone ci-dessous ne soit pas écrasée. */
+.flight-window-times {
+    display: flex;
+    gap: 16px;
+    font-size: 11px;
+    flex-wrap: wrap;
+    margin-left: 6px;
+    flex: 1;
+    justify-content: space-evenly;
+    min-width: 0;
+}
+
 @media (max-width: 600px) {
     .header-controls { flex-wrap: wrap; }
     .flight-mode-toggle { width: 100%; justify-content: center; }
