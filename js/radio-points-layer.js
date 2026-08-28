@@ -23,7 +23,7 @@ import {
     LABEL_MIN_ZOOM, LAYER_MAX_POINTS, formatFreq,
 } from './radio-points.js';
 
-const COLORS = { vor: '#60A5FA', ndb: '#4ADE80', vrp: '#86EFAC' };
+const COLORS = { vor: '#60A5FA', ndb: '#4ADE80', vrp: '#7DD3FC' };
 
 const _esc = (s) => String(s ?? '').replace(/[&<>"']/g, c =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
