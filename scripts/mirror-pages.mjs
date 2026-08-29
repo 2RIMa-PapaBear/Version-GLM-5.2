@@ -23,7 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REMOTE = 'https://github.com/2RIMa-PapaBear/metar-taf-pwa.git';
@@ -78,17 +78,22 @@ git(['config', 'user.email', git(['config', 'user.email'], { cwd: ROOT }) || 'mi
 // ---- 3. Copie par-dessus (et retrait de ce qui n'est plus dans la liste) ----
 const keep = new Set(files);
 keep.add('.nojekyll');
-// Stub config.local.js VIDe : le dépôt privé ne versionne jamais le vrai
-// (relais privé + clé openAIP, gitignoré) mais le miroir doit le SERVIR —
-// sinon la sonde dynamique de applyLocalOverride() laisse un 404 dans la
-// console de chaque visiteur. Valeurs vides = défauts publics inchangés.
+// Stub config.local.js du miroir : le vrai (relais privé + clé openAIP,
+// gitignorés) ne quitte jamais le dépôt privé — sans fichier servi, la sonde
+// applyLocalOverride() laisserait un 404 dans la console. Le miroir ne reçoit
+// QUE la clé corsproxy.io (publique par nature côté navigateur) : la météo y
+// passe par ce proxy quand aviationweather.gov bloque CORS.
+const localCfg = await import(pathToFileURL(path.join(ROOT, 'js', 'config.local.js')).href).catch(() => ({}));
+const corsKey = String(localCfg.CORS_PROXY_KEY || '').replace(/[^\w-]/g, '');
 keep.add('js/config.local.js');
 fs.mkdirSync(path.join(tmp, 'js'), { recursive: true });
 const STUB = [
-    '// [miroir] Stub vide — le vrai config.local.js (relais privé, clé openAIP)',
-    '// ne quitte jamais le dépôt privé. Valeurs vides = défauts publics.',
+    '// [miroir] Config publique — le vrai config.local.js (relais privé,',
+    '// clé openAIP) ne quitte jamais le dépôt privé. Seule la clé corsproxy.io',
+    '// (repli météo quand aviationweather.gov bloque CORS) vit ici.',
     "export const PROXY_URL = '';",
     "export const OPENAIP_API_KEY = '';",
+    `export const CORS_PROXY_KEY = '${corsKey}';`,
 ].join('\n') + '\n';
 fs.writeFileSync(path.join(tmp, 'js', 'config.local.js'), STUB);
 for (const f of files) {
