@@ -78,24 +78,24 @@ git(['config', 'user.email', git(['config', 'user.email'], { cwd: ROOT }) || 'mi
 // ---- 3. Copie par-dessus (et retrait de ce qui n'est plus dans la liste) ----
 const keep = new Set(files);
 keep.add('.nojekyll');
-// Stub config.local.js du miroir : le vrai (relais privé + clé openAIP,
-// gitignorés) ne quitte jamais le dépôt privé — sans fichier servi, la sonde
-// applyLocalOverride() laisserait un 404 dans la console. Le miroir ne reçoit
-// QUE la clé corsproxy.io (publique par nature côté navigateur) : la météo y
-// passe par ce proxy quand aviationweather.gov bloque CORS.
-const localCfg = await import(pathToFileURL(path.join(ROOT, 'js', 'config.local.js')).href).catch(() => ({}));
-const corsKey = String(localCfg.CORS_PROXY_KEY || '').replace(/[^\w-]/g, '');
+// Config locale du miroir : recopie INTÉGRALE du vrai js/config.local.js
+// (relais Apps Script + clé openAIP + clé corsproxy). Décision utilisateur
+// 29/08 (« on tente le 3 et si ça ne fonctionne pas le 1 ») : corsproxy.io
+// gratuit = localhost/dev SEULEMENT (production = plan payant) et la clé
+// n'a jamais activé → repli sur le relais privé, dont l'URL est de toute
+// façon publique via le code source de papabear56.free.fr. Le dépôt PRIVÉ
+// reste lui toujours exempt de secrets (config.local.js gitignoré).
 keep.add('js/config.local.js');
 fs.mkdirSync(path.join(tmp, 'js'), { recursive: true });
-const STUB = [
-    '// [miroir] Config publique — le vrai config.local.js (relais privé,',
-    '// clé openAIP) ne quitte jamais le dépôt privé. Seule la clé corsproxy.io',
-    '// (repli météo quand aviationweather.gov bloque CORS) vit ici.',
-    "export const PROXY_URL = '';",
-    "export const OPENAIP_API_KEY = '';",
-    `export const CORS_PROXY_KEY = '${corsKey}';`,
-].join('\n') + '\n';
-fs.writeFileSync(path.join(tmp, 'js', 'config.local.js'), STUB);
+const LOCAL_CFG_PATH = path.join(ROOT, 'js', 'config.local.js');
+if (fs.existsSync(LOCAL_CFG_PATH)) {
+    fs.copyFileSync(LOCAL_CFG_PATH, path.join(tmp, 'js', 'config.local.js'));
+} else {
+    // Machine sans config locale : stub vide (l'app démarre en défauts).
+    fs.writeFileSync(path.join(tmp, 'js', 'config.local.js'),
+        '// [miroir] Stub vide — aucun config.local.js sur la machine de synchroisation.\n'
+        + "export const PROXY_URL = '';\nexport const OPENAIP_API_KEY = '';\nexport const CORS_PROXY_KEY = '';\n");
+}
 for (const f of files) {
     const dest = path.join(tmp, f);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
