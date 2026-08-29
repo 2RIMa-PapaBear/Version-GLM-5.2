@@ -2,7 +2,7 @@
 // expansion du format compact en forme openAIP.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { _expandFileItem, _decodeType } from '../js/airspaces.js';
+import { _expandFileItem, _decodeType, _rdpKey, _dropOpenAipDuplicates } from '../js/airspaces.js';
 
 test('_expandFileItem : polygone compact → forme openAIP complète', () => {
     const c = {
@@ -64,4 +64,38 @@ test('_decodeType : repli sur le nom quand le type manque', () => {
     assert.equal(_decodeType({ name: 'RMZ ANGOULEME' }),  'RMZ');
     assert.equal(_decodeType({ name: 'ATZ DEAUVILLE' }),  'ATZ');
     assert.equal(_decodeType({ name: 'TMZ PARIS' }),      'TMZ');
+});
+
+// Dé-duplounage openAIP vs base SIA : les zones réglementées françaises
+// s'appellent « R 278 » côté SIA et « LF-R278 VANNES » côté openAIP —
+// le nom exact ne suffit pas (LF-R278/279 Vannes restaient en double, la
+// copie openAIP apportant sa fréquence communautaire « 122.600 » que le
+// SIA ne publie pas).
+test('_rdpKey : désignateurs R/D/P des deux conventions de nommage', () => {
+    assert.equal(_rdpKey('LF-R278 VANNES'), 'R278');
+    assert.equal(_rdpKey('LF-R279 VANNES PARA'), 'R279');
+    assert.equal(_rdpKey('LF-R13A1 GAVRES QUIBERON'), 'R13A1');
+    assert.equal(_rdpKey('R 278'), 'R278');
+    assert.equal(_rdpKey('D 59B'), 'D59B');
+    assert.equal(_rdpKey('P 23'), 'P23');
+    // Hors famille R/D/P : aucune clé (jamais dé-duplounés par désignateur).
+    assert.equal(_rdpKey('RMZ CHERBOURG'), null);
+    assert.equal(_rdpKey('TMA RENNES 2'), null);
+    assert.equal(_rdpKey('SIV RENNES SUD A'), null);
+    assert.equal(_rdpKey('CTR VANNES'), null);
+});
+
+test('_dropOpenAipDuplicates : la copie SIA prime, y compris par désignateur', () => {
+    const sia = [{ name: 'R 278' }, { name: 'R 279' }, { name: 'CTR VANNES' }];
+    const oaip = [
+        sia[0],                                          // déjà dans SIA
+        { name: 'LF-R278 VANNES', frequencies: [{ value: '122.600' }] },
+        { name: 'LF-R279 VANNES PARA' },
+        { name: 'CTR VANNES' },                          // homonyme exact
+        { name: 'RMZ VANNES' },                          // famille non-SIA : conservé
+        { name: 'LF-D42B LOINTAIN' },                    // désignateur absent du SIA : conservé
+    ];
+    const out = _dropOpenAipDuplicates(oaip, sia);
+    assert.equal(out.length, 3);
+    assert.deepEqual(out.map(z => z.name), ['R 278', 'RMZ VANNES', 'LF-D42B LOINTAIN']);
 });
