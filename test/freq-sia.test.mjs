@@ -68,3 +68,17 @@ test('parseAdFrequencies : lignes AD 2.18 → liste dédupliquée', () => {
     const dup = parseAdFrequencies(AD_HTML + '<tr><td>AFIS</td><td>VANNES Information (FR)</td><td>122.605 MHz</td></tr>');
     assert.equal(dup.length, 3);
 });
+
+test('overrides terrains : priorité maximale sur l\'eAIP (LFRP/LFRW/LFOM)', async () => {
+    const assert = (await import('node:assert/strict')).default;
+    const { ok, equal, match } = assert;
+    const { readFile } = await import('node:fs/promises');
+    const ov = JSON.parse(await readFile(new URL('../data/freq-overrides.json', import.meta.url), 'utf8'));
+    for (const [icao, freq] of [['LFRP', '118.255'], ['LFRW', '119.785'], ['LFOM', '128.930']]) {
+        const list = ov.airports?.[icao];
+        ok(Array.isArray(list) && list.length >= 1, `${icao} présent dans les overrides`);
+        equal(list[0].value, freq, `${icao} = ${freq}`);
+        equal(list[0].type, 'AFIS');
+        match(list[0].value, /^\d{3}\.\d{3}$/, 'format 3 décimales');
+    }
+});
