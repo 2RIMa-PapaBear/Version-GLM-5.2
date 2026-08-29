@@ -145,10 +145,14 @@ each('Volume', (attrs, body) => {
             : [ft, 1];
 
     const partie = esp.parties.find(p => p.nom && partieLk.endsWith(`[${p.nom}]`)) || esp.parties[0];
-    // Activite « APP MELUN#SEINE INFO 134.300 » → organisme + fréquence.
+    // Activite « APP MELUN#SEINE INFO 134.300 » → organisme + fréquence ;
+    // sinon c'est une DESCRIPTION d'activité (« Parachutage.#\Paradropping. »)
+    // → première phrase française, affichée dans l'infobulle et le profil
+    // (« R 279 · Parachutage » — l'info qui fait décider un contournement).
     const act = (txt(body, 'Activite') || '');
     const freqMatch = act.match(/(\d{3}\.\d{2,3})/);
     const whoMatch = act.split('#')[1]?.replace(/\d{3}\.\d{2,3}/, '').trim() || '';
+    const actTxt = freqMatch ? '' : act.split('#')[0].replace(/[.\\]+$/, '').trim().slice(0, 60);
 
     zonesOut.push({
         i: attr(attrs, 'pk'),
@@ -162,6 +166,7 @@ each('Volume', (attrs, body) => {
         lo: compactLimit(txt(body, 'Plancher'), txt(body, 'PlancherRefUnite') || '', loFt) || [loFt, 1],
         up: compactLimit(txt(body, 'Plafond'), txt(body, 'PlafondRefUnite') || '', upFt) || [upFt, 1],
         f: freqMatch ? [{ value: freqMatch[1], name: whoMatch.toUpperCase() }] : null,
+        act: actTxt || null,
         hor: txt(body, 'HorCode') || '',
         g: { t: 1, c: [partie.ring] },
     });
@@ -202,13 +207,18 @@ console.log(`fréquences organismes : ${services.size} services → data/freq-se
 //    périmètre.
 // ---------------------------------------------------------------------------
 const NAV_KIND = { VOR: 'vor', 'VOR-DME': 'vor', VORTAC: 'vor', NDB: 'ndb' };
-const navFreq = new Map();   // "TYPE IDENT" → { f, u } (u : 1 = kHz, 2 = MHz)
+const navFreq = new Map();   // "TYPE IDENT" → { f, u, n (nom phraséologique), r (portée NM) }
 each('RadioNav', (attrs, body) => {
     const m = (attr(attrs, 'lk') || '').match(/^\[LF\]\[([A-Z-]+) ([^\]]+)\]$/);
     if (!m) return;
     const f = parseFloat(String(txt(body, 'Frequence') || '').replace(',', '.'));
     if (!Number.isFinite(f)) return;
-    navFreq.set(`${m[1]} ${m[2]}`, { f, u: m[1] === 'NDB' ? 1 : 2 });
+    const portee = parseInt(String(txt(body, 'Portee') || ''), 10);
+    navFreq.set(`${m[1]} ${m[2]}`, {
+        f, u: m[1] === 'NDB' ? 1 : 2,
+        n: (txt(body, 'NomPhraseo') || '').trim() || null,
+        r: Number.isFinite(portee) && portee > 0 ? portee : null,
+    });
 });
 const navaids = [];
 each('NavFix', (attrs, body) => {
@@ -219,18 +229,21 @@ each('NavFix', (attrs, body) => {
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
     const ident = txt(body, 'Ident') || '';
     const fq = navFreq.get(`${t} ${ident}`);
-    navaids.push({ k: NAV_KIND[t], ident, lat: Math.round(lat * 1e5) / 1e5, lon: Math.round(lon * 1e5) / 1e5, f: fq?.f ?? null, u: fq?.u ?? null, used: false });
+    navaids.push({ k: NAV_KIND[t], ident, lat: Math.round(lat * 1e5) / 1e5, lon: Math.round(lon * 1e5) / 1e5, f: fq?.f ?? null, u: fq?.u ?? null, n: fq?.n ?? null, r: fq?.r ?? null, used: false });
 });
 const rpPath = path.join(ROOT, 'data', 'radio-points.json');
 const rp = JSON.parse(fs.readFileSync(rpPath, 'utf8'));
+// 7ᵉ élément (optionnel) : méta officielles RadioNav [nom phraséologique,
+// portée NM] — ex. ['BORDEAUX', 100] pour BMC.
+const metaOf = (s) => (s.n || s.r) ? [s.n, s.r] : null;
 const merged = rp.navaids.map(o => {
     const s = navaids.find(n => !n.used && n.ident === o[1]
         && Math.abs(n.lat - o[2]) < 0.35 && Math.abs(n.lon - o[3]) < 0.5);
     if (!s) return o;
     s.used = true;
-    return [s.k, s.ident, s.lat, s.lon, s.f ?? o[4] ?? null, s.u ?? o[5] ?? null];
+    return [s.k, s.ident, s.lat, s.lon, s.f ?? o[4] ?? null, s.u ?? o[5] ?? null, metaOf(s)];
 });
-for (const s of navaids) if (!s.used) merged.push([s.k, s.ident, s.lat, s.lon, s.f, s.u]);
+for (const s of navaids) if (!s.used) merged.push([s.k, s.ident, s.lat, s.lon, s.f, s.u, metaOf(s)]);
 rp.navaids = merged;
 rp.counts = rp.counts || {};
 rp.counts.navaidsSia = navaids.length;

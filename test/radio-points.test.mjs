@@ -202,3 +202,23 @@ test('le fichier data/obstacles.json généré est conforme (SIA officiel)', asy
     ok(metro > parsed.obstacles.length * 0.9, `métropole dominante (${metro}/${parsed.obstacles.length})`);
     ok(parsed.obstacles.every(o => Number.isFinite(o.lat) && Number.isFinite(o.lon)), 'coordonnées finies');
 });
+
+test('parseRadioPoints : méta officielle SIA des navaids (nom phraséologique + portée)', () => {
+    const parsed = parseRadioPoints({
+        navaids: [
+            ['vor', 'BMC', 44.82695, -0.72111, 113.75, 2, ['BORDEAUX', 100]],
+            ['ndb', 'AN', 47.5, 3.2, 355, 1, ['ANNECY', null]],
+            [4, 'LGL', 48.79, 0.53, 112.7, 2],                    // openAIP sans méta
+        ],
+        vrps: [],
+    });
+    const bmc = parsed.vor.find(n => n.ident === 'BMC');
+    equal(bmc.officialName, 'BORDEAUX');
+    equal(bmc.rangeNm, 100);
+    const an = parsed.ndb[0];
+    equal(an.officialName, 'ANNECY');
+    equal(an.rangeNm, null, 'portée absente → null');
+    const lgl = parsed.vor.find(n => n.ident === 'LGL');
+    equal(lgl.officialName, null, 'openAIP sans méta');
+    equal(lgl.rangeNm, null);
+});
