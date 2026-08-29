@@ -78,6 +78,19 @@ git(['config', 'user.email', git(['config', 'user.email'], { cwd: ROOT }) || 'mi
 // ---- 3. Copie par-dessus (et retrait de ce qui n'est plus dans la liste) ----
 const keep = new Set(files);
 keep.add('.nojekyll');
+// Stub config.local.js VIDe : le dépôt privé ne versionne jamais le vrai
+// (relais privé + clé openAIP, gitignoré) mais le miroir doit le SERVIR —
+// sinon la sonde dynamique de applyLocalOverride() laisse un 404 dans la
+// console de chaque visiteur. Valeurs vides = défauts publics inchangés.
+keep.add('js/config.local.js');
+fs.mkdirSync(path.join(tmp, 'js'), { recursive: true });
+const STUB = [
+    '// [miroir] Stub vide — le vrai config.local.js (relais privé, clé openAIP)',
+    '// ne quitte jamais le dépôt privé. Valeurs vides = défauts publics.',
+    "export const PROXY_URL = '';",
+    "export const OPENAIP_API_KEY = '';",
+].join('\n') + '\n';
+fs.writeFileSync(path.join(tmp, 'js', 'config.local.js'), STUB);
 for (const f of files) {
     const dest = path.join(tmp, f);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
