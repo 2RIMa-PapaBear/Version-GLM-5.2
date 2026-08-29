@@ -493,7 +493,9 @@
 <tr><td>🟡 Terrain courant</td><td>Marqueur jaune au centre ; pistes tracées selon le revêtement (vert = herbe, gris = béton, ocre = terre)</td></tr>
 <tr><td>Terrains voisins</td><td>Jusqu'à 25 terrains environnants avec marqueurs colorés VFR/MVFR/IFR/LIFR</td></tr>
 <tr><td>🛩️ PIREPs</td><td>Observations de pilotes (turbulence, givrage) dans la zone</td></tr>
-<tr><td>Espaces aériens</td><td>CTR, TMA, ATZ, classes ICAO — cliquez une zone pour la surligner (décoché par défaut)</td></tr>
+<tr><td>Espaces aériens</td><td>Base officielle <strong>SIA</strong> (XML AIRAC) en priorité puis openAIP — CTR, TMA, SIV, ATZ, zones R·P·D… sous-cases par famille dans le menu « Espaces » ; cliquez une zone pour la surligner et lire secteur, altitudes et fréquence (décoché par défaut)</td></tr>
+<tr><td>📍 Radiophares &amp; points VFR</td><td>VOR, NDB et points de repère VFR (openAIP, maj hebdomadaire) — symboles des cartes aéro, case par case dans le menu « Espaces » ; utilisables comme waypoints du plan</td></tr>
+<tr><td>⚠️ Obstacles</td><td>Base officielle <strong>SIA</strong> (export AIXM, maj à chaque cycle AIRAC) : ~13 800 obstacles en France et outre-mer — éoliennes, pylônes, mâts, châteaux d'eau, cheminées… — icône par type ; au clic : hauteur, altitude du sommet et <strong>balisage lumineux</strong> (visible à partir d'un zoom régional, décoché par défaut)</td></tr>
 <tr><td>SIGMET / AIRMET</td><td>Polygones de phénomènes dangereux actifs (décoché par défaut)</td></tr>
 </tbody>
 </table>
@@ -543,7 +545,7 @@
 <li><strong>Popup d'un terrain</strong> sur la carte : bouton « + Waypoint » ;</li>
 <li><strong>Bouton « + Waypoint »</strong> de la barre de la carte, puis clic à l'endroit voulu ;</li>
 <li><strong>Clic droit</strong> n'importe où sur la carte ;</li>
-<li>champ <strong>« Waypoints »</strong> du plan (codes OACI séparés par des espaces, à la main) ;</li>
+<li>champ <strong>« Waypoints »</strong> du plan : codes OACI ou <strong>noms des repères</strong> séparés par des espaces — les VOR, NDB et points de repère VFR ajoutés au plan s'y affichent sous leur vrai nom (ex. BNE, LOR, E2), les codes techniques restant invisibles ;</li>
 <li>clic sur un repère déjà posé → « + Plan ».</li>
 </ul>
 <p>Chaque ajout est <strong>inséré à la meilleure position</strong> : l'outil teste tous les emplacements possibles et garde le trajet total le plus court — un intermédiaire se glisse ainsi automatiquement <em>avant</em> une étape plus lointaine. L'ordre des étapes déjà saisies est toujours respecté.</p>
@@ -557,7 +559,7 @@
 <p>Affiche les marqueurs de catégorie de vol des terrains situés le long de votre route, pour anticiper une éventuelle dégradation en chemin.</p>
 
 <h3>Profil d'élévation</h3>
-<p>Échantillonne le <strong>profil d'élévation du terrain</strong> le long de la route pour vérifier le respect de la règle VFR (500 ft / 1000 ft de clearance).</p>
+<p>Échantillonne le <strong>profil d'élévation du terrain</strong> le long de la route pour vérifier le respect de la règle VFR (500 ft / 1000 ft de clearance). Les <strong>espaces aériens traversés</strong> y figurent aussi : à l'écran, survolez la bande d'altitude pour lire le secteur et sa fréquence ; sur le log de nav PDF, chaque traversée est délimitée par des traits verticaux (même bleu que la carte) avec le <strong>nom du secteur et sa fréquence</strong> en vertical entre les limites.</p>
 
 <!-- ====================== FRÉQUENCES ====================== -->
 <h2 id="frequences">📡 FRÉQUENCES ET INFO TERRAIN</h2>

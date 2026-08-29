@@ -36,15 +36,24 @@ dans une PWA installable qui fonctionne aussi hors ligne.
 ### Navigation
 - **Planificateur de vol** : recherche de terrain par code OACI (validation
   alphanumérique, ex. CNU8 ou K6RE), waypoints intelligents ou libres,
-  alternates, compagnie du trajet, autocomplétion.
+  alternates, compagnie du trajet, autocomplétion. Le champ « Waypoints »
+  affiche les **vrais noms** des repères (VOR, NDB, points de repère VFR).
 - **Carte régionale** (Leaflet) : route, étiquettes de tronçons
-  (cap / distance / temps), espaces aériens (openAIP), radar.
+  (cap / distance / temps), espaces aériens — **base officielle SIA (XML
+  AIRAC) en priorité**, complétée par openAIP (ATZ, reste du monde), radar.
 - **Radiophares et points VFR mondiaux** (openAIP, actualisés chaque
   semaine par un cron GitHub) : couches VOR / NDB / points de repère
   VFR activables case par case dans le menu du bouton « Espaces », avec
   allègement selon le zoom — chaque point est utilisable comme waypoint
   du plan de vol.
-- **Profil d'élévation** du trajet (Open-Meteo) en NM par tronçon.
+- **Obstacles** (base officielle **SIA**, export AIXM « Obstacles Model ») :
+  ~13 800 obstacles en France et outre-mer — éoliennes, pylônes, mâts,
+  châteaux d'eau, cheminées, bâtiments… — avec icône par type, hauteur,
+  altitude du sommet et **balisage lumineux** au clic ; visible à partir
+  d'un zoom régional, mise à jour à chaque cycle AIRAC (28 j).
+- **Profil d'élévation** du trajet (Open-Meteo) en NM par tronçon, avec les
+  **espaces traversés** : limites tracées en traits verticaux (bleu carte)
+  et, sur le PDF, nom du secteur + fréquence en vertical entre les limites.
 - **Météo de route** sur chaque waypoint, créneaux de vol par étape.
 - **Permalien complet** du plan de vol (départ / destination / waypoints),
   partageable par QR code.
@@ -73,8 +82,9 @@ dans une PWA installable qui fonctionne aussi hors ligne.
 | Source | Usage |
 |---|---|
 | [aviationweather.gov](https://aviationweather.gov/) | METAR, TAF, PIREP, SIGMET, ATIS, infos stations |
+| [SIA](https://www.sia.aviation-civile.gouv.fr/) (eAIP + XML AIRAC) | Fréquences officielles des terrains, espaces aériens France, radiophares, obstacles — cycle AIRAC 28 j (paternité mentionnée dans l'application) |
 | [Open-Meteo](https://open-meteo.com/) | Prévisions, élévation, vents en altitude |
-| [openAIP](https://www.openaip.net/) | Terrains, espaces aériens, radiophares et points VFR |
+| [openAIP](https://www.openaip.net/) | Terrains, espaces aériens mondiaux, radiophares et points VFR |
 | [RainViewer](https://rainviewer.com/) | Radar de précipitations |
 | Relais CORS (Google Apps Script) | Proxy met en cache les requêtes météo |
 
@@ -84,7 +94,7 @@ Prérequis : **Node.js ≥ 18** (tests `node --test`).
 
 ```bash
 npm install     # devDependencies (basic-ftp pour le déploiement)
-npm test        # suite complète (~140 tests : cœur, plan de vol, perfs, centrage…)
+npm test        # suite complète (~185 tests : cœur, plan de vol, perfs, centrage…)
 ```
 
 - `index.html` — application (vanilla JS, modules ES, aucun framework).
@@ -102,13 +112,26 @@ npm test        # suite complète (~140 tests : cœur, plan de vol, perfs, centr
 À chaque push sur `Version-2.0`, **GitHub Actions** déploie automatiquement par
 FTP sur Free.fr, bump les versions PWA et committe le marqueur `[deploy]`
 (workflow `.github/workflows/deploy-ftp.yml`, secrets `FTP_SERVER`,
-`FTP_USER`, `FTP_PASSWORD`).
+`FTP_USER`, `FTP_PASSWORD`). Les ~27 000 cellules openAIP
+(`data/airspaces/cells/`) sont exclues de cet upload (débit Free.fr
+insuffisant) et posées directement sur le FTP.
 
 En local, la routine complète tient en une commande :
 
 ```bash
 npm run pub -- "message du commit"   # commit + push + attente du déploiement
 ```
+
+### Données aéronautiques — mises à jour automatiques
+
+- **Cron quotidien** (`update-radio-points.yml`) : crawl incrémental des
+  espaces aériens openAIP (cellule 1°), fréquences SIA (à chaque nouvel
+  AIRAC), radiophares + points VFR (lundi).
+- **Obstacles SIA** : extraits de l'export AIXM « Obstacles Model »
+  téléchargé manuellement à chaque cycle AIRAC → `node scripts/fetch-obstacles.mjs`.
+  Un **garde-fou** (job `airac-obstacles`) fait échouer le workflow quotidien
+  — notification GitHub — tant que la base est en retard sur le cycle en
+  vigueur.
 
 ## Crédits & licences
 
@@ -117,7 +140,9 @@ npm run pub -- "message du commit"   # commit + push + attente du déploiement
 - [Mozilla pdf.js](https://github.com/mozilla/pdf.js) (Apache-2.0) — aperçus PDF.
 - [Lucide](https://lucide.dev/) (Apache-2.0) — icônes (dont l'avion du schéma
   de décollage, tracé `plane-takeoff`).
-- Données aéronautiques : aviationweather.gov (NOAA), openAIP et contributeurs.
+- Données aéronautiques : aviationweather.gov (NOAA), **SIA / DGAC**
+  (eAIP France et export XML AIRAC — fréquences, espaces, obstacles),
+  openAIP et contributeurs.
 
 ## ⚠️ Avertissement
 
