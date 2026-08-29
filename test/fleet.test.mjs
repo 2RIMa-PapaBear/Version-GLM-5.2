@@ -94,3 +94,54 @@ describe('flotte — régression id (bug updateAircraft)', () => {
         assert.ok(fleet.getFleet().every(a => a.id));
     });
 });
+
+describe('flotte — export / import', () => {
+    const WB = { emptyMassKg: 740, emptyArmMm: 2.393, envelope: [[740, 2393], [1050, 2450], [1050, 2600], [740, 2600]], stations: [{ name: 'Pilote', armMm: 2400, maxKg: 130 }] };
+
+    test('normalizeFleetImport : charge valide normalisée, ids et actif conservés', () => {
+        const norm = fleet.normalizeFleetImport({
+            app: 'metar-taf-pwa', kind: 'fleet', version: 1,
+            fleet: [
+                { id: 'a1', name: 'DR400-140', registration: 'f-xxxx', type: 'DR400', groundRoll: 170, fiftyFt: 335, safetyMargin: 20, cruiseSpeedKt: 110, fuelBurnLph: 30, wb: WB },
+                { id: 'a2', name: 'Cessna 172', registration: '', type: 'C172' },
+            ],
+            activeId: 'a2',
+        });
+        assert.ok(norm);
+        assert.equal(norm.fleet.length, 2);
+        assert.equal(norm.fleet[0].id, 'a1');
+        assert.equal(norm.fleet[0].registration, 'F-XXXX', 'immat majusculée');
+        assert.equal(norm.fleet[0].wb.emptyMassKg, 740, 'bloc centrage conservé');
+        assert.equal(norm.activeId, 'a2');
+    });
+
+    test('normalizeFleetImport : rejets (null, vide, mauvais type, plan de vol, entrée non objet, > 30)', () => {
+        assert.equal(fleet.normalizeFleetImport(null), null);
+        assert.equal(fleet.normalizeFleetImport({ fleet: [] }), null);
+        assert.equal(fleet.normalizeFleetImport({ fleet: 'x' }), null);
+        assert.equal(fleet.normalizeFleetImport({ kind: 'plan', fleet: [{ name: 'x' }] }), null);
+        assert.equal(fleet.normalizeFleetImport({ fleet: [{ name: 'ok' }, 42] }), null);
+        assert.equal(fleet.normalizeFleetImport({ fleet: Array.from({ length: 31 }, () => ({ name: 'x' })) }), null);
+    });
+
+    test('normalizeFleetImport : id manquant régénéré, actif inconnu → 1ᵉʳ avion, défauts comblés', () => {
+        const norm = fleet.normalizeFleetImport({ fleet: [{ name: 'Sans id' }] });
+        assert.ok(norm);
+        assert.match(norm.fleet[0].id, /^ac_/);
+        assert.equal(norm.activeId, norm.fleet[0].id);
+        assert.equal(norm.fleet[0].groundRoll, 830, 'défaut C172 comblé');
+    });
+
+    test('importFleetData : remplace flotte + actif (aller-retour avec exportFleetData)', () => {
+        fleet.addAircraft({ name: 'DR400-140', registration: 'F-GABC', groundRoll: 170, fiftyFt: 335, wb: WB });
+        const dump = fleet.exportFleetData();
+        assert.equal(dump.kind, 'fleet');
+        assert.equal(dump.fleet.length, 2);   // défaut C172 + DR400
+        assert.ok(fleet.importFleetData(dump));
+        assert.equal(fleet.getFleet().length, 2);
+        assert.equal(fleet.getActiveAircraftId(), dump.activeId, 'actif préservé');
+        // Charge invalide : refusée, flotte intacte.
+        assert.equal(fleet.importFleetData({}), false);
+        assert.equal(fleet.getFleet().length, 2);
+    });
+});
