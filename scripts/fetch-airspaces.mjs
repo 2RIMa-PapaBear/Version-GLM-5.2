@@ -54,17 +54,20 @@ async function getKey() {
     }
 }
 
-// Classification type → famille : RÉPLIQUE EXACTE de js/airspaces.js
-// (TYPE_MAP + _decodeType + _KIND_TO_GROUP) — toute évolution du menu
-// « Espaces » côté client doit être reportée ici.
+// Classification type → famille pour données openAIP BRUTES : RÉPLIQUE
+// EXACTE de js/airspaces.js TYPE_MAP (numérotation openAIP, vérifiée sur
+// le corpus : 5=TMZ, 6=RMZ, 13=ATZ, 14=MATZ, 25=MOA, 26=CTA…). Attention :
+// la base SIA (fetch-sia-airac.mjs TYPE_NUM) a SA numérotation propre —
+// côté client elle est décodée par SIA_TYPE_MAP via le marqueur _sia.
 const TYPE_MAP = {
-    0: 'OTHER', 1: 'DROP', 2: 'DANGER', 3: 'PROHIBITED', 4: 'CTR', 5: 'TMA',
-    6: 'ATZ', 7: 'TMA', 8: 'TMA', 9: 'TMA', 10: 'TMA', 11: 'TMZ', 12: 'RMZ',
-    13: 'ATZ', 14: 'GLIDER', 15: 'RESTRICTED', 16: 'DANGER', 17: 'PROHIBITED',
+    0: 'OTHER', 1: 'RESTRICTED', 2: 'DANGER', 3: 'PROHIBITED', 4: 'CTR', 5: 'TMZ',
+    6: 'RMZ', 7: 'TMA', 8: 'TMA', 9: 'TMA', 10: 'OTHER', 11: 'OTHER', 12: 'OTHER',
+    13: 'ATZ', 14: 'ATZ', 15: 'GLIDER', 16: 'DANGER', 17: 'PROHIBITED',
     18: 'RESTRICTED', 19: 'RESTRICTED', 20: 'RESTRICTED', 21: 'RESTRICTED',
-    22: 'RESTRICTED', 23: 'RESTRICTED', 24: 'GLIDER', 25: 'GLIDER',
-    26: 'GLIDER', 27: 'GLIDER', 28: 'ACRO', 29: 'DROP', 30: 'OTHER',
-    31: 'OTHER', 32: 'OTHER', 33: 'SIV', 34: 'CTA', 35: 'OTHER', 36: 'OTHER',
+    22: 'RESTRICTED', 23: 'ATZ', 24: 'ATZ', 25: 'RESTRICTED', 26: 'CTA',
+    27: 'OTHER', 28: 'DROP', 29: 'RESTRICTED',
+    30: 'OTHER', 31: 'OTHER', 32: 'OTHER', 33: 'SIV', 34: 'CTA', 35: 'OTHER',
+    36: 'CTR',
 };
 function decodeKind(as) {
     if (typeof as.type === 'number' && TYPE_MAP[as.type]) return TYPE_MAP[as.type];
