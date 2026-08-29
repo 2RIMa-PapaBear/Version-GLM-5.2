@@ -103,7 +103,7 @@ const expand = (c) => {
     return {
         _id: c.i, name: c.n, type: c.ty, icaoClass: c.ic,
         lowerLimit: lim(c.lo), upperLimit: lim(c.up),
-        frequencies: c.f || [], radius: Array.isArray(c.r) ? { value: c.r[0] } : null,
+        frequencies: c.f || [], radius: Array.isArray(c.r) ? { value: c.r[0] } : null, activity: c.act || null,
         geometry,
     };
 };

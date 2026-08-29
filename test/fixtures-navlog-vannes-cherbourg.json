@@ -2,13 +2,13 @@
  "isFr": true,
  "aircraftType": "DR400-140",
  "aircraftReg": "F-XXXX",
- "qnh": "1010",
+ "qnh": "1011",
  "windDir": 250,
  "windKt": 12,
  "runway": "36",
  "distanceNm": 137,
  "timeLabel": "1h11",
- "metarRaw": "METAR LFRV 291000Z AUTO 25014KT 210V290 9999 BKN008 BKN014 OVC032 20/18 Q1010",
+ "metarRaw": "METAR LFRV 291200Z AUTO 25013G24KT 220V290 9999 SCT025 BKN032 BKN038 21/16 Q1011",
  "rows": [
   {
    "from": "LFRV",
@@ -411,7 +411,8 @@
        "fa": 0.3466658462428084,
        "fb": 0.7301433261056096,
        "up": 11500,
-       "zone": "SIV RENNES NORD"
+       "zone": "SIV RENNES NORD",
+       "act": null
       }
      ]
     },
@@ -432,7 +433,8 @@
        "fa": 0.7301433261056096,
        "fb": 1,
        "up": 11500,
-       "zone": "SIV RENNES COTENTIN A"
+       "zone": "SIV RENNES COTENTIN A",
+       "act": null
       }
      ]
     },
@@ -453,7 +455,8 @@
        "fa": 0.12307754155766429,
        "fb": 0.3466658462428084,
        "up": 11500,
-       "zone": "SIV RENNES SUD A"
+       "zone": "SIV RENNES SUD A",
+       "act": null
       }
      ]
     },
@@ -474,7 +477,8 @@
        "fa": 0.07384652493459858,
        "fb": 0.253333325133886,
        "up": 11500,
-       "zone": "R 146 A"
+       "zone": "R 146 A",
+       "act": "Activités spécifiques Défense"
       }
      ]
     },
@@ -495,7 +499,8 @@
        "fa": 0,
        "fb": 0.12307754155766429,
        "up": 11500,
-       "zone": "SIV NANTES 1"
+       "zone": "SIV NANTES 1",
+       "act": null
       }
      ]
     },
@@ -516,7 +521,8 @@
        "fa": 0.3466658462428084,
        "fb": 0.4399983673517308,
        "up": 11500,
-       "zone": "TMA RENNES 4"
+       "zone": "TMA RENNES 4",
+       "act": null
       }
      ]
     },
@@ -537,7 +543,8 @@
        "fa": 0.253333325133886,
        "fb": 0.3466658462428084,
        "up": 6500,
-       "zone": "TMA RENNES 2"
+       "zone": "TMA RENNES 2",
+       "act": null
       }
      ]
     },
@@ -558,7 +565,8 @@
        "fa": 0,
        "fb": 0.03692326246729929,
        "up": 14500,
-       "zone": "R 279"
+       "zone": "R 279",
+       "act": "Parachutage"
       }
      ]
     }

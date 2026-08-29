@@ -115,3 +115,10 @@ test('_dropOpenAipDuplicates : « partie X » normalisé (SIV RENNES SUD partie 
     const out = _dropOpenAipDuplicates(oaip, sia);
     assert.deepEqual(out.map(z => z.name), ['CTR SARREBRUCK PARTIE FRANCE', 'SIV RENNES NORD']);
 });
+
+test('_expandFileItem : activité officielle des zones R/D/P transportée', () => {
+    const it = _expandFileItem({ i: 'r279', n: 'R 279', ty: 15, ic: null, lo: [0, 1], up: [145, 6], f: null, act: 'Parachutage', g: { t: 1, c: [[[-3, 47], [-2.9, 47], [-2.9, 47.1], [-3, 47]]] } });
+    assert.equal(it.activity, 'Parachutage');
+    const sans = _expandFileItem({ i: 'x', n: 'TMA RENNES 2', ty: 5, ic: null, lo: null, up: null, f: null, g: null });
+    assert.equal(sans.activity, null, 'champ absent → null');
+});
