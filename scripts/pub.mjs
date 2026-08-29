@@ -90,3 +90,16 @@ if (res.status === 'deployed') {
     log('  Faites simplement « git pull » dans une minute.');
     toast('Déploiement FTP Free.fr', 'Pas de conclusion après 4 min - voir onglet Actions', 'warn');
 }
+
+// ---- 5. Miroir GitHub Pages (PWA installable, HTTPS) ------------------------
+// Synchronise le dépôt public metar-taf-pwa avec les fichiers prod. Un échec
+// du miroir NE FAIT PAS échouer pub (Free.fr est déjà servi) — relancer
+// simplement : node scripts/mirror-pages.mjs
+try {
+    const { spawnSync } = await import('node:child_process');
+    log('Miroir GitHub Pages (metar-taf-pwa)…');
+    const r = spawnSync(process.execPath, ['scripts/mirror-pages.mjs'], { stdio: 'inherit' });
+    if (r.status !== 0) log('⚠ Miroir non synchronisé — relancer : node scripts/mirror-pages.mjs');
+} catch (e) {
+    log('⚠ Miroir ignoré : ' + String(e.message).slice(0, 80));
+}
