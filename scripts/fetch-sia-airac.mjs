@@ -178,32 +178,53 @@ fs.writeFileSync(path.join(ROOT, 'data', 'freq-services-sia.json'), JSON.stringi
 console.log(`fréquences organismes : ${services.size} services → data/freq-services-sia.json`);
 
 // ---------------------------------------------------------------------------
-// 3. RADIOphares France (VOR/NDB) — fusion dans radio-points.json (les
-//    fréquences openAIP sont conservées par correspondance d'ident).
+// 3. RADIOphares France (VOR, VOR-DME, NDB) — fusion dans radio-points.json.
+//    Fréquences OFFICIELLES des entités <RadioNav> (Frequence + NomPhraseo) ;
+//    coordonnées SIA officielles. Le rapprochement openAIP se fait par
+//    ident ET proximité (<0,35°/0,5°) — l'ident seul collisionne à l'échelle
+//    mondiale (mesuré : LDV Brest ↔ openAIP même ident en Champagne !) ;
+//    les navaids SIA absents d'openAIP sont AJOUTÉS (ex. VOR-DME BT, TOU,
+//    CAV, MEN, ROA, CNM, LSE). TACAN (azimut militaire UHF, non recevable
+//    sur VOR classique) et DME seul (distance sans azimut) restent hors
+//    périmètre.
 // ---------------------------------------------------------------------------
+const NAV_KIND = { VOR: 'vor', 'VOR-DME': 'vor', VORTAC: 'vor', NDB: 'ndb' };
+const navFreq = new Map();   // "TYPE IDENT" → { f, u } (u : 1 = kHz, 2 = MHz)
+each('RadioNav', (attrs, body) => {
+    const m = (attr(attrs, 'lk') || '').match(/^\[LF\]\[([A-Z-]+) ([^\]]+)\]$/);
+    if (!m) return;
+    const f = parseFloat(String(txt(body, 'Frequence') || '').replace(',', '.'));
+    if (!Number.isFinite(f)) return;
+    navFreq.set(`${m[1]} ${m[2]}`, { f, u: m[1] === 'NDB' ? 1 : 2 });
+});
 const navaids = [];
 each('NavFix', (attrs, body) => {
     if (!/^\[LF\]/.test(attr(attrs, 'lk'))) return;
     const t = txt(body, 'NavType');
-    if (t !== 'VOR' && t !== 'NDB') return;
+    if (!NAV_KIND[t]) return;
     const lat = parseFloat(txt(body, 'Latitude')), lon = parseFloat(txt(body, 'Longitude'));
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-    navaids.push([t === 'VOR' ? 'vor' : 'ndb', txt(body, 'Ident') || '', Math.round(lat * 1e5) / 1e5, Math.round(lon * 1e5) / 1e5]);
+    const ident = txt(body, 'Ident') || '';
+    const fq = navFreq.get(`${t} ${ident}`);
+    navaids.push({ k: NAV_KIND[t], ident, lat: Math.round(lat * 1e5) / 1e5, lon: Math.round(lon * 1e5) / 1e5, f: fq?.f ?? null, u: fq?.u ?? null, used: false });
 });
 const rpPath = path.join(ROOT, 'data', 'radio-points.json');
 const rp = JSON.parse(fs.readFileSync(rpPath, 'utf8'));
-const siaIdent = new Map(navaids.map(n => [n[1], n]));
-const merged = [];
-for (const o of rp.navaids) {
-    const s2 = siaIdent.get(o[1]);
-    if (s2) { merged.push([s2[0], s2[1], s2[2], s2[3], o[4], o[5]]); siaIdent.delete(o[1]); }
-    else merged.push(o);
-}
-for (const s2 of siaIdent.values()) merged.push([s2[0], s2[1], s2[2], s2[3], null, null]);
+const merged = rp.navaids.map(o => {
+    const s = navaids.find(n => !n.used && n.ident === o[1]
+        && Math.abs(n.lat - o[2]) < 0.35 && Math.abs(n.lon - o[3]) < 0.5);
+    if (!s) return o;
+    s.used = true;
+    return [s.k, s.ident, s.lat, s.lon, s.f ?? o[4] ?? null, s.u ?? o[5] ?? null];
+});
+for (const s of navaids) if (!s.used) merged.push([s.k, s.ident, s.lat, s.lon, s.f, s.u]);
 rp.navaids = merged;
+rp.counts = rp.counts || {};
+rp.counts.navaidsSia = navaids.length;
 rp.siaAirac = effDate;
 fs.writeFileSync(rpPath, JSON.stringify(rp));
-console.log(`radio-points.json : ${rp.navaids.length} navaids (dont ${navaids.length} officiels SIA)`);
+const navFreqCount = navaids.filter(n => n.f != null).length;
+console.log(`radio-points.json : ${rp.navaids.length} navaids (dont ${navaids.length} officiels SIA, ${navFreqCount} avec fréquence officielle RadioNav)`);
 
 // ---------------------------------------------------------------------------
 // 4. TERRAINS officiels France (+ élévation et déclinaison magnétique

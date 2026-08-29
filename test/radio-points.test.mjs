@@ -61,6 +61,25 @@ test('parseRadioPoints : VRP SIA avec description (5ᵉ élément)', () => {
     equal(parsed.vrp[2].sia, false, 'hors France jamais marqué SIA');
 });
 
+// Fusion SIA des navaids France (VOR-DME inclus depuis le 29/08, fréquences
+// officielles <RadioNav>) — cohérence du fichier généré.
+test('radio-points.json : navaids SIA France (VOR/VOR-DME/NDB + RadioNav)', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const json = JSON.parse(await readFile(new URL('../data/radio-points.json', import.meta.url), 'utf8'));
+    ok(json.counts?.navaidsSia >= 115, `≥115 navaids officiels SIA (${json.counts?.navaidsSia})`);
+    // Les 7 VOR-DME absents d'openAIP, avec leur fréquence officielle.
+    const ATTENDUS = { BT: 116.1, CNM: 111.4, LSE: 114.75, MEN: 115.3, ROA: 110.4, TOU: 117.7, CAV: 111.65 };
+    for (const [ident, freq] of Object.entries(ATTENDUS)) {
+        const hit = json.navaids.find(n => n[1] === ident && n[2] > 41 && n[2] < 50 && n[3] > -5 && n[3] < 9);
+        ok(hit, `${ident} présent en France`);
+        equal(hit[4], freq, `${ident} fréquence officielle ${freq}`);
+    }
+    // Pas de détournement d'ident : l'entrée openAIP « LDV » champenoise ne
+    // doit PAS avoir été écrasée par le TACAN breton (collision mesurée).
+    const ldv = json.navaids.filter(n => n[1] === 'LDV');
+    ok(ldv.every(n => Math.abs(n[2] - 48.53) < 0.01), 'LDV inchangé (garde de proximité)');
+});
+
 test('filterBbox : cadre simple et antiméridien (est < ouest)', () => {
     const pts = [
         { lat: 0, lon: 0 }, { lat: 0, lon: 10 },
