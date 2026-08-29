@@ -145,3 +145,50 @@ describe('flotte — export / import', () => {
         assert.equal(fleet.getFleet().length, 2);
     });
 });
+
+describe('flotte — export / import d\'UN avion', () => {
+    const WB = { emptyMassKg: 740, emptyArmMm: 2.393, envelope: [[740, 2393], [1050, 2450], [1050, 2600], [740, 2600]], stations: [{ name: 'Pilote', armMm: 2400, maxKg: 130 }] };
+
+    test('exportAircraftData : conteneur flotte monoplace, centrage inclus', () => {
+        const ac = fleet.addAircraft({ name: 'DR400-140', registration: 'F-GABC', groundRoll: 170, fiftyFt: 335, wb: WB });
+        const dump = fleet.exportAircraftData(ac.id);
+        assert.equal(dump.kind, 'fleet');
+        assert.equal(dump.single, true);
+        assert.equal(dump.fleet.length, 1);
+        assert.equal(dump.fleet[0].wb.emptyMassKg, 740);
+        assert.equal(fleet.exportAircraftData('inconnu'), null);
+    });
+
+    test('importAircraftData : remplace l\'avion en conservant id et actif', () => {
+        const a = fleet.addAircraft({ name: 'Ancien', registration: 'F-OLD', groundRoll: 200, fiftyFt: 400 });
+        const b = fleet.addAircraft({ name: 'Autre', registration: 'F-OTH' });
+        fleet.setActiveAircraft(b.id);
+        const dump = fleet.exportAircraftData(a.id);
+        // Modifie la charge : nouveau nom + centrage complet.
+        dump.fleet[0].name = 'DR400 neuf';
+        dump.fleet[0].wb = WB;
+        const res = fleet.importAircraftData(a.id, dump);
+        assert.equal(res.ok, true);
+        const apres = fleet.getFleet().find(x => x.id === a.id);
+        assert.equal(apres.name, 'DR400 neuf');
+        assert.equal(apres.wb.emptyMassKg, 740);
+        assert.equal(fleet.getActiveAircraftId(), b.id, 'avion actif inchangé');
+    });
+
+    test('importAircraftData : refuse fichiers multi-avions et invalides', () => {
+        const a = fleet.addAircraft({ name: 'Cible' });
+        assert.equal(fleet.importAircraftData(a.id, { fleet: [{ name: 'x' }, { name: 'y' }] }).reason, 'not-single');
+        assert.equal(fleet.importAircraftData(a.id, null).reason, 'not-single');
+        assert.equal(fleet.importAircraftData(a.id, { fleet: [42] }).reason, 'not-single');
+        assert.equal(fleet.importAircraftData('inconnu', { fleet: [{ name: 'x' }] }).reason, 'not-found');
+        assert.equal(fleet.getFleet().find(x => x.id === a.id).name, 'Cible', 'cible intacte après refus');
+    });
+
+    test('aller-retour complet : export monoplace → import flotte (ajout)', () => {
+        const a = fleet.addAircraft({ name: 'Transféré', registration: 'F-TRF', wb: WB });
+        const dump = fleet.exportAircraftData(a.id);
+        assert.ok(fleet.importFleetData(dump), 'un fichier monoplace est une flotte valide (remplace tout)');
+        assert.equal(fleet.getFleet().length, 1);
+        assert.equal(fleet.getFleet()[0].name, 'Transféré');
+    });
+});
