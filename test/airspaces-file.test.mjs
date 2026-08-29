@@ -2,7 +2,7 @@
 // expansion du format compact en forme openAIP.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { _expandFileItem } from '../js/airspaces.js';
+import { _expandFileItem, _decodeType } from '../js/airspaces.js';
 
 test('_expandFileItem : polygone compact → forme openAIP complète', () => {
     const c = {
@@ -31,4 +31,37 @@ test('_expandFileItem : Point+rayon et champs absents', () => {
 
     const vide = _expandFileItem({ i: 'y', n: 'W', ty: 0, lo: null, up: null, f: null, g: null });
     assert.equal(vide.geometry, null);
+});
+
+// Tests du décodage type → famille. Les cellules openAIP stockent le type
+// BRUT openAIP ; la base SIA (data/sia-airspaces.json) une numérotation
+// PROPRE qui collisionne (SIA 5=TMA vs openAIP 5=TMZ…) — d'où le marqueur
+// _sia qui aiguille vers la bonne table.
+test('_decodeType : numérotation openAIP (cellules, sans _sia)', () => {
+    assert.equal(_decodeType({ type: 6,  name: 'RMZ CHERBOURG' }),  'RMZ');
+    assert.equal(_decodeType({ type: 5,  name: 'TMZ SEINE 9' }),    'TMZ');
+    assert.equal(_decodeType({ type: 13, name: 'ZARAGOZA ATZ' }),   'ATZ');
+    assert.equal(_decodeType({ type: 14, name: 'WITTERING' }),      'ATZ');   // MATZ
+    assert.equal(_decodeType({ type: 25, name: 'TWELVE MILE EAST MOA' }), 'RESTRICTED');
+    assert.equal(_decodeType({ type: 26, name: 'PONCE CLASS E5' }), 'CTA');
+    assert.equal(_decodeType({ type: 28, name: 'BROWN DZ' }),       'DROP');
+    assert.equal(_decodeType({ type: 4,  name: 'ZARAGOZA CTR' }),   'CTR');
+    assert.equal(_decodeType({ type: 7,  name: 'TMA ZARAGOZA-1' }), 'TMA');
+    assert.equal(_decodeType({ type: 33, name: 'SIV AJACCIO' }),    'SIV');
+});
+
+test('_decodeType : numérotation SIA (items marqués _sia)', () => {
+    assert.equal(_decodeType({ _sia: true, type: 5,  name: 'TMA RENNES' }),     'TMA');
+    assert.equal(_decodeType({ _sia: true, type: 33, name: 'SIV RENNES SUD A' }), 'SIV');
+    assert.equal(_decodeType({ _sia: true, type: 11, name: 'TMZ SEINE' }),      'TMZ');
+    assert.equal(_decodeType({ _sia: true, type: 12, name: 'RMZ ANNECY' }),     'RMZ');
+    assert.equal(_decodeType({ _sia: true, type: 6,  name: 'ATZ' }),            'ATZ');
+    assert.equal(_decodeType({ _sia: true, type: 14, name: 'TrPla' }),          'GLIDER');
+    assert.equal(_decodeType({ _sia: true, type: 1,  name: 'Pje' }),            'DROP');
+});
+
+test('_decodeType : repli sur le nom quand le type manque', () => {
+    assert.equal(_decodeType({ name: 'RMZ ANGOULEME' }),  'RMZ');
+    assert.equal(_decodeType({ name: 'ATZ DEAUVILLE' }),  'ATZ');
+    assert.equal(_decodeType({ name: 'TMZ PARIS' }),      'TMZ');
 });
