@@ -69,16 +69,36 @@ test('parseAdFrequencies : lignes AD 2.18 → liste dédupliquée', () => {
     assert.equal(dup.length, 3);
 });
 
-test('overrides terrains : priorité maximale sur l\'eAIP (LFRP/LFRW/LFOM)', async () => {
-    const assert = (await import('node:assert/strict')).default;
-    const { ok, equal, match } = assert;
+test('base XML AFIS/A-A : toutes les fréquences A/A de France (LFRP/LFRW/LFOM/LFEV/LFEQ)', async () => {
     const { readFile } = await import('node:fs/promises');
-    const ov = JSON.parse(await readFile(new URL('../data/freq-overrides.json', import.meta.url), 'utf8'));
-    for (const [icao, freq] of [['LFRP', '118.255'], ['LFRW', '119.785'], ['LFOM', '128.930']]) {
-        const list = ov.airports?.[icao];
-        ok(Array.isArray(list) && list.length >= 1, `${icao} présent dans les overrides`);
-        equal(list[0].value, freq, `${icao} = ${freq}`);
-        equal(list[0].type, 'AFIS');
-        match(list[0].value, /^\d{3}\.\d{3}$/, 'format 3 décimales');
+    const d = JSON.parse(await readFile(new URL('../data/freq-aa-sia.json', import.meta.url), 'utf8'));
+    const attendus = {
+        LFRP: ['A/A', '118.255'], LFRW: ['A/A', '119.785'], LFEV: ['A/A', '118.840'],
+        LFEQ: ['AFIS', '119.605'], LFRV: ['AFIS', '122.605'],
+    };
+    for (const [icao, [type, value]] of Object.entries(attendus)) {
+        const hit = (d.airports[icao] || []).find(x => x.type === type && x.value === value);
+        assert.ok(hit, `${icao} ${type} ${value} présent`);
     }
+    // LFOM : LES DEUX A/A publiées (« SAINT LAURENT » 123.500 + « LESSAY » 128.930).
+    const lfom = d.airports.LFOM.filter(x => x.type === 'A/A');
+    assert.equal(lfom.length, 2);
+    assert.ok(lfom.some(x => x.name === 'LESSAY' && x.value === '128.930'));
+    // Volume : ≥ 240 A/A sur ≥ 250 terrains.
+    const nAA = Object.values(d.airports).flat().filter(x => x.type === 'A/A').length;
+    assert.ok(nAA >= 240 && Object.keys(d.airports).length >= 250, `volume plausible (${nAA} A/A / ${Object.keys(d.airports).length} terrains)`);
+});
+
+test('getAirportFreqs : fusion eAIP ⊕ XML AFIS/A-A, déduplication par fréquence', () => {
+    _setSources(
+        { airac: 'X', airports: { LFX: [{ type: 'AFIS', name: 'X Information', value: '120.000' }] } },
+        { airports: {}, services: {} },
+        { airac: 'X', airports: { LFX: [{ type: 'A/A', name: 'X', value: '120.000' }, { type: 'A/A', name: 'Y', value: '123.455' }] } },
+    );
+    const r = getAirportFreqs('LFX', []);
+    assert.equal(r.source, 'sia');
+    assert.equal(r.freqs.length, 2, '120.000 dédupliquée, 123.455 ajoutée');
+    assert.deepEqual(r.freqs.map(f => f.freq), [120, 123.455]);
+    assert.equal(r.freqs[0].primary, true, 'AFIS primaire');
+    assert.equal(r.freqs[1].primary, false, 'A/A non primaire');
 });
