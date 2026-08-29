@@ -72,10 +72,14 @@ dans une PWA installable qui fonctionne aussi hors ligne.
   performances et centrage — généré dans le navigateur, sans serveur.
 
 ### Général
-- **PWA** installable (mobile / bureau), fonctionne **hors ligne** (service
-  worker + cache), mise à jour automatique à chaque déploiement.
+- **PWA prête** (manifest + service worker) : installation et démarrage
+  hors ligne complets **sur un hébergement HTTPS** ou en local (localhost).
+  L'hébergement Free.fr actuel est en HTTP seul — les navigateurs n'y
+  exécutent pas les service workers, l'application y fonctionne comme un
+  site classique : données consultées mises en cache navigateur (IndexedDB)
+  pour la réactivité, versions rafraîchies au rechargement (numérotation
+  automatique à chaque déploiement).
 - **Interface française / anglaise**, thème sombre.
-- Données mises en cache côté client pour la réactivité (mode avion toléré).
 
 ## Sources de données
 
