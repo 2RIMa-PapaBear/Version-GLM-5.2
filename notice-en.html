@@ -480,7 +480,9 @@
 <tr><td>🟡 Current airfield</td><td>Yellow center marker; runway outlines colored by surface (green = grass, gray = concrete, ochre = dirt)</td></tr>
 <tr><td>Nearby airfields</td><td>Up to 25 surrounding fields with VFR/MVFR/IFR/LIFR colored markers</td></tr>
 <tr><td>🛩️ PIREPs</td><td>Pilot reports (turbulence, icing) in the area</td></tr>
-<tr><td>Airspaces</td><td>CTR, TMA, ATZ, ICAO classes — click a zone to highlight it (off by default)</td></tr>
+<tr><td>Airspaces</td><td>Official <strong>French SIA</strong> base (AIRAC XML) first, then openAIP — CTR, TMA, SIV, ATZ, R·P·D areas… per-family sub-toggles in the “Airspaces” menu; click a zone to highlight it and read sector, altitudes and frequency (off by default)</td></tr>
+<tr><td>📍 Radio beacons &amp; VFR points</td><td>VOR, NDB and VFR reporting points (openAIP, weekly update) — chart-style symbols, toggled one by one in the “Airspaces” menu; usable as flight-plan waypoints</td></tr>
+<tr><td>⚠️ Obstacles</td><td>Official <strong>SIA</strong> base (AIXM export, updated each AIRAC cycle): ~13,800 obstacles across France and overseas — wind turbines, pylons, masts, water towers, chimneys… — one icon per type; click for height, top altitude and <strong>lighting</strong> (shown from regional zoom, off by default)</td></tr>
 <tr><td>SIGMET / AIRMET</td><td>Polygons of active hazardous phenomena (off by default)</td></tr>
 </tbody>
 </table>
@@ -530,7 +532,7 @@
 <li><strong>Airfield popup</strong> on the map: "+ Waypoint" button;</li>
 <li>the <strong>"+ Waypoint" button</strong> in the map toolbar, then click where you want it;</li>
 <li><strong>right-click</strong> anywhere on the map;</li>
-<li>the plan's <strong>"Waypoints" field</strong> (ICAO codes, space-separated, typed by hand);</li>
+<li>the plan's <strong>"Waypoints" field</strong>: ICAO codes or <strong>waypoint names</strong>, space-separated — VOR, NDB and VFR reporting points added to the plan appear under their real name (e.g. BNE, LOR, E2), technical codes stay hidden;</li>
 <li>clicking a previously dropped marker → "+ Plan".</li>
 </ul>
 <p>Every addition is <strong>inserted at the best position</strong>: the tool tests all slots and keeps the shortest total route — an intermediate stop automatically slips in <em>before</em> a farther leg. The order of already-entered waypoints is always preserved.</p>
@@ -544,7 +546,7 @@
 <p>Displays flight-category markers for airfields along your route, to anticipate possible en-route deterioration.</p>
 
 <h3>Elevation Profile</h3>
-<p>Samples the <strong>terrain elevation profile</strong> along the route to verify compliance with VFR clearance rules (500 ft / 1000 ft).</p>
+<p>Samples the <strong>terrain elevation profile</strong> along the route to verify compliance with VFR clearance rules (500 ft / 1000 ft). <strong>Airspaces crossed</strong> are shown too: on screen, hover the altitude band to read the sector and its frequency; on the PDF nav log, each crossing is bounded by vertical lines (same blue as the map) with the <strong>sector name and frequency</strong> written vertically between the bounds.</p>
 
 <!-- ====================== FREQUENCIES ====================== -->
 <h2 id="frequencies">📡 FREQUENCIES &amp; AIRFIELD INFO</h2>
