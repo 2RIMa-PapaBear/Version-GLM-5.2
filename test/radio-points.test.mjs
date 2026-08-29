@@ -45,6 +45,22 @@ test('parseRadioPoints : séparation VOR/NDB/VRP et rejet des points invalides',
     equal(parseRadioPoints(null), null, 'absence → null');
 });
 
+test('parseRadioPoints : VRP SIA avec description (5ᵉ élément)', () => {
+    const parsed = parseRadioPoints({
+        navaids: [[4, 'LGL', 48.79, 0.53, 112.7, 2]],
+        vrps: [
+            ['MM-CV', 43.81083, 5.04222, 'FR', 'VRP-Cavaillon (Pont TGV sur la Durance)'],
+            ['AC', 49.44806, 0.90528, 'FR'],
+            ['XX', 10, 20, 'PH', ''],
+        ],
+    });
+    equal(parsed.vrp[0].desc, 'VRP-Cavaillon (Pont TGV sur la Durance)');
+    equal(parsed.vrp[0].sia, true, 'point marqué officiel SIA');
+    equal(parsed.vrp[1].desc, null, 'openAIP sans description');
+    equal(parsed.vrp[1].sia, false);
+    equal(parsed.vrp[2].sia, false, 'hors France jamais marqué SIA');
+});
+
 test('filterBbox : cadre simple et antiméridien (est < ouest)', () => {
     const pts = [
         { lat: 0, lon: 0 }, { lat: 0, lon: 10 },

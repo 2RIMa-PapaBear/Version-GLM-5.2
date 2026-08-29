@@ -206,22 +206,100 @@ fs.writeFileSync(rpPath, JSON.stringify(rp));
 console.log(`radio-points.json : ${rp.navaids.length} navaids (dont ${navaids.length} officiels SIA)`);
 
 // ---------------------------------------------------------------------------
-// 4. TERRAINS officiels France.
+// 4. TERRAINS officiels France (+ élévation et déclinaison magnétique
+//    officielles — AdRefAltFt / AdMagVar millésimé MagVarDate).
 // ---------------------------------------------------------------------------
 const airfields = [];
+const adLkToIcao = new Map();   // lk « [LF][BT] » → LFBT (pour les pistes)
 each('Ad', (attrs, body) => {
     if (!/^\[LF\]/.test(attr(attrs, 'lk'))) return;
     const code = 'LF' + (txt(body, 'AdCode') || '');
     if (!/^[A-Z][A-Z0-9]{3}$/.test(code)) return;
+    adLkToIcao.set(attr(attrs, 'lk'), code);
     const lat = parseFloat(txt(body, 'ArpLat')), lon = parseFloat(txt(body, 'ArpLong'));
+    const elev = parseInt(txt(body, 'AdRefAltFt') || '', 10);
+    const magVar = parseFloat(String(txt(body, 'AdMagVar') || '').replace(',', '.'));
     airfields.push({
         code, nom: txt(body, 'AdNomComplet') || code, carto: txt(body, 'AdNomCarto') || '',
         lat: Number.isFinite(lat) ? lat : null, lon: Number.isFinite(lon) ? lon : null,
         statut: txt(body, 'AdStatut') || '', vfr: txt(body, 'TfcVfr') === 'oui', ifr: txt(body, 'TfcIfr') === 'oui',
         prive: txt(body, 'TfcPrive') === 'oui',
+        elevFt: Number.isFinite(elev) ? elev : null,
+        magVar: Number.isFinite(magVar) ? magVar : null, magVarYear: txt(body, 'MagVarDate') || null,
     });
 });
 fs.writeFileSync(path.join(ROOT, 'data', 'sia-airfields.json'), JSON.stringify({
     generatedAt: new Date().toISOString(), airac: effDate, count: airfields.length, items: airfields,
 }));
 console.log(`terrains France : ${airfields.length} → data/sia-airfields.json`);
+
+// ---------------------------------------------------------------------------
+// 4bis. PISTES officielles France (section <RwyS>) — longueur/largeur en
+// MÈTRES, revêtement, piste principale, orientation vraie, seuils (lat/lon/
+// alt, déplacés compris). Les seuils du XML SIA sont exacts (même source
+// que les cartes) : ils remplacent avantageusement le CSV OurAirports.
+// ---------------------------------------------------------------------------
+const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
+const runways = {};
+{
+    const s = xml.indexOf('<RwyS>'); const e = xml.indexOf('</RwyS>', s);
+    const seg = s >= 0 && e > s ? xml.slice(s, e) : '';
+    const blocks = seg.match(/<Rwy pk="[^"]*" lk="(\[LF\]\[..\])\[[^\]]*\]">[\s\S]*?(?=<Rwy pk=|<\/RwyS>|$)/g) || [];
+    for (const b of blocks) {
+        const lk = (b.match(/lk="(\[LF\]\[..\])/) || [])[1];
+        const icao = adLkToIcao.get(lk);
+        if (!icao) continue;
+        const t = (tag) => txt(b, tag);
+        const pair = t('Rwy') || '';
+        const [n1, n2] = pair.split('/');
+        const thr = (i) => {
+            const lat = num(t(`LatThr${i}`)), lon = num(t(`LongThr${i}`));
+            if (lat == null || lon == null) return null;
+            const dLat = num(t(`LatDThr${i}`)), dLon = num(t(`LongDThr${i}`));
+            return {
+                id: i === 1 ? n1 : n2, lat: Math.round(lat * 1e6) / 1e6, lon: Math.round(lon * 1e6) / 1e6,
+                altFt: num(t(`AltFtThr${i}`)),
+                d: (dLat != null && dLon != null) ? { lat: Math.round(dLat * 1e6) / 1e6, lon: Math.round(dLon * 1e6) / 1e6, altFt: num(t(`AltFtDThr${i}`)) } : null,
+            };
+        };
+        const r = {
+            d: pair,
+            len: num(t('Longueur')), wid: num(t('Largeur')),
+            surf: t('Revetement') || '',
+            main: t('Principale') === 'oui',
+            brg: num(t('OrientationGeo')),
+            t1: thr(1), t2: thr(2),
+        };
+        if (!r.d || r.len == null) continue;
+        (runways[icao] ??= []).push(r);
+    }
+}
+fs.writeFileSync(path.join(ROOT, 'data', 'sia-runways.json'), JSON.stringify({
+    generatedAt: new Date().toISOString(), airac: effDate,
+    count: Object.values(runways).reduce((a, v) => a + v.length, 0), items: runways,
+}));
+console.log(`pistes officielles : ${Object.values(runways).reduce((a, v) => a + v.length, 0)} pistes / ${Object.keys(runways).length} terrains → data/sia-runways.json`);
+
+// ---------------------------------------------------------------------------
+// 4ter. POINTS VFR officiels France (NavFix type VFR) — remplacent les
+// points openAIP en France : 1098 points AVEC description officielle
+// (« VRP-Cavaillon (Pont TGV sur la Durance) ») contre 675 sans.
+// ---------------------------------------------------------------------------
+const vrpsSia = [];
+each('NavFix', (attrs, body) => {
+    if (!/^\[LF\]/.test(attr(attrs, 'lk'))) return;
+    if (txt(body, 'NavType') !== 'VFR') return;
+    const lat = parseFloat(txt(body, 'Latitude')), lon = parseFloat(txt(body, 'Longitude'));
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    const desc = (txt(body, 'Description') || '').replace(/\s+/g, ' ').trim();
+    vrpsSia.push([txt(body, 'Ident') || '', Math.round(lat * 1e5) / 1e5, Math.round(lon * 1e5) / 1e5, 'FR', desc || null]);
+});
+{
+    // Priorité SIA : les points VFR openAIP de France sont écartés.
+    rp.vrps = rp.vrps.filter(v => v[3] !== 'FR').concat(vrpsSia);
+    rp.counts = rp.counts || {};
+    rp.counts.vrpsSia = vrpsSia.length;
+    rp.siaVrpAirac = effDate;
+    fs.writeFileSync(rpPath, JSON.stringify(rp));
+}
+console.log(`points VFR officiels : ${vrpsSia.length} (openAIP FR écartés) → data/radio-points.json`);
