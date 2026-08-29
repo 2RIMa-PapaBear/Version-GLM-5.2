@@ -132,9 +132,17 @@ each('Volume', (attrs, body) => {
     const ty = TYPE_NUM[esp.type];
     if (!ty) return;   // « Aer », « other », MSA… : hors périmètre carte VFR
 
-    const lo = toFt(txt(body, 'Plancher'), txt(body, 'PlancherRefUnite')) ?? 0;
-    const up = toFt(txt(body, 'Plafond'), txt(body, 'PlafondRefUnite'));
-    if (up == null || up <= 0) return;
+    const loFt = toFt(txt(body, 'Plancher'), txt(body, 'PlancherRefUnite')) ?? 0;
+    const upFt = toFt(txt(body, 'Plafond'), txt(body, 'PlafondRefUnite'));
+    if (upFt == null || upFt <= 0) return;
+    // Tuple compact openAIP : unité 6 = valeur EN FL, 1 = pieds. On garde la
+    // valeur BRUTE dans son unité (FL115 → [115,6]) — y glisser des PIEDS
+    // (l'ancien [11500,6]) faisait relire ×100 par les consommateurs
+    // (plafond 1 150 000 ft au profil, zones à plancher FL invisibles).
+    const compactLimit = (val, unit, ft) =>
+        (/^FL/i.test(unit) && Number.isFinite(parseFloat(String(val).replace(',', '.'))))
+            ? [parseFloat(String(val).replace(',', '.')), 6]
+            : [ft, 1];
 
     const partie = esp.parties.find(p => p.nom && partieLk.endsWith(`[${p.nom}]`)) || esp.parties[0];
     // Activite « APP MELUN#SEINE INFO 134.300 » → organisme + fréquence.
@@ -151,8 +159,8 @@ each('Volume', (attrs, body) => {
         // vivent dans le NOM de l'Espace, pas dans NomPartie : intacts.
         n: `${esp.type} ${esp.nom}${partie.nom && partie.nom !== '.' ? ' ' + partie.nom.replace(/\bpartie\b\s*/gi, '').trim() : ''}`,
         ty,
-        lo: [lo, /FL/i.test(txt(body, 'PlancherRefUnite') || '') ? 6 : 1],
-        up: [up, /FL/i.test(txt(body, 'PlafondRefUnite') || '') ? 6 : 1],
+        lo: compactLimit(txt(body, 'Plancher'), txt(body, 'PlancherRefUnite') || '', loFt) || [loFt, 1],
+        up: compactLimit(txt(body, 'Plafond'), txt(body, 'PlafondRefUnite') || '', upFt) || [upFt, 1],
         f: freqMatch ? [{ value: freqMatch[1], name: whoMatch.toUpperCase() }] : null,
         hor: txt(body, 'HorCode') || '',
         g: { t: 1, c: [partie.ring] },
