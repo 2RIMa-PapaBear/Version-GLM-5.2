@@ -144,7 +144,12 @@ each('Volume', (attrs, body) => {
 
     zonesOut.push({
         i: attr(attrs, 'pk'),
-        n: `${esp.type} ${esp.nom}${partie.nom && partie.nom !== '.' ? ' ' + partie.nom : ''}`,
+        // NomPartie peut porter le mot « partie » (« SUD partie A ») :
+        // nettoyé pour nommer la zone « SIV RENNES SUD A » comme sur la
+        // carte et comme openAIP (sinon le dé-duplounage client échoue).
+        // Les vrais noms avec trait d'union (CTR SARREBRUCK-PARTIE FRANCE)
+        // vivent dans le NOM de l'Espace, pas dans NomPartie : intacts.
+        n: `${esp.type} ${esp.nom}${partie.nom && partie.nom !== '.' ? ' ' + partie.nom.replace(/\bpartie\b\s*/gi, '').trim() : ''}`,
         ty,
         lo: [lo, /FL/i.test(txt(body, 'PlancherRefUnite') || '') ? 6 : 1],
         up: [up, /FL/i.test(txt(body, 'PlafondRefUnite') || '') ? 6 : 1],

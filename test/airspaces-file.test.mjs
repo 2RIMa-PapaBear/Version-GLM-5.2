@@ -99,3 +99,19 @@ test('_dropOpenAipDuplicates : la copie SIA prime, y compris par désignateur', 
     assert.equal(out.length, 3);
     assert.deepEqual(out.map(z => z.name), ['R 278', 'RMZ VANNES', 'LF-D42B LOINTAIN']);
 });
+
+test('_dropOpenAipDuplicates : « partie X » normalisé (SIV RENNES SUD partie A ≡ SIV RENNES SUD A)', () => {
+    const sia = [
+        { name: 'SIV RENNES SUD partie A' },
+        { name: 'SIV RENNES SUD partie B' },
+        { name: 'CTR SARREBRUCK-PARTIE FRANCE' },        // trait d'union : vrai nom, pas normalisé
+    ];
+    const oaip = [
+        { name: 'SIV RENNES SUD A' },                    // doublon de la partie A
+        { name: 'SIV RENNES SUD B' },                    // doublon de la partie B
+        { name: 'CTR SARREBRUCK PARTIE FRANCE' },        // ≠ « SARREBRUCK-PARTIE » (tiret) : conservé
+        { name: 'SIV RENNES NORD' },                     // inconnu du SIA ici : conservé
+    ];
+    const out = _dropOpenAipDuplicates(oaip, sia);
+    assert.deepEqual(out.map(z => z.name), ['CTR SARREBRUCK PARTIE FRANCE', 'SIV RENNES NORD']);
+});
