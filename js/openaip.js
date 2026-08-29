@@ -120,7 +120,13 @@ function _mapAirport(aip) {
         .map(f => ({
             freq: parseFloat(f.value),
             name: f.name || '',
-            type: FREQ_TYPE_LABELS[f.type] ?? 'COM',
+            type: FREQ_TYPE_LABELS[f.type] === 'UNK'
+                // openAIP tape « UNK » (type 16) sur beaucoup de fréquences
+                // A/A ; leur nom les désigne (« A/A », « AIR/AIR ») → vraie
+                // étiquette à l'affichage (détail des waypoints, widget).
+                && /\bA\s*\/\s*A\b|AIR[\s\/-]?AIR/i.test(f.name || '')
+                ? 'A/A'
+                : (FREQ_TYPE_LABELS[f.type] ?? 'COM'),
             primary: !!f.primary,
         }))
         .filter(f => !isNaN(f.freq))
