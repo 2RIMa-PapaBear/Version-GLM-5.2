@@ -29,7 +29,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG_PATH = path.join(ROOT, 'deploy.config.json');
 const STATE_PATH = path.join(ROOT, 'deploy.state.json');
 
-// Seuls ces chemins partent en prod (le reste du dépôt = dev : test/, src-tauri/,
+// Seuls ces chemins partent en prod (le reste du dépôt = dev : test/,
 // apps-script/, scripts/, package.json…).
 const ALLOWED = [
     'index.html', 'sw.js', 'manifest.webmanifest', 'favicon.ico', 'icon.svg',
