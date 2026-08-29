@@ -248,6 +248,11 @@ describe('fetchAvecRelais — sérialisation relai', () => {
     test('la file survit à un échec : la requête suivante passe quand même', async () => {
         // LFZZ échoue réseau à chaque tentative ; LFYY réussit. Le sondage
         // no-cors (HEAD) répond : l'échec est classé « réponse bloquée ».
+        // (Test du MODE PROXI : PROXY_URL fixé explicitement — le mode direct
+        // sans relais a son propre test ci-dessous.)
+        const { config } = await import('../js/config.js');
+        const savedProxy = config.PROXY_URL;
+        config.PROXY_URL = 'https://relais.test/exec';
         globalThis.fetch = async (u, opts) => {
             if (opts && opts.method === 'HEAD') return {};
             if (String(u).includes('LFZZ')) throw new TypeError('Failed to fetch');
@@ -258,7 +263,25 @@ describe('fetchAvecRelais — sérialisation relai', () => {
             const u2 = 'https://aviationweather.gov/api/data/metar?ids=LFYY&format=raw';
             await assert.rejects(fetchAvecRelais(u1), /relai Google Apps Script inaccessible/i);
             assert.equal(await fetchAvecRelais(u2), 'OK-APRES');
-        } finally { globalThis.fetch = _realFetch; }
+        } finally { config.PROXY_URL = savedProxy; globalThis.fetch = _realFetch; }
+    });
+
+    test('mode DIRECT (miroir Pages, sans relais) : succès, json vide, erreur réseau habillée', async () => {
+        const { config } = await import('../js/config.js');
+        const savedProxy = config.PROXY_URL;
+        config.PROXY_URL = '';
+        try {
+            // Succès texte direct.
+            globalThis.fetch = async (u) => ({ ok: true, status: 200, text: async () => 'METAR LFRV' });
+            assert.equal(await fetchAvecRelais('https://aviationweather.gov/api/data/metar?ids=LFRV&format=raw'), 'METAR LFRV');
+            // Corps vide en json → [] (même règle que via le relais).
+            globalThis.fetch = async () => ({ ok: true, status: 200, text: async () => '' });
+            assert.deepEqual(await fetchAvecRelais('https://aviationweather.gov/api/data/pirep?bbox=1,2,3,4&format=json', 'json'), []);
+            // Réseau coupé : message clair, et la file survit.
+            globalThis.fetch = async (u) => { if (String(u).includes('LFZZ')) throw new TypeError('Failed to fetch'); return { ok: true, status: 200, text: async () => 'OK-DIRECT' }; };
+            await assert.rejects(fetchAvecRelais('https://aviationweather.gov/api/data/metar?ids=LFZZ&format=raw'), /Service météo inaccessible|Weather service unreachable/i);
+            assert.equal(await fetchAvecRelais('https://aviationweather.gov/api/data/metar?ids=LFYY&format=raw'), 'OK-DIRECT');
+        } finally { config.PROXY_URL = savedProxy; globalThis.fetch = _realFetch; }
     });
 });
 
