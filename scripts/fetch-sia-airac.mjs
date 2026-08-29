@@ -53,16 +53,54 @@ each('Espace', (attrs, body) => {
     e.type = txt(body, 'TypeEspace') || e.type;
     e.nom = txt(body, 'Nom') || e.nom;
 });
+// Le Contour ne donne que les ANCHRES : les cercles officiels y sont
+// définis par cwa(lat lon:rayon:unité:centre…) sur la 1ʳᵉ ligne et le
+// reste n'est que quelques points sur le cercle — relier les ancres par
+// des cordes déforme la zone (RMZ QUIBERON = triangle au lieu d'un disque
+// 3 NM). Le SIA publie aussi <Geometrie> : le contour DENSIFIÉ complet
+// (~200 pts pour un cercle). On l'utilise quand il est cohérent avec les
+// ancres (toutes présentes, même ordre cyclique au sens près — validé sur
+// tout l'AIRAC 2026-09-03 : 1345/2063 parties, TOUTES les zones cwa) ;
+// sinon repli sur les ancres seules (zones Pje/TrPla/Vol… sans Geometrie).
+const _geomCoherent = (anchors, gpts) => {
+    if (anchors.length < 3 || gpts.length < anchors.length) return false;
+    let gp = gpts;
+    if (gp.length > 1 && Math.abs(gp[0][0] - gp[gp.length - 1][0]) < 1e-4
+        && Math.abs(gp[0][1] - gp[gp.length - 1][1]) < 1e-4) gp = gp.slice(0, -1);
+    const idx = [];
+    for (const [alon, alat] of anchors) {
+        const j = gp.findIndex(([glon, glat]) => Math.abs(glat - alat) < 1e-4 && Math.abs(glon - alon) < 1e-4);
+        if (j < 0) return false;
+        idx.push(j);
+    }
+    const s = (idx[0] === idx[idx.length - 1]) ? idx.slice(0, -1) : idx;
+    if (s.length < 2 || new Set(s).size !== s.length) return false;
+    for (const dir of [1, -1]) {
+        let wraps = 0;
+        for (let i = 0; i < s.length; i++) {
+            const a = s[i], b = s[(i + 1) % s.length];
+            if (dir === 1 && b < a) wraps++;
+            if (dir === -1 && b > a) wraps++;
+        }
+        if (wraps <= 1) return true;
+    }
+    return false;
+};
 each('Partie', (attrs, body) => {
     const elLk = attr((body.match(/<Espace [^>]*>/) || [''])[0], 'lk') || attr(attrs, 'lk').replace(/\[[^\]]*\]$/, '');
     const esp = espaces.get(elLk);
     if (!esp) return;
     // Contour : « seq,Cloture=n,lat lon,type(…) \t oui » — ordre = séquence.
     const lignes = (txt(body, 'Contour') || '').split('\n').map(l => l.trim()).filter(Boolean);
-    const ring = lignes
+    const anchors = lignes
         .map(l => (l.split(',')[2] || '').split(' ').map(Number))
         .filter(c => c.length === 2 && Number.isFinite(c[0]) && Number.isFinite(c[1]))
         .map(([lat, lon]) => [Math.round(lon * 1e4) / 1e4, Math.round(lat * 1e4) / 1e4]);
+    const geom = ((txt(body, 'Geometrie') || '').split('\n').map(l => l.trim()).filter(Boolean)
+        .map(l => l.split(',').map(Number))
+        .filter(c => c.length === 2 && Number.isFinite(c[0]) && Number.isFinite(c[1]))
+        .map(([lat, lon]) => [Math.round(lon * 1e4) / 1e4, Math.round(lat * 1e4) / 1e4]));
+    const ring = _geomCoherent(anchors, geom) ? geom : anchors;
     if (ring.length >= 3) esp.parties.push({ nom: txt(body, 'NomPartie') || '', ring });
 });
 console.log(`  espaces: ${espaces.size}, parties avec contour: ${[...espaces.values()].reduce((a, e) => a + e.parties.length, 0)}`);
