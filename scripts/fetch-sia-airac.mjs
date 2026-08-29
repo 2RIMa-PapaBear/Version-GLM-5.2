@@ -178,17 +178,24 @@ const withFreq = zonesOut.filter(z => z.f).length;
 console.log(`espaces : ${zonesOut.length} zones officielles (${withFreq} avec fréquence) → data/sia-airspaces.json`);
 
 // ---------------------------------------------------------------------------
-// 2. FRÉQUENCES par organisme (Service complet : FIS/TWR/APP + terrain).
+// 2. FRÉQUENCES par organisme (Service complet : FIS/TWR/APP + AFIS, A/A…)
+//    + collecte brute pour la base PAR TERRAIN (écrite en 4quater, une fois
+//    la correspondance code AD → OACI connue).
 // ---------------------------------------------------------------------------
 const services = new Map();
+const rawAaAfis = [];   // {ad, type, name, freq, hor} — AFIS et A/A par terrain
 each('Frequence', (attrs, body) => {
-    // Le lk porte tout : [territoire][code AD][FIS/TWR/… Nom][fréq].
-    const m = attr(attrs, 'lk').match(/\[([A-Z]{2})\]\[(FIS|TWR|APP|GND|DEL|ATIS) ([^\]]+)\]\[(\d{3}\.\d{2,3})\]/);
+    // Le lk porte tout : [territoire][code AD][FIS/TWR/…/AFIS/A-A Nom][fréq].
+    const m = attr(attrs, 'lk').match(/\[([A-Z]{2})\]\[(FIS|TWR|APP|GND|DEL|ATIS|AFIS|A\/A) ([^\]]+)\]\[(\d{3}\.\d{2,3})\]/);
     if (!m) return;
     const key = `${m[2]} ${m[3]}`;
-    (services.get(key) ?? services.set(key, []).get(key)).push({
+    const entry = {
         freq: m[4], ad: m[1], hor: txt(body, 'HorCode') || '', rem: (txt(body, 'Remarque') || '').trim(),
-    });
+    };
+    (services.get(key) ?? services.set(key, []).get(key)).push(entry);
+    if (m[2] === 'AFIS' || m[2] === 'A/A') {
+        rawAaAfis.push({ ad: m[1], type: m[2], name: m[3].replace(/\s*\.+\s*$/, '').trim(), ...entry });
+    }
 });
 fs.writeFileSync(path.join(ROOT, 'data', 'freq-services-sia.json'), JSON.stringify({
     generatedAt: new Date().toISOString(), airac: effDate, services: Object.fromEntries(services),
@@ -279,6 +286,32 @@ fs.writeFileSync(path.join(ROOT, 'data', 'sia-airfields.json'), JSON.stringify({
     generatedAt: new Date().toISOString(), airac: effDate, count: airfields.length, items: airfields,
 }));
 console.log(`terrains France : ${airfields.length} → data/sia-airfields.json`);
+
+// ---------------------------------------------------------------------------
+// 4quater. FRÉQUENCES PAR TERRAIN (AFIS + A/A) — la demande « toutes les
+//    fréquences A/A de France » : le XML_SIA publie 227 A/A et 68 AFIS
+//    (Ploërmel, Avranches, Lessay n'existent NI dans l'eAIP AD-2 NI
+//    ailleurs — leurs valeurs officielles vivent ICI). Consommé par
+//    freq-sia.js en source 3 (après eAIP, avant openAIP).
+// ---------------------------------------------------------------------------
+{
+    const byAirport = {};
+    for (const e of rawAaAfis) {
+        const icao = adLkToIcao.get(`[LF][${e.ad}]`);
+        if (!icao) continue;
+        const list = byAirport[icao] ??= [];
+        if (!list.some(x => x.type === e.type && x.value === e.freq)) {
+            list.push({ type: e.type, name: e.name, value: e.freq, hor: e.hor || '' });
+        }
+    }
+    // AFIS d'abord, puis A/A (ordre d'affichage du widget).
+    for (const list of Object.values(byAirport)) list.sort((a, b) => (a.type === 'AFIS' ? -1 : 1) - (b.type === 'AFIS' ? -1 : 1));
+    fs.writeFileSync(path.join(ROOT, 'data', 'freq-aa-sia.json'), JSON.stringify({
+        generatedAt: new Date().toISOString(), airac: effDate,
+        count: Object.values(byAirport).reduce((a, v) => a + v.length, 0), airports: byAirport,
+    }));
+    console.log(`fréquences AFIS/A-A par terrain : ${Object.values(byAirport).reduce((a, v) => a + v.length, 0)} fréq / ${Object.keys(byAirport).length} terrains → data/freq-aa-sia.json`);
+}
 
 // ---------------------------------------------------------------------------
 // 4bis. PISTES officielles France (section <RwyS>) — longueur/largeur en
