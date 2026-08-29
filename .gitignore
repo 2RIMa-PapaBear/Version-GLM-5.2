@@ -22,9 +22,8 @@ Thumbs.db
 *.bak
 *.orig
 
-# Builds générés (Tauri / bundler)
+# Builds générés
 dist/
-src-tauri/target/
 
 # Aperçus PDF/PNG générés (test/gen-apercu-navlog.mjs) et profils Edge headless
 Apercu_*.pdf
