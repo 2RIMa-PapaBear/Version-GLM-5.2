@@ -269,7 +269,9 @@ describe('fetchAvecRelais — sérialisation relai', () => {
     test('mode DIRECT (miroir Pages, sans relais) : succès, json vide, erreur réseau habillée', async () => {
         const { config } = await import('../js/config.js');
         const savedProxy = config.PROXY_URL;
+        const savedKey = config.CORS_PROXY_KEY;
         config.PROXY_URL = '';
+        config.CORS_PROXY_KEY = '';
         try {
             // Succès texte direct.
             globalThis.fetch = async (u) => ({ ok: true, status: 200, text: async () => 'METAR LFRV' });
@@ -281,7 +283,31 @@ describe('fetchAvecRelais — sérialisation relai', () => {
             globalThis.fetch = async (u) => { if (String(u).includes('LFZZ')) throw new TypeError('Failed to fetch'); return { ok: true, status: 200, text: async () => 'OK-DIRECT' }; };
             await assert.rejects(fetchAvecRelais('https://aviationweather.gov/api/data/metar?ids=LFZZ&format=raw'), /Service météo inaccessible|Weather service unreachable/i);
             assert.equal(await fetchAvecRelais('https://aviationweather.gov/api/data/metar?ids=LFYY&format=raw'), 'OK-DIRECT');
-        } finally { config.PROXY_URL = savedProxy; globalThis.fetch = _realFetch; }
+        } finally { config.PROXY_URL = savedProxy; config.CORS_PROXY_KEY = savedKey; globalThis.fetch = _realFetch; }
+    });
+
+    test('mode DIRECT + corsproxy : CORS coupé au direct → le proxy avec clé prend le relais', async () => {
+        const { config } = await import('../js/config.js');
+        const savedProxy = config.PROXY_URL;
+        const savedKey = config.CORS_PROXY_KEY;
+        config.PROXY_URL = '';
+        config.CORS_PROXY_KEY = 'TESTKEY';
+        try {
+            const vus = [];
+            globalThis.fetch = async (u) => {
+                vus.push(String(u));
+                if (String(u).startsWith('https://corsproxy.io/')) {
+                    return { ok: true, status: 200, text: async () => 'METAR-VIA-PROXY' };
+                }
+                throw new TypeError('Failed to fetch');   // CORS bloque le direct
+            };
+            assert.equal(await fetchAvecRelais('https://aviationweather.gov/api/data/metar?ids=LFRV&format=raw'), 'METAR-VIA-PROXY');
+            assert.ok(vus.length === 2, 'direct tenté puis proxy');
+            assert.ok(vus[1].includes('key=TESTKEY') && vus[1].includes(encodeURIComponent('https://aviationweather.gov')), 'clé + URL cible encodée');
+            // Proxy en échec réseau aussi → erreur habillée, la file survit.
+            globalThis.fetch = async () => { throw new TypeError('Failed to fetch'); };
+            await assert.rejects(fetchAvecRelais('https://aviationweather.gov/api/data/metar?ids=LFZZ&format=raw'), /Service météo inaccessible|Weather service unreachable/i);
+        } finally { config.PROXY_URL = savedProxy; config.CORS_PROXY_KEY = savedKey; globalThis.fetch = _realFetch; }
     });
 });
 
