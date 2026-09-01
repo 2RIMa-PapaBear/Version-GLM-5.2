@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Aperçu favoris (olive météo)</title>
+<link rel="stylesheet" href="/css/style.css">
+<style> body { padding: 16px; width: 360px; } </style>
+</head>
+<body>
+<aside class="side-column card" style="position:static;">
+    <h3 id="lbl-favoris-title">Favoris</h3>
+    <div id="favorites-list"></div>
+</aside>
+<script type="module">
+  const step = (t) => document.body.insertAdjacentHTML('afterbegin', `<pre style="color:#8ff;margin:2px">${t}</pre>`);
+  try {
+    const { updateFavoritesUI, initAirportsDB } = await import('/js/ui-module.js');
+    const { setWatchdogSettings, checkNow } = await import('/js/watchdog.js');
+    step('modules ok');
+    // Le fetch « data/airports.json » est relatif au dossier de la page :
+    // hors index.html il rate → course de 3 s, les noms retomberont sur les codes.
+    await Promise.race([initAirportsDB(), new Promise(r => setTimeout(r, 3000))]);
+    step('base terrains (ou délai)');
+    localStorage.setItem('favorites', JSON.stringify(['LFRV', 'LFRC', 'LFOM']));
+    updateFavoritesUI(() => {});
+    step('favoris rendus');
+    // Watchdog réel : fetch aviationweather via le relais, olives colorées.
+    setWatchdogSettings({ enabled: true, intervalMin: 15, notify: false });
+    await Promise.race([checkNow(), new Promise(r => setTimeout(r, 8000))]);
+    await new Promise(r => setTimeout(r, 500));
+    const n = document.querySelectorAll('.fav-status-badge:not(:empty)').length;
+    step(`badges peints : ${n}`);
+    document.title = 'DONE';
+  } catch (e) {
+    step('ERREUR : ' + (e && e.message || e));
+    document.title = 'ERR';
+  }
+</script>
+</body>
+</html>
