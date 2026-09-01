@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Repro bandeau nuit (mobile)</title>
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  body { padding: 8px; }
+  .card { background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px; margin-bottom: 12px; }
+  .tt { color: #8ff; font: 700 11px monospace; margin: 4px 0; }
+  #probe { color: #0f0; font: 10px monospace; white-space: pre-wrap; }
+  /* Miroir des styles du bandeau (flight-window.js + style.css) */
+  .flight-window-content { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .flight-window-status { display:flex; align-items:center; gap:10px; min-width:0; }
+  .flight-window-icon { width:42px; height:42px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+</style>
+</head>
+<body>
+<div class="tt">AVANT (white-space:nowrap) :</div>
+<div class="card" style="background:rgba(239,68,68,0.12); border-color:#EF4444;">
+    <div class="flight-window-content">
+        <div class="flight-window-status">
+            <div class="flight-window-icon" style="background:rgba(239,68,68,0.12); border:2px solid #EF4444; color:#EF4444; font-size:22px;">☾</div>
+            <div style="min-width:0;">
+                <div style="font-weight:800; font-size:13px; color:#EF4444; letter-spacing:0.5px; white-space:nowrap;">NUIT AÉRONAUTIQUE — VFR DE JOUR INTERDIT</div>
+                <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Le prochain lever civil est demain matin.</div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="tt">APRÈS (libellé court, sans nowrap — correctif) :</div>
+<div class="card" style="background:rgba(239,68,68,0.12); border-color:#EF4444;">
+    <div class="flight-window-content">
+        <div class="flight-window-status">
+            <div class="flight-window-icon" style="background:rgba(239,68,68,0.12); border:2px solid #EF4444; color:#EF4444; font-size:22px;">☾</div>
+            <div style="min-width:0;">
+                <div style="font-weight:800; font-size:13px; color:#EF4444; letter-spacing:0.5px;">NUIT AÉRONAUTIQUE</div>
+                <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Qualification de nuit requise. Prochain lever civil demain matin.</div>
+            </div>
+        </div>
+    </div>
+</div>
+<pre id="probe"></pre>
+<script>
+    var out = [];
+    var cards = document.querySelectorAll('.card');
+    [0, 1].forEach(function (i) {
+        var lab = cards[i].querySelector('div > div');
+        out.push((i === 0 ? 'AVANT' : 'APRÈS') + ' : lab scrollW=' + lab.scrollWidth + ' clientW=' + lab.clientWidth +
+            ' | carte scrollW=' + cards[i].scrollWidth + ' clientW=' + cards[i].clientWidth +
+            (cards[i].scrollWidth > cards[i].clientWidth ? '  ← DÉBORDE' : '  ← ok'));
+    });
+    out.push('page: scrollW=' + document.scrollingElement.scrollWidth + ' innerW=' + window.innerWidth);
+    document.getElementById('probe').textContent = out.join('\n');
+    document.title = 'DONE';
+</script>
+</body>
+</html>

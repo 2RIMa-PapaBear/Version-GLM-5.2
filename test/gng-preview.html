@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Repro GO/NO-GO nuit (mobile)</title>
+<link rel="stylesheet" href="/css/style.css">
+<style> body { padding: 8px; } #probe { color: #8ff; font-size: 10px; font-family: monospace; white-space: pre-wrap; } </style>
+</head>
+<body>
+<div class="metar-dashboard visible">
+    <aside id="go-nogo-banner" class="dashboard-cell go-nogo" role="status" aria-live="polite" aria-atomic="true">
+        <!-- Markup EXACT généré par renderGoNoGo() (cas nuit, NO-GO) -->
+        <div class="go-nogo-content" style="display:flex; flex-direction:column; height:100%;">
+            <div class="go-nogo-verdict-block" style="display:flex; flex-direction:column; align-items:center; gap:4px; padding-top:12px; padding-bottom:8px;">
+                <div class="go-nogo-icon" style="width:53px; height:53px; border-radius:50%; background:#EF444422; border:3px solid #EF4444; display:flex; align-items:center; justify-content:center;">
+                    <i data-lucide="x-octagon" style="width:29px; height:29px; color:#EF4444;"></i>
+                </div>
+                <div style="font-size:20px; font-weight:900; color:#EF4444; letter-spacing:1px; line-height:1;">NO-GO</div>
+                <div style="font-size:9px; color:var(--text-muted); text-align:center; line-height:1.2;">NO-GO — Vol déconseillé/interdit</div>
+            </div>
+            <div class="go-nogo-reasons" style="margin-top:6px; display:flex; flex-direction:column; gap:4px; flex:1; min-height:0; overflow-y:auto;">
+                <div class="go-nogo-reason" style="display:flex; align-items:flex-start; gap:6px; padding:5px 8px; border-radius:5px; font-size:11px; line-height:1.3; color:#FCA5A5;">
+                    <span style="width:6px; height:6px; border-radius:50%; background:#EF4444; flex-shrink:0; margin-top:4px;"></span>
+                    <span>Nuit aéronautique — qualification de nuit requise</span>
+                </div>
+                <div class="go-nogo-reason" style="display:flex; align-items:flex-start; gap:6px; padding:5px 8px; border-radius:5px; font-size:11px; line-height:1.3; color:#FCD34D;">
+                    <span style="width:6px; height:6px; border-radius:50%; background:#F59E0B; flex-shrink:0; margin-top:4px;"></span>
+                    <span>Plafond: 2500 ft</span>
+                </div>
+                <div class="go-nogo-reason" style="display:flex; align-items:flex-start; gap:6px; padding:5px 8px; border-radius:5px; font-size:11px; line-height:1.3; color:#FCD34D;">
+                    <span style="width:6px; height:6px; border-radius:50%; background:#F59E0B; flex-shrink:0; margin-top:4px;"></span>
+                    <span>Fin de journée proche (25 min avant la nuit)</span>
+                </div>
+            </div>
+            <button id="go-nogo-config" class="go-nogo-config-btn" title="Réglages des Minimums VFR" style="background:none; border:none; cursor:pointer; padding:3px; border-radius:6px; color:var(--text-muted); opacity:0.6; transition:opacity 0.2s; display:flex; align-items:center; margin-left:auto; margin-top:auto; align-self:flex-end;">
+                <i data-lucide="settings" style="width:15px; height:15px;"></i>
+            </button>
+        </div>
+    </aside>
+</div>
+<pre id="probe"></pre>
+<script>
+    const lines = [];
+    const se = document.scrollingElement;
+    lines.push(`page: scrollW=${se.scrollWidth} innerW=${window.innerWidth} ${se.scrollWidth > window.innerWidth ? 'DÉBORDEMENT PAGE' : 'ok'}`);
+    document.querySelectorAll('.go-nogo-reason').forEach((r, i) => {
+        const txt = r.lastElementChild;
+        lines.push(`raison ${i + 1} « ${txt.textContent.slice(0, 28)}… » : row scrollW=${r.scrollWidth} clientW=${r.clientWidth} ${r.scrollWidth > r.clientWidth ? 'DÉBORDE' : 'ok'} | txt scrollW=${txt.scrollWidth} clientW=${txt.clientWidth}`);
+    });
+    const aside = document.getElementById('go-nogo-banner');
+    lines.push(`aside: scrollW=${aside.scrollWidth} clientW=${aside.clientWidth} rect=${Math.round(aside.getBoundingClientRect().width)}px`);
+    document.getElementById('probe').textContent = lines.join('\n');
+    document.title = 'DONE';
+</script>
+</body>
+</html>
