@@ -2,13 +2,13 @@
  "isFr": true,
  "aircraftType": "DR400-140",
  "aircraftReg": "F-XXXX",
- "qnh": "1011",
+ "qnh": "1021",
  "windDir": 250,
  "windKt": 12,
  "runway": "36",
  "distanceNm": 137,
  "timeLabel": "1h11",
- "metarRaw": "METAR LFRV 291200Z AUTO 25013G24KT 220V290 9999 SCT025 BKN032 BKN038 21/16 Q1011",
+ "metarRaw": "METAR LFRV 011730Z AUTO 28007KT 250V310 CAVOK 20/11 Q1021",
  "rows": [
   {
    "from": "LFRV",
@@ -161,7 +161,7 @@
    "points": [
     {
      "frac": 0,
-     "elevFt": 423
+     "elevFt": 440
     },
     {
      "frac": 0.01230775415576643,
@@ -213,7 +213,7 @@
     },
     {
      "frac": 0.16000080402496356,
-     "elevFt": 240
+     "elevFt": 237
     },
     {
      "frac": 0.19111164439460437,
@@ -265,7 +265,7 @@
     },
     {
      "frac": 0.564441728830294,
-     "elevFt": 20
+     "elevFt": 25
     },
     {
      "frac": 0.5828530174164402,
@@ -317,7 +317,7 @@
     },
     {
      "frac": 0.8037884804501944,
-     "elevFt": 89
+     "elevFt": 96
     },
     {
      "frac": 0.8188816742617179,
@@ -373,7 +373,7 @@
     },
     {
      "frac": 1,
-     "elevFt": 449
+     "elevFt": 459
     }
    ],
    "waypoints": [

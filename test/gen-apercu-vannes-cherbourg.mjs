@@ -84,9 +84,27 @@ for (let i = 0; i < pts2.length; i += 90) {
 }
 const FT_PER_M = 3.28084;
 const profilePoints = pts2.map((p, i) => ({ frac: p.frac, lat: p.lat, lon: p.lon, elevFt: Math.round(elevs[i] * FT_PER_M) }));
+
+// Ancrage OFFICIEL des extrémités et des étapes (même règle que l'app :
+// fetchRouteElevation endElevFt / fetchMultiSegmentElevation wpElevFt) —
+// la courbe démarre/termine exactement au sol des terrains.
+const SIA_AF = require(path.join(root, 'data', 'sia-airfields.json')).items || [];
+const officialFt = (icao) => SIA_AF.find(a => a.code === icao)?.elevFt ?? apt(icao)?.elevation ?? null;
+profilePoints[0].elevFt = Math.round(officialFt(ROUTE[0]) ?? profilePoints[0].elevFt);
+profilePoints[profilePoints.length - 1].elevFt = Math.round(officialFt(ROUTE.at(-1)) ?? profilePoints[profilePoints.length - 1].elevFt);
+for (const icao of ROUTE.slice(1, -1)) {
+    const A = COORD[icao];
+    let best = null, bestD = Infinity;
+    for (const p of profilePoints) {
+        const d = gcNm(p, A);
+        if (d < bestD) { bestD = d; best = p; }
+    }
+    const off = officialFt(icao);
+    if (best && off != null) best.elevFt = Math.round(off);
+}
 const minFt = Math.min(...profilePoints.map(p => p.elevFt));
 const maxFt = Math.max(...profilePoints.map(p => p.elevFt));
-console.log(`Route ${ROUTE[0]}→${ROUTE.at(-1)} : ${Math.round(totalNm)} NM, relief ${minFt}-${maxFt} ft, ${profilePoints.length} points`);
+console.log(`Route ${ROUTE[0]}→${ROUTE.at(-1)} : ${Math.round(totalNm)} NM, relief ${minFt}-${maxFt} ft, ${profilePoints.length} points (extrémités ancrées SIA)`);
 
 // ---- Espaces aériens réels (base SIA + overrides de fréquences) ----
 const SIA = require(path.join(root, 'data', 'sia-airspaces.json'));

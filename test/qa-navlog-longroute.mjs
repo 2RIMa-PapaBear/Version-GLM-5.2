@@ -74,24 +74,26 @@ const t3 = texts(3).join(' | ');
 for (const s of ['PROFIL D\'ÉLÉVATION — LFRV - LFRC', '3500 ft', 'LFRV', 'LFRC', 'LFER', 'LFTQ', 'LFOV', 'LFRW', 'LFOM']) {
     t3.includes(s) ? ok(`p3 contient ${JSON.stringify(s)}`) : ko(`p3 manque ${JSON.stringify(s)}`);
 }
-// Zones : libellés verticaux secteur + fréquence présents (SIA réel).
+// Zones : étiquettes HORIZONTALES au-dessus du relief (design 01/09) —
+// plus AUCUN texte vertical ; la fréquence peut être sur sa propre ligne
+// (retour à la ligne entre les limites du secteur).
 const rot = byPage(3).filter(i => i.rot);
-console.log('libellés verticaux p3 :', rot.map(i => i.s).join(' | '));
-rot.length >= 4 ? ok(`p3 ≥ 4 libellés verticaux de zones (${rot.length})`) : ko(`p3 seulement ${rot.length} libellés verticaux`);
-for (const i of rot) {
-    if (/SIV/i.test(i.s) && !/1[23]\d\.\d{3}/.test(i.s)) ko(`libellé SIV sans fréquence : ${JSON.stringify(i.s)}`);
-}
+rot.length === 0 ? ok('p3 plus aucun libellé vertical')
+                 : ko(`p3 libellés verticaux résiduels : ${rot.map(i => JSON.stringify(i.s)).join(', ')}`);
+const sivTxt = byPage(3).filter(i => /(^|\s)SIV/i.test(i.s));
+const profFreqs = byPage(3).filter(i => /1[23]\d\.\d{3}/.test(i.s));
+sivTxt.length >= 4 ? ok(`p3 ≥ 4 libellés SIV horizontaux (${sivTxt.length})`) : ko(`p3 seulement ${sivTxt.length} libellés SIV`);
+profFreqs.length >= 4 ? ok(`p3 ≥ 4 fréquences de zones (${profFreqs.length})`) : ko(`p3 seulement ${profFreqs.length} fréquences`);
 // Plus AUCUNE référence FL / plafond / SFC sur le profil.
 const flRefs = byPage(3).filter(i => /(^|\s)(FL\d|> ?FL|SFC)/i.test(i.s));
 flRefs.length ? ko(`p3 résidus FL/plafond : ` + flRefs.map(i => JSON.stringify(i.s)).join(', '))
               : ok('p3 aucun résidu FL/plafond/SFC');
-// Les libellés verticaux restent dans le graphe (vertical : entre top/bot du graphe,
-// horizontal : bande ~[56..400]).
-for (const i of rot) {
-    if (i.x < 55 || i.x + i.w > 401) ko(`libellé vertical hors graphe en x : ${JSON.stringify(i.s)} x=${i.x.toFixed(1)}`);
-    if (i.top < 28 || i.bot > 594) ko(`libellé vertical hors page : ${JSON.stringify(i.s)}`);
+// Les libellés SIV restent dans le graphe en x, et sur la page.
+for (const i of sivTxt) {
+    if (i.x < 55 || i.x + i.w > 401) ko(`libellé SIV hors graphe en x : ${JSON.stringify(i.s)} x=${i.x.toFixed(1)}`);
+    if (i.top < 28 || i.bot > 594) ko(`libellé SIV hors page : ${JSON.stringify(i.s)}`);
 }
-ok('libellés verticaux dans le graphe');
+ok('libellés SIV dans le graphe');
 
 // ---- Page 2 : cellule Waypoints en noms réels + 7 tronçons ----
 const t2 = texts(2).join(' | ');

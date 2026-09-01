@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Aperçu profil d'élévation (site)</title>
+<style>
+  body { margin: 16px; background: #0f172a; font-family: 'DM Sans', sans-serif; }
+  #elevation-profile-container { width: 900px; }
+</style>
+</head>
+<body>
+<div id="elevation-profile-container" style="display:none;"></div>
+<script type="module">
+  import { renderElevationChart } from '../js/elevation-chart.js';
+
+  // Profil fixture : route LFRV → LFRC (relief doux Bretagne/Normandie),
+  // waypoints LFRP/LFRW/LFOM, zones SIV + TMA (mêmes groupes que le PDF).
+  const mk = (frac, elev) => ({ frac, elevFt: elev, lat: 47.5 - frac * 1.2, lon: -2.8 + frac * 2.6 });
+  const points = Array.from({ length: 27 }, (_, i) => mk(i / 26, 30 + 120 * Math.abs(Math.sin(i * 0.8)) + (i > 18 ? 200 : 0)));
+  points[0].elevFt = 440;            // LFRV (élévation officielle)
+  points[points.length - 1].elevFt = 459;   // LFRC
+  const profile = { points, maxFt: Math.max(...points.map(p => p.elevFt)), minFt: Math.min(...points.map(p => p.elevFt)), avgFt: 150 };
+
+  const zones = [
+    { name: 'SIV NANTES 1', freq: '122.800', lo: 0, up: 11500, ranges: [[0, 0.12]], segs: [{ fa: 0, fb: 0.12, up: 11500, zone: 'SIV NANTES 1' }], span: 0.12 },
+    { name: 'RENNES INFO', freq: '134.000', lo: 0, up: 19500, ranges: [[0.12, 0.55]], segs: [{ fa: 0.12, fb: 0.55, up: 19500, zone: 'SIV RENNES SUD A' }], span: 0.43 },
+    { name: 'RENNES INFO', freq: '126.950', lo: 0, up: 19500, ranges: [[0.55, 0.78]], segs: [{ fa: 0.55, fb: 0.78, up: 19500, zone: 'SIV RENNES NORD' }], span: 0.23 },
+    { name: 'RENNES INFO', freq: '134.200', lo: 0, up: 19500, ranges: [[0.78, 1]], segs: [{ fa: 0.78, fb: 1, up: 19500, zone: 'SIV RENNES COTENTIN A' }], span: 0.22 },
+    { name: 'TMA RENNES 4', freq: '126.950', lo: 1500, up: 19500, ranges: [[0.4, 0.55]], segs: [{ fa: 0.4, fb: 0.55, up: 19500, zone: 'TMA RENNES 4' }], span: 0.15 },
+  ];
+
+  const waypoints = [
+    { icao: 'LFRV', name: 'LFRV', lat: points[0].lat, lon: points[0].lon },
+    { icao: 'LFRP', name: 'Ploërmel', lat: points[6].lat, lon: points[6].lon },
+    { icao: 'LFRW', name: 'Avranches', lat: points[13].lat, lon: points[13].lon },
+    { icao: 'LFOM', name: 'Lessay', lat: points[20].lat, lon: points[20].lon },
+    { icao: 'LFRC', name: 'LFRC', lat: points[26].lat, lon: points[26].lon },
+  ];
+
+  renderElevationChart('elevation-profile-container', profile, 4500, 'LFRV', 'LFRC', waypoints, zones);
+  document.title = 'DONE';
+</script>
+</body>
+</html>
