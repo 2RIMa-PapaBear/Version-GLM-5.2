@@ -60,7 +60,8 @@ function _mapSurface(mainComposite) {
 
 function _mToFt(m) { return Math.round(m * FT_PER_M); }
 
-function _mapAirport(aip) {
+/** Mapping d'un item openAIP brut → forme interne. Exporté pour les tests. */
+export function _mapAirport(aip) {
     const [lon, lat] = aip.geometry?.coordinates || [null, null];
     const elevM = aip.elevation?.value;
     const elevFt = typeof elevM === 'number' ? _mToFt(elevM) : null;
