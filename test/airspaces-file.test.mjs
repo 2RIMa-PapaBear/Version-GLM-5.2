@@ -48,6 +48,12 @@ test('_decodeType : numérotation openAIP (cellules, sans _sia)', () => {
     assert.equal(_decodeType({ type: 4,  name: 'ZARAGOZA CTR' }),   'CTR');
     assert.equal(_decodeType({ type: 7,  name: 'TMA ZARAGOZA-1' }), 'TMA');
     assert.equal(_decodeType({ type: 33, name: 'SIV AJACCIO' }),    'SIV');
+    // ZRT françaises : openAIP les tape RESTRICTED (1) mais le NOM prime —
+    // requalifiées en kind propre → famille TMZ/RMZ/ZRT (demande 02/09) ;
+    // les zones R normales restent RESTRICTED.
+    assert.equal(_decodeType({ type: 1, name: 'ZRT VILLACOUBLAY' }), 'ZRT');
+    assert.equal(_decodeType({ type: 1, name: 'ZRT 1 LE CROISIC' }), 'ZRT');
+    assert.equal(_decodeType({ type: 1, name: 'LF-R278 VANNES' }),   'RESTRICTED');
 });
 
 test('_decodeType : numérotation SIA (items marqués _sia)', () => {
@@ -64,6 +70,7 @@ test('_decodeType : repli sur le nom quand le type manque', () => {
     assert.equal(_decodeType({ name: 'RMZ ANGOULEME' }),  'RMZ');
     assert.equal(_decodeType({ name: 'ATZ DEAUVILLE' }),  'ATZ');
     assert.equal(_decodeType({ name: 'TMZ PARIS' }),      'TMZ');
+    assert.equal(_decodeType({ name: 'ZRT PLOEMEUR BASE' }), 'ZRT');
 });
 
 // Dé-duplounage openAIP vs base SIA : les zones réglementées françaises
