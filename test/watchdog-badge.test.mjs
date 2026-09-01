@@ -24,6 +24,7 @@ function makeEl() {
     return {
         className: '', style: {}, textContent: '', title: '', dataset: {},
         appendChild() {}, insertBefore() {}, remove() {}, addEventListener() {},
+        setAttribute() {}, getAttribute: () => null,
         querySelector: () => null,
     };
 }
@@ -67,32 +68,33 @@ const { checkNow, applyFavoriteBadges } = await import('../js/watchdog.js');
 _ls.set('favorites', JSON.stringify(['LFRV', 'LFRC', 'LFOM']));
 _ls.set('watchdog-settings', JSON.stringify({ enabled: true, intervalMin: 15, notify: false }));
 
-describe('watchdog — olive météo des favoris (emplacement réservé)', () => {
+describe('watchdog — voyant météo des favoris (emplacement réservé)', () => {
 
-    test('checkNow peint UNE olive par favori, devant le code (pas en fin de ligne)', async () => {
+    test('checkNow peint UN voyant par favori, devant le code (pas en fin de ligne)', async () => {
         await checkNow();
-        assert.equal(badges.get('LFRV').textContent, 'GO');
-        assert.equal(badges.get('LFRC').textContent, 'NO-GO');
-        assert.equal(badges.get('LFOM').textContent, 'CAUT');
+        assert.equal(badges.get('LFRV').textContent, '');
+        assert.equal(badges.get('LFRC').textContent, '');
+        assert.equal(badges.get('LFOM').textContent, '');
     });
 
-    test('couleurs d\'état : vert / rouge / orange (fond translucide assorti)', async () => {
-        assert.ok(badges.get('LFRV').style.color.startsWith('#10B981'), 'GO en vert');
-        assert.ok(badges.get('LFRC').style.color.startsWith('#EF4444'), 'NO-GO en rouge');
-        assert.ok(badges.get('LFOM').style.color.startsWith('#F59E0B'), 'CAUTION en orange');
-        assert.equal(badges.get('LFRV').style.background, '#10B98133');
+    test('couleurs d\'état : voyant PLEIN vert / rouge / orange, SANS texte', () => {
+        assert.equal(badges.get('LFRV').style.background, '#10B981', 'GO en vert');
+        assert.equal(badges.get('LFRC').style.background, '#EF4444', 'NO-GO en rouge');
+        assert.equal(badges.get('LFOM').style.background, '#F59E0B', 'CAUTION en orange');
+        assert.equal(badges.get('LFRV').style.borderColor, '#10B981');
     });
 
-    test('infobulle explicite sur l\'olive', () => {
+    test('infobulle explicite sur le voyant', () => {
         assert.ok(badges.get('LFRV').title.length > 3);
         assert.ok(badges.get('LFRC').title.includes('NO-GO'));
     });
 
-    test('applyFavoriteBadges repeint les olives après un re-rendu de la liste', () => {
-        for (const b of badges.values()) { b.textContent = ''; b.style.color = ''; }
+    test('applyFavoriteBadges repeint les voyants après un re-rendu de la liste', () => {
+        for (const b of badges.values()) { b.style.background = ''; }
         applyFavoriteBadges();
-        assert.equal(badges.get('LFRV').textContent, 'GO');
-        assert.equal(badges.get('LFRC').textContent, 'NO-GO');
-        assert.equal(badges.get('LFOM').textContent, 'CAUT');
+        assert.equal(badges.get('LFRV').style.background, '#10B981');
+        assert.equal(badges.get('LFRC').style.background, '#EF4444');
+        assert.equal(badges.get('LFOM').style.background, '#F59E0B');
+        assert.equal(badges.get('LFRV').textContent, '');
     });
 });
