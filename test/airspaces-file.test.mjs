@@ -2,7 +2,7 @@
 // expansion du format compact en forme openAIP.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { _expandFileItem, _decodeType, _rdpKey, _dropOpenAipDuplicates } from '../js/airspaces.js';
+import { _expandFileItem, _decodeType, _rdpKey, _dropOpenAipDuplicates, _isZrt } from '../js/airspaces.js';
 
 test('_expandFileItem : polygone compact → forme openAIP complète', () => {
     const c = {
@@ -48,12 +48,6 @@ test('_decodeType : numérotation openAIP (cellules, sans _sia)', () => {
     assert.equal(_decodeType({ type: 4,  name: 'ZARAGOZA CTR' }),   'CTR');
     assert.equal(_decodeType({ type: 7,  name: 'TMA ZARAGOZA-1' }), 'TMA');
     assert.equal(_decodeType({ type: 33, name: 'SIV AJACCIO' }),    'SIV');
-    // ZRT françaises : openAIP les tape RESTRICTED (1) mais le NOM prime —
-    // requalifiées en kind propre → famille TMZ/RMZ/ZRT (demande 02/09) ;
-    // les zones R normales restent RESTRICTED.
-    assert.equal(_decodeType({ type: 1, name: 'ZRT VILLACOUBLAY' }), 'ZRT');
-    assert.equal(_decodeType({ type: 1, name: 'ZRT 1 LE CROISIC' }), 'ZRT');
-    assert.equal(_decodeType({ type: 1, name: 'LF-R278 VANNES' }),   'RESTRICTED');
 });
 
 test('_decodeType : numérotation SIA (items marqués _sia)', () => {
@@ -70,7 +64,20 @@ test('_decodeType : repli sur le nom quand le type manque', () => {
     assert.equal(_decodeType({ name: 'RMZ ANGOULEME' }),  'RMZ');
     assert.equal(_decodeType({ name: 'ATZ DEAUVILLE' }),  'ATZ');
     assert.equal(_decodeType({ name: 'TMZ PARIS' }),      'TMZ');
-    assert.equal(_decodeType({ name: 'ZRT PLOEMEUR BASE' }), 'ZRT');
+});
+
+// ZRT — zones réglementées TEMPORAIRES : JAMAIS affichées (décision pilote
+// 02/09 — activation NOTAM, absentes de l'AIP permanente, openAIP seul) ;
+// filtrées à la source dans _loadCellsGrid / fetchAirspacesForBbox.
+test('_isZrt : les ZRT sont filtrées, les zones permanentes restent', () => {
+    assert.equal(_isZrt('ZRT VILLACOUBLAY'), true);
+    assert.equal(_isZrt('zrt 1 le croisic'), true);
+    assert.equal(_isZrt('  ZRT PLOEMEUR BASE'), true);
+    assert.equal(_isZrt('LF-R278 VANNES'), false);
+    assert.equal(_isZrt('R 278'), false);
+    assert.equal(_isZrt('TMZ SEINE 9'), false);
+    assert.equal(_isZrt(''), false);
+    assert.equal(_isZrt(undefined), false);
 });
 
 // Dé-duplounage openAIP vs base SIA : les zones réglementées françaises
