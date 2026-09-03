@@ -1,4 +1,6 @@
-// Tests du mapping openAIP → interne : étiquette A/A au lieu de UNK.
+// Tests du mapping openAIP → interne : JAMAIS d'étiquette « UNK » à
+// l'affichage — le nom désigne le vrai rôle (A/A, TWR…) sinon pas
+// d'étiquette (la valeur de fréquence reste fiable, le rôle community non).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { _mapAirport } from '../js/openaip.js';
@@ -12,21 +14,37 @@ const apt = (frequencies) => _mapAirport({
     runways: [],
 });
 
-test('fréquence openAIP type UNK nommée A/A → étiquette A/A', () => {
+test('fréquence openAIP type UNK : rôle déduit du nom, sinon PAS d\u2019étiquette', () => {
     const fs = apt([
         { type: 16, value: '118.255', name: 'A/A' },
         { type: 16, value: '123.5', name: 'AIR-AIR Ploermel' },
-        { type: 16, value: '121.0', name: 'Autre service' },   // UNK sans nom A/A → reste UNK
+        { type: 16, value: '121.0', name: 'Autre service' },   // sans rôle décelable
+        { type: 16, value: '119.9', name: 'TWR Ploermel' },
+        { type: 16, value: '120.5', name: 'AFIS' },
+        { type: 16, value: '121.5', name: 'Approche' },
         { type: 10, value: '118.4', name: 'TWR' },
     ]).frequencies;
     const at = (v) => fs.find(x => x.freq === v);   // le tri (primary, fréq) réordonne
     assert.equal(at(118.255).type, 'A/A', '« A/A » reconnu');
     assert.equal(at(123.5).type, 'A/A', '« AIR-AIR » reconnu');
-    assert.equal(at(121.0).type, 'UNK', 'UNK sans indice de nom reste UNK');
+    assert.equal(at(121.0).type, '', 'sans rôle décelable → PAS d\u2019étiquette (jamais UNK)');
+    assert.equal(at(119.9).type, 'TWR', '« TWR » dans le nom → TWR');
+    assert.equal(at(120.5).type, 'AFIS', '« AFIS » dans le nom → AFIS');
+    assert.equal(at(121.5).type, 'APP', '« Approche » dans le nom → APP');
     assert.equal(at(118.4).type, 'TWR', 'type réel inchangé');
 });
 
 test('fréquence openAIP sans type connu → COM (inchangé)', () => {
     const f = apt([{ type: 99, value: '130.0', name: 'X' }]).frequencies;
     assert.equal(f[0].type, 'COM');
+});
+
+test('aucune fréquence ne sort jamais étiquetée UNK', () => {
+    const fs = apt([
+        { type: 16, value: '118.255', name: 'A/A' },
+        { type: 16, value: '121.0', name: 'Radio locale' },
+        { type: 16, value: '122.0', name: '' },
+        { type: 5, value: '118.4', name: 'AFIS' },
+    ]).frequencies;
+    assert.ok(fs.every(x => x.type !== 'UNK'), 'zéro UNK dans la sortie');
 });
