@@ -3,7 +3,7 @@
 // d'étiquette (la valeur de fréquence reste fiable, le rôle community non).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { _mapAirport } from '../js/openaip.js';
+import { _mapAirport, _relabelUnk } from '../js/openaip.js';
 
 const apt = (frequencies) => _mapAirport({
     name: 'PLOERMEL (LFRP)',
@@ -47,4 +47,15 @@ test('aucune fréquence ne sort jamais étiquetée UNK', () => {
         { type: 5, value: '118.4', name: 'AFIS' },
     ]).frequencies;
     assert.ok(fs.every(x => x.type !== 'UNK'), 'zéro UNK dans la sortie');
+});
+
+test('_relabelUnk : helper du cache IDB (rôles déduits du nom)', () => {
+    assert.equal(_relabelUnk('A/A'), 'A/A');
+    assert.equal(_relabelUnk('AIR-AIR Ploermel'), 'A/A');
+    assert.equal(_relabelUnk('Tour de contrôle'), 'TWR');
+    assert.equal(_relabelUnk('TOWER'), 'TWR');
+    assert.equal(_relabelUnk('AFIS'), 'AFIS');
+    assert.equal(_relabelUnk('Approche'), 'APP');
+    assert.equal(_relabelUnk('Radio locale'), '');
+    assert.equal(_relabelUnk(''), '');
 });
