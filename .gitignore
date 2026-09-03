@@ -39,7 +39,13 @@ package-lock.json
 
 # eAIP téléchargé (local, jamais committé)
 eaip_06_aug_2026/
+eaip_*/
 *.zip
+
+# Sources SIA volumineuses locales (ré-téléchargeables depuis le SIA)
+telechargement AIRAC/donnees_tod_france_sia_1/
+telechargement AIRAC/*.pdf
 
 # Captures QA locales (rendu navigateur — régénérables)
 test/render/
+test/*.png
