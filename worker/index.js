@@ -11,10 +11,10 @@
  *   pour consommer le quota gratuit du compte (100 k req/jour).
  * - Cache périphérique : 180 s par défaut, paramètre ttl honoré
  *   (30 s mini, 24 h maxi) — mêmes règles que l'ancien relais.
- * - Échec de la cible (réseau ou HTTP) : on répond 502 avec un
- *   corps commençant par '<' — l'app y reconnaît une « page HTML
- *   inattendue » et déclenche son retry habituel avec le message
- *   « AviationWeather momentanément indisponible (réessayez) ».
+ * - Échec de la cible (réseau ou HTTP) : HTTP 200 + corps 'PROXY_ERROR: …',
+ *   le contrat exact de l'ancien relais Apps Script — l'app échoue proprement
+ *   sans retry ni erreur console (l'endpoint /api/data/atis, supprimé côté
+ *   AviationWeather en 2025, répond 404 à chaque chargement de terrain).
  * - HEAD sans paramètre : 200 immédiat (sondage du watchdog).
  * ================================================================ */
 
@@ -61,6 +61,11 @@ export default {
         }
 
         // 2) Miss : aller chercher la donnée à la source.
+        //    Contrat de l'ancien relais Apps Script, reproduit à l'identique :
+        //    tout échec amont est renvoyé en HTTP 200 avec le préfixe
+        //    'PROXY_ERROR:' — l'app le détecte et échoue proprement SANS retry
+        //    ni erreur console (cas quotidien : /api/data/atis répond 404 pour
+        //    tout terrain depuis la refonte 2025 de l'API AviationWeather).
         let amont;
         try {
             amont = await fetch(cible.toString(), {
@@ -68,9 +73,12 @@ export default {
                 redirect: 'follow',
             });
         } catch (e) {
-            return reponse(502, `<ERREUR cible injoignable : ${e.message}/>`);
+            return reponse(200, `PROXY_ERROR: ${e.message}`);
         }
-        if (!amont.ok) return reponse(502, `<ERREUR cible HTTP ${amont.status}/>`);
+        if (amont.status !== 200 && amont.status !== 204) {
+            const extrait = (await amont.text()).substring(0, 200);
+            return reponse(200, `PROXY_ERROR: HTTP ${amont.status} — ${extrait}`);
+        }
 
         const corps = await amont.text();
         const type = amont.headers.get('Content-Type') || 'text/plain';
