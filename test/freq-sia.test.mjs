@@ -2,7 +2,7 @@
 // parseur eAIP (scripts/fetch-freq-sia.mjs, fonction pure exportée).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getAirportFreqs, getServiceFreq, getSiaAirac, _setSources } from '../js/freq-sia.js';
+import { getAirportFreqs, getServiceFreq, getSiaAirac, _setSources, loadFreqSources } from '../js/freq-sia.js';
 import { parseAdFrequencies } from '../scripts/fetch-freq-sia.mjs';
 
 const SIA = {
@@ -101,4 +101,49 @@ test('getAirportFreqs : fusion eAIP ⊕ XML AFIS/A-A, déduplication par fréque
     assert.deepEqual(r.freqs.map(f => f.freq), [120, 123.455]);
     assert.equal(r.freqs[0].primary, true, 'AFIS primaire');
     assert.equal(r.freqs[1].primary, false, 'A/A non primaire');
+});
+
+
+// ---- Régression 04/09/2026 : cache IDB par clé -------------------------------
+// Bug : _fetchJsonCached passait le NOM du store aux helpers uniparamétrés
+// _idbGet/_idbPut → les deux fichiers sécrasaient sous la seule clé « freq »
+// (valeur = la chaîne 'sia') → au 2e chargement, _sia valait 'sia-aa' : plus
+// d'airac au pied de page ni de fréquences SIA (repli openAIP silencieux).
+// Faux IndexedDB en mémoire, assez fidèle pour _idbOpen/_idbGet/_idbPut.
+function _fakeIdb() {
+    const mem = new Map();
+    const fire = (r) => queueMicrotask(() => r.onsuccess && r.onsuccess());
+    const db = {
+        close() {},
+        objectStoreNames: { contains: () => true },
+        transaction() {
+            const tx = { objectStore: () => ({
+                get(k) { const r = { result: mem.has(k) ? mem.get(k) : undefined }; fire(r); return r; },
+                put(v, k) { queueMicrotask(() => { mem.set(k, v); tx.oncomplete && tx.oncomplete(); }); },
+            }) };
+            return tx;
+        },
+    };
+    globalThis.indexedDB = { open() { const r = { result: db }; fire(r); return r; } };
+    return mem;
+}
+
+test('cache IDB : chaque fichier sous SA clé (régression bug clé unique)', async () => {
+    const mem = _fakeIdb();
+    const sauveFetch = globalThis.fetch;
+    globalThis.fetch = async (url) => {
+        if (String(url).includes('freq-aa-sia.json')) return { ok: true, json: async () => ({ airac: '2099-01-01', airports: {} }) };
+        if (String(url).includes('freq-sia.json')) return { ok: true, json: async () => ({ airac: '2026-08-06', airports: { LFRV: [{ type: 'AFIS', name: 'VANNES Information', value: '122.605' }] } }) };
+        return { ok: true, json: async () => ({}) };
+    };
+    try {
+        await loadFreqSources();
+        assert.deepEqual([...mem.keys()].sort(), ['sia', 'sia-aa'], 'deux clés distinctes (avant le fix : une seule clé « freq »)');
+        assert.equal(mem.get('sia').data.airac, '2026-08-06');
+        assert.equal(mem.get('sia-aa').data.airac, '2099-01-01');
+        assert.equal(getSiaAirac(), '2026-08-06', 'airac lu depuis le fichier eAIP');
+    } finally {
+        globalThis.fetch = sauveFetch;
+        delete globalThis.indexedDB;
+    }
 });
