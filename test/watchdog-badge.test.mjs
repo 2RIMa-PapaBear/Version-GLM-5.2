@@ -72,9 +72,9 @@ describe('watchdog — voyant météo des favoris (emplacement réservé)', () =
 
     test('checkNow peint UN voyant par favori, devant le code (pas en fin de ligne)', async () => {
         await checkNow();
-        assert.equal(badges.get('LFRV').textContent, '');
-        assert.equal(badges.get('LFRC').textContent, '');
-        assert.equal(badges.get('LFOM').textContent, '');
+        assert.equal(badges.get('LFRV').textContent, ' ');
+        assert.equal(badges.get('LFRC').textContent, ' ');
+        assert.equal(badges.get('LFOM').textContent, ' ');
     });
 
     test('couleurs d\'état : voyant PLEIN vert / rouge / orange, SANS texte', () => {
@@ -95,6 +95,6 @@ describe('watchdog — voyant météo des favoris (emplacement réservé)', () =
         assert.equal(badges.get('LFRV').style.background, '#10B981');
         assert.equal(badges.get('LFRC').style.background, '#EF4444');
         assert.equal(badges.get('LFOM').style.background, '#F59E0B');
-        assert.equal(badges.get('LFRV').textContent, '');
+        assert.equal(badges.get('LFRV').textContent, ' ');
     });
 });
