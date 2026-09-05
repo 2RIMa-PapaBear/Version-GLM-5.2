@@ -261,8 +261,19 @@ console.log(`radio-points.json : ${rp.navaids.length} navaids (dont ${navaids.le
 
 // ---------------------------------------------------------------------------
 // 4. TERRAINS officiels France (+ élévation et déclinaison magnétique
-//    officielles — AdRefAltFt / AdMagVar millésimé MagVarDate).
+//    officielles — AdRefAltFt / AdMagVar millésimé MagVarDate — et les
+//    rubriques AD « infos terrain » : horaires du service ATS/AFIS
+//    HorAtsTxt, avitaillement HorAvtTxt, téléphone exploitant AdTel).
 // ---------------------------------------------------------------------------
+// Texte bilingue SIA : « français\\anglais » (# = saut de ligne) → on ne
+// garde que la partie française, en lignes ; « NEANT »/vide → null.
+const adFrLines = (t) => {
+    if (!t) return null;
+    const fr = t.split('\\\\')[0];
+    const lines = fr.split('#').map(s => s.trim()).filter(Boolean);
+    if (!lines.length || (lines.length === 1 && /^NEANT$/i.test(lines[0]))) return null;
+    return lines;
+};
 const airfields = [];
 const adLkToIcao = new Map();   // lk « [LF][BT] » → LFBT (pour les pistes)
 each('Ad', (attrs, body) => {
@@ -280,6 +291,10 @@ each('Ad', (attrs, body) => {
         prive: txt(body, 'TfcPrive') === 'oui',
         elevFt: Number.isFinite(elev) ? elev : null,
         magVar: Number.isFinite(magVar) ? magVar : null, magVarYear: txt(body, 'MagVarDate') || null,
+        horAtsCode: txt(body, 'HorAtsCode') || null,
+        horAts: adFrLines(txt(body, 'HorAtsTxt')),
+        horAvt: adFrLines(txt(body, 'HorAvtTxt')),
+        tel: txt(body, 'AdTel') || null,
     });
 });
 fs.writeFileSync(path.join(ROOT, 'data', 'sia-airfields.json'), JSON.stringify({
