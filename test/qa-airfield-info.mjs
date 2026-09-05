@@ -48,17 +48,31 @@ async function checkTerrain(icao, present, absent) {
     (fit.scrollW <= fit.clientW + 1 ? ok : ko)(`${icao} widget sans débordement (${fit.scrollW} ≤ ${fit.clientW})`);
 }
 
-// LFRV — France complète : identité SIA, pistes officielles, horaires AFIS,
-// tél exploitant, avitaillement, fréquences intactes.
+// LFRV — France complète : FRÉQUENCES puis PISTES puis HORAIRES puis le
+// reste, lien eAIP en DERNIÈRE ligne (ordre demandé par le pilote 05/09).
 await checkTerrain('LFRV', [
     '440 ft', 'VFR · IFR', 'CAP',
-    '04/22 ★', '039° vrai', '1530 × 45 m', 'revêtue',
+    '04/22 ★', '039° vrai', '1530 × 45 m', 'revêtue', 'seuils 429/437 ft',
     '08/26', '995 × 60 m', 'non revêtue',
     'Horaires du service', 'HX', 'AFIS', '02 97 60 78 79',
     'Avitaillement', 'Automate',
     '122.605',
     'infos terrain : SIA (AIRAC 2026-09-03)',
 ], []);
+{
+    // Ordre des sections : fréquences < pistes < horaires < terrain <
+    // avitaillement < lien eAIP (dernière ligne).
+    await page.goto('http://127.0.0.1:8663/index.html?icao=LFRV', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForFunction(() => document.getElementById('frequencies-widget')?.style.display === 'block', { timeout: 30000 });
+    await new Promise(r => setTimeout(r, 1200));
+    const order = await page.evaluate(() => {
+        const t = document.getElementById('frequencies-widget').innerText.toUpperCase();
+        const idx = (s) => t.indexOf(s.toUpperCase());
+        return { freq: idx('122.605'), piste: idx('PISTES'), hor: idx('HORAIRES DU SERVICE'), terrain: idx('VFR · IFR'), avt: idx('AVITAILLEMENT'), vac: idx('EAIP OFFICIEL') };
+    });
+    const seq = [order.freq, order.piste, order.hor, order.terrain, order.avt, order.vac];
+    (seq.every((v, i) => v >= 0 && (i === 0 || v > seq[i - 1])) ? ok : ko)(`ordre sections ${JSON.stringify(order)}`);
+}
 
 // LFOM — France sans rubriques AD horaires : sections absentes, fiche reste.
 await checkTerrain('LFOM', [], ['Horaires du service', 'Avitaillement']);
