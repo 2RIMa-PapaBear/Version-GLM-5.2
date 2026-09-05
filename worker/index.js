@@ -30,7 +30,7 @@ const HOSTS_AUTORISES = new Set([
 // Cartes PDF de l'eAIP SIA :
 //   /media/dvd/eAIP_06_AUG_2026/FRANCE/AIRAC-2026-08-06/html/eAIP/
 //   Cartes/LFRS/AD_2_LFRS_ADC_01.pdf   (ADC = carte d'aérodrome, MIA = insertion)
-const SIA_CARTE_PDF = /^\/media\/dvd\/eAIP_[A-Z0-9_]+\/FRANCE\/AIRAC-\d{4}-\d{2}-\d{2}\/html\/eAIP\/Cartes\/[A-Z0-9]{4}\/AD_2_[A-Z0-9]{4}_[A-Z]+_\d{2}\.pdf$/;
+const SIA_CARTE_PDF = /^\/media\/dvd\/eAIP_[A-Z0-9_]+\/FRANCE\/AIRAC-\d{4}-\d{2}-\d{2}\/html\/eAIP\/Cartes\/[A-Z0-9]{4}\/AD_2_[A-Z0-9]{4}_[A-Z0-9_]+\.pdf$/;
 
 const CORS = {
     'Access-Control-Allow-Origin': '*',
