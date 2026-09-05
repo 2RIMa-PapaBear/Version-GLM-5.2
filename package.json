@@ -5,7 +5,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test test/core.test.mjs test/flight-planner.test.mjs test/relais-cache.test.mjs test/fleet.test.mjs test/route-alternates.test.mjs test/bump-version.test.mjs test/route-labels.test.mjs test/takeoff-profile.test.mjs test/wb-core.test.mjs test/flight-plan-io.test.mjs test/watchdog-badge.test.mjs test/radio-points.test.mjs test/sia-data.test.mjs test/airspace-profile.test.mjs test/airspaces-file.test.mjs test/freq-sia.test.mjs test/openaip-map.test.mjs test/waypoints-field.test.mjs test/favorites-reorder.test.mjs test/check-obstacles-airac.test.mjs test/check-sia-airac.test.mjs",
+    "test": "node --test test/core.test.mjs test/flight-planner.test.mjs test/relais-cache.test.mjs test/fleet.test.mjs test/route-alternates.test.mjs test/bump-version.test.mjs test/route-labels.test.mjs test/takeoff-profile.test.mjs test/wb-core.test.mjs test/flight-plan-io.test.mjs test/watchdog-badge.test.mjs test/radio-points.test.mjs test/sia-data.test.mjs test/airspace-profile.test.mjs test/airspaces-file.test.mjs test/freq-sia.test.mjs test/openaip-map.test.mjs test/waypoints-field.test.mjs test/favorites-reorder.test.mjs test/check-obstacles-airac.test.mjs test/check-sia-airac.test.mjs test/vac-viewer.test.mjs",
     "deploy": "node scripts/deploy-ftp.mjs",
     "deploy:dry": "node scripts/deploy-ftp.mjs --dry-run",
     "pub": "node scripts/pub.mjs"

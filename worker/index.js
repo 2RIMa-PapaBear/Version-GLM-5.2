@@ -6,8 +6,12 @@
  *   ?url=<https cible encodée>&ttl=<secondes optionnel>
  *
  * - Cibles autorisées : aviationweather.gov (METAR/TAF/SIGMET/
- *   stations/PIREP) et nominatim.openstreetmap.org (recherche
- *   terrain). RIEN d'autre : personne ne peut détourner ce relais
+ *   stations/PIREP), nominatim.openstreetmap.org (recherche
+ *   terrain) et sia.aviation-civile.gouv.fr — pour ce dernier,
+ *   UNIQUEMENT les PDF de cartes d'aérodrome de l'eAIP (VAC/ADC),
+ *   servis en BINAIRE avec cache périphérique de 7 jours (l'URL
+ *   contient le cycle AIRAC : elle change à chaque cycle, jamais
+ *   périmée). RIEN d'autre : personne ne peut détourner ce relais
  *   pour consommer le quota gratuit du compte (100 k req/jour).
  * - Cache périphérique : 180 s par défaut, paramètre ttl honoré
  *   (30 s mini, 24 h maxi) — mêmes règles que l'ancien relais.
@@ -23,11 +27,18 @@ const HOSTS_AUTORISES = new Set([
     'nominatim.openstreetmap.org',
 ]);
 
+// Cartes PDF de l'eAIP SIA :
+//   /media/dvd/eAIP_06_AUG_2026/FRANCE/AIRAC-2026-08-06/html/eAIP/
+//   Cartes/LFRS/AD_2_LFRS_ADC_01.pdf   (ADC = carte d'aérodrome, MIA = insertion)
+const SIA_CARTE_PDF = /^\/media\/dvd\/eAIP_[A-Z0-9_]+\/FRANCE\/AIRAC-\d{4}-\d{2}-\d{2}\/html\/eAIP\/Cartes\/[A-Z0-9]{4}\/AD_2_[A-Z0-9]{4}_[A-Z]+_\d{2}\.pdf$/;
+
 const CORS = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
     'Access-Control-Allow-Headers': '*',
 };
+
+const TTL_PDF_SEC = 7 * 86400;   // cartes AIRAC : URL par cycle, jamais périmée
 
 export default {
     async fetch(request, env, ctx) {
@@ -42,13 +53,16 @@ export default {
         let cible;
         try { cible = new URL(cibleBrute); } catch { return reponse(400, '<ERREUR url invalide/>'); }
 
+        const estSiaCarte = cible.hostname === 'www.sia.aviation-civile.gouv.fr' && SIA_CARTE_PDF.test(cible.pathname);
         const hoteAutorise = HOSTS_AUTORISES.has(cible.hostname)
-            || cible.hostname.endsWith('.aviationweather.gov');
+            || cible.hostname.endsWith('.aviationweather.gov')
+            || estSiaCarte;
         if (cible.protocol !== 'https:' || !hoteAutorise) {
             return reponse(403, '<ERREUR hôte non autorisé/>');
         }
 
-        const ttl = Math.min(86400, Math.max(30, parseInt(params.get('ttl') || '180', 10) || 180));
+        const ttl = estSiaCarte ? TTL_PDF_SEC
+            : Math.min(86400, Math.max(30, parseInt(params.get('ttl') || '180', 10) || 180));
 
         // 1) Cache périphérique d'abord — c'est lui qui rend les hits ~instantanés.
         const cache = caches.default;
@@ -80,8 +94,20 @@ export default {
             return reponse(200, `PROXY_ERROR: HTTP ${amont.status} — ${extrait}`);
         }
 
+        // PDF (binaire) : réponse binaire CORS + cache périphérique long.
+        const typeAmont = amont.headers.get('Content-Type') || 'text/plain';
+        if (typeAmont.includes('application/pdf')) {
+            const buf = await amont.arrayBuffer();
+            const sortie = reponse(200, buf, 'application/pdf');
+            sortie.headers.set('X-Cache', 'MISS');
+            ctx.waitUntil(cache.put(cle, new Response(buf, {
+                headers: { 'Content-Type': 'application/pdf', 'Cache-Control': `public, max-age=${TTL_PDF_SEC}` },
+            })));
+            return sortie;
+        }
+
         const corps = await amont.text();
-        const type = amont.headers.get('Content-Type') || 'text/plain';
+        const type = typeAmont;
         const sortie = reponse(200, corps, type);
         sortie.headers.set('X-Cache', 'MISS');
 
