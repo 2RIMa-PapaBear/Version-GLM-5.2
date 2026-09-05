@@ -103,6 +103,27 @@ test('getAirportFreqs : fusion eAIP ⊕ XML AFIS/A-A, déduplication par fréque
     assert.equal(r.freqs[1].primary, false, 'A/A non primaire');
 });
 
+// ---- Régression 05/09/2026 : GONIO écartées + code horaires transporté -------
+// Retour pilote : les fréquences VDF « Gonio » dupliquent les organes
+// existants (Tour/FIS… rien de propre) et alourdissent la liste — filtrées
+// sur les 3 sources ; le code d'horaires (HO/H24…) alimente le badge.
+test('getAirportFreqs : GONIO/VDF filtrées, horaires transportés (LFRS-like)', () => {
+    _setSources(
+        { airac: 'X', airports: { LFRS: [
+            { type: 'TWR', name: 'NANTES Tour', value: '118.655', hor: 'HO' },
+            { type: 'VDF', name: 'NANTES Gonio', value: '118.655', hor: 'HO' },
+            { type: 'VDF', name: 'NANTES Gonio', value: '121.500', hor: 'HO' },
+            { type: 'APP', name: 'NANTES Approche', value: '119.400', hor: 'HO' },
+        ] } },
+        { airports: {}, services: {} },
+        { airac: 'X', airports: { LFRS: [{ type: 'A/A', name: 'GONIO TEST', value: '130.100' }] } },
+    );
+    const r = getAirportFreqs('LFRS', [{ freq: 122.0, name: 'VDF INFO', type: 'VDF', primary: false }]);
+    assert.ok(!r.freqs.some(f => /gonio/i.test(f.name) || /^(VDF|GONIO)$/i.test(f.type)), 'aucune GONIO (eAIP, XML ni openAIP)');
+    assert.equal(r.freqs.length, 2, 'Tour + Approche conservées');
+    assert.equal(r.freqs[0].hor, 'HO', 'code horaires transporté');
+});
+
 
 // ---- Régression 04/09/2026 : cache IDB par clé -------------------------------
 // Bug : _fetchJsonCached passait le NOM du store aux helpers uniparamétrés
