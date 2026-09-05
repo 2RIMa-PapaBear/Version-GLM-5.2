@@ -99,9 +99,10 @@ async function findCurrentAirac() {
         await sleep(30000);
     }
 
-    // Rien de neuf : SORTIE IMMÉDIATE, aucun téléchargement.
-    if (extracted) {
-        console.log(`À jour : AIRAC ${known} déjà extrait — rien à faire.`);
+    // Rien de neuf : SORTIE IMMÉDIATE, aucun téléchargement — sauf --force
+    // (ré-extraction du même cycle : extracteur amélioré, champ ajouté…).
+    if (extracted && !process.argv.includes('--force')) {
+        console.log(`À jour : AIRAC ${known} déjà extrait — rien à faire (--force pour ré-extraire).`);
         process.exit(0);
     }
 
@@ -178,6 +179,8 @@ async function getOpenAipKey() {
 const strip = (html) => html
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
     .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ')
     .trim();
@@ -201,7 +204,19 @@ export function parseAdFrequencies(html) {
             .replace(/\s*\(EN\).*$/i, '').trim();
         if (/^(A\/A|DEL|GND|TWR|AFIS|APP|ATIS|ATM|FIS|TCA|SMR|SFA)$/i.test(type) || name) {
             const hor = (cells.find(c => /^(H24|HO|HX|HC|HJ|UZ|\d{2,4}-\d{2,4})/.test(c)) || '').slice(0, 12);
-            out.push({ type: type.toUpperCase().slice(0, 12), name: name.slice(0, 60), value, hor });
+            // Colonne OBSERVATIONS (5ᵉ) : secteurs, fréquences suppléantes,
+            // conditions d'emploi — c'est ELLE qui différencie les fréquences
+            // multiples d'un même organisme (ex. NANTES Approche : « Secteurs
+            // NA 1 à 4 », « Fréquence supplétive < FL 115 »…). Publiée
+            // bilingue FR/EN d'un seul tenant par le SIA : conservée telle
+            // quelle (la partie française est toujours en tête de segment).
+            const rem = cells
+                .filter(c => c !== freqCell && c !== type && c !== nameCell && c !== hor && !/^\d{2,3}\.\d{2,3}\s*MHz$/i.test(c))
+                .join(' ')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .slice(0, 160) || null;
+            out.push({ type: type.toUpperCase().slice(0, 12), name: name.slice(0, 60), value, hor, rem });
         }
     }
     // Déduplique (type+name+value) en conservant l'ordre.

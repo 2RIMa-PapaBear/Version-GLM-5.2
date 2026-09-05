@@ -122,11 +122,17 @@ await checkTerrain('EGHH', [
             gonio: txt.includes('GONIO') || txt.includes('VDF'),
             nApproche: (w.innerText.match(/NANTES Approche/g) || []).length,
             badgesHO: [...w.querySelectorAll('span')].filter(s => s.textContent.trim() === 'HO' && /border/.test(s.getAttribute('style') || '')).length,
+            // Observations eAIP différenciant les 6 approches (05/09)
+            remNa: txt.includes('NA 1'), remNb: txt.includes('NB 1'), remRs: txt.includes('RS 1'),
+            remSup: txt.includes('SUPPLÉTIVE'), remLu: txt.includes('SECTEUR LU') || txt.includes('/SECTOR LU'),
         };
     });
     (!res.gonio ? ok : ko)('LFRS sans aucune GONIO/VDF');
     (res.nApproche === 6 ? ok : ko)(`LFRS : 6 approches officielles conservées (${res.nApproche})`);
     (res.badgesHO >= 8 ? ok : ko)(`LFRS : badges horaires HO affichés (${res.badgesHO})`);
+    (res.remNa && res.remNb && res.remRs ? ok : ko)(`LFRS : observations secteurs NA/NB/RS affichées (${[res.remNa, res.remNb, res.remRs].filter(Boolean).length}/3)`);
+    (res.remSup ? ok : ko)('LFRS : fréquence supplétive identifiée');
+    (res.remLu ? ok : ko)('LFRS : secteur LU identifié');
 }
 
 // Passe mobile 390 px : les lignes piste (flex-wrap) ne débordent pas.
