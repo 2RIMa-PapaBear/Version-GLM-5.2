@@ -51,7 +51,7 @@ async function checkTerrain(icao, present, absent) {
 // LFRV — France complète : FRÉQUENCES puis PISTES puis HORAIRES puis le
 // reste, lien eAIP en DERNIÈRE ligne (ordre demandé par le pilote 05/09).
 await checkTerrain('LFRV', [
-    '440 ft', 'VFR · IFR', 'CAP',
+    '440 ft', 'VFR · IFR', 'Ouvert à la circulation aérienne publique',
     '04/22 ★', '039° vrai', '1530 × 45 m', 'revêtue', 'seuils 429/437 ft',
     '08/26', '995 × 60 m', 'non revêtue',
     'Horaires du service', 'HX', 'AFIS', '02 97 60 78 79',
