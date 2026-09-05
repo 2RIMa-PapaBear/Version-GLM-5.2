@@ -61,11 +61,11 @@ jobs:
         run: |
           git config user.name "radio-points-bot"
           git config user.email "radio-points-bot@users.noreply.github.com"
-          git add data/radio-points.json data/airspaces/
+          git add data/radio-points.json data/airspaces/ data/freq-sia.json
           if git diff --cached --quiet; then
             echo "Aucun changement openAIP aujourd'hui."
           else
-            git commit -m "openAIP: maj automatique espaces (crawl) + radio-points ($(date -u +%F))"
+            git commit -m "openAIP: maj automatique espaces (crawl) + radio-points + fréquences eAIP ($(date -u +%F))"
             git push
           fi
 
@@ -80,6 +80,26 @@ jobs:
   # vigueur. Job SÉPARÉ et sans needs : son échec n'entrave ni le crawl,
   # ni le commit, ni le déploiement.
   airac-obstacles:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: Version-2.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Fraîcheur obstacles SIA vs cycle AIRAC
+        run: node scripts/check-obstacles-airac.mjs
+
+  # Garde-fou base XML SIA (05/09, question pilote « maj à chaque AIRAC ? ») :
+  # terrains (identité/horaires/avitaillement/tél), pistes, espaces,
+  # fréquences services/A-A — tout vient du XML_SIA téléchargé MANUELLEMENT.
+  # Ce job échoue (→ notification) tant que la base est en retard.
+  airac-sia-xml:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
