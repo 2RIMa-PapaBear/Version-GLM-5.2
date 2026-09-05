@@ -34,7 +34,7 @@ const ko = m => { failures++; console.log('KO  ' + m); };
 async function checkTerrain(icao, present, absent) {
     await page.goto(`http://127.0.0.1:8663/index.html?icao=${icao}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForFunction(() => document.getElementById('frequencies-widget')?.style.display === 'block', { timeout: 30000 });
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, 2000));
     // Insensible à la casse : les titres de section sont rendus en MAJUSCULES
     // (text-transform) et innerText retourne le texte transformé.
     const txt = (await page.evaluate(() => document.getElementById('frequencies-widget').innerText)).toUpperCase();
@@ -90,7 +90,7 @@ await checkTerrain('EGHH', [
 await page.setViewport({ width: 390, height: 800 });
 await page.goto('http://127.0.0.1:8663/index.html?icao=LFRV', { waitUntil: 'domcontentloaded', timeout: 30000 });
 await page.waitForFunction(() => document.getElementById('frequencies-widget')?.style.display === 'block', { timeout: 30000 });
-await new Promise(r => setTimeout(r, 1500));
+await new Promise(r => setTimeout(r, 2000));
 const fitM = await page.evaluate(() => {
     const c = document.getElementById('frequencies-widget');
     return { scrollW: c.scrollWidth, clientW: c.clientWidth };
