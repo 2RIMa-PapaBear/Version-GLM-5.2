@@ -159,8 +159,8 @@ test('cache IDB : chaque fichier sous SA clé (régression bug clé unique)', as
     };
     try {
         await loadFreqSources();
-        assert.deepEqual([...mem.keys()].sort(), ['sia-aa', 'sia:v2'], 'deux clés distinctes (avant le fix : une seule clé « freq » ; v2 = observations eAIP 05/09)');
-        assert.equal(mem.get('sia:v2').data.airac, '2026-08-06');
+        assert.deepEqual([...mem.keys()].sort(), ['sia-aa', 'sia:v3'], 'deux clés distinctes (avant le fix : une seule clé « freq » ; v3 = cartes VAC 05/09)');
+        assert.equal(mem.get('sia:v3').data.airac, '2026-08-06');
         assert.equal(mem.get('sia-aa').data.airac, '2099-01-01');
         assert.equal(getSiaAirac(), '2026-08-06', 'airac lu depuis le fichier eAIP');
     } finally {
