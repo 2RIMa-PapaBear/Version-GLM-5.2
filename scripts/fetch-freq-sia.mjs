@@ -219,6 +219,7 @@ export function parseAdFrequencies(html) {
             out.push({ type: type.toUpperCase().slice(0, 12), name: name.slice(0, 60), value, hor, rem });
         }
     }
+
     // Déduplique (type+name+value) en conservant l'ordre.
     const seen = new Set();
     return out.filter(f => {
@@ -227,6 +228,19 @@ export function parseAdFrequencies(html) {
         seen.add(k);
         return true;
     });
+}
+
+// Cartes PDF référencées par la fiche (liens relatifs Cartes/<ICAO>/…).
+// TOUTES les cartes du terrain y figurent (aérodrome, insertion, parking,
+// sol, environnement… mais aussi SID/STAR/IAC) : la sélection VFR se fait
+// côté app (ADC/MIA/APDC/GMC/ENV) — on archive la liste complète.
+export function parseAdCharts(html, icao) {
+    const code = String(icao || '').toUpperCase();
+    const seen = new Set();
+    for (const m of html.matchAll(/Cartes\/([A-Z0-9]{4})\/([A-Z0-9_]+\.pdf)/g)) {
+        if (m[1] === code) seen.add(m[2]);
+    }
+    return [...seen].sort();
 }
 
 async function main() {
@@ -244,6 +258,7 @@ async function main() {
     console.log(`${codes.length} fiches terrains (LF*)`);
 
     const airports = {};
+    const charts = {};
     let done = 0, failed = 0;
     for (const icao of codes) {
         try {
@@ -251,6 +266,8 @@ async function main() {
             if (html && !/Error 404: Not Found/.test(html)) {
                 const freqs = parseAdFrequencies(html);
                 if (freqs.length) airports[icao] = freqs;
+                const cartes = parseAdCharts(html, icao);
+                if (cartes.length) charts[icao] = cartes;
             } else failed++;
         } catch (e) {
             failed++;
@@ -260,7 +277,7 @@ async function main() {
         if (done % 50 === 0) console.log(`  … ${done}/${codes.length} (${Object.keys(airports).length} avec fréquences)`);
         await sleep(DELAY_MS);
     }
-    writeOut(airports, date, failed);
+    writeOut(airports, date, failed, charts);
 }
 
 async function mainFromZip(zipPath) {
@@ -303,24 +320,29 @@ async function mainFromDir(dir) {
     console.log(`${codes.length} fiches terrains (LF*)`);
 
     const airports = {};
+    const charts = {};
     for (const icao of codes) {
         const html = fs.readFileSync(path.join(htmlDir, `FR-AD-2.${icao}-fr-FR.html`), 'utf8');
         const freqs = parseAdFrequencies(html);
         if (freqs.length) airports[icao] = freqs;
+        const cartes = parseAdCharts(html, icao);
+        if (cartes.length) charts[icao] = cartes;
     }
-    writeOut(airports, airac || 'inconnue', 0);
+    writeOut(airports, airac || 'inconnue', 0, charts);
 }
 
-function writeOut(airports, airac, failed) {
+function writeOut(airports, airac, failed, charts = {}) {
     const total = Object.values(airports).reduce((a, l) => a + l.length, 0);
+    const nCartes = Object.values(charts).reduce((a, l) => a + l.length, 0);
     fs.writeFileSync(OUT, JSON.stringify({
         generatedAt: new Date().toISOString(),
         airac,
         source: 'SIA eAIP France AD 2.17/2.18',
         counts: { airports: Object.keys(airports).length, frequencies: total, failed },
         airports,
+        charts,
     }, null, 1));
-    console.log(`OK : ${Object.keys(airports).length} terrains, ${total} fréquences, ${failed} échecs → data/freq-sia.json`);
+    console.log(`OK : ${Object.keys(airports).length} terrains, ${total} fréquences, ${failed} échecs, ${Object.keys(charts).length} terrains/${nCartes} cartes → data/freq-sia.json`);
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
