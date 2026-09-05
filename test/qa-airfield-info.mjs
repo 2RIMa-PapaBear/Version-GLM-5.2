@@ -34,11 +34,28 @@ const ko = m => { failures++; console.log('KO  ' + m); };
 async function checkTerrain(icao, present, absent) {
     await page.goto(`http://127.0.0.1:8663/index.html?icao=${icao}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForFunction(() => document.getElementById('frequencies-widget')?.style.display === 'block', { timeout: 30000 });
-    await new Promise(r => setTimeout(r, 2000));
+    // Attend (jusqu'à 12 s) que le rendu se STABILISE : deux mesures de texte
+    // identiques à 1 s d'écart — le widget peut être rendu en deux temps
+    // (fréquences d'abord, identité/pistes après un enrichissement tardif).
+    let prev = '';
+    for (let i = 0; i < 12; i++) {
+        const cur = await page.evaluate(() => document.getElementById('frequencies-widget')?.innerText || '');
+        if (cur && cur === prev) break;
+        prev = cur;
+        await new Promise(r => setTimeout(r, 1000));
+    }
     // Insensible à la casse : les titres de section sont rendus en MAJUSCULES
     // (text-transform) et innerText retourne le texte transformé.
-    const txt = (await page.evaluate(() => document.getElementById('frequencies-widget').innerText)).toUpperCase();
-    for (const s of present) (txt.includes(s.toUpperCase()) ? ok : ko)(`${icao} contient « ${s} »`);
+    const raw = await page.evaluate(() => document.getElementById('frequencies-widget').innerText);
+    const txt = raw.toUpperCase();
+    if (process.env.QA_DEBUG) console.log(`--- ${icao} ---
+` + raw.slice(0, 600));
+    for (const s of present) {
+        const pass = txt.includes(s.toUpperCase());
+        if (!pass) console.log(`!!! ${icao} manque « ${s} » — texte complet:
+` + raw);
+        (pass ? ok : ko)(`${icao} contient « ${s} »`);
+    }
     for (const s of absent) (!txt.includes(s.toUpperCase()) ? ok : ko)(`${icao} sans « ${s} »`);
     // Aucun débordement horizontal du widget (pistes en ligne).
     const fit = await page.evaluate(() => {
@@ -77,14 +94,40 @@ await checkTerrain('LFRV', [
 // LFOM — France sans rubriques AD horaires : sections absentes, fiche reste.
 await checkTerrain('LFOM', [], ['Horaires du service', 'Avitaillement']);
 
-// EGHH — reste du monde : pays + élévation + pistes (base embarquée,
-// caps sans « vrai », mètres convertis 7454 ft → 2271 m), aucune
-// section France. Élvévation/pays enrichis dynamiquement (39 ft / GB).
+// EGHH — reste du monde : pistes base embarquée (caps sans « vrai »,
+// pieds convertis en mètres), aucune section France. L'élévation/pays
+// varient selon l'enrichissement dynamique (base 'United Kingdom'/38 ft,
+// openAIP 'GB'/39 ft quand la clé existe) → on teste la STRUCTURE par
+// regex, pas la valeur source-dépendante.
 await checkTerrain('EGHH', [
-    'GB', '39 ft',
-    '08/26', '075°', '2271 m',
-    'base embarquée',
+    '08/26', '075°', 'base embarquée',
 ], ['Horaires du service', 'Avitaillement', 'vrai']);
+{
+    const t = (await page.evaluate(() => document.getElementById('frequencies-widget').innerText)).toUpperCase();
+    (/ALT\. TERRAIN :\s*\d+ FT/.test(t) ? ok : ko)('EGHH : ligne Alt. terrain chiffrée');
+    (/\d{4} M/.test(t) ? ok : ko)('EGHH : longueur de piste en mètres');
+    (/PAYS :|DÉCLINAISON :/.test(t) ? ok : ko)('EGHH : identité présente (pays ou déclinaison)');
+}
+
+// LFRS — Nantes : GONIO supprimées (retour pilote 05/09), les 6 approches
+// officielles restent, badge horaires HO présent sur les lignes.
+{
+    await page.goto('http://127.0.0.1:8663/index.html?icao=LFRS', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForFunction(() => document.getElementById('frequencies-widget')?.style.display === 'block', { timeout: 30000 });
+    await new Promise(r => setTimeout(r, 2000));
+    const res = await page.evaluate(() => {
+        const w = document.getElementById('frequencies-widget');
+        const txt = w.innerText.toUpperCase();
+        return {
+            gonio: txt.includes('GONIO') || txt.includes('VDF'),
+            nApproche: (w.innerText.match(/NANTES Approche/g) || []).length,
+            badgesHO: [...w.querySelectorAll('span')].filter(s => s.textContent.trim() === 'HO' && /border/.test(s.getAttribute('style') || '')).length,
+        };
+    });
+    (!res.gonio ? ok : ko)('LFRS sans aucune GONIO/VDF');
+    (res.nApproche === 6 ? ok : ko)(`LFRS : 6 approches officielles conservées (${res.nApproche})`);
+    (res.badgesHO >= 8 ? ok : ko)(`LFRS : badges horaires HO affichés (${res.badgesHO})`);
+}
 
 // Passe mobile 390 px : les lignes piste (flex-wrap) ne débordent pas.
 await page.setViewport({ width: 390, height: 800 });
