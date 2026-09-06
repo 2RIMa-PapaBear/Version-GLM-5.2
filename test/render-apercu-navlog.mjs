@@ -42,7 +42,7 @@ const html = (only) => `<!DOCTYPE html>
 </body></html>`;
 
 const outs = [path.join(root, `${prefix}_render.html`)];
-for (const p of [1, 2, 3]) outs.push(path.join(root, `${prefix}_render_p${p}.html`));
+for (const p of [1, 2, 3, 4, 5, 6]) outs.push(path.join(root, `${prefix}_render_p${p}.html`));
 fs.writeFileSync(outs[0], html(0));
-for (const p of [1, 2, 3]) fs.writeFileSync(outs[p - 1 + 1], html(p));
+for (const p of [1, 2, 3, 4, 5, 6]) fs.writeFileSync(outs[p - 1 + 1], html(p));
 console.log(`OK : ${outs.map(o => path.basename(o)).join(', ')}`);

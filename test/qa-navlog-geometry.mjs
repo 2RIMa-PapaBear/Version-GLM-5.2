@@ -141,15 +141,22 @@ function runQa(sample, label, extra, expect = EXPECT, wantPages = '1,2,3') {
                : ok('aucun glyphe non WinAnsi');
 }
 
-// ---- Variante 10 waypoints : le tableau (10 tronçons + TOTAL) tient dans la
-// page 2 au-dessus de la zone de note (FOOT_TOP = 581.8 - 24 = 557.8) ----
+// ---- Variante 10 waypoints : 10 tronçons > 9 → une page « VFR Flight Log
+// (suite) » s'intercale en p2 sur la MÊME trame (tableau + checks) ; le
+// détail (10 tronçons + TOTAL) tient alors en p3 au-dessus de la zone de
+// note (FOOT_TOP = 581.8 - 24 = 557.8) ----
 function qa10wp(byPage, ko, ok) {
-    const txt = byPage(2).map(i => i.s).join(' ');
-    if (!txt.includes('DÉTAIL DES WAYPOINTS (10)')) ko('p2 titre waypoints (10) manquant');
-    else ok('p2 titre « DÉTAIL DES WAYPOINTS (10) » présent');
+    const suite = byPage(2).map(i => i.s).join(' ');
+    if (!suite.includes('VFR Flight Log (suite)')) ko('p2 bandeau « VFR Flight Log (suite) » manquant');
+    else ok('p2 bandeau « VFR Flight Log (suite) » présent');
+    for (const s of ['Check Croisière', 'Check Point Tournant', 'Check Vent Arrière', 'FROM/TO', 'HEA'])
+        suite.includes(s) ? ok(`p2 trame conservée : ${s}`) : ko(`p2 trame manquante : ${s}`);
+    const txt = byPage(3).map(i => i.s).join(' ');
+    if (!txt.includes('DÉTAIL DES WAYPOINTS (10)')) ko('p3 titre waypoints (10) manquant');
+    else ok('p3 titre « DÉTAIL DES WAYPOINTS (10) » présent');
     // Ligne TOTAL du tableau = dernier « TOTAL » de la page ; sa boîte doit
     // rester au-dessus de la zone réservée à la note de bas de page.
-    const totalRows = byPage(2).filter(i => i.s === 'TOTAL');
+    const totalRows = byPage(3).filter(i => i.s === 'TOTAL');
     const lastTotal = totalRows[totalRows.length - 1];
     lastTotal && lastTotal.bot <= 558
         ? ok(`tableau 10 wp tient (bas ligne TOTAL à ${lastTotal.bot.toFixed(1)} ≤ 558)`)
@@ -159,7 +166,14 @@ function qa10wp(byPage, ko, ok) {
 const base = JSON.parse(fs.readFileSync(path.join(root, 'test', 'fixtures-navlog-sample.json'), 'utf8'));
 const wp10 = JSON.parse(fs.readFileSync(path.join(root, 'test', 'fixtures-navlog-sample-10wp.json'), 'utf8'));
 runQa(base, 'FIXTURE 2 waypoints', null);
-runQa(wp10, 'FIXTURE 10 waypoints', qa10wp);
+// 10 wp : page « suite » en p2 → l'ancien contenu des p2/p3 est décalé en p3/p4.
+const EXPECT_10WP = {
+    1: EXPECT[1],
+    2: ['VFR Flight Log (suite)'],
+    3: EXPECT[2],
+    4: EXPECT[3],
+};
+runQa(wp10, 'FIXTURE 10 waypoints', qa10wp, EXPECT_10WP, '1,2,3,4');
 
 // Passe EN : même document, isFr=false partout (page 1 comprise).
 const en = JSON.parse(JSON.stringify(base));
