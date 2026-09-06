@@ -33,7 +33,7 @@ const ko = m => { failures++; console.log('KO  ' + m); };
 
 async function checkTerrain(icao, present, absent) {
     await page.goto(`http://127.0.0.1:8663/index.html?icao=${icao}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForFunction(() => document.getElementById('frequencies-widget')?.style.display === 'block', { timeout: 30000 });
+    await page.waitForFunction(() => document.getElementById('frequencies-widget')?.style.display === 'block' || document.getElementById('airfield-widget')?.style.display === 'block', { timeout: 30000 });
     // Attend (jusqu'à 12 s) que le rendu se STABILISE : deux mesures de texte
     // identiques à 1 s d'écart — le widget peut être rendu en deux temps
     // (fréquences d'abord, identité/pistes après un enrichissement tardif).
@@ -44,9 +44,13 @@ async function checkTerrain(icao, present, absent) {
         prev = cur;
         await new Promise(r => setTimeout(r, 1000));
     }
+    // Déplie les sous-sections repliables (horaires, avitaillement) :
+    // display:none les exclut d'innerText — on vérifie AUSSI leur contenu.
+    await page.evaluate(() => document.querySelectorAll('.ss-head').forEach(h => { if (!h.parentElement.classList.contains('open')) h.click(); }));
+    await new Promise(r => setTimeout(r, 200));
     // Insensible à la casse : les titres de section sont rendus en MAJUSCULES
     // (text-transform) et innerText retourne le texte transformé.
-    const raw = await page.evaluate(() => document.getElementById('frequencies-widget').innerText);
+    const raw = await page.evaluate(() => (document.getElementById('frequencies-widget')?.innerText || '') + '\n' + (document.getElementById('airfield-widget')?.innerText || ''));
     const txt = raw.toUpperCase();
     if (process.env.QA_DEBUG) console.log(`--- ${icao} ---
 ` + raw.slice(0, 600));
@@ -59,7 +63,7 @@ async function checkTerrain(icao, present, absent) {
     for (const s of absent) (!txt.includes(s.toUpperCase()) ? ok : ko)(`${icao} sans « ${s} »`);
     // Aucun débordement horizontal du widget (pistes en ligne).
     const fit = await page.evaluate(() => {
-        const c = document.getElementById('frequencies-widget');
+        const c = document.getElementById('airfield-widget')?.clientWidth ? document.getElementById('airfield-widget') : document.getElementById('frequencies-widget');
         return { scrollW: c.scrollWidth, clientW: c.clientWidth };
     });
     (fit.scrollW <= fit.clientW + 1 ? ok : ko)(`${icao} widget sans débordement (${fit.scrollW} ≤ ${fit.clientW})`);
@@ -80,14 +84,14 @@ await checkTerrain('LFRV', [
     // Ordre des sections : fréquences < pistes < horaires < terrain <
     // avitaillement < lien eAIP (dernière ligne).
     await page.goto('http://127.0.0.1:8663/index.html?icao=LFRV', { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForFunction(() => document.getElementById('frequencies-widget')?.style.display === 'block', { timeout: 30000 });
+    await page.waitForFunction(() => document.getElementById('frequencies-widget')?.style.display === 'block' || document.getElementById('airfield-widget')?.style.display === 'block', { timeout: 30000 });
     await new Promise(r => setTimeout(r, 1200));
     const order = await page.evaluate(() => {
-        const t = document.getElementById('frequencies-widget').innerText.toUpperCase();
+        const t = ((document.getElementById('frequencies-widget')?.innerText || '') + '\n' + (document.getElementById('airfield-widget')?.innerText || '')).toUpperCase();
         const idx = (s) => t.indexOf(s.toUpperCase());
-        return { freq: idx('122.605'), piste: idx('PISTES'), hor: idx('HORAIRES DU SERVICE'), terrain: idx('VFR · IFR'), avt: idx('AVITAILLEMENT'), vac: idx('EAIP OFFICIEL') };
+        return { freq: idx('122.605'), piste: idx('★ PISTE PRINCIPALE'), hor: idx('HORAIRES DU SERVICE'), avt: idx('AVITAILLEMENT'), vac: idx('CARTE VAC') };
     });
-    const seq = [order.freq, order.piste, order.hor, order.terrain, order.avt, order.vac];
+    const seq = [order.freq, order.piste, order.hor, order.avt, order.vac];
     (seq.every((v, i) => v >= 0 && (i === 0 || v > seq[i - 1])) ? ok : ko)(`ordre sections ${JSON.stringify(order)}`);
 }
 
@@ -103,7 +107,7 @@ await checkTerrain('EGHH', [
     '08/26', '075°', 'base embarquée',
 ], ['Horaires du service', 'Avitaillement', 'vrai']);
 {
-    const t = (await page.evaluate(() => document.getElementById('frequencies-widget').innerText)).toUpperCase();
+    const t = (await page.evaluate(() => (document.getElementById('frequencies-widget')?.innerText || '') + '\n' + (document.getElementById('airfield-widget')?.innerText || ''))).toUpperCase();
     (/ALT\. TERRAIN :\s*\d+ FT/.test(t) ? ok : ko)('EGHH : ligne Alt. terrain chiffrée');
     (/\d{4} M/.test(t) ? ok : ko)('EGHH : longueur de piste en mètres');
     (/PAYS :|DÉCLINAISON :/.test(t) ? ok : ko)('EGHH : identité présente (pays ou déclinaison)');
@@ -113,7 +117,7 @@ await checkTerrain('EGHH', [
 // officielles restent, badge horaires HO présent sur les lignes.
 {
     await page.goto('http://127.0.0.1:8663/index.html?icao=LFRS', { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForFunction(() => document.getElementById('frequencies-widget')?.style.display === 'block', { timeout: 30000 });
+    await page.waitForFunction(() => document.getElementById('frequencies-widget')?.style.display === 'block' || document.getElementById('airfield-widget')?.style.display === 'block', { timeout: 30000 });
     await new Promise(r => setTimeout(r, 2000));
     const res = await page.evaluate(() => {
         const w = document.getElementById('frequencies-widget');
@@ -141,7 +145,7 @@ await page.goto('http://127.0.0.1:8663/index.html?icao=LFRV', { waitUntil: 'domc
 await page.waitForFunction(() => document.getElementById('frequencies-widget')?.style.display === 'block', { timeout: 30000 });
 await new Promise(r => setTimeout(r, 2000));
 const fitM = await page.evaluate(() => {
-    const c = document.getElementById('frequencies-widget');
+    const c = document.getElementById('airfield-widget')?.clientWidth ? document.getElementById('airfield-widget') : document.getElementById('frequencies-widget');
     return { scrollW: c.scrollWidth, clientW: c.clientWidth };
 });
 (fitM.scrollW <= fitM.clientW + 1 ? ok : ko)(`mobile 390 : sans débordement (${fitM.scrollW} ≤ ${fitM.clientW})`);
