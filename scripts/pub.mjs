@@ -14,6 +14,10 @@
 // ============================================================================
 
 import { execFileSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 import { toast, waitForDeploy } from './notify-deploy.mjs';
 
 const args = process.argv.slice(2);
@@ -42,6 +46,17 @@ if (msg) {
     } else {
         git(['add', '-A']);
         const out = git(['commit', '-m', msg]);
+        // Journal des versions (notice + README) : alimenté par le commit
+        // qui vient d'être posé, puis intégré au même commit (amend avant
+        // push — les docs partent avec le changement qu'ils décrivent).
+        try {
+            execFileSync('node', ['scripts/update-docs.mjs'], { cwd: ROOT, stdio: 'inherit' });
+            const dirty = git(['status', '--porcelain']).split('\n').some(l => /notice-(fr|en)\.html|README\.md/.test(l));
+            if (dirty) {
+                git(['add', 'README.md']);
+                git(['commit', '--amend', '--no-edit']);
+            }
+        } catch (e) { console.warn('update-docs ignoré :', String(e).slice(0, 120)); }
         log(out.split('\n').find(l => l.startsWith('[')) || 'Commit créé.');
     }
 }

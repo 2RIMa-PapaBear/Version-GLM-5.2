@@ -46,10 +46,10 @@ const canvasDessine = () => {
 
 async function ouvre(icao) {
     await page.goto(`http://127.0.0.1:8674/index.html?icao=${icao}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForFunction(() => document.getElementById('frequencies-widget')?.style.display === 'block', { timeout: 30000 });
+    await page.waitForFunction(() => document.getElementById('frequencies-widget')?.style.display === 'block' || document.getElementById('airfield-widget')?.style.display === 'block', { timeout: 30000 });
     await page.waitForFunction(() => {
         const b = document.querySelector('[data-vac-open]');
-        const l = document.querySelector('#frequencies-widget a[target="_blank"]');
+        const l = document.querySelector('#airfield-widget a[target="_blank"], #frequencies-widget a[target="_blank"]');
         return b || l;
     }, { timeout: 30000 });
     await new Promise(r => setTimeout(r, 400));
@@ -94,7 +94,7 @@ await ouvre('LFOM');
 await ouvre('EGHH');
 const repli = await page.evaluate(() => ({
     btn: !!document.querySelector('[data-vac-open]'),
-    portail: !!document.querySelector('#frequencies-widget a[target="_blank"]'),
+    portail: !!document.querySelector('#airfield-widget a[target="_blank"], #frequencies-widget a[target="_blank"]'),
 }));
 (!repli.btn ? ok : ko)('EGHH : pas de bouton carte');
 (repli.portail ? ok : ko)('EGHH : lien portail conservé');
