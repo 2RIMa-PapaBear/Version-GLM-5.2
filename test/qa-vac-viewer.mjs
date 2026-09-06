@@ -60,6 +60,29 @@ await ouvre('LFRV');
 (await page.evaluate(() => !!document.querySelector('[data-vac-open]')) ? ok : ko)('LFRV : bouton « Carte VAC · Atterrissage à vue » présent');
 await page.click('[data-vac-open]');
 await page.waitForFunction(canvasDessine, { timeout: 30000 });
+// Ajustement HAUTEUR (retour pilote 06/09) : toute la carte visible de haut
+// en bas ; si elle est plus large que la fenêtre, scroll horizontal SANS
+// coupure du bord gauche (le centrage flex rend la gauche inaccessible).
+const fit = await page.evaluate(() => {
+    const cont = document.querySelector('#vac-overlay [data-vac="container"]');
+    const c = document.querySelector('#vac-overlay canvas');
+    const contRect = cont.getBoundingClientRect(), cRect = c.getBoundingClientRect();
+    return {
+        pct: document.querySelector('#vac-overlay [data-vac="pct"]')?.textContent || '',
+        contH: cont.clientHeight, scrollableH: cont.scrollHeight,
+        contW: cont.clientWidth, scrollableW: cont.scrollWidth,
+        canvasH: parseFloat(c.style.height), canvasW: parseFloat(c.style.width),
+        left: cRect.left - contRect.left,
+    };
+});
+(Math.abs(fit.canvasH - (fit.contH - 28)) <= 2
+    ? ok : ko)(`ajusté à la HAUTEUR (carte ${Math.round(fit.canvasH)}px ≈ fenêtre ${fit.contH - 28}px)`);
+(fit.pct === '100%' ? ok : ko)(`ouverture à 100 % (${fit.pct})`);
+(fit.canvasH <= fit.contH ? ok : ko)(`toute la carte tient en hauteur (${Math.round(fit.canvasH)} ≤ ${fit.contH})`);
+if (fit.canvasW > fit.contW) {
+    (fit.scrollableW > fit.contW ? ok : ko)(`carte plus large → scroll horizontal (${Math.round(fit.canvasW)}px dans ${fit.contW}px)`);
+    (fit.left >= -1 ? ok : ko)(`bord gauche accessible (left ${fit.left.toFixed(1)}px)`);
+}
 const etat = await page.evaluate(() => ({
     badge: [...document.querySelectorAll('#vac-overlay span')].map(s => s.textContent).find(t => /enregistrée|hors ligne/i.test(t)) || '',
     pages: document.querySelector('#vac-overlay [data-vac="pagelbl"]')?.textContent || '',
@@ -76,6 +99,24 @@ if (/^[2-9]\//.test(etat.pages)) {
 await page.keyboard.press('Escape');
 await page.waitForFunction(() => !document.querySelector('#vac-overlay'), { timeout: 5000 });
 ok('Échap ferme la visionneuse');
+
+// 1bis. MOBILE (390px) : carte paysage plus large que la fenêtre → scroll
+// horizontal, bord gauche accessible (le centrage flex coupe la gauche).
+await page.setViewport({ width: 390, height: 844 });
+await page.click('[data-vac-open]');
+await page.waitForFunction(canvasDessine, { timeout: 30000 });
+const mob = await page.evaluate(() => {
+    const cont = document.querySelector('#vac-overlay [data-vac="container"]');
+    const c = document.querySelector('#vac-overlay canvas');
+    const contRect = cont.getBoundingClientRect(), cRect = c.getBoundingClientRect();
+    return { contW: cont.clientWidth, scrollW: cont.scrollWidth, canvasW: parseFloat(c.style.width), canvasH: parseFloat(c.style.height), contH: cont.clientHeight, left: cRect.left - contRect.left };
+});
+(mob.canvasW > mob.contW && mob.scrollW > mob.contW
+    ? ok : ko)(`mobile : carte ${Math.round(mob.canvasW)}px > fenêtre ${mob.contW}px, scroll horizontal (${mob.scrollW}px)`);
+(mob.left >= -1 ? ok : ko)(`mobile : bord gauche accessible (left ${mob.left.toFixed(1)}px)`);
+(mob.canvasH <= mob.contH ? ok : ko)(`mobile : tient en hauteur (${Math.round(mob.canvasH)} ≤ ${mob.contH})`);
+await page.keyboard.press('Escape');
+await page.setViewport({ width: 1280, height: 900 });
 
 // 2. HORS LIGNE : navigateur offline → cache IndexedDB.
 await page.setOfflineMode(true);
