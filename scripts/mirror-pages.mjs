@@ -37,7 +37,7 @@ const ALLOWED = [
     'js/', 'css/', 'vendor/', 'data/',
     'README.md',   // vitrine du dépôt public
 ];
-const DENIED = [/^vendor\/pdfjs/];
+const DENIED = [];   // (pdfjs rejoint la prod 06/09 : visionneuse VAC)
 
 const isAllowed = (f) => !DENIED.some(re => re.test(f))
     && ALLOWED.some(p => f === p || f === p.replace(/\/$/, '') || f.startsWith(p));
