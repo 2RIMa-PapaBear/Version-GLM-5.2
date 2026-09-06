@@ -146,7 +146,8 @@ function tilesWorld() {
 }
 
 async function fetchPage(key, bbox, page) {
-    for (let attempt = 0; attempt < 5; attempt++) {
+    let netFails = 0;
+    for (let attempt = 0; attempt < 8; attempt++) {
         if (Date.now() > DEADLINE) return 'budget';
         try {
             const url = `${BASE}?bbox=${bbox[1]},${bbox[0]},${bbox[3]},${bbox[2]}&limit=${LIMIT}&page=${page}`;
@@ -160,6 +161,11 @@ async function fetchPage(key, bbox, page) {
             if (!res.ok) return null;   // définitif
             return (await res.json()).items || [];
         } catch (e) {
+            // Un 524 met ~100 s à tomber (timeout Cloudflare côté openAIP,
+            // constaté 06/09) : s'acharner 5 fois brûle le budget pour rien.
+            // 2 échecs réseau → page perdue, le repli en quarts de crawlTile
+            // prend le relais avec une bbox 4× plus petite.
+            if (++netFails >= 2) { console.log(`  page ${page} : ${e.message} ×${netFails} — abandonnée`); return null; }
             console.log(`  erreur page ${page} : ${e.message} — retente`);
             await sleep(8000);
         }
@@ -194,16 +200,15 @@ function cellOf(it) {
     return [Math.floor(lat), Math.floor(lon)];
 }
 
-/** Crawl UNE tuile 5° : écrit ses 25 cellules 1° (fichier vide = cache
- * négatif). Retourne { ok, touched, budget } — ok=false : pages en échec,
- * la tuile sera reprise EN PRIORITÉ au run suivant. */
-async function crawlTile(bbox, key, now) {
-    const byCell = new Map();
+/** Parcourt toutes les pages d'une bbox et remplit byCell (cellule 1° →
+ * Map par _id : une zone renvoyée par plusieurs requêtes n'est gardée
+ * qu'une fois). Retourne 'ok' | 'budget' | 'failed'. */
+async function collectBbox(key, bbox, byCell) {
     let page = 1;
     while (page < 40) {
         const items = await fetchPage(key, bbox, page);
-        if (items === 'budget') return { ok: false, touched: 0, budget: true };
-        if (items === null) { console.log(`  tuile ${bbox.join(',')} page ${page} : abandon`); return { ok: false, touched: 0, budget: false }; }
+        if (items === 'budget') return 'budget';
+        if (items === null) return 'failed';
         for (const it of items) {
             const nm = String(it.name || it.designator || '').toUpperCase();
             if (ADMIN_RE.test(nm)) continue;
@@ -214,10 +219,39 @@ async function crawlTile(bbox, key, now) {
             const k = cell.join('_');
             (byCell.get(k) ?? byCell.set(k, new Map()).get(k)).set(it._id, compactItem(it));
         }
-        if (items.length < LIMIT) break;
+        if (items.length < LIMIT) return 'ok';
         page++;
         await sleep(DELAY_MS);
     }
+    return 'ok';
+}
+
+/** Crawl UNE tuile 5° : écrit ses 25 cellules 1° (fichier vide = cache
+ * négatif). Retourne { ok, touched, budget } — ok=false : pages en échec,
+ * la tuile sera reprise EN PRIORITÉ au run suivant. */
+async function crawlTile(bbox, key, now) {
+    const byCell = new Map();
+    let st = await collectBbox(key, bbox, byCell);
+    if (st === 'failed') {
+        // Tuile récalcitrante (pages lourdes → 524 Cloudflare, constaté
+        // 06/09 sur 45-50N/5-10E : Alpes/Côte d'Azur/Corse) : repli en
+        // 4 quarts 2,5° — bbox 4× plus petite, requêtes indexées rapides.
+        // byCell est conservée : dédup par _id, les zones déjà reçues
+        // ne sont pas re-demandées en double. Un quart en échec n'arrête
+        // pas les autres : ses cellules sortent PARTIELLES mais la tuile
+        // reste en reprise prioritaire pour être complétée au run suivant.
+        console.log(`  tuile ${bbox.join(',')} : repli en 4 quarts 2,5°`);
+        const [la, lo, lb, lrb] = bbox;
+        const mLat = (la + lb) / 2, mLon = (lo + lrb) / 2;
+        let qOk = 0;
+        for (const q of [[la, lo, mLat, mLon], [la, mLon, mLat, lrb], [mLat, lo, lb, mLon], [mLat, mLon, lb, lrb]]) {
+            const qs = await collectBbox(key, q, byCell);
+            if (qs === 'budget') return { ok: false, touched: 0, budget: true };
+            if (qs === 'ok') qOk++;
+        }
+        st = qOk > 0 ? 'partial' : 'failed';
+    }
+    if (st === 'failed') { console.log(`  tuile ${bbox.join(',')} : échec (quarts inclus)`); return { ok: false, touched: 0, budget: false }; }
     let touched = 0;
     for (let lat = bbox[0]; lat < bbox[2]; lat++) {
         for (let lon = bbox[1]; lon < bbox[3]; lon++) {
@@ -227,7 +261,12 @@ async function crawlTile(bbox, key, now) {
             touched++;
         }
     }
-    console.log(`  tuile ${bbox.join(',')} : ${[...byCell.values()].reduce((a, m) => a + m.size, 0)} zones → ${touched} cellules écrites`);
+    const nZones = [...byCell.values()].reduce((a, m) => a + m.size, 0);
+    if (st === 'partial') {
+        console.log(`  tuile ${bbox.join(',')} : PARTIELLE (${nZones} zones) — complétée au run suivant`);
+        return { ok: false, touched, budget: false };   // reste en reprise prioritaire
+    }
+    console.log(`  tuile ${bbox.join(',')} : ${nZones} zones → ${touched} cellules écrites`);
     return { ok: true, touched, budget: false };
 }
 
