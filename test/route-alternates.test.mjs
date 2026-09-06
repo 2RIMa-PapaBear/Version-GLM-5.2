@@ -2,8 +2,9 @@
 // substitution METAR (terrain sans émission → station la plus proche) et de
 // la détection humidité/contamination par tokens METAR (page 3 du log de nav).
 import test from 'node:test';
+import { ok, equal } from 'node:assert';
 import assert from 'node:assert/strict';
-import { _distToSegmentNm, _attachMetars } from '../js/alternates.js';
+import { _distToSegmentNm, _attachMetars, _pickSpread } from '../js/alternates.js';
 import { _wetFromTokens } from '../js/takeoff-performance.js';
 
 // ---------------------------------------------------------------- géométrie
@@ -110,4 +111,46 @@ test('NOSIG / CAVOK / nuages ne déclenchent rien', () => {
         const r = _wetFromTokens(`AAAA 190830Z ${extra} 18/10 Q1013`);
         assert.deepEqual(r, { wet: false, contaminated: false }, extra);
     }
+});
+
+
+// ---- Répartition le long du trajet (retour pilote 06/09) ----------------------
+test('_pickSpread : la sélection couvre le MILIEU, pas seulement les extrémités', () => {
+    const VFR = { cat: { cat: 'VFR' } }, MVFR = { cat: { cat: 'MVFR' } };
+    // Route de 240 NM. Grappe dense de VFR sur le 1er et le dernier tronçon
+    // (8 terrains), milieu plus pauvre (3 MVFR sur les tronçons 3-4).
+    const rows = [
+        { code: 'AAAA', ...VFR, offsetNm: 3, atdNm: 5 },
+        { code: 'AAAB', ...VFR, offsetNm: 4, atdNm: 10 },
+        { code: 'AAAC', ...VFR, offsetNm: 5, atdNm: 15 },
+        { code: 'AAAD', ...VFR, offsetNm: 6, atdNm: 20 },
+        { code: 'ZZZA', ...VFR, offsetNm: 3, atdNm: 220 },
+        { code: 'ZZZB', ...VFR, offsetNm: 4, atdNm: 228 },
+        { code: 'ZZZC', ...VFR, offsetNm: 5, atdNm: 234 },
+        { code: 'ZZZD', ...VFR, offsetNm: 6, atdNm: 238 },
+        { code: 'MMMM', ...MVFR, offsetNm: 8, atdNm: 110 },
+        { code: 'MMMN', ...MVFR, offsetNm: 9, atdNm: 130 },
+        { code: 'MMMS', ...MVFR, offsetNm: 10, atdNm: 150 },
+    ];
+    const picks = _pickSpread(rows, 6, 240);
+    // Au moins un alternate du tiers CENTRAL (80-160 NM) est retenu…
+    ok(picks.some(r => r.atdNm >= 80 && r.atdNm <= 160), 'le milieu de route est couvert');
+    // …et le résultat est dans l'ordre du vol.
+    const pos = picks.map(r => r.atdNm);
+    ok(pos.every((v, i) => i === 0 || v > pos[i - 1]), 'ordre du vol (positions croissantes)');
+    ok(picks.length <= 6, 'max 6');
+});
+
+test('_pickSpread : tronçon sans candidat — le complément prend les meilleurs restants', () => {
+    const VFR = { cat: { cat: 'VFR' } };
+    const rows = [
+        { code: 'AAAA', ...VFR, offsetNm: 2, atdNm: 10 },
+        { code: 'BBBB', ...VFR, offsetNm: 3, atdNm: 70 },
+        { code: 'CCCC', ...VFR, offsetNm: 4, atdNm: 190 },
+        { code: 'DDDD', ...VFR, offsetNm: 5, atdNm: 12 },
+        { code: 'EEEE', ...VFR, offsetNm: 6, atdNm: 72 },
+    ];
+    const picks = _pickSpread(rows, 6, 200);
+    equal(picks.length, 5, 'tout est retenu quand il y a de la place');
+    ok(picks.some(r => r.code === 'DDDD') && picks.some(r => r.code === 'AAAA'), 'complément après le 1er passage');
 });
