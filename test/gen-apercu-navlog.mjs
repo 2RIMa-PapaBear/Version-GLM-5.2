@@ -24,6 +24,7 @@ const { drawNavLogPdf } = await import(pathToFileURL(path.join(root, 'js', 'navl
 const VARIANTS = [
     ['fixtures-navlog-sample.json', 'Apercu_Log-nav_3pages.pdf'],
     ['fixtures-navlog-sample-10wp.json', 'Apercu_Log-nav_3pages_10wp.pdf'],
+    ['fixtures-navlog-sample-14wp.json', 'Apercu_Log-nav_14wp.pdf'],
     ['fixtures-navlog-sample-centro.json', 'Apercu_Log-nav_4pages_centro.pdf'],
 ];
 
