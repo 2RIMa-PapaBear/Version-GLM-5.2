@@ -89,7 +89,12 @@ function isWeatherData(url) {
 async function staleWhileRevalidate(request) {
     const cache = await caches.open(CACHE);
     const cached = await cache.match(request);
-    const network = fetch(request).then((response) => {
+    // cache:'no-cache' — REVALIDATION systématique auprès du serveur : sans
+    // cela, le fetch() du SW honore le cache HTTP heuristique du navigateur
+    // (Free.fr n'envoie pas de Cache-Control) et peut resservir un module
+    // PÉRIMÉ des heures durant alors même que le shell vient d'être mis à
+    // jour (bug « le pilote voit une vieille app », 06/09).
+    const network = fetch(request, { cache: 'no-cache' }).then((response) => {
         // On ne met en cache que les réponses valides. Les réponses
         // opaques (cross-origin no-cors) ont status 0 : on les accepte.
         if (response && (response.ok || response.status === 0 || response.type === 'opaque')) {
@@ -108,7 +113,8 @@ async function staleWhileRevalidate(request) {
 async function networkFirst(request) {
     const cache = await caches.open(CACHE);
     try {
-        const response = await fetch(request);
+        // Même règle que staleWhileRevalidate : revalidation systématique.
+        const response = await fetch(request, { cache: 'no-cache' });
         if (response && response.ok) {
             cache.put(request, response.clone()).catch(() => {});
         }
