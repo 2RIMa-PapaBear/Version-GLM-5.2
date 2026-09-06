@@ -36,13 +36,14 @@ const ALLOWED = [
     'notice-fr.html', 'notice-en.html',
     'js/', 'css/', 'vendor/', 'data/',
 ];
-// … sauf outilage dev hébergé dans vendor/ (pdfjs ne sert que aux aperçus locaux).
-// … sauf outilage dev hébergé dans vendor/ (pdfjs ne sert qu'aux aperçus locaux)
+// … sauf les CELLULES openAIP (voir ci-dessous). vendor/pdfjs a rejoint la
+// prod le 06/09 (la visionneuse VAC le charge à la demande — son exclusion
+// « outillage dev » datait d'avant).
 // et les CELLULES openAIP (data/airspaces/cells/) : ~27 000 fichiers, le débit
 // Free.fr (~10 fichiers/min) rend l'upload impossible dans un run Actions —
 // l'utilisateur les pose directement sur le FTP (décision 29/08). Base SIA,
 // radio-points et obstacles restent déployés normalement.
-const DENIED = [/^vendor\/pdfjs/, /^data\/airspaces\/cells\//];
+const DENIED = [/^data\/airspaces\/cells\//];
 
 const DRY = process.argv.includes('--dry-run');
 const sinceArg = process.argv.find(a => a.startsWith('--since='));
