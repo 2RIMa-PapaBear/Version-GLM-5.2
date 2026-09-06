@@ -194,70 +194,84 @@ function cellOf(it) {
     return [Math.floor(lat), Math.floor(lon)];
 }
 
+/** Crawl UNE tuile 5° : écrit ses 25 cellules 1° (fichier vide = cache
+ * négatif). Retourne { ok, touched, budget } — ok=false : pages en échec,
+ * la tuile sera reprise EN PRIORITÉ au run suivant. */
+async function crawlTile(bbox, key, now) {
+    const byCell = new Map();
+    let page = 1;
+    while (page < 40) {
+        const items = await fetchPage(key, bbox, page);
+        if (items === 'budget') return { ok: false, touched: 0, budget: true };
+        if (items === null) { console.log(`  tuile ${bbox.join(',')} page ${page} : abandon`); return { ok: false, touched: 0, budget: false }; }
+        for (const it of items) {
+            const nm = String(it.name || it.designator || '').toUpperCase();
+            if (ADMIN_RE.test(nm)) continue;
+            if ((limitToFt(it.lowerLimit) ?? 0) > 5000) continue;
+            if (limitToFt(it.upperLimit) == null) continue;
+            const cell = cellOf(it);
+            if (!cell) continue;
+            const k = cell.join('_');
+            (byCell.get(k) ?? byCell.set(k, new Map()).get(k)).set(it._id, compactItem(it));
+        }
+        if (items.length < LIMIT) break;
+        page++;
+        await sleep(DELAY_MS);
+    }
+    let touched = 0;
+    for (let lat = bbox[0]; lat < bbox[2]; lat++) {
+        for (let lon = bbox[1]; lon < bbox[3]; lon++) {
+            const k = `${lat}_${lon}`;
+            const arr = byCell.has(k) ? [...byCell.get(k).values()] : [];
+            fs.writeFileSync(path.join(CELLS_DIR, `${k}.json`), JSON.stringify({ ts: now, n: arr.length, items: arr }));
+            touched++;
+        }
+    }
+    console.log(`  tuile ${bbox.join(',')} : ${[...byCell.values()].reduce((a, m) => a + m.size, 0)} zones → ${touched} cellules écrites`);
+    return { ok: true, touched, budget: false };
+}
+
 async function main() {
     const key = await getKey();
     fs.mkdirSync(CELLS_DIR, { recursive: true });
 
-    let state = { cursor: 0, updated: 0 };
-    try { state = { ...state, ...JSON.parse(fs.readFileSync(CRAWL_STATE, 'utf8')) }; } catch { /* premier run */ }
+    let state = { cursor: 0, updated: 0, pending: [] };
+    try { state = { ...state, pending: [], ...JSON.parse(fs.readFileSync(CRAWL_STATE, 'utf8')) }; } catch { /* premier run */ }
     const tiles = tilesWorld();
-    console.log(`Crawl mondial : ${tiles.length} tuiles 5° (masque continental), curseur ${state.cursor}, budget ${BUDGET_MIN || '∞'} min`);
+    console.log(`Crawl mondial : ${tiles.length} tuiles 5° (masque continental), curseur ${state.cursor}, ${state.pending.length} tuile(s) à reprendre, budget ${BUDGET_MIN || '∞'} min`);
 
     const now = new Date().toISOString();
     let touched = 0;
+    // REPRISE PRIORITAIRE des tuiles en échec des runs précédents : une
+    // tuile malade ne doit pas attendre un cycle complet (bug constaté
+    // 06/09 : cellules du sud-est de la France absentes alors que le
+    // curseur était déjà passé — attente de semaines sinon).
+    const pending = new Set((state.pending || []).filter(ti => Number.isInteger(ti) && ti >= 0 && ti < tiles.length));
+    for (const ti of [...pending]) {
+        if (Date.now() > DEADLINE) break;
+        const r = await crawlTile(tiles[ti], key, now);
+        touched += r.touched;
+        if (r.ok) pending.delete(ti);
+        if (r.budget) break;
+    }
+
     for (let ti = state.cursor; ti < tiles.length; ti++) {
-        const bbox = tiles[ti];
-        // items valides, groupés par cellule 1°
-        const byCell = new Map();
-        let page = 1, failed = false;
-        while (page < 40) {
-            const items = await fetchPage(key, bbox, page);
-            if (items === 'budget') { console.log('Budget épuisé — arrêt propre.'); failed = 'budget'; break; }
-            if (items === null) { console.log(`  tuile ${bbox.join(',')} page ${page} : abandon`); failed = true; break; }
-            for (const it of items) {
-                const nm = String(it.name || it.designator || '').toUpperCase();
-                if (ADMIN_RE.test(nm)) continue;
-                if ((limitToFt(it.lowerLimit) ?? 0) > 5000) continue;
-                if (limitToFt(it.upperLimit) == null) continue;
-                const cell = cellOf(it);
-                if (!cell) continue;
-                const k = cell.join('_');
-                (byCell.get(k) ?? byCell.set(k, new Map()).get(k)).set(it._id, compactItem(it));
-            }
-            if (items.length < LIMIT) break;
-            page++;
-            await sleep(DELAY_MS);
-        }
-        if (failed === 'budget') { state.cursor = ti; break; }
-        if (!failed) {
-            // Remplace les cellules couvertes par cette tuile (une cellule
-            // 1° appartient à une seule tuile 5°) ; cellule vide → fichier
-            // vide (cache négatif côté client).
-            for (let lat = bbox[0]; lat < bbox[2]; lat++) {
-                for (let lon = bbox[1]; lon < bbox[3]; lon++) {
-                    const k = `${lat}_${lon}`;
-                    const arr = byCell.has(k) ? [...byCell.get(k).values()] : [];
-                    fs.writeFileSync(path.join(CELLS_DIR, `${k}.json`), JSON.stringify({ ts: now, n: arr.length, items: arr }));
-                    touched++;
-                }
-            }
-            console.log(`  tuile ${bbox.join(',')} : ${[...byCell.values()].reduce((a, m) => a + m.size, 0)} zones → ${touched} cellules écrites`);
-        } else {
-            // Tuile abandonnée (pages en échec) : on AVANCE quand même — le
-            // cycle suivant du crawl la retentera (sinon une tuile malade
-            // bloquerait le curseur indéfiniment).
-            console.log(`  tuile ${bbox.join(',')} : partielle/échec, avancée (retentée au prochain cycle)`);
-        }
+        const r = await crawlTile(tiles[ti], key, now);
+        touched += r.touched;
+        if (r.budget) { state.cursor = ti; break; }
+        if (!r.ok) pending.add(ti);   // reprise prioritaire au run suivant
         state.cursor = ti + 1;
         state.updated = touched;
+        state.pending = [...pending];
         fs.writeFileSync(CRAWL_STATE, JSON.stringify(state));
         if (Date.now() > DEADLINE) { console.log('Budget épuisé — arrêt propre.'); break; }
         await sleep(DELAY_MS);
     }
 
     if (state.cursor >= tiles.length) state.cursor = 0;   // cycle suivant
+    state.pending = [...pending];
     fs.writeFileSync(CRAWL_STATE, JSON.stringify(state));
-    console.log(`OK : curseur ${state.cursor}/${tiles.length}, ${touched} cellules écrites ce run.`);
+    console.log(`OK : curseur ${state.cursor}/${tiles.length}, ${state.pending.length} tuile(s) en attente, ${touched} cellules écrites ce run.`);
 }
 
 main().catch(e => { console.error(e); process.exit(1); });
