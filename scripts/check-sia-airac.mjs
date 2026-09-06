@@ -45,6 +45,9 @@ export const SIA_XML_BASES = {
     'sia-airspaces': 'espaces aériens',
     'freq-services-sia': 'fréquences organismes',
     'freq-aa-sia': 'fréquences AFIS/A-A',
+    // data/vac-sia/index.json : cartes « Atterrissage à vue » de l'Atlas-VAC
+    // (ZIP eAIP complet, téléchargement manuel) — même dépendance AIRAC.
+    'vac-sia/index': 'cartes VAC (Atlas-VAC)',
 };
 
 /**

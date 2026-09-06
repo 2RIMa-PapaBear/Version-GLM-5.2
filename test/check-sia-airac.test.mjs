@@ -13,6 +13,7 @@ import { checkSiaAirac, airacInForce, SIA_XML_BASES } from '../scripts/check-sia
 const NOW = Date.parse('2026-08-29T12:00:00Z');
 const aJour = { airac: '2026-08-06' };
 const toutesAJour = Object.fromEntries(Object.keys(SIA_XML_BASES).map(k => [k, aJour]));
+// (toutesAJour inclut vac-sia/index : même contrat {airac}.)
 
 test('à jour et en avance → OK', () => {
     ok(checkSiaAirac(toutesAJour, { airac: '2026-08-06' }, NOW).ok, 'égalité → ok');
