@@ -333,13 +333,16 @@ function _siaItemsForArea(minLat, minLon, maxLat, maxLon) {
 // zones). On rapproche sur le désignateur : R278A, D59B, P23…
 export function _rdpKey(name) {
     const n = String(name || '').toUpperCase();
+    // Zéros initiaux écartés : « LF-R042 » ≡ « R 42 » (openAIP zéro-initialise,
+    // même règle que les noms — retour pilote 09/09 « CTR DINARD 01/1 »).
+    const noZeros = (k) => k.replace(/^(.)0+(\d)/, '$1$2');
     let m = n.match(/^LF-([RDP]\d+(?:[A-Z]\d?)?(?:\(\d+\))?)\b/);
-    if (m) return m[1];
+    if (m) return noZeros(m[1]);
     // SIA : « R 278 », « D 59B »… mais AUSSI « R 149 E » (suffixe ESPACÉ) —
     // sans l'espace optionnel la clé s'arrêtait à « R149 » et ne rattrapait
     // pas « LF-R149E » : les deux copies se dessinaient (retour pilote 09/09).
     m = n.match(/^([RDP]) ?(\d+)(?: ?([A-Z]\d?))?(?: ?(\(\d+\)))?( |$)/);
-    return m ? m[1] + m[2] + (m[3] || '') + (m[4] || '') : null;
+    return m ? noZeros(m[1] + m[2] + (m[3] || '') + (m[4] || '')) : null;
 }
 
 /** ZRT — zones réglementées TEMPORAIRES : JAMAIS affichées, ni carte ni
@@ -361,7 +364,9 @@ const dropZrt = (items) => items.filter(it => !_isZrt(it.name));
  *  les tests. */
 export function _dropOpenAipDuplicates(items, sia) {
     const norm = (n) => String(n || '').toUpperCase()
-        .replace(/\s+PARTIE\s+(?=[A-Z0-9.]+$)/, ' ').replace(/\s+/g, ' ').trim();
+        .replace(/\s+PARTIE\s+(?=[A-Z0-9.]+$)/, ' ')
+        .replace(/\b0+(\d)/g, '$1')   // « DINARD 01 » ≡ « DINARD 1 » (retour pilote 09/09)
+        .replace(/\s+/g, ' ').trim();
     const siaNames = new Set();
     for (const z of sia) {
         const n = String(z.name || '').toUpperCase();
@@ -828,7 +833,10 @@ export function createAirspaceController(map) {
             highlighted.setStyle({ color: m.style.color, weight: m.style.weight });
         }
         poly.bringToFront();
-        poly.setStyle({ color: '#FFFFFF', weight: 4 });
+        // Surlignage SANS blanc (retour pilote 09/09) : on épaissit le trait
+        // dans la COULEUR PROPRE de la zone — le code couleur SIA reste lisible.
+        const st = (polyMeta.get(poly) || {}).style || {};
+        poly.setStyle({ weight: (st.weight || 2) + 2 });
         highlighted = poly;
     }
 
