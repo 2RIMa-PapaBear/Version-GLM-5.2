@@ -45,6 +45,14 @@ Le champ « Waypoints »
 - **Carte régionale** (Leaflet) : route, étiquettes de tronçons
   (cap / distance / temps), espaces aériens — **base officielle SIA (XML
   AIRAC) en priorité**, complétée par openAIP (ATZ, reste du monde), radar.
+- **Suivi GPS** (mobile, HTTPS) : position de l'avion sur la carte
+  régionale avec cercle de précision et **trace du trajet**, orientation
+  « Nord / Route » (la carte tourne pour placer votre cap vers le haut),
+  écran maintenu allumé pendant le suivi (Wake Lock). Chaque session est
+  enregistrée automatiquement sur l'appareil (position, altitude GPS,
+  vitesse, cap — sessions < 5 min ignorées) ; le bouton « Vols » liste les
+  vols, rejoue leur trace et les exporte en **GPX / KML**. Actif sur
+  <https://papabear56.pages-perso.free.fr/> ; grisé sur l'adresse HTTP.
 - **Radiophares et points VFR mondiaux** (openAIP, actualisés chaque
   semaine par un cron GitHub) : couches VOR / NDB / points de repère
   VFR activables case par case dans le menu du bouton « Espaces », avec
