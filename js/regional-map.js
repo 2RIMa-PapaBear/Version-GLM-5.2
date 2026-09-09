@@ -163,8 +163,12 @@ async function _initOrRefresh() {
     if (isFirstInit) {
         const el = document.getElementById('regional-map');
         if (!el || typeof L === 'undefined') return;
-        
-        _map = L.map(el, { zoomControl: true, attributionControl: true, maxZoom: 19 }).setView([lat, lon], 7);
+
+        // rotate: true (plugin vendor/leaflet-rotate.js) : autorise la rotation
+        // « Route haut » du suivi GPS (js/gps.js). La carte est exposée en
+        // global pour ce module (monté après, sans dépendance d'import).
+        _map = L.map(el, { zoomControl: true, attributionControl: true, maxZoom: 19, rotate: true }).setView([lat, lon], 7);
+        window.__regionalMap = _map;
 
         // Fond de carte : mémorisé dans localStorage, satellite par défaut.
         const savedBase = localStorage.getItem('mt-basemap');

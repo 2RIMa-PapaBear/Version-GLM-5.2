@@ -45,6 +45,8 @@ const PRECACHE = [
     'js/core.js',
     'js/regional-map.js',
     'js/ui-module.js',
+    'js/gps.js',
+    'vendor/leaflet-rotate.js',
     'css/style.css',
 ];
 

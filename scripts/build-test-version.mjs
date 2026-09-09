@@ -25,8 +25,8 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'version-test');
-const V_TEST = '99.269';      // bump à chaque lot test (bust des caches HTTP/PWA)
-const SW_TEST_CACHE = 'mt-shell-test-v16';
+const V_TEST = '99.270';      // bump à chaque lot test (bust des caches HTTP/PWA)
+const SW_TEST_CACHE = 'mt-shell-test-v17';
 
 const COPY = [
     'index.html', 'sw.js', 'manifest.webmanifest', 'favicon.ico', 'icon.svg',
@@ -46,19 +46,16 @@ for (const f of COPY) {
 }
 log(`Copie : ${COPY.length} entrées → version-test/`);
 
-// ---- 2. index.html : versions « 99.x » + chargement du module GPS -----------
+// ---- 2. index.html : versions « 99.x » ---------------------------------------
+// (Depuis l'action 8 — GPS intégré aux sources réelles — les balises gps.js
+// et leaflet-rotate.js existent déjà : on ne fait que vérifier leur présence.)
 const idxPath = path.join(OUT, 'index.html');
 let idx = fs.readFileSync(idxPath, 'utf8');
 idx = idx.replace(/\?v=\d+\.\d+/g, `?v=${V_TEST}`);
-const anchor = `<script type="module" src="js/app.js?v=${V_TEST}"></script>`;
-if (!idx.includes(anchor)) throw new Error('ancre app.js introuvable dans index.html — abandon');
-idx = idx.replace(anchor, anchor + `\n    <script type="module" src="js/gps.js?v=${V_TEST}"></script>`);
-// Plugin de rotation (gps-feature/vendor/) : APRÈS leaflet.min.js
-const leafAnchor = `<script src="vendor/leaflet.min.js?v=${V_TEST}" defer></script>`;
-if (!idx.includes(leafAnchor)) throw new Error('ancre leaflet.min.js introuvable dans index.html — abandon');
-idx = idx.replace(leafAnchor, leafAnchor + `\n    <script src="vendor/leaflet-rotate.js?v=${V_TEST}" defer></script>`);
+if (!idx.includes(`js/gps.js?v=${V_TEST}`) || !idx.includes(`vendor/leaflet-rotate.js?v=${V_TEST}`))
+    throw new Error('balises GPS absentes de index.html — intégration réelle incomplète ?');
 fs.writeFileSync(idxPath, idx);
-log(`index.html : ?v=${V_TEST} + js/gps.js + vendor/leaflet-rotate.js chargés`);
+log(`index.html : ?v=${V_TEST} (balises GPS déjà présentes dans la prod)`);
 
 // ---- 3. sw.js : cache indépendant -------------------------------------------
 const swPath = path.join(OUT, 'sw.js');
@@ -68,22 +65,15 @@ sw = sw.replace(/CACHE = 'mt-shell-v\d+'/, `CACHE = '${SW_TEST_CACHE}'`);
 fs.writeFileSync(swPath, sw);
 log(`sw.js : CACHE ${SW_TEST_CACHE} (indépendant de la vraie PWA)`);
 
-// ---- 4. regional-map.js : plugin rotation + exposition de la carte (copie seule)
+// ---- 4. (action 8) Le GPS vit désormais dans les sources réelles : la copie
+// des dossiers js/ et vendor/ l'embarque telle quelle — vérification de forme.
 const rmPath = path.join(OUT, 'js', 'regional-map.js');
-let rm = fs.readFileSync(rmPath, 'utf8');
-const mapAnchor = "_map = L.map(el, { zoomControl: true, attributionControl: true, maxZoom: 19 }).setView([lat, lon], 7);";
-if (!rm.includes(mapAnchor)) throw new Error('ancre création carte introuvable dans js/regional-map.js — abandon');
-rm = rm.replace(mapAnchor,
-    "_map = L.map(el, { zoomControl: true, attributionControl: true, maxZoom: 19, rotate: true }).setView([lat, lon], 7);"
-    + '\n        window.__regionalMap = _map;   // [TEST GPS] carte exposée à js/gps.js');
-fs.writeFileSync(rmPath, rm);
-log('js/regional-map.js : rotate:true + window.__regionalMap exposé (copie seule)');
-
-// ---- 5. Module GPS + plugin de rotation --------------------------------------
-fs.copyFileSync(path.join(ROOT, 'gps-feature', 'js', 'gps.js'), path.join(OUT, 'js', 'gps.js'));
-fs.mkdirSync(path.join(OUT, 'vendor'), { recursive: true });
-fs.copyFileSync(path.join(ROOT, 'gps-feature', 'vendor', 'leaflet-rotate.js'), path.join(OUT, 'vendor', 'leaflet-rotate.js'));
-log('js/gps.js + vendor/leaflet-rotate.js copiés (gps-feature/)');
+const rm = fs.readFileSync(rmPath, 'utf8');
+if (!rm.includes('rotate: true') || !rm.includes('window.__regionalMap'))
+    throw new Error('regional-map.js sans rotate/__regionalMap — intégration réelle incomplète ?');
+if (!fs.existsSync(path.join(OUT, 'js', 'gps.js')) || !fs.existsSync(path.join(OUT, 'vendor', 'leaflet-rotate.js')))
+    throw new Error('js/gps.js ou vendor/leaflet-rotate.js absent de la copie');
+log('GPS présent dans la copie (issu des sources réelles)');
 
 // js/config.local.js part avec la copie de js/ s'il existe (machine pilote,
 // même choix que le miroir) ; sinon stub vide pour zéro 404.
