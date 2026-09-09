@@ -2641,3 +2641,8 @@ html.theme-light .neighbors-loading { background: rgba(255, 255, 255, 0.9); colo
 /* Zone de clic des pastilles de la carte régionale : disque transparent
  * superposé au cercle SVG (clic gauche = panneau, clic droit = waypoint). */
 .pin-hit { background: transparent; border-radius: 50%; }
+
+/* Zones aériennes (SVG Leaflet interactifs) : le focus au 2e clic dessinait
+   un CADRE NOIR autour de la zone (rectangle de focus navigateur — retour
+   pilote 09/09). Le surlignage par trait épaissi suffit. */
+.leaflet-interactive:focus { outline: none; }

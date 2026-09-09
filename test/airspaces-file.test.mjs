@@ -97,6 +97,10 @@ test('_rdpKey : désignateurs R/D/P des deux conventions de nommage', () => {
     assert.equal(_rdpKey('R 149 E'), 'R149E');
     assert.equal(_rdpKey('LF-R149E'), 'R149E');
     assert.equal(_rdpKey('R 149 E (2)'), 'R149E(2)');
+    // Zéros initiaux : openAIP « 01 » ≡ SIA « 1 » (retour pilote 09/09 —
+    // la capture montrait CTR DINARD 1 ET CTR DINARD 01 empilés).
+    assert.equal(_rdpKey('LF-R042 BREST'), 'R42');
+    assert.equal(_rdpKey('R 42'), 'R42');
     // Hors famille R/D/P : aucune clé (jamais dé-duplounés par désignateur).
     assert.equal(_rdpKey('RMZ CHERBOURG'), null);
     assert.equal(_rdpKey('TMA RENNES 2'), null);
@@ -118,6 +122,12 @@ test('_dropOpenAipDuplicates : la copie SIA prime, y compris par désignateur', 
     const out = _dropOpenAipDuplicates(oaip, sia);
     assert.equal(out.length, 3);
     assert.deepEqual(out.map(z => z.name), ['R 278', 'RMZ VANNES', 'LF-D42B LOINTAIN']);
+
+    // Noms à numéro zéro-initialisé : CTR DINARD 01 (openAIP) ≡ CTR DINARD 1 (SIA).
+    const out2 = _dropOpenAipDuplicates(
+        [{ name: 'CTR DINARD 01' }, { name: 'CTR PLOERMEL 4' }, { name: 'RMZ VANNES' }],
+        [{ name: 'CTR DINARD 1' }, { name: 'CTR PLOERMEL 04' }]);
+    assert.deepEqual(out2.map(z => z.name), ['RMZ VANNES']);
 });
 
 test('_dropOpenAipDuplicates : « partie X » normalisé (SIV RENNES SUD partie A ≡ SIV RENNES SUD A)', () => {
