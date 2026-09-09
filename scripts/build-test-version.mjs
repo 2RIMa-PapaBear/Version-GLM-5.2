@@ -25,8 +25,8 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'version-test');
-const V_TEST = '99.265';      // bump à chaque lot test (bust des caches HTTP/PWA)
-const SW_TEST_CACHE = 'mt-shell-test-v12';
+const V_TEST = '99.268';      // bump à chaque lot test (bust des caches HTTP/PWA)
+const SW_TEST_CACHE = 'mt-shell-test-v15';
 
 const COPY = [
     'index.html', 'sw.js', 'manifest.webmanifest', 'favicon.ico', 'icon.svg',

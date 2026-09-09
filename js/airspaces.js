@@ -96,9 +96,11 @@ const ICAO_CLASS_MAP = {
 };
 
 const AIRSPACE_STYLE = {
-    CTR:    { color: '#EF4444', fill: 'rgba(239,68,68,0.10)',  weight: 2, label: 'CTR' },
-    TMA:    { color: '#F97316', fill: 'rgba(249,115,22,0.10)', weight: 2, label: 'TMA' },
-    CTA:    { color: '#F97316', fill: 'rgba(249,115,22,0.10)', weight: 1.5, label: 'CTA' },
+    CTR:    { color: '#3B82F6', fill: 'rgba(59,130,246,0.10)', weight: 2, label: 'CTR' },
+    // STRICT SIA (décision pilote 09/09) : espaces contrôlés en BLEU
+    // (les TMA/CTA étaient orange, confondues avec les zones D ambre).
+    TMA:    { color: '#3B82F6', fill: 'rgba(59,130,246,0.10)', weight: 2, label: 'TMA' },
+    CTA:    { color: '#3B82F6', fill: 'rgba(59,130,246,0.10)', weight: 1.5, label: 'CTA' },
     ATZ:    { color: '#FBBF24', fill: 'rgba(251,191,36,0.08)', weight: 1.2, label: 'ATZ' },
     ACRO:   { color: '#A855F7', fill: 'rgba(168,85,247,0.08)', weight: 1, label: 'Voltige' },
     'A':    { color: '#DC2626', fill: 'rgba(220,38,38,0.10)',  weight: 1.5, label: 'A' },
@@ -112,18 +114,21 @@ const AIRSPACE_STYLE = {
     'GLIDER': { color: '#4ADE80', fill: 'rgba(74,222,128,0.08)', weight: 1, label: 'Planel' },
     'DROP': { color: '#94A3B8', fill: 'rgba(148,163,184,0.08)', weight: 1, label: 'Parachut.' },
     'RESTRICTED': { color: '#EF4444', fill: 'rgba(239,68,68,0.18)', weight: 2, label: 'Réglementée' },
-    'DANGER': { color: '#F59E0B', fill: 'rgba(245,158,11,0.15)', weight: 2, label: 'Dangereuse' },
+    'DANGER': { color: '#EF4444', fill: 'rgba(239,68,68,0.12)', weight: 2, label: 'Dangereuse' },
     'PROHIBITED': { color: '#DC2626', fill: 'rgba(220,38,38,0.25)', weight: 2.5, label: 'Interdite' },
-    'SIV':   { color: '#38BDF8', fill: 'rgba(56,189,248,0.07)', weight: 1.5, label: 'SIV' },
+    // STRICT SIA (décision pilote 09/09) : TOUS les espaces contrôlés en
+    // BLEU (CTR, TMA/CTA, SIV) — la distinction passe par les étiquettes,
+    // comme sur la carte papier. SIV garde un remplissage plus léger.
+    'SIV':   { color: '#3B82F6', fill: 'rgba(59,130,246,0.07)', weight: 1.5, label: 'SIV' },
     'OTHER': { color: '#94A3B8', fill: 'rgba(148,163,184,0.06)', weight: 1, label: '?' },
 };
 
 // Familles (dé)cochables du menu « Espaces » — chaque case filtre le rendu
 // sans re-téléchargement (les items du dernier cadrage sont rejoués).
 export const AIRSPACE_GROUPS = {
-    ctr:    { kinds: ['CTR'], label: 'CTR', en: 'CTR', color: '#EF4444' },
-    tma:    { kinds: ['TMA', 'CTA'], label: 'TMA / CTA', en: 'TMA / CTA', color: '#F97316' },
-    siv:    { kinds: ['SIV'], label: 'SIV', en: 'SIV', color: '#38BDF8' },
+    ctr:    { kinds: ['CTR'], label: 'CTR', en: 'CTR', color: '#3B82F6' },
+    tma:    { kinds: ['TMA', 'CTA'], label: 'TMA / CTA', en: 'TMA / CTA', color: '#3B82F6' },
+    siv:    { kinds: ['SIV'], label: 'SIV', en: 'SIV', color: '#3B82F6' },
     atz:    { kinds: ['ATZ'], label: 'ATZ', en: 'ATZ', color: '#FBBF24' },
     rpd:    { kinds: ['RESTRICTED', 'PROHIBITED', 'DANGER', 'DROP'], label: 'Zones R · P · D', en: 'R · P · D areas', color: '#DC2626' },
     tmz:    { kinds: ['TMZ', 'RMZ'], label: 'TMZ / RMZ', en: 'TMZ / RMZ', color: '#A855F7' },
@@ -330,8 +335,11 @@ export function _rdpKey(name) {
     const n = String(name || '').toUpperCase();
     let m = n.match(/^LF-([RDP]\d+(?:[A-Z]\d?)?(?:\(\d+\))?)\b/);
     if (m) return m[1];
-    m = n.match(/^([RDP]) (\d+(?:[A-Z]\d?)?(?:\(\d+\))?)( |$)/);
-    return m ? m[1] + m[2] : null;
+    // SIA : « R 278 », « D 59B »… mais AUSSI « R 149 E » (suffixe ESPACÉ) —
+    // sans l'espace optionnel la clé s'arrêtait à « R149 » et ne rattrapait
+    // pas « LF-R149E » : les deux copies se dessinaient (retour pilote 09/09).
+    m = n.match(/^([RDP]) ?(\d+)(?: ?([A-Z]\d?))?(?: ?(\(\d+\)))?( |$)/);
+    return m ? m[1] + m[2] + (m[3] || '') + (m[4] || '') : null;
 }
 
 /** ZRT — zones réglementées TEMPORAIRES : JAMAIS affichées, ni carte ni

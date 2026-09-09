@@ -92,6 +92,11 @@ test('_rdpKey : désignateurs R/D/P des deux conventions de nommage', () => {
     assert.equal(_rdpKey('R 278'), 'R278');
     assert.equal(_rdpKey('D 59B'), 'D59B');
     assert.equal(_rdpKey('P 23'), 'P23');
+    // Suffixe ESPACÉ côté SIA (retour pilote 09/09 : « R 149 E » doublonnait
+    // avec « LF-R149E ») — la clé doit rejoindre la convention openAIP.
+    assert.equal(_rdpKey('R 149 E'), 'R149E');
+    assert.equal(_rdpKey('LF-R149E'), 'R149E');
+    assert.equal(_rdpKey('R 149 E (2)'), 'R149E(2)');
     // Hors famille R/D/P : aucune clé (jamais dé-duplounés par désignateur).
     assert.equal(_rdpKey('RMZ CHERBOURG'), null);
     assert.equal(_rdpKey('TMA RENNES 2'), null);
@@ -100,7 +105,7 @@ test('_rdpKey : désignateurs R/D/P des deux conventions de nommage', () => {
 });
 
 test('_dropOpenAipDuplicates : la copie SIA prime, y compris par désignateur', () => {
-    const sia = [{ name: 'R 278' }, { name: 'R 279' }, { name: 'CTR VANNES' }];
+    const sia = [{ name: 'R 278' }, { name: 'R 279' }, { name: 'CTR VANNES' }, { name: 'R 149 E' }];
     const oaip = [
         sia[0],                                          // déjà dans SIA
         { name: 'LF-R278 VANNES', frequencies: [{ value: '122.600' }] },
@@ -108,6 +113,7 @@ test('_dropOpenAipDuplicates : la copie SIA prime, y compris par désignateur', 
         { name: 'CTR VANNES' },                          // homonyme exact
         { name: 'RMZ VANNES' },                          // famille non-SIA : conservé
         { name: 'LF-D42B LOINTAIN' },                    // désignateur absent du SIA : conservé
+        { name: 'LF-R149E' },                            // suffixe espacé côté SIA (retour 09/09)
     ];
     const out = _dropOpenAipDuplicates(oaip, sia);
     assert.equal(out.length, 3);
