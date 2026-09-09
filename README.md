@@ -22,7 +22,7 @@ dans une PWA installable qui fonctionne aussi hors ligne.
 
 ### Météo & briefing
 - **METAR / TAF** décodés en clair et visualisés graphiquement (rose des vents
-  animée, sélecteur de piste en service, tendances sur 24 h).
+  animée, piste en service publiée par la rose des vents, tendances sur 24 h).
 - **Widgets météo** : température / point de rosée, tendance de pression,
   **givrage carburateur** (zones à risque), niveau de congélation, vents en
   altitude, plafond & visibilité.
@@ -30,18 +30,20 @@ dans une PWA installable qui fonctionne aussi hors ligne.
   (plus tracés sur la carte — retour pilote). Les PIREP ont été retirés.
 - **Radar de précipitations** (RainViewer) en superposition carte.
 - **Fenêtre de vol jour VFR** avec alerte de nuit (crépuscules calculés).
-- **Mode cockpit** (briefing express ultra-lisible) et **mode nuit** (vision
-  scotopique préservée).
+- **Mode cockpit** (briefing express ultra-lisible) et **thème clair /
+  sombre** persistant (l'ancien « mode nuit rouge » a été remplacé par le
+  thème clair de briefing).
 - **Watchdog** : surveillance active des terrains favoris.
 
 ### Navigation
 - **Planificateur de vol** : recherche de terrain par code OACI (validation
   alphanumérique, ex. CNU8 ou K6RE), waypoints intelligents ou libres,
-  alternates, compagnie du trajet, autocomplétion. - **Log de nav PDF multi-pages** : au-delà de 9 tronçons, une page « VFR Flight Log
-  (suite) » prolonge le log dans la même trame (lignes vierges + checks en bas de page) ;
-  le tableau des calculs remplit la page avant d'appeler « Détail des waypoints (suite) ».
-Le champ « Waypoints »
+  alternates, compagnie du trajet, autocomplétion. Le champ « Waypoints »
   affiche les **vrais noms** des repères (VOR, NDB, points de repère VFR).
+- **Log de nav PDF multi-pages** : au-delà de 9 tronçons, une page « VFR
+  Flight Log (suite) » prolonge le log dans la même trame (lignes vierges +
+  checks en bas de page) ; le tableau des calculs remplit la page avant
+  d'appeler « Détail des waypoints (suite) ».
 - **Carte régionale** (Leaflet) : route, étiquettes de tronçons
   (cap / distance / temps), espaces aériens — **base officielle SIA (XML
   AIRAC) en priorité**, complétée par openAIP (ATZ, reste du monde), radar.
@@ -120,12 +122,12 @@ Le champ « Waypoints »
 
 | Source | Usage |
 |---|---|
-| [aviationweather.gov](https://aviationweather.gov/) | METAR, TAF, PIREP, SIGMET, ATIS, infos stations |
+| [aviationweather.gov](https://aviationweather.gov/) | METAR, TAF, SIGMET, infos stations |
 | [SIA](https://www.sia.aviation-civile.gouv.fr/) (eAIP + XML AIRAC) | Fréquences officielles des terrains, espaces aériens France, radiophares, obstacles — cycle AIRAC 28 j (paternité mentionnée dans l'application) |
 | [Open-Meteo](https://open-meteo.com/) | Prévisions, élévation, vents en altitude |
 | [openAIP](https://www.openaip.net/) | Terrains, espaces aériens mondiaux, radiophares et points VFR |
 | [RainViewer](https://rainviewer.com/) | Radar de précipitations |
-| Relais CORS (Google Apps Script) | Proxy met en cache les requêtes météo |
+| Relais CORS (Cloudflare Worker, dossier `worker/`) | Proxy met en cache les requêtes météo |
 
 ## Développement
 
@@ -133,18 +135,20 @@ Prérequis : **Node.js ≥ 18** (tests `node --test`).
 
 ```bash
 npm install     # devDependencies (basic-ftp pour le déploiement)
-npm test        # suite complète (~185 tests : cœur, plan de vol, perfs, centrage…)
+npm test        # suite complète (~240 tests : cœur, plan de vol, perfs, centrage…)
 ```
 
 - `index.html` — application (vanilla JS, modules ES, aucun framework).
-- `js/` — modules applicatifs (`engine`, `weather`, `flight-planner`,
-  `takeoff-performance`, `wb-core`, `navlog-pdf`…), volontairement découplés
+- `js/` — modules applicatifs (`engine`, `flight-planner`, `route-weather`,
+  `takeoff-ui`, `wb-core`, `navlog-pdf`, `gps`…), volontairement découplés
   et testables sous Node.
 - `test/` — tests unitaires + **pages d'aperçu** autonomes (QA visuelle des
   schémas, génération d'aperçus PDF) — non exécutées par `npm test`.
-- `vendor/` — dépendances bundlées (Leaflet, jsPDF, pdf.js, Lucide) pour un
-  fonctionnement 100 % hors ligne.
-- `apps-script/` — code du relais CORS (proxy météo avec cache).
+- `vendor/` — dépendances bundlées (Leaflet + leaflet-rotate, jsPDF, pdf.js,
+  Lucide, geomag) pour un fonctionnement 100 % hors ligne.
+- `worker/` — code du relais CORS (Cloudflare Worker, proxy météo avec cache ;
+  déploiement : `cd worker && npx wrangler deploy`). `apps-script/` conserve
+  l'ancien relais Google Apps Script (historique / repli).
 
 ## Déploiement
 
@@ -205,7 +209,9 @@ npm run pub -- "message du commit"   # commit + push + attente du déploiement
 
 ## Crédits & licences
 
-- [Leaflet](https://leafletjs.com/) (BSD-2) — cartographie.
+- [Leaflet](https://leafletjs.com/) (BSD-2) — cartographie, avec le plugin
+  [leaflet-rotate](https://github.com/Raruto/leaflet-rotate) (MIT) pour
+  l'orientation « Route haut » du suivi GPS.
 - [jsPDF](https://github.com/parallax/jsPDF) (MIT) — log de nav PDF.
 - [Mozilla pdf.js](https://github.com/mozilla/pdf.js) (Apache-2.0) — aperçus PDF.
 - [Lucide](https://lucide.dev/) (Apache-2.0) — icônes (dont l'avion du schéma
