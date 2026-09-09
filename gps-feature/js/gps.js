@@ -31,6 +31,10 @@ const TRACE_MAX = 2000;          // au-delà : décimation ×2 (mémoire bornée
 const TRACE_COLOR = '#D946EF';   // magenta EFB, distinct de la route (#38BDF8)
 const FT_START_MS = 18.0;        // ~35 kt : chrono de vol déclenché au-delà
 const VOLS_MAX = 50;             // historique conservé sur le portable
+// Durée minimale d'une session pour être conservée (réglage pilote 09/09) ;
+// surchargeable avant le chargement via window.__gpsVolMinMs (QA).
+const VOL_MIN_MS = (typeof window !== 'undefined' && Number(window.__gpsVolMinMs)) || 300000;
+const volDurMs = (v) => (v.pts.length ? v.pts[v.pts.length - 1].t : v.id) - v.id;
 const VDB_NAME = 'mt-gps-test', VDB_STORE = 'vols';
 const ROT_KEY = 'mt-gps-rotation';
 
@@ -501,10 +505,14 @@ function stop() {
     if (activeMap) activeMap.off('dragstart', onUserDrag);
     releaseWakeLock();
     clearMarker();          // la trace reste affichée après l'arrêt
-    // Clôture du vol enregistré (≥ 2 points) → historique du portable
+    // Clôture du vol : conservé seulement si ≥ 2 points ET ≥ durée minimale
+    // (les autosaves incrémentaux l'ont déjà écrit : on le RETIRE sinon).
     if (curVol) {
         curVol.endedAt = new Date().toISOString();
-        if (curVol.pts.length >= 2) volSave(curVol);
+        // Durée en horloge murale (id = départ de session) : les timestamps
+        // des fixations peuvent être identiques (cache géoloc, injecteurs).
+        if (curVol.pts.length >= 2 && (Date.now() - curVol.id) >= VOL_MIN_MS) volSave(curVol);
+        else volDel(curVol.id);   // vol trop court : pas enregistré
         curVol = null;
     }
     mode = 'off';
@@ -691,6 +699,45 @@ function mount() {
     }
 
     volsBtn.addEventListener('click', () => panelOpen ? closePanel() : openPanel());
+
+    // Le menu des familles d'espaces (.rp-menu de radio-points-layer) vit
+    // DANS la barre (position:absolute sous son bouton) : le défilement
+    // horizontal de la barre le CLIPPE (overflow-y devient auto) — le bouton
+    // « Espaces » semblait mort. On libère tout menu ouvert en position:fixed
+    // sous son bouton, déplacé sur <body> (hors du contexte de défilement).
+    // (écouteur en CAPTURE : le bouton « Espaces » fait stopPropagation,
+    // les écouteurs de remontée ne voient jamais le clic.)
+    document.addEventListener('click', () => {
+        setTimeout(() => {
+            document.querySelectorAll('.rp-menu').forEach(m => {
+                if (m.style.display !== 'block') return;
+                const btn = m._rpBtn || (m._rpBtn = m.parentElement?.querySelector?.('button'));
+                if (!btn) return;
+                if (m.parentElement !== document.body) document.body.appendChild(m);
+                const r = btn.getBoundingClientRect();
+                m.style.position = 'fixed';
+                m.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 185)) + 'px';
+                m.style.top = (r.bottom + 6) + 'px';
+                m.style.zIndex = 4000;
+                m.style.maxHeight = '60vh';
+                m.style.overflowY = 'auto';
+            });
+        }, 0);
+    }, true);
+
+    // Orphelins d'une fermeture brutale (endedAt nul, plus rien qui arrive) :
+    // finalisés si ≥ durée minimale, sinon supprimés — même règle qu'à l'arrêt.
+    (async () => {
+        const all = await volAll();
+        for (const v of all) {
+            if (v.endedAt) continue;
+            const lastT = v.pts.length ? v.pts[v.pts.length - 1].t : v.id;
+            if (Date.now() - lastT < 60000) continue;   // session peut-être encore active
+            if (volDurMs(v) >= VOL_MIN_MS) { v.endedAt = new Date(lastT).toISOString(); volSave(v); }
+            else volDel(v.id);
+        }
+        updateVolsCount();
+    })();
     updateVolsCount();
     render();
 }

@@ -38,6 +38,8 @@ const context = browser.defaultBrowserContext();
 await context.overridePermissions('http://127.0.0.1:8656', ['geolocation']);
 const page = await browser.newPage();
 await page.setViewport({ width: 1280, height: 900 });
+// Seuil minimal de durée de vol abaissé à 1,5 s pour la QA (5 min réels).
+await page.evaluateOnNewDocument(() => { window.__gpsVolMinMs = 1500; });
 await page.setGeolocation({ latitude: 48.7690, longitude: 2.1050, accuracy: 30 });
 await page.setRequestInterception(true);
 page.on('request', req => {
@@ -108,6 +110,31 @@ ui2.ids === 'gps-toggle-btn,gps-recenter-btn,gps-rot-btn,map-fitplan-btn,map-fs-
 ui2.led ? ok('icône GPS porte la LED (.gps-led)') : ko('LED absente');
 const volsIconRendered = await page.evaluate(() => !!document.querySelector('#gps-vols-btn svg'));
 volsIconRendered ? ok('icône du bouton « Vols » rendue (Lucide)') : ko('icône « Vols » VIDE (createIcons manquant)');
+
+// 1ter. MENU « ESPACES » : le défilement de la barre clippait le dropdown
+// (bouton « mort » en recette 09/09) — il doit s'ouvrir en position:fixed,
+// visible et atteignable au pointeur.
+await page.click('.precip-toggle-airspaces');
+await new Promise(r => setTimeout(r, 400));
+const rpMenu = await page.evaluate(() => {
+    const m = document.querySelector('.rp-menu');
+    if (!m) return { exists: false };
+    const r = m.getBoundingClientRect();
+    const hit = document.elementFromPoint(r.left + Math.min(10, r.width / 2), r.top + 10);
+    return {
+        exists: true, open: m.style.display === 'block',
+        fixed: getComputedStyle(m).position === 'fixed',
+        w: Math.round(r.width), h: Math.round(r.height),
+        inViewport: r.top >= 0 && r.right <= window.innerWidth + 1 && r.bottom <= window.innerHeight,
+        clickable: !!hit && (m.contains(hit) || hit === m),
+    };
+});
+rpMenu.exists && rpMenu.open ? ok('menu « Espaces » ouvert au clic') : ko("menu Espaces n'ouvre pas : " + JSON.stringify(rpMenu));
+rpMenu.fixed ? ok('menu « Espaces » libéré en position:fixed (hors barre)') : ko('menu toujours dans le contexte de défilement de la barre');
+rpMenu.h > 30 && rpMenu.inViewport ? ok(`menu visible dans le viewport (${rpMenu.w}×${rpMenu.h}px)`) : ko('menu clippé/hors viewport : ' + JSON.stringify(rpMenu));
+rpMenu.clickable ? ok('menu atteignable au pointeur (cases cliquables)') : ko('un élément couvre le menu : ' + JSON.stringify(rpMenu));
+await page.keyboard.press('Escape');
+await new Promise(r => setTimeout(r, 200));
 
 // 2. Clic GPS → marqueur + cercle + trace + LED, carte centrée sur la position
 await page.click('#gps-toggle-btn');
@@ -317,6 +344,18 @@ const volsAfterKill = await idbVols();
 const inFlight = volsAfterKill.find(v => !v.endedAt);
 inFlight && inFlight.pts.length >= 1
     ? ok(`vol en cours SURVIT à la fermeture sans arrêt (${inFlight.pts.length} points)`) : ko('vol perdu après fermeture brutale : ' + JSON.stringify(volsAfterKill.map(v => ({ endedAt: v.endedAt, n: v.pts.length }))));
+
+// 7bis. FILTRE DES VOLS COURTS : session < seuil (1,5 s en QA) → rien en
+// PLUS en base (la section 8 a laissé un orphelin volontairement).
+const volsBeforeShort = await idbVols();
+await page.click('#gps-toggle-btn');
+await page.waitForSelector('.gps-plane-icon', { timeout: 15000 });
+await new Promise(r => setTimeout(r, 400));   // session ~0,4 s < 1,5 s
+await page.click('#gps-toggle-btn');
+await new Promise(r => setTimeout(r, 800));
+const volsShort = await idbVols();
+volsShort.length === volsBeforeShort.length
+    ? ok(`vol trop court (< 5 min réels) NON enregistré (${volsShort.length} vol(s) en base, inchangé)`) : ko('un vol court a été enregistré : ' + volsBeforeShort.length + ' → ' + volsShort.length);
 
 if (jsErrors.length > 0) ko('erreurs JS : ' + jsErrors.join(' | ')); else ok('aucune erreur JS');
 console.log(failures === 0 ? '\nVERSION TEST GPS v2 : TOUT OK' : `\nVERSION TEST GPS v2 : ${failures} ÉCHEC(S)`);
