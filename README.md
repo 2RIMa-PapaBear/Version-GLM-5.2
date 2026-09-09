@@ -163,12 +163,12 @@ npm run pub -- "message du commit"   # commit + push + attente du déploiement
 
 ### Données aéronautiques — mises à jour automatiques
 
-- **Cron quotidien** (`update-radio-points.yml`) : crawl incrémental des
+- **Cron hebdomadaire** (`update-radio-points.yml`, lundi 05:30 UTC) : crawl incrémental des
   espaces aériens openAIP (cellule 1°), fréquences SIA (à chaque nouvel
   AIRAC), radiophares + points VFR (lundi).
 - **Obstacles SIA** : extraits de l'export AIXM « Obstacles Model »
   téléchargé manuellement à chaque cycle AIRAC → `node scripts/fetch-obstacles.mjs`.
-  Un **garde-fou** (job `airac-obstacles`) fait échouer le workflow quotidien
+  Un **garde-fou** (job `airac-obstacles`) fait échouer le workflow hebdomadaire
   — notification GitHub — tant que la base est en retard sur le cycle en
   vigueur.
 - **Base SIA (XML bd SIA)** — terrains (identité, horaires ATS,
