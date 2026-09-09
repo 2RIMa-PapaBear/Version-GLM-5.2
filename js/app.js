@@ -855,14 +855,15 @@ document.addEventListener('DOMContentLoaded', async function () {
     renderSearchHistory('search-history-list', _selectAndFetch);
     updateFavoritesUI(_selectAndFetch);
 
-    // Sidebars repliables sur mobile : clic sur le titre pour déplier/replier.
-    document.querySelectorAll('.side-column h3').forEach(h3 => {
-        h3.addEventListener('click', () => {
-            if (window.innerWidth <= 800) {
-                h3.closest('.side-column').classList.toggle('expanded');
-            }
-        });
-    });
+    // Sidebars repliables sur mobile : DÉLÉGATION document (un seul listener
+    // idempotent — insensible au remplacement des h3 ni à un double init).
+    const _sideColToggle = (e) => {
+        if (window.innerWidth > 1100) return;   // seuil aligné sur l'empilement des colonnes
+        const h3 = e.target.closest('.side-column h3');
+        if (h3) h3.closest('.side-column').classList.toggle('expanded');
+    };
+    document.removeEventListener('click', _sideColToggle);
+    document.addEventListener('click', _sideColToggle);
 
     // Efface la route sur la carte quand on passe en mode Local.
     document.addEventListener('clear-route', () => {
