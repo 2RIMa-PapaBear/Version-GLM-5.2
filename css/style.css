@@ -74,7 +74,7 @@ body {
 
 /* Sur mobile, les sidebars sont repliables (fermées par défaut).
    Le titre devient un bouton toggle (curseur + chevron). */
-@media (max-width: 800px) {
+@media (max-width: 1100px) {
     .side-column { padding: 10px 12px; }
     .side-column h3 {
         cursor: pointer;
@@ -88,12 +88,16 @@ body {
         font-size: 12px;
         transition: transform 0.2s;
     }
-    /* Contenu replié par défaut. */
-    .side-column > div,
-    .side-column > button {
-        display: none;
+    /* Contenu replié par défaut. Impératif : #favorites-list et
+       #search-history-container ont des règles display par identifiant plus
+       spécifiques que .side-column > div — sans !important, ils restaient
+       déployés (retour pilote 09/09). */
+    .side-column:not(.expanded) > div,
+    .side-column:not(.expanded) > button {
+        display: none !important;
     }
-    /* Quand le titre est cliqué, on déploie. */
+    /* Quand le titre est cliqué, on déploie : les règles ID d'origine
+       (flex…) reprennent la main. */
     .side-column.expanded > div,
     .side-column.expanded > button {
         display: block;
