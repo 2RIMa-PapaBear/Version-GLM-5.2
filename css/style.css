@@ -2646,3 +2646,18 @@ html.theme-light .neighbors-loading { background: rgba(255, 255, 255, 0.9); colo
    un CADRE NOIR autour de la zone (rectangle de focus navigateur — retour
    pilote 09/09). Le surlignage par trait épaissi suffit. */
 .leaflet-interactive:focus { outline: none; }
+
+/* Badge d'âge de la dernière observation (data-age.js, demande pilote 09/09) */
+.data-age-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 600; letter-spacing: .3px;
+    border-radius: 999px; padding: 3px 9px; margin: 0 8px 4px 0;
+    border: 1px solid transparent; vertical-align: middle;
+}
+.data-age-badge::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.data-age-badge.age-fresh { color: #4ADE80; background: rgba(74, 222, 128, 0.12); border-color: rgba(74, 222, 128, 0.35); }
+.data-age-badge.age-aging { color: #FBBF24; background: rgba(251, 191, 36, 0.12); border-color: rgba(251, 191, 36, 0.35); }
+.data-age-badge.age-old   { color: #F87171; background: rgba(248, 113, 113, 0.14); border-color: rgba(248, 113, 113, 0.4); }
+html.theme-light .data-age-badge.age-fresh { color: #15803D; background: rgba(34, 197, 94, 0.12); }
+html.theme-light .data-age-badge.age-aging { color: #B45309; background: rgba(245, 158, 11, 0.14); }
+html.theme-light .data-age-badge.age-old   { color: #B91C1C; background: rgba(239, 68, 68, 0.12); }

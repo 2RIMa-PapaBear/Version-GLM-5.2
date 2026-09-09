@@ -210,3 +210,46 @@ export function searchAircraft(query, limit = 8) {
 
     return results;
 }
+
+
+// ----------------------------------------------------------------
+// VITESSES DE ROTATION (VR) représentatives, en kt — item ⑤ du plan
+// d'améliorations 09/09 : le chrono de vol du suivi GPS démarre à
+// VR − 5 kt (décollage réel, pas roulage — un DR400 ne roule pas à 35 kt).
+// Valeurs indicatives des POH publics ; type inconnu → 55 kt (monomoteur
+// club). Exporté pour les tests.
+// ----------------------------------------------------------------
+export const VR_KT = {
+    C150: 48, C152: 48, C172: 55, C172S: 55, C172RG: 59, C182: 60, C177: 58,
+    C206: 63, C210: 65, C310: 75,
+    'PA28-140': 55, 'PA28-150': 55, 'PA28-160': 56, 'PA28-180': 58, 'PA28-181': 59,
+    PA28R: 67, 'PA28-161': 57, PA32: 65, PA34: 75, PA38: 50, PA44: 75, PA18: 45,
+    'DR400-120': 50, 'DR400-140': 52, 'DR400-160': 53, 'DR400-180': 55,
+    'DR400-200': 57, 'DR400-220': 58, DR401: 56, DR500: 60, R2120: 52, CAP10: 60,
+    DA20: 49, 'DA20-C1': 55, DA40: 60, DA40NG: 68, DA42: 78,
+    SR20: 70, SR22: 75, SR22T: 80,
+    TB9: 60, TB10: 62, TB20: 71, TB21: 75, MS880: 45, MS883: 50, MS893: 52,
+    TBM700: 85, TBM850: 90, TBM900: 90,
+    F33A: 60, A36: 70, BE58: 84, BE76: 55, BE23: 55, BE77: 58, BE24: 60,
+    M20J: 64, M20K: 70, M20R: 70, M20TN: 75,
+    AA5: 52, AA5A: 55, AA5B: 60, AA1: 50,
+    '7AC': 45, '11AC': 45, L8A: 50, BC12D: 45, '7GCBC': 50, '8KCAB': 55,
+    '8GCBC': 58, M7: 50, M9: 55,
+    P92: 50, P2002: 55, P2010: 60, P2006T: 68, A22: 52, A32: 60,
+    MCR01: 60, MCR4S: 65, TL3000: 55, EV97: 50, VirusSW: 60, Sinus: 55,
+    CAP20: 65, EA200: 60, S10VT: 60,
+    Yak18T: 60, AERC: 55, AUSTER: 45, D112: 50, DR1050: 50, DR1051: 50,
+    SF260: 70, L90: 60, KOLIBER: 50, Yak52: 65, Z42: 60, Z43: 60, Z142: 65,
+    Z242L: 65, G115: 70, G120A: 70, T67: 60, BULLOG: 60, 'B-121': 60, HEMA352: 55,
+};
+
+/** VR d'un type de la base ; type inconnu → 55 kt (monomoteur club). */
+export function vrForType(type) {
+    return VR_KT[type] || 55;
+}
+
+/** Seuil du chrono de vol : VR − 5 kt (jamais sous 10 kt). */
+export const CHRONO_MARGIN_KT = 5;
+export function chronoThresholdKt(vrKt) {
+    return Math.max(10, vrKt - CHRONO_MARGIN_KT);
+}

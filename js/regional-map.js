@@ -8,6 +8,7 @@ import { createAirspaceController } from './airspaces.js';
 import { createRadioPointsController } from './radio-points-layer.js';
 import { getRunwayThresholds } from './runways-geo.js';
 import { hasVac, openVac } from './vac-viewer.js';
+import { registerMap } from './map-registry.js';
 
 let _map = null;
 let _precip = null;
@@ -165,9 +166,11 @@ async function _initOrRefresh() {
         if (!el || typeof L === 'undefined') return;
 
         // rotate: true (plugin vendor/leaflet-rotate.js) : autorise la rotation
-        // « Route haut » du suivi GPS (js/gps.js). La carte est exposée en
-        // global pour ce module (monté après, sans dépendance d'import).
+        // « Route haut » du suivi GPS (js/gps.js). L'instance est déclarée au
+        // REGISTRE (js/map-registry.js) pour les modules montés après la carte.
+        // window.__regionalMap reste posé comme HOOK DE QA (qa-gps.mjs).
         _map = L.map(el, { zoomControl: true, attributionControl: true, maxZoom: 19, rotate: true }).setView([lat, lon], 7);
+        registerMap(_map);
         window.__regionalMap = _map;
 
         // Fond de carte : mémorisé dans localStorage, satellite par défaut.

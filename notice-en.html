@@ -535,6 +535,7 @@
 </tbody>
 </table>
 <p><strong>Recorded flights</strong>: every tracking session is recorded automatically on the device (position, altitude, speed, heading, time) — sessions under 5 minutes are discarded. The <span class="demo-btn"><i data-lucide="download"></i> Flights</span> button in the toolbar lists your flights: show the track on the map ("Track" button), export it as <strong>GPX</strong> or <strong>KML</strong>, or delete it. Example: after a 1 h 20 flight, open "Flights", tap GPX — the file downloads and opens in Google Earth or your logbook.</p>
+<p><strong>In-flight info</strong>: tap the aircraft on the map — ground speed (kt), GPS altitude (ft), heading, flight time and tracking time appear on demand, continuously refreshed. <strong>Flight time</strong> starts at the actual takeoff: the rotation speed of the aircraft selected in your fleet, minus 5 kt (a DR400 will not start its timer while taxiing).</p>
 <p>Tracking requires a secure address: on <em>http://papabear56.free.fr/</em> (HTTP), the GPS button stays greyed out.</p>
 
 <h3>SIGMET / AIRMET</h3>
@@ -619,6 +620,7 @@
 
 <h3>Audio Read-Aloud</h3>
 <p>The <i data-lucide="volume-2" class="li-ic"></i> button reads the METAR aloud (browser speech synthesis), ATIS-style.</p>
+<p><strong>Observation age</strong>: a small pill next to the airfield name shows how fresh the message is — <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#4ADE80;"></span> green (under an hour), <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#FBBF24;"></span> amber, <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#F87171;"></span> red (stale for briefing). It refreshes every minute. If the network drops, the last observation stays on display in red with its age: you always know what you are looking at.</p>
 
 <h3>Printable Nav Log</h3>
 <p>In the "Flight plan" panel, the <strong>"Print nav log"</strong> button generates the A5 log (3-4 pages: nav log, navigation computations, performance &amp; terrain, weight &amp; balance if the aircraft is configured — beyond 9 legs the nav log continues on a "VFR Flight Log (cont.)" page with the same layout — table filled with blank rows and the Cruise / Turning point / Downwind check boxes kept at the bottom — and the computations table fills the whole page before an extra "Leg details (continued)" page takes over). A <strong>verification modal</strong> lists the automatically computed values to check before any in-flight use; once confirmed, the PDF <strong>opens in a browser tab</strong> — the viewer's Print button is one click away (fallback: direct download if the tab is blocked).</p>

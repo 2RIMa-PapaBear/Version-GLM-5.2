@@ -25,17 +25,20 @@
 //     l'écran (souhait pilote) : ils vivent dans les exports.
 // ============================================================================
 import { state } from './core.js';
+import { vrForType, chronoThresholdKt } from './aircraft-database.js';
+import { getActiveAircraft } from './aircraft-fleet.js';
+import { volSave, volAll, volDel, volDurMs, volName, toGpx, toKml, download } from './gps-vols.js';
+import { getRegisteredMap } from './map-registry.js';
 
 const ROT_OFFSET = -45;          // glyphe Lucide orienté NE → rotation = cap − 45°
 const TRACE_MAX = 2000;          // au-delà : décimation ×2 (mémoire bornée)
 const TRACE_COLOR = '#D946EF';   // magenta EFB, distinct de la route (#38BDF8)
-const FT_START_MS = 18.0;        // ~35 kt : chrono de vol déclenché au-delà
-const VOLS_MAX = 50;             // historique conservé sur le portable
+// Chrono de vol (item ⑤ 09/09) : seuil DÉRIVÉ DE LA FLOTTE — VR de l'avion
+// actif moins 5 kt (décollage réel, pas roulage) ; sans avion → 55−5 = 50 kt.
+let ftStartMs = chronoThresholdKt(55) / 1.94384;
 // Durée minimale d'une session pour être conservée (réglage pilote 09/09) ;
 // surchargeable avant le chargement via window.__gpsVolMinMs (QA).
 const VOL_MIN_MS = (typeof window !== 'undefined' && Number(window.__gpsVolMinMs)) || 300000;
-const volDurMs = (v) => (v.pts.length ? v.pts[v.pts.length - 1].t : v.id) - v.id;
-const VDB_NAME = 'mt-gps-test', VDB_STORE = 'vols';
 const ROT_KEY = 'mt-gps-rotation';
 
 const isFr = () => state && state.lang === 'fr';
@@ -48,6 +51,9 @@ const T = () => isFr() ? {
     recTitlePaused: 'Recentrage en pause (carte déplacée) — cliquer pour recentrer et reprendre',
     voyant: 'écran maintenu allumé',
     voyantLock: 'Wake Lock actif — l\'écran restera allumé',
+    infoSpd: 'Vitesse sol', infoAlt: 'Altitude GPS', infoHdg: 'Cap',
+    infoVol: 'Temps de vol', infoSuivi: 'Temps de suivi',
+    infoAltNote: 'Altitude GPS (WGS84) — peut différer de l\'altitude baro.',
     voyantNoLock: 'Wake Lock indisponible sur ce navigateur',
     errDenied: 'Position indisponible : autorise la localisation de ce site dans ton navigateur (icône cadenas → Autorisations → Localisation).',
     errOther: 'Position GPS introuvable pour le moment — réessaie.',
@@ -72,6 +78,9 @@ const T = () => isFr() ? {
     recTitlePaused: 'Centering paused (map moved) — click to center and resume',
     voyant: 'screen kept awake',
     voyantLock: 'Wake Lock active — screen will stay on',
+    infoSpd: 'Ground speed', infoAlt: 'GPS altitude', infoHdg: 'Heading',
+    infoVol: 'Flight time', infoSuivi: 'Tracking time',
+    infoAltNote: 'GPS altitude (WGS84) — may differ from baro altitude.',
     voyantNoLock: 'Wake Lock unavailable on this browser',
     errDenied: 'Position unavailable: allow location for this site in your browser (padlock icon → Permissions → Location).',
     errOther: 'GPS position not found right now — try again.',
@@ -178,6 +187,7 @@ let watchId = null, wakeLock = null;
 let marker = null, circle = null, traceLine = null, trace = [];
 let lastFix = null, lastFixT = 0, lastHdg = 0, haveHdg = false;
 let lastAcc = 8;
+let lastSpd = null, lastAltM = null;   // pour les infos vol au tap sur l'avion
 let activeMap = null;
 let rotationOn = false;
 let curBearing = 0;               // bearing réellement appliqué à la carte
@@ -214,7 +224,8 @@ function drawPlane(ll, hdg, accM) {
     const rel = hdg + curBearing;
     const icon = L.divIcon({ html: planeSvg(rel), className: '', iconSize: [30, 30], iconAnchor: [15, 15] });
     if (!marker) {
-        marker = L.marker(ll, { icon, zIndexOffset: 1000, interactive: false }).addTo(activeMap);
+        marker = L.marker(ll, { icon, zIndexOffset: 1000, interactive: true }).addTo(activeMap);
+        marker.bindPopup(() => _volInfoHtml(), { closeButton: true, autoPan: false });   // fonction : ré-évaluée à CHAQUE ouverture
         circle = L.circle(ll, {
             radius: accM, color: '#FFFFFF', weight: 1, opacity: .9,
             fillColor: '#FFFFFF', fillOpacity: .15, interactive: false,
@@ -248,110 +259,13 @@ function appendTrace(ll) {
     }
 }
 
-// ---- IndexedDB (historique des vols) ----------------------------------------
-let _dbp = null;
-function idb() {
-    if (!_dbp) {
-        _dbp = new Promise((res, rej) => {
-            const rq = indexedDB.open(VDB_NAME, 1);
-            rq.onupgradeneeded = () => rq.result.createObjectStore(VDB_STORE, { keyPath: 'id' });
-            rq.onsuccess = () => res(rq.result);
-            rq.onerror = () => rej(rq.error);
-        });
-    }
-    return _dbp;
-}
-async function volSave(vol) {
-    try {
-        const db = await idb();
-        const st = db.transaction(VDB_STORE, 'readwrite').objectStore(VDB_STORE);
-        st.put(vol);
-        const all = await volAll();
-        for (const old of all.slice(VOLS_MAX)) st.delete(old.id);
-        updateVolsCount();
-    } catch (e) { /* stockage indisponible : le vol reste exportable de la session */ }
-}
-async function volAll() {
-    try {
-        const db = await idb();
-        const all = await new Promise((res, rej) => {
-            const rq = db.transaction(VDB_STORE).objectStore(VDB_STORE).getAll();
-            rq.onsuccess = () => res(rq.result || []);
-            rq.onerror = () => rej(rq.error);
-        });
-        return all.sort((a, b) => b.id - a.id);
-    } catch (e) { return []; }
-}
-async function volDel(id) {
-    try {
-        const db = await idb();
-        db.transaction(VDB_STORE, 'readwrite').objectStore(VDB_STORE).delete(id);
-        updateVolsCount();
-    } catch (e) { /* rien */ }
-}
 async function updateVolsCount() {
     if (!volsCount) return;
     const all = await volAll();
     volsCount.textContent = all.length ? String(all.length) : '';
 }
 
-// ---- Exports GPX / KML ------------------------------------------------------
-function volName(v) {
-    const d = new Date(v.id);
-    const p = n => String(n).padStart(2, '0');
-    return `vol-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
-}
-function toGpx(v) {
-    const pts = v.pts.map(p => {
-        let s = `      <trkpt lat="${p.lat.toFixed(6)}" lon="${p.lon.toFixed(6)}">`;
-        if (p.alt != null) s += `<ele>${p.alt.toFixed(1)}</ele>`;
-        s += `<time>${new Date(p.t).toISOString()}</time>`;
-        if (p.spd != null) s += `<speed>${p.spd.toFixed(1)}</speed>`;
-        if (p.hdg != null) s += `<course>${p.hdg.toFixed(1)}</course>`;
-        return s + `</trkpt>`;
-    }).join('\n');
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="meteo VFR - version test GPS" xmlns="http://www.topografix.com/GPX/1/1">
-  <trk>
-    <name>${volName(v)}</name>
-    <trkseg>
-${pts}
-    </trkseg>
-  </trk>
-</gpx>
-`;
-}
-function toKml(v) {
-    const coords = v.pts.map(p => `${p.lon.toFixed(6)},${p.lat.toFixed(6)},${p.alt != null ? p.alt.toFixed(1) : 0}`).join(' ');
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2">
-  <Document>
-    <name>${volName(v)}</name>
-    <Placemark>
-      <name>${volName(v)}</name>
-      <Style><LineStyle><color>ffef46d9</color><width>3</width></LineStyle></Style>
-      <LineString>
-        <tessellate>1</tessellate>
-        <altitudeMode>absolute</altitudeMode>
-        <coordinates>${coords}</coordinates>
-      </LineString>
-    </Placemark>
-  </Document>
-</kml>
-`;
-}
-function download(name, content, mime) {
-    const b = new Blob([content], { type: mime });
-    const u = URL.createObjectURL(b);
-    const a = document.createElement('a');
-    a.href = u; a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(u), 2000);
-}
-
-// ---- Rotation « Route haut » --------------------------------------------------
+// ---- Rotation « Route haut » (restaurées après le découpage ⑥) ---------------
 function updateBearing() {
     if (!rotationOn || !activeMap || !activeMap.setBearing || !haveHdg) return;
     const target = -lastHdg;                       // cap sol vers le HAUT de l'écran
@@ -383,7 +297,7 @@ function renderRot() {
 // Indépendant du suivi : la carte (singleton) est utilisée directement, pour
 // pouvoir rejouer un vol AU DÉMARRAGE de l'app sans avoir lancé le GPS
 // (bug constaté par le pilote : « Trace » sans session GPS = rien).
-function replayMap() { return window.__regionalMap || activeMap; }
+function replayMap() { return getRegisteredMap() || activeMap; }
 function resetReplay() {
     const map = replayMap();
     if (replayLine && map) map.removeLayer(replayLine);
@@ -400,6 +314,32 @@ function toggleReplay(v) {
     }).addTo(map);
     replayVolId = v.id;
     map.fitBounds(replayLine.getBounds(), { padding: [40, 40] });
+}
+
+// ---- Infos vol au tap sur l'avion (item ④, 09/09) ---------------------------
+const KT = 1.94384, FT = 3.28084;
+function _fmtDur(ms) {
+    if (!Number.isFinite(ms) || ms < 0) return '—';
+    const m = Math.floor(ms / 60000), h = Math.floor(m / 60);
+    return h ? `${h}h${String(m % 60).padStart(2, '0')}` : `${m} min`;
+}
+function _volInfoHtml() {
+    const t = T();
+    const now = lastFixT || Date.now();
+    const spdKt = Number.isFinite(lastSpd) ? Math.round(lastSpd * KT) : null;
+    const altFt = Number.isFinite(lastAltM) ? Math.round(lastAltM * FT) : null;
+    const vol = curVol?.flightStartT ? _fmtDur(now - curVol.flightStartT) : null;
+    const suivi = curVol ? _fmtDur(now - curVol.id) : null;
+    const row = (l, v) => `<div style="display:flex;justify-content:space-between;gap:12px;">
+        <span style="color:#94A3B8;">${l}</span><b style="font-family:'DM Mono',monospace;">${v}</b></div>`;
+    return `<div style="min-width:170px;">
+        ${row(t.infoSpd, spdKt != null ? spdKt + ' kt' : '—')}
+        ${row(t.infoAlt, altFt != null ? altFt.toLocaleString('fr-FR') + ' ft' : '—')}
+        ${row(t.infoHdg, haveHdg ? Math.round(((lastHdg % 360) + 360) % 360) + '°' : '—')}
+        ${row(t.infoVol, vol ?? '—')}
+        ${row(t.infoSuivi, suivi ?? '—')}
+        <div style="color:#64748B;font-size:10px;margin-top:4px;">${t.infoAltNote}</div>
+    </div>`;
 }
 
 // ---- Wake Lock --------------------------------------------------------------
@@ -425,10 +365,10 @@ function updateVoyant() {
 }
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && mode !== 'off') requestWakeLock();
-    if (document.visibilityState === 'hidden' && curVol) volSave(curVol);   // arrière-plan/fermeture
+    if (document.visibilityState === 'hidden' && curVol) volSave(curVol, updateVolsCount);   // arrière-plan/fermeture
 });
 // Fermeture de la page (swipe de fermeture, changement de page…) : dernier état sauvegardé
-window.addEventListener('pagehide', () => { if (curVol) volSave(curVol); });
+window.addEventListener('pagehide', () => { if (curVol) volSave(curVol, updateVolsCount); });
 
 // ---- Suivi + enregistrement --------------------------------------------------
 function onFix(pos) {
@@ -442,6 +382,8 @@ function onFix(pos) {
     let spd = Number.isFinite(c.speed) ? c.speed
         : (lastFix && lastFixT && t > lastFixT ? distM(lastFix, ll) / ((t - lastFixT) / 1000) : null);
     lastFix = ll; lastFixT = t;
+    lastSpd = Number.isFinite(spd) ? spd : null;
+    lastAltM = Number.isFinite(c.altitude) ? c.altitude : null;
     lastAcc = Math.max(Number.isFinite(c.accuracy) ? c.accuracy : 0, 8);
     // Enregistrement automatique du vol
     if (curVol) {
@@ -451,10 +393,11 @@ function onFix(pos) {
             spd: Number.isFinite(spd) ? spd : null,
             hdg: haveHdg ? Math.round(lastHdg * 10) / 10 : null,
         });
-        // Chrono de vol : première vitesse > ~35 kt (roulage terminé)
-        if (!curVol.flightStartT && Number.isFinite(spd) && spd >= FT_START_MS) curVol.flightStartT = t;
+        // Chrono de vol : première vitesse au-dessus du seuil décollage (VR − 5 kt)
+        if (!curVol.flightStartT && Number.isFinite(spd) && spd >= ftStartMs) curVol.flightStartT = t;
     }
     drawPlane(ll, lastHdg, lastAcc);
+    if (marker && marker.isPopupOpen()) marker.setPopupContent(_volInfoHtml());
     appendTrace(ll);
     if (mode === 'follow' && activeMap) activeMap.panTo(ll, { animate: true, duration: .25 });
     updateBearing();
@@ -475,7 +418,7 @@ function showErr(msg) {
 }
 
 function start() {
-    const map = window.__regionalMap;
+    const map = getRegisteredMap();
     if (!map || !navigator.geolocation) return;
     activeMap = map;
     resetTrace();
@@ -487,8 +430,12 @@ function start() {
     // à l'arrière-plan et à la fermeture de la page.
     try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { /* refusé */ }
     curVol = { id: Date.now(), startedAt: new Date().toISOString(), endedAt: null, flightStartT: null, pts: [] };
-    volSave(curVol);
-    gpsSaveTimer = setInterval(() => { if (curVol) volSave(curVol); }, 180000);   // 3 min (réglage pilote)
+    try {
+        const vr = vrForType(getActiveAircraft()?.type);
+        ftStartMs = chronoThresholdKt(vr) / 1.94384;
+    } catch (e) { /* flotte indisponible : seuil par défaut */ }
+    volSave(curVol, updateVolsCount);
+    gpsSaveTimer = setInterval(() => { if (curVol) volSave(curVol, updateVolsCount); }, 180000);   // 3 min (réglage pilote)
     mode = 'follow';
     render();
     requestWakeLock();
@@ -511,8 +458,8 @@ function stop() {
         curVol.endedAt = new Date().toISOString();
         // Durée en horloge murale (id = départ de session) : les timestamps
         // des fixations peuvent être identiques (cache géoloc, injecteurs).
-        if (curVol.pts.length >= 2 && (Date.now() - curVol.id) >= VOL_MIN_MS) volSave(curVol);
-        else volDel(curVol.id);   // vol trop court : pas enregistré
+        if (curVol.pts.length >= 2 && (Date.now() - curVol.id) >= VOL_MIN_MS) volSave(curVol, updateVolsCount);
+        else volDel(curVol.id, updateVolsCount);   // vol trop court : pas enregistré
         curVol = null;
     }
     mode = 'off';
@@ -564,7 +511,7 @@ async function openPanel() {
         row.querySelector('[data-x="kml"]').addEventListener('click', () => download(volName(v) + '.kml', toKml(v), 'application/vnd.google-earth.kml+xml'));
         row.querySelector('[data-x="del"]').addEventListener('click', async () => {
             if (replayVolId === v.id) resetReplay();
-            await volDel(v.id); openPanel();
+            await volDel(v.id, updateVolsCount); openPanel();
         });
     });
 }
@@ -690,7 +637,8 @@ function mount() {
     });
 
     // Rotation : proposée seulement si le plugin est actif sur la carte
-    if (window.__regionalMap && typeof window.__regionalMap.setBearing === 'function') {
+    const _regMap = getRegisteredMap();
+    if (_regMap && typeof _regMap.setBearing === 'function') {
         rotationOn = rotationWanted();
         rotBtn.addEventListener('click', () => setRotation(!rotationOn));
         renderRot();
@@ -734,7 +682,7 @@ function mount() {
             const lastT = v.pts.length ? v.pts[v.pts.length - 1].t : v.id;
             if (Date.now() - lastT < 60000) continue;   // session peut-être encore active
             if (volDurMs(v) >= VOL_MIN_MS) { v.endedAt = new Date(lastT).toISOString(); volSave(v); }
-            else volDel(v.id);
+            else volDel(v.id, updateVolsCount);
         }
         updateVolsCount();
     })();
@@ -752,7 +700,7 @@ const api = { start, stop, get mode() { return mode; } };
 
 // La barre est créée à l'ouverture de la carte : on attend qu'elle existe.
 const poll = setInterval(() => {
-    if (document.getElementById('map-layers-bar') && window.__regionalMap) {
+    if (document.getElementById('map-layers-bar') && getRegisteredMap()) {
         clearInterval(poll);
         mount();
     }
