@@ -1,12 +1,13 @@
 # ============================================================================
 # DONNÉES OPENAIP LOCALES — mises à jour automatiques.
 #
-#   1. QUOTIDIEN 05:30 UTC — crawl MONDIAL incrémental des espaces aériens
-#      par cellule 1° (data/airspaces/cells/, budget 4 h par run via
-#      .crawl.json : le monde est couvert en quelques jours puis rafraîchi
-#      en continu ; l'API refuse les rafales, d'où le rythme).
-#   2. LUNDI 05:30 UTC — data/radio-points.json (radiophares + points VFR
-#      mondiaux).
+#   HEBDOMADAIRE, LUNDI 05:30 UTC — crawl MONDIAL incrémental des espaces
+#   aériens par cellule 1° (data/airspaces/cells/, budget 4 h par run via
+#   .crawl.json ; l'API refuse les rafales, d'où un rythme espacé), data/
+#   radio-points.json (radiophares + points VFR mondiaux) et fréquences
+#   officielles SIA (eAIP).
+#   (Quotidien jusqu'au 09/09/2026 — passage hebdomadaire à la demande du
+#   pilote : « une fois par semaine suffit », aligné sur le README.)
 # Puis commit et appel du déploiement FTP (un push au GITHUB_TOKEN n'amorce
 # pas de workflow : c'est le « needs/uses » qui enchaîne).
 #
@@ -17,7 +18,7 @@ name: Données openAIP (maj auto)
 
 on:
   schedule:
-    - cron: '30 5 * * *'   # quotidien 05:30 UTC ≈ 07:30 Paris (été)
+    - cron: '30 5 * * 1'   # hebdomadaire, lundi 05:30 UTC ≈ 07:30 Paris (été)
   workflow_dispatch:
 
 permissions:
@@ -47,8 +48,7 @@ jobs:
           OPENAIP_API_KEY: ${{ secrets.OPENAIP_API_KEY }}
         run: node scripts/fetch-freq-sia.mjs
 
-      - name: Radiophares + points VFR (lundi seulement)
-        if: github.event.schedule == '30 5 * * 1' || github.event_name == 'workflow_dispatch'
+      - name: Radiophares + points VFR
         env:
           OPENAIP_API_KEY: ${{ secrets.OPENAIP_API_KEY }}
         run: node scripts/fetch-radio-points.mjs
