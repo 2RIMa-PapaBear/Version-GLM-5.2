@@ -78,6 +78,10 @@ git(['config', 'user.email', git(['config', 'user.email'], { cwd: ROOT }) || 'mi
 // ---- 3. Copie par-dessus (et retrait de ce qui n'est plus dans la liste) ----
 const keep = new Set(files);
 keep.add('.nojekyll');
+// [gps-test] Le sous-dossier test/ (PWA version test GPS) est géré par
+// scripts/publish-test-pages.mjs : NE JAMAIS le retirer ni l'écraser ici —
+// un sync miroir de pub effaçait la version test entière (constaté 09/09).
+keep.add('test');
 // Config locale du miroir : recopie INTÉGRALE du vrai js/config.local.js
 // (relais Apps Script + clé openAIP + clé corsproxy). Décision utilisateur
 // 29/08 (« on tente le 3 et si ça ne fonctionne pas le 1 ») : corsproxy.io
@@ -106,6 +110,7 @@ fs.writeFileSync(path.join(tmp, '.nojekyll'), '');
 const walk = (dir) => {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
         if (e.name === '.git') continue;
+        if (dir === tmp && e.name === 'test') continue;   // [gps-test] préservé
         const p = path.join(dir, e.name);
         if (e.isDirectory()) walk(p);
         else {
