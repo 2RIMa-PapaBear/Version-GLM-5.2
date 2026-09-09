@@ -4,7 +4,7 @@
 graphique des METAR/TAF, planification de vol, performances décollage et log de nav,
 dans une PWA installable qui fonctionne aussi hors ligne.
 
-🌐 **Application en ligne :** <https://2rima-papabear.github.io/metar-taf-pwa/>
+🌐 **Application en ligne :** <https://papabear56.pages-perso.free.fr/> (HTTPS — PWA installable, suivi GPS actif)
 
 ## Captures d'écran
 
@@ -88,17 +88,16 @@ Le champ « Waypoints »
   performances et centrage — généré dans le navigateur, sans serveur.
 
 ### Général
-- **PWA installable** sur le **miroir GitHub Pages** :
-  <https://2rima-papabear.github.io/metar-taf-pwa/> (HTTPS — service worker
-  actif, installation mobile / bureau, shell hors ligne). Ce miroir public
-  reçoit automatiquement les mêmes fichiers prod que Free.fr à chaque
-  publication, **cellules openAIP incluses** (servies en HTTPS, sans dépôt
-  FTP manuel).
-- L'hébergement Free.fr (<http://papabear56.free.fr/>) est en HTTP seul —
-  les navigateurs n'y exécutent pas les service workers : l'application y
-  fonctionne comme un site classique, données consultées mises en cache
-  navigateur (IndexedDB), versions rafraîchies au rechargement (numérotation
-  automatique à chaque déploiement).
+- **PWA installable** sur l'adresse HTTPS de Free :
+  <https://papabear56.pages-perso.free.fr/> (service worker actif,
+  installation mobile / bureau, shell hors ligne, **suivi GPS** —
+  géolocalisation exigée par les navigateurs en contexte sécurisé).
+- L'adresse historique <http://papabear56.free.fr/> (HTTP seul) sert les
+  mêmes fichiers : l'application y fonctionne comme un site classique
+  (cache navigateur IndexedDB, versions rafraîchies au rechargement), le
+  suivi GPS y est grisé.
+- Le miroir GitHub Pages (metar-taf-pwa) a été retiré le 09/09/2026 —
+  l'adresse HTTPS officielle est celle de Free ci-dessus.
 - **Interface française / anglaise**, thème sombre / clair.
 - **Notice utilisateur bilingue** (FR/EN) : icônes et contrôles reproduits
   à l'identique de l'application (Lucide, pastilles, segments), contenu
@@ -152,7 +151,6 @@ En local, la routine complète tient en une commande :
 
 ```bash
 npm run pub -- "message du commit"   # commit + push + attente du déploiement
-                                    # + miroir GitHub Pages (metar-taf-pwa)
 ```
 
 ### Données aéronautiques — mises à jour automatiques
