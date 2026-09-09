@@ -50,5 +50,3 @@ telechargement AIRAC/*.pdf
 test/render/
 test/*.png
 
-# Artefact de build GPS version test (regenerable : node scripts/build-test-version.mjs)
-version-test/

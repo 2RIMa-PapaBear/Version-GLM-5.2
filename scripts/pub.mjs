@@ -106,49 +106,10 @@ if (res.status === 'deployed') {
     toast('Déploiement FTP Free.fr', 'Pas de conclusion après 4 min - voir onglet Actions', 'warn');
 }
 
-// ---- 5. Miroir GitHub Pages (PWA installable, HTTPS) ------------------------
-// Synchronise le dépôt public metar-taf-pwa avec les fichiers prod. Un échec
-// du miroir NE FAIT PAS échouer pub (Free.fr est déjà servi) — relancer
-// simplement : node scripts/mirror-pages.mjs
-try {
-    const { spawnSync } = await import('node:child_process');
-    log('Miroir GitHub Pages (metar-taf-pwa)…');
-    const r = spawnSync(process.execPath, ['scripts/mirror-pages.mjs'], { stdio: 'inherit' });
-    if (r.status !== 0) log('⚠ Miroir non synchronisé — relancer : node scripts/mirror-pages.mjs');
-} catch (e) {
-    log('⚠ Miroir ignoré : ' + String(e.message).slice(0, 80));
-}
+// ---- 5. (Décision pilote 09/09) PLUS DE MIROIR GitHub Pages ------------------
+// Le dépôt metar-taf-pwa est SUPPRIMÉ : la PWA HTTPS officielle vit sur
+// https://papabear56.pages-perso.free.fr/ (même hébergement Free, en HTTPS).
+// Le déploiement FTP ci-dessus met déjà à jour cette adresse — rien de plus
+// à faire ici. L'ancienne adresse http://…free.fr sert les mêmes fichiers
+// (GPS y reste grisé : HTTP), impossible à retirer séparément chez Free.
 
-// ---- 6. Attendre le BUILD Pages (scrutation active, pas d'attente fixe) ----
-// Le push du miroir déclenche une construction GitHub Pages (~1 min). On
-// scrute son statut via gh, puis on lit la version réellement servie —
-// remplace les « sleep 100 puis curl » à l'aveugle (demande pilote 04/09).
-try {
-    const { execFileSync: x } = await import('node:child_process');
-    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-    let ghOk = false;
-    try { x('gh', ['--version'], { stdio: 'ignore' }); ghOk = true; } catch { /* gh absent */ }
-    if (ghOk) {
-        const deadline = Date.now() + 180000;
-        let status = '';
-        while (Date.now() < deadline) {
-            await sleep(5000);
-            try {
-                status = JSON.parse(x('gh', ['api', 'repos/2RIMa-PapaBear/metar-taf-pwa/pages/builds/latest', '--jq', '{status: .status}'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })).status;
-            } catch { status = '?'; }
-            if (status === 'built') break;
-        }
-        log(status === 'built' ? 'Build Pages terminé ✓' : `⚠ Build Pages non confirmé (${status || 'délai dépassé'}) — il finira de lui-même.`);
-    }
-    // Version servie par le miroir (contrôle final ; le CDN peut traîner).
-    for (let i = 0; i < 4; i++) {
-        try {
-            const html = x('curl', ['-s', '--max-time', '20', 'https://2rima-papabear.github.io/metar-taf-pwa/'], { encoding: 'utf8' });
-            const v = (html.match(/v=(\d+\.\d+)/) || [])[1];
-            if (v) { log(`Miroir servi : v${v} ✓ — https://2rima-papabear.github.io/metar-taf-pwa/`); break; }
-        } catch { /* on retente */ }
-        await sleep(5000);
-    }
-} catch (e) {
-    log('⚠ Contrôle miroir ignoré : ' + String(e.message).slice(0, 80));
-}

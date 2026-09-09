@@ -1,6 +1,6 @@
-// QA VERSION TEST GPS v2 (lots 06-07/09) : teste la VERSION-TEST COMPLÈTE
-// (copie prod + module GPS) avec des positions injectées dans la VRAIE API
-// Geolocation via CDP. Couverture :
+// QA GPS — teste l'APPLICATION RÉELLE (module js/gps.js intégré, action 08/09)
+// avec des positions injectées dans la VRAIE API Geolocation via CDP.
+// Couverture :
 //   v1 : bouton GPS → marqueur + cercle + trace → suivi → « Recentrer » →
 //        arrêt (trace conservée), voyant Wake Lock.
 //   v2 : rotation « Route haut » (leaflet-rotate : setBearing actif, cap sol
@@ -8,7 +8,6 @@
 //        vol en IndexedDB (chrono déclenché à la vitesse dérivée > 35 kt) ;
 //        panneau « Vols » avec exports .GPX / .KML réels (contenu vérifié)
 //        et suppression.
-// Prérequis : node scripts/build-test-version.mjs
 import puppeteer from 'puppeteer-core';
 import http from 'node:http';
 import fs from 'node:fs';
@@ -18,12 +17,8 @@ import { fileURLToPath } from 'node:url';
 
 // Garde-fou : aucune exécution QA ne doit dépasser 3 min (diagnostic si blocage).
 setTimeout(() => { console.log('\nWATCHDOG : QA bloquée au-delà de 180 s — arrêt forcé'); process.exit(2); }, 180000);
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const TEST_ROOT = path.join(root, 'version-test');
-if (!fs.existsSync(path.join(TEST_ROOT, 'index.html'))) {
-    console.error('version-test/ absente — lancer d\'abord scripts/build-test-version.mjs');
-    process.exit(1);
-}
+// L'application réelle (racine du dépôt) — le GPS y est intégré.
+const TEST_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const server = http.createServer((req, res) => {
     let p = decodeURIComponent(req.url.split('?')[0]); if (p === '/') p = '/index.html';
     fs.readFile(path.join(TEST_ROOT, p), (e, d) => {
@@ -71,7 +66,7 @@ await new Promise(r => setTimeout(r, 500));
 
 // 1. Version test + interface v2 complète
 const appVersion = await page.evaluate(() => window.APP_VERSION || '?');
-appVersion.startsWith('99.') ? ok('APP_VERSION = ' + appVersion) : ko('APP_VERSION inattendue : ' + appVersion);
+/^\d+\.\d+$/.test(appVersion) ? ok('APP_VERSION = ' + appVersion) : ko('APP_VERSION inattendue : ' + appVersion);
 const ui = await page.evaluate(() => ({
     rot: !!document.getElementById('gps-rot-btn') && document.getElementById('gps-rot-btn').style.display !== 'none',
     vols: !!document.getElementById('gps-vols-btn'),
