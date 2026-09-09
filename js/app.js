@@ -15,6 +15,7 @@ import {
     getStartupFavorite
 } from './ui-module.js';
 import { initTheme, toggleTheme } from './night-mode.js';
+import { dataAgeUpdate, initDataAge } from './data-age.js';
 import { showFlightWindow, hideFlightWindow } from './flight-window.js';
 import { initFlightMode, setFlightMode, getFlightMode } from './flight-mode.js';
 import { renderGoNoGo, refreshPressureTrend, refreshSigmet, refreshFreezingLevel } from './go-nogo.js';
@@ -419,6 +420,7 @@ export function telechargerMessage(typeMessage) {
         state.lastCacheKey = null;
         state.lastRenderState = null;
         textarea.value = texteMeteo.trim();
+        dataAgeUpdate(texteMeteo.trim());   // badge d'âge : nouvelle observation
         nettoyerUI();
         // Affiche la bannière du créneau de vol jour pour le terrain demandé
         // (ex: LFEA), même si la météo vient d'un terrain voisin (LFRH).
@@ -523,6 +525,7 @@ export function telechargerMessage(typeMessage) {
                     ? err.message
                     : tr.errNetwork;
                 textarea.value = `${detail} (${codeDemandeInitial})`;
+                dataAgeUpdate(null, { offline: true });   // badge : réseau indisponible, on garde l'âge de la dernière obs.
                 nettoyerUI();
             });
     }
@@ -851,6 +854,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
 
     initPlanIo();
+    initDataAge();   // badge d'âge des données (06/09… piloté par dataAgeUpdate)
     initAutocomplete('icaoInput', (icao) => { document.getElementById('icaoInput').value = icao; telechargerMessage('metar'); });
     renderSearchHistory('search-history-list', _selectAndFetch);
     updateFavoritesUI(_selectAndFetch);

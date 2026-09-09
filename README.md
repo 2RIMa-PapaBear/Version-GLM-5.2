@@ -33,6 +33,10 @@ dans une PWA installable qui fonctionne aussi hors ligne.
 - **Mode cockpit** (briefing express ultra-lisible) et **thème clair /
   sombre** persistant (l'ancien « mode nuit rouge » a été remplacé par le
   thème clair de briefing).
+- **Badge d'âge des données** : pilule verte / ambre / rouge selon la
+  fraîcheur de la dernière observation (rafraîchie chaque minute). En cas de
+  panne réseau, la dernière observation reste affichée, en rouge avec son âge —
+  jamais une donnée périmée présentée comme courante.
 - **Watchdog** : surveillance active des terrains favoris.
 
 ### Navigation
@@ -53,7 +57,10 @@ dans une PWA installable qui fonctionne aussi hors ligne.
   écran maintenu allumé pendant le suivi (Wake Lock). Chaque session est
   enregistrée automatiquement sur l'appareil (position, altitude GPS,
   vitesse, cap — sessions < 5 min ignorées) ; le bouton « Vols » liste les
-  vols, rejoue leur trace et les exporte en **GPX / KML**. Actif sur
+  vols, rejoue leur trace et les exporte en **GPX / KML**. Tapez l'avion
+  pour afficher à la demande vitesse sol, altitude GPS, cap et temps de vol ;
+  le chrono de vol démarre au décollage réel (VR de l'avion actif de la
+  flotte − 5 kt, sans avion : 50 kt). Actif sur
   <https://papabear56.pages-perso.free.fr/> ; grisé sur l'adresse HTTP.
 - **Radiophares et points VFR mondiaux** (openAIP, actualisés chaque
   semaine par un cron GitHub) : couches VOR / NDB / points de repère
@@ -135,12 +142,13 @@ Prérequis : **Node.js ≥ 18** (tests `node --test`).
 
 ```bash
 npm install     # devDependencies (basic-ftp pour le déploiement)
-npm test        # suite complète (~240 tests : cœur, plan de vol, perfs, centrage…)
+npm test        # suite complète (~250 tests : cœur, plan de vol, perfs, centrage…)
 ```
 
 - `index.html` — application (vanilla JS, modules ES, aucun framework).
 - `js/` — modules applicatifs (`engine`, `flight-planner`, `route-weather`,
-  `takeoff-ui`, `wb-core`, `navlog-pdf`, `gps`…), volontairement découplés
+  `takeoff-ui`, `wb-core`, `navlog-pdf`, `gps` + `gps-vols`, `data-age`,
+  `map-registry`…), volontairement découplés
   et testables sous Node.
 - `test/` — tests unitaires + **pages d'aperçu** autonomes (QA visuelle des
   schémas, génération d'aperçus PDF) — non exécutées par `npm test`.
@@ -156,14 +164,23 @@ npm test        # suite complète (~240 tests : cœur, plan de vol, perfs, centr
 FTP sur Free.fr, bump les versions PWA et committe le marqueur `[deploy]`
 (workflow `.github/workflows/deploy-ftp.yml`, secrets `FTP_SERVER`,
 `FTP_USER`, `FTP_PASSWORD`). Les ~27 000 cellules openAIP
-(`data/airspaces/cells/`) sont exclues de cet upload (débit Free.fr
-insuffisant) et posées directement sur le FTP.
+(`data/airspaces/cells/`) sont **exclues de cet upload** (débit Free.fr
+insuffisant) : elles partent par **`npm run cells`** — upload incrémental
+local qui ne pousse que le delta (identifiants dans `deploy.config.json`,
+gitignoré ; `--dry-run` pour simuler, `--mirror` pour purger les orphelins).
 
 En local, la routine complète tient en une commande :
 
 ```bash
 npm run pub -- "message du commit"   # commit + push + attente du déploiement
 ```
+
+### Surveillance automatique
+
+- **Health-check toutes les 6 h** (`health-check.yml`) : site HTTPS en ligne
+  + relais météo vivant **et** utile (un vrai METAR traverse le Worker de
+  bout en bout) ; échec → notification GitHub. Lançable à la main :
+  `node scripts/health-check.mjs`.
 
 ### Données aéronautiques — mises à jour automatiques
 
@@ -203,7 +220,7 @@ npm run pub -- "message du commit"   # commit + push + attente du déploiement
 - **2026-09-05** — FICHE TERRAIN v3 — feu vert pilote après aperçu PDF (Apercu_fiche_terrain.pdf, 3 terrains LFRN/LFRV/LFPF) : section Terrain en LIGNES LIBELL…
 - **2026-09-05** — FICHE TERRAIN v2 (retours pilote : ordre + lisibilité) : ① FRÉQUENCES en tête (sans sous-titre redondant) ② PISTES (seuils officiels affiché…
 - **2026-09-05** — FICHE TERRAIN COMPLÈTE dans l onglet « Fréquences & info terrain » (demande pilote, 4 arbitrages validés) : ① IDENTITÉ en chips — élévation,…
-<!-- docs:lastSha=b7eef64ba4b273a00f84df2e218bfc52b56980aa -->
+<!-- docs:lastSha=eb7cd30617d9430e67f3553a6abf90dfac218a49 -->
 
 
 

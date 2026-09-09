@@ -118,8 +118,9 @@ const AIRSPACE_STYLE = {
     'PROHIBITED': { color: '#DC2626', fill: 'rgba(220,38,38,0.25)', weight: 2.5, label: 'Interdite' },
     // STRICT SIA (décision pilote 09/09) : TOUS les espaces contrôlés en
     // BLEU (CTR, TMA/CTA, SIV) — la distinction passe par les étiquettes,
-    // comme sur la carte papier. SIV garde un remplissage plus léger.
-    'SIV':   { color: '#3B82F6', fill: 'rgba(59,130,246,0.07)', weight: 1.5, label: 'SIV' },
+    // comme sur la carte papier. SIV : remplissage plus léger + contour
+    // POINTILLÉ bien marqué (2.5 px, retour pilote « trop discret »).
+    'SIV':   { color: '#3B82F6', fill: 'rgba(59,130,246,0.07)', weight: 2.5, label: 'SIV', dashArray: '8 5' },
     'OTHER': { color: '#94A3B8', fill: 'rgba(148,163,184,0.06)', weight: 1, label: '?' },
 };
 
@@ -779,11 +780,23 @@ export function createAirspaceController(map) {
 
             rings.forEach((ring, ringIdx) => {
                 if (ring.length < 2) return;
+                // Contours POINTILLÉS (SIV) : un HALO sombre passe SOUS le
+                // trait — sans lui, toute ligne superposée (bordure CTR/TMA
+                // pleine, SIV voisin partageant la limite) remplit les trous
+                // et l'effet pointillé disparaît (retour pilote 09/09).
+                if (style.dashArray) {
+                    L.polygon(ring, {
+                        stroke: true, color: 'rgba(2,6,23,0.35)',
+                        weight: (style.weight || 2.5) + 1.5,
+                        fill: false, interactive: false,
+                    }).addTo(layerGroup);
+                }
                 const poly = L.polygon(ring, {
                     color: style.color,
                     weight: style.weight,
                     fillColor: style.color,
                     fillOpacity: parseFloat(style.fill.match(/[\d.]+(?=\))/)[0]) || 0.08,
+                    dashArray: style.dashArray,   // SIV en pointillés ; undefined = trait plein
                     interactive: true,
 
                 });

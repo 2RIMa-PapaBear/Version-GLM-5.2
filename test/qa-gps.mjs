@@ -182,6 +182,16 @@ const rotOff = await page.evaluate(() => ({ b: window.__regionalMap.getBearing ?
 const iconRotNord = parseRot(await page.evaluate(() => document.querySelector('.gps-plane-icon')?.style.transform || ''));
 iconRotNord != null && Math.abs(iconRotNord - 45) < 2 ? ok(`avion vers l'EST en mode Nord (${iconRotNord.toFixed(1)}°)`) : ko(`avion MAL orienté en mode Nord : ${iconRotNord}° (attendu ≈ 45)`);
 
+// 3bis. TAP SUR L'AVION (après ≥ 2 fixations : vitesse/cap dérivés dispo)
+await page.evaluate(() => document.querySelector('.gps-plane-icon')?.closest('.leaflet-marker-icon')?.click());
+await page.waitForSelector('.leaflet-popup', { timeout: 5000 }).catch(() => {});
+const tapInfo = await page.evaluate(() => {
+    const p = document.querySelector('.leaflet-popup');
+    return p ? { text: p.textContent, visible: p.getClientRects().length > 0 } : null;
+});
+tapInfo && tapInfo.visible && /kt/.test(tapInfo.text) && /(Vitesse|Speed)/.test(tapInfo.text) && /Cap/.test(tapInfo.text)
+    ? ok('tap sur l\'avion → popup infos vol (vitesse/altitude/cap/temps)') : ko('popup infos vol absent : ' + JSON.stringify(tapInfo));
+
 // 4. Déplacement carte → « Recentrer » → reprise → arrêt (trace conservée, vol clôturé)
 // Drag SYNTHÉTIQUE sur le conteneur Leaflet : un drag souris physique est
 // instable en headless (des panneaux de l'app, ex. alternates-header, peuvent
@@ -236,7 +246,7 @@ const planeAfterRot = await page.evaluate(() => !!document.querySelector('.gps-p
 // 5. Enregistrement auto : le vol est dans IndexedDB avec chrono > 35 kt
 const vols = await idbVols();
 vols.length >= 1 ? ok(`vol enregistré automatiquement (${vols[0].pts.length} points)`) : ko('aucun vol en IndexedDB : ' + vols.length);
-vols.length && vols[0].flightStartT ? ok('chrono de vol déclenché (vitesse dérivée > 35 kt)') : ko('chrono de vol jamais déclenché : ' + JSON.stringify(vols.length && { fs: vols[0].flightStartT, pts: vols[0].pts.length }));
+vols.length && vols[0].flightStartT ? ok('chrono de vol déclenché (vitesse dérivée > seuil décollage)') : ko('chrono de vol jamais déclenché : ' + JSON.stringify(vols.length && { fs: vols[0].flightStartT, pts: vols[0].pts.length }));
 vols.length && vols[0].pts.every(p => Number.isFinite(p.lat) && Number.isFinite(p.lon)) ? ok('points valides (lat/lon)') : ko('points invalides');
 
 // 6. Panneau « Vols » : exports GPX et KML réels (capturés via CDP)

@@ -192,3 +192,26 @@ describe('flotte — export / import d\'UN avion', () => {
         assert.equal(fleet.getFleet()[0].name, 'Transféré');
     });
 });
+
+// VR / seuil chrono décollage (item ⑤, 09/09) — vitesses de rotation
+// représentatives de la base avions.
+import { VR_KT, vrForType, chronoThresholdKt } from '../js/aircraft-database.js';
+
+test('vrForType : valeurs connues et fallback monomoteur club', () => {
+    assert.equal(vrForType('C172'), 55);
+    assert.equal(vrForType('DR400-180'), 55);
+    assert.equal(vrForType('PA18'), 45, 'le Super Cub décolle tôt');
+    assert.equal(vrForType('SR22'), 75);
+    assert.equal(vrForType('INEXISTANT'), 55, 'type inconnu → 55 kt');
+    assert.equal(vrForType(undefined), 55);
+    // Tous les types de la base ont une VR renseignée (pas de 55 implicite oublié)
+    const sansVr = Object.keys(VR_KT).filter(t => !Number.isFinite(VR_KT[t]));
+    assert.deepEqual(sansVr, []);
+});
+
+test('chronoThresholdKt : VR − 5 kt, plancher 10 kt', () => {
+    assert.equal(chronoThresholdKt(55), 50);
+    assert.equal(chronoThresholdKt(45), 40);
+    assert.equal(chronoThresholdKt(13), 10, 'plancher bas');
+    assert.equal(chronoThresholdKt(90), 85);
+});

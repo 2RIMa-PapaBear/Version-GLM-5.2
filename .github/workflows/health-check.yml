@@ -1,0 +1,38 @@
+# ============================================================================
+# HEALTH-CHECK — surveillance du site Free (HTTPS) et du relais météo
+# (Cloudflare Worker), item ② du plan d'améliorations (09/09).
+#
+#   Toutes les 6 h + déclenchement manuel (onglet Actions → Run workflow).
+#   Un contrôle critique en échec fait échouer le job → GitHub envoie son
+#   e-mail d'échec de workflow au propriétaire (vérifier Settings →
+#   Notifications → Actions : « Send notifications for failed workflows »).
+#
+#   Le script teste aussi l'ancienne adresse HTTP ? Non : même backend FTP,
+#   le contrôle HTTPS couvre les deux.
+# ============================================================================
+name: Health check (site + relais)
+
+on:
+  schedule:
+    - cron: '7 */6 * * *'   # toutes les 6 h (minute décalée, hors pointe)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: Version-2.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Site + relais météo
+        run: node scripts/health-check.mjs
