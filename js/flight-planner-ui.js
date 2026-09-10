@@ -2,7 +2,8 @@ import { state, escapeHtml, fetchAvecRelais } from './core.js';
 import { getAirportByICAO, enrichAirport } from './ui-module.js';
 import { getActiveAircraftId, getActiveAircraft, getFleet, updateAircraft } from './aircraft-fleet.js';
 import { getActiveRunwayNameForIcao, evaluateTakeoffFromRaw, getAircraftRef } from './takeoff-performance.js';
-import { drawNavLogPdf } from './navlog-pdf.js';
+import { drawNavLogPdf, drawNotamAnnex } from './navlog-pdf.js';
+import { getSelectedNotams } from './notam.js';
 import { computeWb, resolveLoads, normalizeEnvelope } from './wb-core.js';
 import { makeCollapsible } from './collapsible.js';
 import { computeFlightPlan, computeMultiLegFlightPlan, getDefaultAircraftPerf, greatCircleDistanceNm, RESERVES } from './flight-planner.js';
@@ -434,6 +435,12 @@ async function _generateNavLogPdfInto(tab) {
         distanceNm: totalNm ?? '', timeLabel,
         metarRaw, rows, calc, perf, centro,
     });
+    // Annexe NOTAM : les NOTAM cochés du dossier SOFIA (10/09) prolongent le
+    // log de vol sur des pages dédiées — aucune annexe si rien n'est coché.
+    try {
+        const selNotams = getSelectedNotams();
+        if (selNotams.length) drawNotamAnnex(doc, selNotams, state.lang === 'fr');
+    } catch (e) { console.warn('annexe NOTAM ignorée :', e.message); }
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const filename = `Log-nav_${fromIcao}-${toIcao}_${today}.pdf`;
     // Le PDF s'ouvre dans un onglet, dans une PAGE HTML HABILLÉE : il y est

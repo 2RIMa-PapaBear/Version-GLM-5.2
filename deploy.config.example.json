@@ -1,8 +1,0 @@
-{
-    "host": "ftpperso.free.fr",
-    "user": "papabear56",
-    "password": "VOTRE_MOT_DE_PASSE_FREE",
-    "port": 21,
-    "secure": false,
-    "remoteRoot": "/"
-}

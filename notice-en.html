@@ -538,6 +538,15 @@
 <p><strong>In-flight info</strong>: tap the aircraft on the map — ground speed (kt), GPS altitude (ft), heading, flight time and tracking time appear on demand, continuously refreshed. <strong>Flight time</strong> starts at the actual takeoff: the rotation speed of the aircraft selected in your fleet, minus 5 kt (a DR400 will not start its timer while taxiing).</p>
 <p>Tracking requires a secure address: on <em>http://papabear56.free.fr/</em> (HTTP), the GPS button stays greyed out.</p>
 
+<h3>NOTAM briefing (SOFIA)</h3>
+<p>The <strong>"NOTAM (SOFIA)"</strong> panel builds your official NOTAM briefing from the French SIA SOFIA-Briefing portal:</p>
+<ul>
+<li><strong>In navigation mode</strong>: the briefing follows your flight plan — <strong>departure</strong>, <strong>en-route</strong> (FIR) NOTAM, <strong>waypoints checked one by one</strong> (the panel states "no VFR NOTAM" when a field has none — the check is proven), then <strong>arrival</strong>.</li>
+<li><strong>On a local flight</strong>: a <strong>30 NM zone around the observed airfield</strong>.</li>
+</ul>
+<p>Only <strong>VFR</strong> NOTAM are shown, within your flight levels (plan FL plus a climb margin). Each family (obstacles, procedures, airspace regulations…) is collapsed: open what matters to you. Text is shown <strong>in French</strong> where the official translation exists, with validity period and hours of activity. <strong>Refresh</strong> fetches a fresh briefing — NOTAM are never cached.</p>
+<p><strong>Printing</strong>: a checkbox precedes every NOTAM and every category. Only <strong>checked</strong> NOTAM are appended, grouped in flight order, as an <strong>annex to the nav log PDF</strong> ("Print nav log" button).</p>
+
 <h3>SIGMET / AIRMET</h3>
 <p>Active <strong>SIGMETs</strong> (hazardous phenomena: thunderstorms, severe icing, turbulence) and <strong>AIRMETs</strong> (moderate) near your airfield are detected and feed directly into the GO / NO-GO banner.</p>
 

@@ -19,6 +19,9 @@ export const config = {
     // config.local.js (jamais déployé), il lui faut le relais (météo, cartes
     // VAC). config.local.js peut toujours surcharger.
     PROXY_URL: 'https://meteo-relais.papabear56.workers.dev',
+    // Route NOTAM du relais (POST /notam, PIB SOFIA) — surchargeable localement
+    // via config.local.js (ex. wrangler dev : http://127.0.0.1:8787/notam).
+    NOTAM_RELAY_URL: 'https://meteo-relais.papabear56.workers.dev/notam',
     OPENAIP_API_KEY: '',
     // Clé corsproxy.io — repli météo du miroir public quand aviationweather.gov
     // bloque CORS (fréquent : leurs backends n'envoient pas toujours ACAO).
@@ -32,5 +35,6 @@ export async function applyLocalOverride() {
         if (m.PROXY_URL) config.PROXY_URL = m.PROXY_URL;
         if (m.OPENAIP_API_KEY) config.OPENAIP_API_KEY = m.OPENAIP_API_KEY;
         if (m.CORS_PROXY_KEY) config.CORS_PROXY_KEY = m.CORS_PROXY_KEY;
+        if (m.NOTAM_RELAY_LOCAL) config.NOTAM_RELAY_URL = m.NOTAM_RELAY_LOCAL;
     } catch { /* absent (miroir public) : on garde les défauts */ }
 }
