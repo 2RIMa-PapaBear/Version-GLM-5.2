@@ -420,7 +420,7 @@ export function telechargerMessage(typeMessage) {
         state.lastCacheKey = null;
         state.lastRenderState = null;
         textarea.value = texteMeteo.trim();
-        dataAgeUpdate(texteMeteo.trim());   // badge d'âge : nouvelle observation
+        dataAgeUpdate(texteMeteo.trim(), { type: typeMessage });   // badge d'âge : type = metar (observé) ou taf (émis)
         nettoyerUI();
         // Affiche la bannière du créneau de vol jour pour le terrain demandé
         // (ex: LFEA), même si la météo vient d'un terrain voisin (LFRH).

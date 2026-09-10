@@ -34,9 +34,11 @@ dans une PWA installable qui fonctionne aussi hors ligne.
   sombre** persistant (l'ancien « mode nuit rouge » a été remplacé par le
   thème clair de briefing).
 - **Badge d'âge des données** : pilule verte / ambre / rouge selon la
-  fraîcheur de la dernière observation (rafraîchie chaque minute). En cas de
-  panne réseau, la dernière observation reste affichée, en rouge avec son âge —
-  jamais une donnée périmée présentée comme courante.
+  fraîcheur du message, **au rythme propre à son type** — METAR observé
+  toutes les heures (vert < 1 h, rouge ≈ 2 h) ; TAF émis toutes les ~6 h
+  (« Émis il y a… », vert < 6 h 30, rouge > 12 h). En cas de panne réseau,
+  le dernier message reste affiché, en rouge avec son âge — jamais une
+  donnée périmée présentée comme courante.
 - **Watchdog** : surveillance active des terrains favoris.
 
 ### Navigation
@@ -220,7 +222,7 @@ npm run pub -- "message du commit"   # commit + push + attente du déploiement
 - **2026-09-05** — FICHE TERRAIN v3 — feu vert pilote après aperçu PDF (Apercu_fiche_terrain.pdf, 3 terrains LFRN/LFRV/LFPF) : section Terrain en LIGNES LIBELL…
 - **2026-09-05** — FICHE TERRAIN v2 (retours pilote : ordre + lisibilité) : ① FRÉQUENCES en tête (sans sous-titre redondant) ② PISTES (seuils officiels affiché…
 - **2026-09-05** — FICHE TERRAIN COMPLÈTE dans l onglet « Fréquences & info terrain » (demande pilote, 4 arbitrages validés) : ① IDENTITÉ en chips — élévation,…
-<!-- docs:lastSha=eb7cd30617d9430e67f3553a6abf90dfac218a49 -->
+<!-- docs:lastSha=a19e808bd84777adee7f39114c99b4daf0ff076b -->
 
 
 
