@@ -42,6 +42,22 @@ const TTL_PDF_SEC = 7 * 86400;   // cartes AIRAC : URL par cycle, jamais périm�
 
 export default {
     async fetch(request, env, ctx) {
+        const url = new URL(request.url);
+        if (request.method === 'POST' && url.pathname === '/notam') {
+            try {
+                return await pibNotam(request);
+            } catch (e) {
+                return reponse(502, JSON.stringify({ error: String(e.message || e).slice(0, 200) }), 'application/json');
+            }
+        }
+        return handleGet(request, env, ctx);
+    },
+};
+
+async function handleGet(request, env, ctx) {
+        if (request.method === 'OPTIONS') return reponse(204, null);
+        if (request.method === 'HEAD') return reponse(200, null);
+        if (request.method !== 'GET') return reponse(405, 'Méthode non supportée');
         if (request.method === 'OPTIONS') return reponse(204, null);
         if (request.method === 'HEAD') return reponse(200, null);
         if (request.method !== 'GET') return reponse(405, 'Méthode non supportée');
@@ -124,8 +140,110 @@ export default {
             ctx.waitUntil(cache.put(cle, aStocker));
         }
         return sortie;
-    },
-};
+}
+
+// ----------------------------------------------------------------
+// POST /notam — PIB NOTAM officiel SOFIA-Briefing pour un plan de
+// vol (10/09). Entrée JSON : { route:[OACI…], validFrom, durationMin,
+// flLower, flUpper, widthNm, radiusAdNm }. Le Worker joue la session
+// (cookie JSESSIONID) puis l'opération postNarrowRoutePibRequest, et
+// renvoie le PIB JSON INTERNE (double parse fait ici). Cible FIXÉE
+// (hôte + opération) : ce relais ne peut pas être détourné en proxy
+// générique. Pas de cache : les NOTAM doivent être frais.
+// ----------------------------------------------------------------
+async function pibNotam(request) {
+    const SOFIA = 'https://sofia-briefing.aviation-civile.gouv.fr';
+    const params = await request.json();
+    const route = (params.route || []).filter(c => /^[A-Z][A-Z0-9]{3}$/.test(String(c || '').toUpperCase()));
+    if (route.length < 1) return reponse(400, JSON.stringify({ error: 'route vide' }), 'application/json');
+
+    // 1. Session (cookie) — un GET préalable suffit.
+    const page = await fetch(`${SOFIA}/sofia/pages/notamform.html`, { headers: { 'User-Agent': 'papabear56-meteo-relais/1.0' } });
+    const cookie = (page.headers.get('Set-Cookie') || '').split(';')[0];
+
+    // 2. Requête PIB (contrat reverse-engineéré — cf mémoire notam-sofia-api).
+    const body = new URLSearchParams({
+        ':operation': params.area ? 'postAreaPibRequest' : 'postNarrowRoutePibRequest',
+        'valid_from': params.validFrom || new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+        'duration': String(params.durationMin || 1200),
+        'traffic': 'V',   // VFR uniquement (retour pilote 10/09 : exclure les NOTAM IFR-only)
+        'fl_lower': String(params.flLower ?? 0),
+        'fl_upper': String(params.flUpper ?? 999),
+        'width': String(params.widthNm || 15),
+        'radiusAD': String(params.radiusAdNm || 30),
+        'uuid': crypto.randomUUID(),
+        'isFromSofia': 'true',
+    });
+    if (params.area) {
+        // Mode VOL LOCAL (retour pilote 10/09) : cylindre autour du terrain.
+        body.set('lat', String(params.area.lat || ''));
+        body.set('long', String(params.area.long || ''));
+        body.set('radius', String(params.area.radiusNm || 30));
+    } else {
+        route.forEach(c => body.append('route[]', c));
+    }
+
+    const appelSofia = async (extra) => {
+        const b = new URLSearchParams(body);
+        for (const [k, v] of Object.entries(extra || {})) b.set(k, v);
+        const res = await fetch(`${SOFIA}/sofia`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                ...(cookie ? { 'Cookie': cookie } : {}),
+                'Referer': `${SOFIA}/sofia/pages/notamform.html`,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json, text/javascript, */*; q=0.01',
+                'User-Agent': 'papabear56-meteo-relais/1.0',
+            },
+            body: b.toString(),
+        });
+        const txt = await res.text();
+        if (res.status !== 200 || !txt.trim().startsWith('{')) throw new Error(`SOFIA HTTP ${res.status}`);
+        return JSON.parse(JSON.parse(txt)['status.message']);
+    };
+
+    const inner = await appelSofia({});
+    if (!inner || !inner.listnotams) throw new Error('PIB sans listnotams');
+
+    // Dossiers des POINTS DE PASSAGE (retour pilote 10/09) : SOFIA ne remplit
+    // ADDep/ADDes que pour le premier/dernier terrain — chaque tronçon partant
+    // du point de passage rapporte SON dossier (vérifié : LFRV→1, LFRC→6).
+    // Appels parallèles côté Worker, ajoutés comme waypointDossiers.
+    const legs = Array.isArray(params.legs) ? params.legs : [];
+    if (legs.length) {
+        const dossiers = await Promise.all(legs.map(async ([a, b]) => {
+            if (!/^[A-Z][A-Z0-9]{3}$/.test(a) || !/^[A-Z][A-Z0-9]{3}$/.test(b)) return [a, null];
+            try {
+                const lp = new URLSearchParams(body);
+                lp.delete('route[]');
+                lp.append('route[]', a); lp.append('route[]', b);
+                const res = await fetch(`${SOFIA}/sofia`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        ...(cookie ? { 'Cookie': cookie } : {}),
+                        'Referer': `${SOFIA}/sofia/pages/notamform.html`,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json, text/javascript, */*; q=0.01',
+                        'User-Agent': 'papabear56-meteo-relais/1.0',
+                    },
+                    body: lp.toString(),
+                });
+                const t = await res.text();
+                if (res.status !== 200 || !t.trim().startsWith('{')) return [a, null];
+                const leg = JSON.parse(JSON.parse(t)['status.message']);
+                const dep = {};
+                let n = 0;
+                for (const [cat, list] of Object.entries(leg.listnotams?.ADDep || {}))
+                    if (Array.isArray(list) && list.length) { dep[cat] = list; n += list.length; }
+                return [a, n ? dep : {}];
+            } catch { return [a, null]; }
+        }));
+        inner.waypointDossiers = Object.fromEntries(dossiers.filter(([a]) => a));
+    }
+    return reponse(200, JSON.stringify(inner), 'application/json');
+}
 
 function reponse(statut, corps, type = 'text/plain') {
     return new Response(corps, { status: statut, headers: { ...CORS, 'Content-Type': type } });

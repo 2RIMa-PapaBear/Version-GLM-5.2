@@ -64,6 +64,14 @@ dans une PWA installable qui fonctionne aussi hors ligne.
   le chrono de vol démarre au décollage réel (VR de l'avion actif de la
   flotte − 5 kt, sans avion : 50 kt). Actif sur
   <https://papabear56.pages-perso.free.fr/> ; grisé sur l'adresse HTTP.
+- **Dossier NOTAM officiel (SOFIA-Briefing, SIA)** : dans le panneau
+  « NOTAM (SOFIA) » — en navigation, le dossier suit le **plan** (départ,
+  FIR, points de passage vérifiés un à un — même sans NOTAM, arrivée) ; en
+  vol local, une **zone 30 NM autour du terrain** observé. NOTAM filtrés
+  **VFR**, plafond **FL du plan**, texte **traduit en français**, groupés
+  par familles officielles. **Cases par NOTAM et par catégorie** : seuls
+  les cochés sont ajoutés en **annexe du log de nav PDF**. Fraîcheur
+  garantie par le bouton Actualiser (aucun cache).
 - **Radiophares et points VFR mondiaux** (openAIP, actualisés chaque
   semaine par un cron GitHub) : couches VOR / NDB / points de repère
   VFR activables case par case dans le menu du bouton « Espaces », avec
@@ -133,6 +141,7 @@ dans une PWA installable qui fonctionne aussi hors ligne.
 |---|---|
 | [aviationweather.gov](https://aviationweather.gov/) | METAR, TAF, SIGMET, infos stations |
 | [SIA](https://www.sia.aviation-civile.gouv.fr/) (eAIP + XML AIRAC) | Fréquences officielles des terrains, espaces aériens France, radiophares, obstacles — cycle AIRAC 28 j (paternité mentionnée dans l'application) |
+| [SOFIA-Briefing](https://sofia-briefing.aviation-civile.gouv.fr/) (SIA) | Dossiers NOTAM officiels (plan de vol et zone 30 NM), via le relais |
 | [Open-Meteo](https://open-meteo.com/) | Prévisions, élévation, vents en altitude |
 | [openAIP](https://www.openaip.net/) | Terrains, espaces aériens mondiaux, radiophares et points VFR |
 | [RainViewer](https://rainviewer.com/) | Radar de précipitations |
@@ -150,14 +159,16 @@ npm test        # suite complète (~250 tests : cœur, plan de vol, perfs, centr
 - `index.html` — application (vanilla JS, modules ES, aucun framework).
 - `js/` — modules applicatifs (`engine`, `flight-planner`, `route-weather`,
   `takeoff-ui`, `wb-core`, `navlog-pdf`, `gps` + `gps-vols`, `data-age`,
-  `map-registry`…), volontairement découplés
+  `map-registry`, `notam`…), volontairement découplés
   et testables sous Node.
 - `test/` — tests unitaires + **pages d'aperçu** autonomes (QA visuelle des
   schémas, génération d'aperçus PDF) — non exécutées par `npm test`.
 - `vendor/` — dépendances bundlées (Leaflet + leaflet-rotate, jsPDF, pdf.js,
   Lucide, geomag) pour un fonctionnement 100 % hors ligne.
-- `worker/` — code du relais CORS (Cloudflare Worker, proxy météo avec cache ;
-  déploiement : `cd worker && npx wrangler deploy`). `apps-script/` conserve
+- `worker/` — code du relais CORS (Cloudflare Worker, proxy météo avec cache
+  + route `POST /notam` vers SOFIA-Briefing ; déploiement :
+  `cd worker && npx wrangler deploy`). `scripts/dev-notam-relay.mjs` = même
+  route en local pour le développement (sans Worker). `apps-script/` conserve
   l'ancien relais Google Apps Script (historique / repli).
 
 ## Déploiement
@@ -222,7 +233,7 @@ npm run pub -- "message du commit"   # commit + push + attente du déploiement
 - **2026-09-05** — FICHE TERRAIN v3 — feu vert pilote après aperçu PDF (Apercu_fiche_terrain.pdf, 3 terrains LFRN/LFRV/LFPF) : section Terrain en LIGNES LIBELL…
 - **2026-09-05** — FICHE TERRAIN v2 (retours pilote : ordre + lisibilité) : ① FRÉQUENCES en tête (sans sous-titre redondant) ② PISTES (seuils officiels affiché…
 - **2026-09-05** — FICHE TERRAIN COMPLÈTE dans l onglet « Fréquences & info terrain » (demande pilote, 4 arbitrages validés) : ① IDENTITÉ en chips — élévation,…
-<!-- docs:lastSha=a19e808bd84777adee7f39114c99b4daf0ff076b -->
+<!-- docs:lastSha=ea69ae733d5553cf298a063b1d185c889462fef7 -->
 
 
 

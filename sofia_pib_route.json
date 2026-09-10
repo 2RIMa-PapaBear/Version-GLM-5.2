@@ -1,0 +1,2581 @@
+{
+ "pibUid": "NW432609102534",
+ "authorityName": "NEW CALEDONIA (FRANCE)",
+ "authorityTitle": "AERONAUTICAL INFORMATION SERVICES",
+ "organisationName": "SEAC",
+ "validFrom": "2026-09-10T15:23:27.000Z",
+ "validTo": "2026-09-11T03:23:00.000Z",
+ "traffic": "IV",
+ "contentExplanation": "Aerodromes, En-route, Warnings, including miscellaneous information",
+ "issued": "2026-09-10T15:23:27.000Z",
+ "dateProd": "10-09-2026 15:23",
+ "lowerFl": 0,
+ "upperFl": 999,
+ "radius": 30,
+ "duration": "1159",
+ "routeWidth": 30,
+ "listnotams": {
+  "ADDep": {
+   "code": "LFRN",
+   "name": "RENNES SAINT JACQUES",
+   "aerodromes_services": [
+    {
+     "sectionCode": "LFRN",
+     "pibSection": "AD",
+     "id": "400000052298890",
+     "nof": "LFFA",
+     "series": "A",
+     "number": 5431,
+     "year": 26,
+     "type": "N",
+     "qLine": {
+      "fir": "LFRR",
+      "code23": "FA",
+      "code45": "AH",
+      "traffic": "IV",
+      "purpose": "BO",
+      "scope": "A",
+      "lower": 0,
+      "upper": 999
+     },
+     "coordinates": "4804N00144W",
+     "radius": 5,
+     "itemA": "LFRN",
+     "startValidity": "2026-08-31T05:30:00Z",
+     "endValidity": "2026-10-25T21:00:00Z",
+     "startValidityFormat": "31 08 2026 05:30",
+     "endValidityFormat": "25 10 2026 21:00",
+     "itemE": "HANDLING AND AD ADMINISTRATION HOURS OF OPS OUTSIDE SKED \nCOMMERCIAL FLIGHTS :\n- MON TUE WED THU FRI 0530-1930\n- SAT 0530-1730\n- SUN 0530-2000",
+     "multiLanguage": {
+      "itemE": "HORAIRES GESTIONNAIRE ET HANDLING HORS VOLS COMMERCIAUX PROGRAMMES :\n- LUN MAR MER JEU VEN 0530-1930\n- SAM 0530-1730\n- DIM 0530-2000"
+     },
+     "marker": "+",
+     "valid": ""
+    },
+    {
+     "sectionCode": "LFRN",
+     "pibSection": "AD",
+     "id": "400000050355445",
+     "nof": "LFFA",
+     "series": "A",
+     "number": 2129,
+     "year": 26,
+     "type": "N",
+     "qLine": {
+      "fir": "LFRR",
+      "code23": "FU",
+      "code45": "AH",
+      "traffic": "IV",
+      "purpose": "BO",
+      "scope": "A",
+      "lower": 0,
+      "upper": 999
+     },
+     "coordinates": "4804N00144W",
+     "radius": 5,
+     "itemA": "LFRN",
+     "startValidity": "2026-04-07T12:45:00Z",
+     "endValidity": "2026-10-24T22:00:00Z",
+     "startValidityFormat": "07 04 2026 12:45",
+     "endValidityFormat": "24 10 2026 22:00",
+     "itemE": "REFUELLING HOURS:\n- AVGAS 100LL: SELF DISPENSER STATION\n         MON-FRI 0600-1800\n-JET A1:\n        MON-FRI 0300-1800\n         SAT  0500-1700\n         SUN : 0500-1800\n- LABOR DAY 0500-1800\nOUTSIDE THESE SKED, REFUELLING PROVIDED FOR PLANNED REGULAR\nCOMMERCIAL FLT.\nFOR OTHER FLT: ON-CALL DUTY AT +33 613 392 671",
+     "multiLanguage": {
+      "itemE": "HORAIRES AVITAILLEMENT\n- AVGAS 100LL: STATION AUTOMATE\n         LUN-VEN 0600-1800\n-JET A1:\n        LUN-VEN 0300-1800\n         SAM  0500-1700\n         DIM : 0500-1800\n- MAY 01: 0500-1800\n- EN DEHORS DE CES HORAIRES, AVITAILLEMENTS ASSURES POUR LES VOLS\nREGULIERS COMMERCIAUX PROGRAMMES\n- POUR LES AUTRES: ASTREINTE AU 06.13.39.26.71"
+     },
+     "marker": "+",
+     "valid": ""
+    }
+   ],
+   "aire_mouvement": [
+    {
+     "sectionCode": "LFRN",
+     "pibSection": "AD",
+     "id": "400000052439844",
+     "nof": "LFFA",
+     "series": "A",
+     "number": 5659,
+     "year": 26,
+     "type": "N",
+     "qLine": {
+      "fir": "LFRR",
+      "code23": "MR",
+      "code45": "LT",
+      "traffic": "IV",
+      "purpose": "NBO",
+      "scope": "A",
+      "lower": 0,
+      "upper": 999
+     },
+     "coordinates": "4804N00144W",
+     "radius": 5,
+     "itemA": "LFRN",
+     "startValidity": "2026-09-07T06:30:00Z",
+     "endValidity": "2026-09-11T15:30:00Z",
+     "startValidityFormat": "07 09 2026 06:30",
+     "endValidityFormat": "11 09 2026 15:30",
+     "itemE": "RWY 10/28 LIMITED :\n- RESERVED FOR PLANNED COMMERCIAL, STATE FLIGHTS, HOME BASED IFR, \nMEDEVAC\n- RWY CIRCUITS PROHIBITED\n- IFR TRAINING FLIGHTS WITH GO AROUND AT 1000FT AUTHORISED.",
+     "multiLanguage": {
+      "itemE": "PISTE 10/28 LIMITEE :\n- RESERVEE AUX VOLS COMMERCIAUX PROGRAMMES, VOLS D'ETAT, IFR BASES,\nEVASAN\n- TOURS DE PISTE INTERDITS\n- ENTRAINEMENTS IFR AUTORISES AVEC REMISE DE GAZ A 1000FT"
+     },
+     "marker": "+",
+     "valid": ""
+    }
+   ],
+   "aire_trafic": [],
+   "balisage": [],
+   "aides_atter_instal_radionav_GNSS": [],
+   "procedures": [
+    {
+     "sectionCode": "LFRN",
+     "pibSection": "AD",
+     "id": "400000049916926",
+     "nof": "LFFA",
+     "series": "A",
+     "number": 1462,
+     "year": 26,
+     "type": "N",
+     "qLine": {
+      "fir": "LFRR",
+      "code23": "PI",
+      "code45": "CH",
+      "traffic": "I",
+      "purpose": "NBO",
+      "scope": "A",
+      "lower": 0,
+      "upper": 999
+     },
+     "coordinates": "4804N00144W",
+     "radius": 5,
+     "itemA": "LFRN",
+     "startValidity": "2026-03-12T00:00:00Z",
+     "endValidity": "PERM",
+     "startValidityFormat": "12 03 2026 00:00",
+     "endValidityFormat": "PERM",
+     "itemE": "MNM OPS LNAV-VNAV: REF AD2 LFRN IAC RWY10 RNP-AD2 LFRN IAC RWY28 \nRNP\n-RNP RWY 10\nCAT DA(H) RVR\nA 510 (430) 1500\nB 510 (430) 1500\nC 510 (430) 2000\nD 510 (430) 2000\n-RNP RWY 28\nDA(H) CAT A B C ET D 520(400)\nRVR CAT A B C D 1100",
+     "multiLanguage": {
+      "itemE": "MNM OPS LNAV-VNAV: REF AD2 LFRN IAC RWY10 RNP-AD2 LFRN IAC RWY28 RNP\n-RNP RWY 10\nCAT DA(H) RVR\nA 510 (430) 1500\nB 510 (430) 1500\nC 510 (430) 2000\nD 510 (430) 2000\n-RNP RWY 28\nDA(H) CAT A B C ET D 520(400)\nRVR CAT A B C D 1100"
+     },
+     "marker": "+",
+     "valid": ""
+    },
+    {
+     "sectionCode": "LFRN",
+     "pibSection": "AD",
+     "id": "400000049919874",
+     "nof": "LFFA",
+     "series": "A",
+     "number": 1465,
+     "year": 26,
+     "type": "N",
+     "qLine": {
+      "fir": "LFRR",
+      "code23": "PI",
+      "code45": "XX",
+      "traffic": "I",
+      "purpose": "NBO",
+      "scope": "A",
+      "lower": 0,
+      "upper": 999
+     },
+     "coordinates": "4804N00144W",
+     "radius": 5,
+     "itemA": "LFRN",
+     "startValidity": "2026-03-12T00:00:00Z",
+     "endValidity": "PERM",
+     "startValidityFormat": "12 03 2026 00:00",
+     "endValidityFormat": "PERM",
+     "itemE": "IFR APCH TRAINING :\nANY IFR TRAINING FLIGHT MUST BE THE SUBJECT OF AN IFR FPL SUBMISSION \nWITH DIFFERENT DESIGNATORS FOR EACH FLOWN INSTRUMENT APCH PROC. THE \nMENTION  'RMK/TRAINING' IN CASE 18 IS MANDATORY FOR EACH OF THESE \nFPL.\nREF AD 2 LFRN.20.4",
+     "multiLanguage": {
+      "itemE": "ENTRAINEMENT AUX APPROCHES IFR :\nTOUT VOLS D'ENTRAINEMENT IFR DOIT FAIRE L'OBJET D'UN DEPOT DE PLANS\nDE VOL IFR AVEC DES INDICATIFS DIFFERENTS POUR CHAQUE PROCEDURE\nD'APPROCHE AUX INSTRUMENTS VOLEE. LA MENTION 'RMK/TRAINING' EN CASE\n18 EST OBLIGATOIRE POUR CHACUN DE CES PLANS DE VOL.\nREF AD 2 LFRN.20.4"
+     },
+     "marker": "+",
+     "valid": ""
+    },
+    {
+     "sectionCode": "LFRN",
+     "pibSection": "AD",
+     "id": "400000052393393",
+     "nof": "LFFA",
+     "series": "A",
+     "number": 5591,
+     "year": 26,
+     "type": "R",
+     "referredSeries": "A",
+     "referredNumber": 3309,
+     "referredYear": 26,
+     "qLine": {
+      "fir": "LFRR",
+      "code23": "PI",
+      "code45": "CH",
+      "traffic": "I",
+      "purpose": "NBO",
+      "scope": "A",
+      "lower": 0,
+      "upper": 999
+     },
+     "coordinates": "4804N00144W",
+     "radius": 5,
+     "itemA": "LFRN",
+     "startValidity": "2026-08-31T12:30:00Z",
+     "endValidity": "2026-11-30T23:59:00Z",
+     "startValidityFormat": "31 08 2026 12:30",
+     "endValidityFormat": "30 11 2026 23:59",
+     "itemE": "RNP RWY 10 PROC FAF-SDF MOCA SEGMENT CHANGED (DUE TO OBST) :\n- RNP RWY 10 : MOCA(H) 570(489)\nREF AIP FRANCE AD 2 LFRN IAC RWY10 RNP.",
+     "multiLanguage": {
+      "itemE": "MOCA DU SEGMENT FAF-SDF PROC RNP RWY 10 MODIFIEE (CAUSE OBST) :\n- RNP RWY 10 : MOCA(H) 570(489)\nREF AIP FRANCE AD 2 LFRN IAC RWY10 RNP."
+     },
+     "marker": "+",
+     "valid": ""
+    },
+    {
+     "sectionCode": "LFRN",
+     "pibSection": "AD",
+     "id": "400000052393439",
+     "nof": "LFFA",
+     "series": "A",
+     "number": 5592,
+     "year": 26,
+     "type": "R",
+     "referredSeries": "A",
+     "referredNumber": 3310,
+     "referredYear": 26,
+     "qLine": {
+      "fir": "LFRR",
+      "code23": "PI",
+      "code45": "CH",
+      "traffic": "I",
+      "purpose": "NBO",
+      "scope": "A",
+      "lower": 0,
+      "upper": 999
+     },
+     "coordinates": "4804N00144W",
+     "radius": 5,
+     "itemA": "LFRN",
+     "startValidity": "2026-08-31T12:33:00Z",
+     "endValidity": "2026-11-30T23:59:00Z",
+     "startValidityFormat": "31 08 2026 12:33",
+     "endValidityFormat": "30 11 2026 23:59",
+     "itemE": "VOR RWY 28 PROC FAF-3NM FROM DME 'REN' SEGMENT MOCA CHANGED \n(DUE TO OBST) :\n- MOCA(H) 630(506)\nREF AD2 LFRN IAC RWY28 FNA VOR.",
+     "multiLanguage": {
+      "itemE": "MOCA DU SEGMENT FAF-DISTANCE 3NM DU DME 'REN' DE LA PROC VOR \nRWY 28 MODIFIEE (CAUSE OBST) :\n- MOCA(H) 630(506)\nREF AD2 LFRN IAC RWY28 FNA VOR."
+     },
+     "marker": "+",
+     "valid": ""
+    },
+    {
+     "sectionCode": "LFRN",
+     "pibSection": "AD",
+     "id": "400000052447729",
+     "nof": "LFFA",
+     "series": "A",
+     "number": 5687,
+     "year": 26,
+     "type": "R",
+     "referredSeries": "A",
+     "referredNumber": 5292,
+     "referredYear": 26,
+     "qLine": {
+      "fir": "LFRR",
+      "code23": "PI",
+      "code45": "CH",
+      "traffic": "I",
+      "purpose": "NBO",
+      "scope": "A",
+      "lower": 0,
+      "upper": 999
+     },
+     "coordinates": "4804N00144W",
+     "radius": 5,
+     "itemA": "LFRN",
+     "startValidity": "2026-09-03T14:54:00Z",
+     "endValidity": "2026-10-09T23:59:00Z",
+     "startValidityFormat": "03 09 2026 14:54",
+     "endValidityFormat": "09 10 2026 23:59",
+     "itemE": "PROC VOR RWY 28, MNM OPS MODIFIED : \nMDA(H)    RVR    OCH\n610(490)  1500   484\nREF AIP : AD2 LFRN IAC RWY 28 FNA VOR.",
+     "multiLanguage": {
+      "itemE": "MINIMA PROCEDURE VOR RWY 28 MODIFIES :\nMDA(H)    RVR    OCH\n610(490)  1500   484\nREF AIP : AD2 LFRN IAC RWY 28 FNA VOR."
+     },
+     "marker": "+",
+     "valid": ""
+    },
+    {
+     "sectionCode": "LFRN",
+     "pibSection": "AD",
+     "id": "400000052447737",
+     "nof": "LFFA",
+     "series": "A",
+     "number": 5688,
+     "year": 26,
+     "type": "R",
+     "referredSeries": "A",
+     "referredNumber": 5293,
+     "referredYear": 26,
+     "qLine": {
+      "fir": "LFRR",
+      "code23": "PI",
+      "code45": "CH",
+      "traffic": "I",
+      "purpose": "NBO",
+      "scope": "A",
+      "lower": 0,
+      "upper": 999
+     },
+     "coordinates": "4804N00144W",
+     "radius": 5,
+     "itemA": "LFRN",
+     "startValidity": "2026-09-03T14:56:00Z",
+     "endValidity": "2026-10-09T23:59:00Z",
+     "startValidityFormat": "03 09 2026 14:56",
+     "endValidityFormat": "09 10 2026 23:59",
+     "itemE": "PROC RNP RWY28, LNAV MNM OPS MODIFIED :\nMDA(H)    RVR    OCH\n600(480)  1500   471\nREF AIP : AD2 LFRN IAC RWY28 RNP.",
+     "multiLanguage": {
+      "itemE": "PROCEDURE RNP RWY28, MINIMA LNAV MODIFIES :\nMDA(H)    RVR    OCH\n600(480)  1500   471\nREF AIP : AD2 LFRN IAC RWY28 RNP."
+     },
+     "marker": "+",
+     "valid": ""
+    }
+   ],
+   "organisation_espace_services_circulation": [],
+   "meteorologie_equipements": [],
+   "reglementation_espace_aerien": [],
+   "avertissements_navigation": [],
+   "obstacles": [
+    {
+     "sectionCode": "LFRN",
+     "pibSection": "AD",
+     "id": "400000047972141",
+     "nof": "LFFA",
+     "series": "P",
+     "number": 3953,
+     "year": 25,
+     "type": "N",
+     "qLine": {
+      "fir": "LFRR",
+      "code23": "OB",
+      "code45": "CE",
+      "traffic": "IV",
+      "purpose": "M",
+      "scope": "AE",
+      "lower": 0,
+      "upper": 4
+     },
+     "coordinates": "4804N00143W",
+     "radius": 1,
+     "itemA": "LFRN",
+     "startValidity": "2025-11-25T14:01:00Z",
+     "endValidity": "2026-09-25T19:00:00Z",
+     "startValidityFormat": "25 11 2025 14:01",
+     "endValidityFormat": "25 09 2026 19:00",
+     "itemD": "0600-1900",
+     "itemE": "OBST : 4 MOBILES CRANES OPR AT 'CHARTRES DE BRETAGNE'\nRDL133/0.84NM LFRN ARP\nPSN MOY : 480345N 0014301W WITHIN 330M RADIUS\nHEIGHT : 190FT\nELEV : 311FT\nLIGHTING : DAY AND NIGHT.",
+     "multiLanguage": {
+      "itemE": "OBST : 4 GRUES MOBILES ERIGEES A CHARTRES DE BRETAGNE\nRDL133/0.84NM ARP LFRN\nPSN MOY : 480345N 0014301W DANS UN RAYON DE 330M\nHAUTEUR : 190FT\nALT AU SOMMET : 311FT\nBALISAGE : JOUR ET NUIT."
+     },
+     "marker": "-",
+     "valid": ""
+    },
+    {
+     "sectionCode": "LFRN",
+     "pibSection": "AD",
+     "id": "400000050194129",
+     "nof": "LFFA",
+     "series": "P",
+     "number": 1149,
+     "year": 26,
+     "type": "N",
+     "qLine": {
+      "fir": "LFRR",
+      "code23": "OB",
+      "code45": "CE",
+      "traffic": "IV",
+      "purpose": "M",
+      "scope": "A",
+      "lower": 0,
+      "upper": 999
+     },
+     "coordinates": "4804N00144W",
+     "radius": 5,
+     "itemA": "LFRN",
+     "startValidity": "2026-03-30T05:00:00Z",
+     "endValidity": "2026-11-30T17:00:00Z",
+     "startValidityFormat": "30 03 2026 05:00",
+     "endValidityFormat": "30 11 2026 17:00",
+     "itemE": "OBST : 2 CRANES OPR AT 'BRUZ' :\nRDL183/0.88NM ARP AD LFRN\nAVERAGE PSN : 480326N 0014400W\nHEIGHT : 119FT\nELEV : 228FT\nLIGHTING : DAY AND NIGHT",
+     "multiLanguage": {
+      "itemE": "OBST : 2 GRUES A TOUR ERIGEES A BRUZ :\nRDL183/0.88NM ARP AD LFRN\nPSN MOY : 480326N 0014400W\nHAUTEUR : 119FT\nALT AU SOMMET : 228FT\nBALISAGE : JOUR ET NUIT"
+     },
+     "marker": "+",
+     "valid": ""
+    },
+    {
+     "sectionCode": "LFRN",
+     "pibSection": "AD",
+     "id": "400000050887779",
+     "nof": "LFFA",
+     "series": "P",
+     "number": 1800,
+     "year": 26,
+     "type": "R",
+     "referredSeries": "P",
+     "referredNumber": 1253,
+     "referredYear": 26,
+     "qLine": {
+      "fir": "LFRR",
+      "code23": "OB",
+      "code45": "CE",
+      "traffic": "IV",
+      "purpose": "M",
+      "scope": "A",
+      "lower": 0,
+      "upper": 999
+     },
+     "coordinates": "4804N00144W",
+     "radius": 5,
+     "itemA": "LFRN",
+     "startValidity": "2026-05-12T09:16:00Z",
+     "endValidity": "2026-10-30T17:00:00Z",
+     "startValidityFormat": "12 05 2026 09:16",
+     "endValidityFormat": "30 10 2026 17:00",
+     "itemE": "OBST: MOBILE CRANE ERECTED AT 'CHARTRES DE BRETAGNE'\n-RDL136/0.91NM LFRN ARP \nPSN: 480340N 0014259W\nHEIGHT : 148FT\nELEV : 266FT\nLIGHTING: NIGHT AND DAY .",
+     "multiLanguage": {
+      "itemE": "OBST :  GRUE MOBILE A TOUR ERIGEE A CHARTRES DE BRETAGNE\nRDL136/0.91NM ARP LFRN \nPSN : 480340N 0014259W\nHAUTEUR : 148FT\nALT AU SOMMET : 266FT\nBALISAGE : JOUR ET NUIT"
+     },
+     "marker": "+",
+     "valid": ""
+    },
+    {
+     "sectionCode": "LFRN",
+     "pibSection": "AD",
+     "id": "400000051314137",
+     "nof": "LFFA",
+     "series": "P",
+     "number": 2173,
+     "year": 26,
+     "type": "N",
+     "qLine": {
+      "fir": "LFRR",
+      "code23": "OB",
+      "code45": "CE",
+      "traffic": "IV",
+      "purpose": "M",
+      "scope": "A",
+      "lower": 0,
+      "upper": 999
+     },
+     "coordinates": "4804N00144W",
+     "radius": 5,
+     "itemA": "LFRN",
+     "startValidity": "2026-06-11T05:00:00Z",
+     "endValidity": "2027-04-30T16:00:00Z",
+     "startValidityFormat": "11 06 2026 05:00",
+     "endValidityFormat": "30 04 2027 16:00",
+     "itemE": "OBST 2 MOBILE AND TOWER CRANES OPR AT 'NOYAL CHATILLON SUR \nSEICHE' :\n- RDL087/2.76NM ARP LFRN RENNES SAINT JACQUES\n- PSN : 480429N 0013949W\n- HGT : 148FT\n- ELEV : 270FT\n- LGT : DAY AND NIGHT",
+     "multiLanguage": {
+      "itemE": "OBST 2 GRUES A TOUR ET MOBILE ERIGEES A NOYAL CHATILLON SUR SEICHE :\n- RDL087/2.76NM ARP LFRN RENNES SAINT JACQUES\n- PSN : 480429N 0013949W\n- HAUTEUR : 148FT\n- ALT AU SOMMET : 270FT\n- BALISAGE : JOUR ET NUIT."
+     },
+     "marker": "+",
+     "valid": ""
+    },
+    {
+     "sectionCode": "LFRN",
+     "pibSection": "AD",
+     "id": "400000051564251",
+     "nof": "LFFA",
+     "series": "P",
+     "number": 2404,
+     "year": 26,
+     "type": "N",
+     "qLine": {
+      "fir": "LFRR",
+      "code23": "OB",
+      "code45": "CE",
+      "traffic": "IV",
+      "purpose": "M",
+      "scope": "AE",
+      "lower": 0,
+      "upper": 5
+     },
+     "coordinates": "4808N00142W",
+     "radius": 1,
+     "itemA": "LFRN",
+     "startValidity": "2026-07-13T05:00:00Z",
+     "endValidity": "2026-10-30T17:00:00Z",
+     "startValidityFormat": "13 07 2026 05:00",
+     "endValidityFormat": "30 10 2026 17:00",
+     "itemE": "OBST : MOBILE CRANE OPR NEAR HLP AT 'RENNES' :\n- RDL 298/0.30NM 'RENNES PONT CHAILLOU ALPHA CENTRE HOSPITALIER' HRP\n- PSN : 480732N 0014216W \n- HGT : 279FT \n- ELEV : 466FT \n- LGT : DAY AND NGT.",
+     "multiLanguage": {
+      "itemE": "OBST : GRUE MOBILE ERIGEE A PROXIMITE HELISTATION A 'RENNES' :\n- RDL 298/0.30NM HRP 'RENNES PONT CHAILLOU ALPHA CENTRE HOSPITALIER'\n- PSN : 480732N 0014216W \n- HAUTEUR : 279FT \n- ALT AU SOMMET : 466FT \n- BALISAGE : JOUR ET NUIT."
+     },
+     "marker": "+",
+     "valid": ""
+    },
+    {
+     "sectionCode": "LFRN",
+     "pibSection": "AD",
+     "id": "400000051680393",
+     "nof": "LFFA",
+     "series": "P",
+     "number": 2547,
+     "year": 26,
+     "type": "N",
+     "qLine": {
+      "fir": "LFRR",
+      "code23": "OB",
+      "code45": "CE",
+      "traffic": "IV",
+      "purpose": "M",
+      "scope": "AE",
+      "lower": 0,
+      "upper": 5
+     },
+     "coordinates": "4805N00141W",
+     "radius": 1,
+     "itemA": "LFRN",
+     "startValidity": "2026-07-08T00:00:00Z",
+     "endValidity": "2027-02-26T23:59:00Z",
+     "startValidityFormat": "08 07 2026 00:00",
+     "endValidityFormat": "26 02 2027 23:59",
+     "itemE": "OBST : TOWER MOBILE CRANE OVER RENNES\nRDL061/2.24NM ARP LFRN\nPSN : 480523N 0014100W\nHGT : 276FT\nELEV : 410FT\nLGT : DAY NGT",
+     "multiLanguage": {
+      "itemE": "OBST : GRUE A TOUR ET MOBILE ERIGEES A RENNES\nRDL061/2.24NM ARP LFRN\nPSN : 480523N 0014100W\nHAUTEUR : 276FT\nALT AU SOMMET : 410FT\nBALISAGE : JOUR NUIT"
+     },
+     "marker": "+",
+     "valid": ""
+    },
+    {
+     "sectionCode": "LFRN",
+     "pibSection": "AD",
+     "id": "400000052373065",
+     "nof": "LFFA",
+     "series": "P",
+     "number": 3129,
+     "year": 26,
+     "type": "N",
+     "qLine": {
+      "fir": "LFRR",
+      "code23": "OB",
+      "code45": "CE",
+      "traffic": "IV",
+      "purpose": "M",
+      "scope": "AE",
+      "lower": 0,
+      "upper": 4
+     },
+     "coordinates": "4804N00142W",
+     "radius": 1,
+     "itemA": "LFRN",
+     "startValidity": "2026-09-07T06:00:00Z",
+     "endValidity": "2026-10-09T17:00:00Z",
+     "startValidityFormat": "07 09 2026 06:00",
+     "endValidityFormat": "09 10 2026 17:00",
+     "itemE": "OBST : MOBILE CRANE OPR AT 'CHARTRES DE BRETAGNE' (35)\n- RDL124/1.26NM ARP LFRN\n- PSN : 480336.205N 0014222.547W \n- HGT : 230FT \n- ELEV : 362FT\n- LGT : DAY AND NIGHT",
+     "multiLanguage": {
+      "itemE": "OBST : GRUE MOBILE A CHARTRES DE BRETAGNE (35)\n- RDL124/1.26NM ARP LFRN\n- PSN : 480336.205N 0014222.547W \n- HAUTEUR : 230FT \n- ALT AU SOMMET : 362FT\n- BALISAGE : JOUR ET NUIT"
+     },
+     "marker": "+",
+     "valid": ""
+    },
+    {
+     "sectionCode": "LFRN",
+     "pibSection": "AD",
+     "id": "400000052502177",
+     "nof": "LFFA",
+     "series": "P",
+     "number": 3289,
+     "year": 26,
+     "type": "N",
+     "qLine": {
+      "fir": "LFRR",
+      "code23": "OB",
+      "code45": "CE",
+      "traffic": "IV",
+      "purpose": "M",
+      "scope": "A",
+      "lower": 0,
+      "upper": 999
+     },
+     "coordinates": "4804N00144W",
+     "radius": 5,
+     "itemA": "LFRN",
+     "startValidity": "2026-09-09T06:30:00Z",
+     "endValidity": "2026-10-24T15:30:00Z",
+     "startValidityFormat": "09 09 2026 06:30",
+     "endValidityFormat": "24 10 2026 15:30",
+     "itemD": "0630-1530",
+     "itemE": "OBST : MOBILE CRANE AT CHARTRES DE BRETAGNE - RDL 140/0.87NM ARP \nLFRN :\n- PSN : 480338N 0014306W\n- HEIGHT : 115FT\n- ELEVATION : 237FT\n- LIGHTING : DAY AND NIGHT.",
+     "multiLanguage": {
+      "itemE": "OBST : GRUE MOBILE A CHARTRES DE BRETAGNE - RDL 140/0.87NM ARP LFRN :\n- PSN : 480338N 0014306W \n- HAUTEUR : 115FT \n- ALTITUDE AU SOMMET : 237FT\n- BALISAGE : JOUR ET NUIT."
+     },
+     "marker": "+",
+     "valid": ""
+    }
+   ],
+   "autres_info": []
+  },
+  "ADDeg": [],
+  "ADSur": [],
+  "ADDes": {
+   "code": "LFRV",
+   "name": "VANNES GOLFE DU MORBIHAN",
+   "aerodromes_services": [],
+   "aire_mouvement": [],
+   "aire_trafic": [],
+   "balisage": [],
+   "aides_atter_instal_radionav_GNSS": [],
+   "procedures": [
+    {
+     "sectionCode": "LFRV",
+     "pibSection": "AD",
+     "id": "400000050234973",
+     "nof": "LFFA",
+     "series": "E",
+     "number": 1539,
+     "year": 26,
+     "type": "R",
+     "referredSeries": "E",
+     "referredNumber": 1534,
+     "referredYear": 26,
+     "qLine": {
+      "fir": "LFRR",
+      "code23": "PI",
+      "code45": "CH",
+      "traffic": "I",
+      "purpose": "NBO",
+      "scope": "A",
+      "lower": 0,
+      "upper": 999
+     },
+     "coordinates": "4743N00243W",
+     "radius": 5,
+     "itemA": "LFRV",
+     "startValidity": "2026-03-30T08:48:00Z",
+     "endValidity": "2026-10-01T07:00:00Z",
+     "startValidityFormat": "30 03 2026 08:48",
+     "endValidityFormat": "01 10 2026 07:00",
+     "itemE": "OPERATING MINIMA OF IFR APCH PROC RNP LNAV-VNAV CHANGED :\n- RNP RWY04\nCAT DA  (H)   RVR\n A  780 (350) 1500\n B  780 (350) 1500\n C  780 (350) 1600\n- RNP RWY22\nCAT DA  (H)   RVR\n A  800 (370) 1500\n B  810 (380) 1500\n C  810 (380) 1700",
+     "multiLanguage": {
+      "itemE": "PROC APCH IFR RNP MINIMA OPS LNAV-VNAV MODIFIES :\n- RNP RWY04\nCAT DA  (H)   RVR\n A  780 (350) 1500\n B  780 (350) 1500\n C  780 (350) 1600\n- RNP RWY22\nCAT DA  (H)   RVR\n A  800 (370) 1500\n B  810 (380) 1500\n C  810 (380) 1700"
+     },
+     "marker": "+",
+     "valid": ""
+    },
+    {
+     "sectionCode": "LFRV",
+     "pibSection": "AD",
+     "id": "400000052383642",
+     "nof": "LFFA",
+     "series": "E",
+     "number": 4096,
+     "year": 26,
+     "type": "N",
+     "qLine": {
+      "fir": "LFRR",
+      "code23": "PM",
+      "code45": "CH",
+      "traffic": "I",
+      "purpose": "NBO",
+      "scope": "A",
+      "lower": 0,
+      "upper": 999
+     },
+     "coordinates": "4743N00243W",
+     "radius": 5,
+     "itemA": "LFRV",
+     "startValidity": "2026-08-30T16:22:00Z",
+     "endValidity": "2026-11-30T06:00:00Z",
+     "startValidityFormat": "30 08 2026 16:22",
+     "endValidityFormat": "30 11 2026 06:00",
+     "itemE": "LVP LIMITATION :\n- WITH AFIS PRESENCE : POSSIBLE TKOF WITH 550M LOW VISIBILITY \n- WITHOUT AFIS PRESENCE : \n. POSSIBLE TKOF WITH 550M LOW VISIBILITY DURING THE DAY \n. POSSIBLE TKOF WITH 800M LOW VISIBILITY AT NIGHT.",
+     "multiLanguage": {
+      "itemE": "LVP LIMITATION :\n-DECOLLAGE PAR FAIBLE VISIBILITE POSSIBLE AVEC 550M EN PRESENCE DU\nSERVICE AFIS.\n-DECOLLAGE PAR FAIBLE VISIBILITE POSSIBLE AVEC  550M DE JOUR ET 800M\nDE NUIT HORS PRESENCE AFIS."
+     },
+     "marker": "+",
+     "valid": ""
+    }
+   ],
+   "organisation_espace_services_circulation": [
+    {
+     "sectionCode": "LFRV",
+     "pibSection": "AD",
+     "id": "400000052383571",
+     "nof": "LFFA",
+     "series": "E",
+     "number": 4093,
+     "year": 26,
+     "type": "N",
+     "qLine": {
+      "fir": "LFRR",
+      "code23": "SF",
+      "code45": "AH",
+      "traffic": "IV",
+      "purpose": "BO",
+      "scope": "A",
+      "lower": 0,
+      "upper": 999
+     },
+     "coordinates": "4743N00243W",
+     "radius": 5,
+     "itemA": "LFRV",
+     "startValidity": "2026-08-30T16:12:00Z",
+     "endValidity": "2026-09-30T16:00:00Z",
+     "startValidityFormat": "30 08 2026 16:12",
+     "endValidityFormat": "30 09 2026 16:00",
+     "itemE": "AFIS SKED : 0700-1030 1200-1600.",
+     "multiLanguage": {
+      "itemE": "HORAIRES AFIS : 0700-1030 1200-1600."
+     },
+     "marker": "+",
+     "valid": ""
+    },
+    {
+     "sectionCode": "LFRV",
+     "pibSection": "AD",
+     "id": "400000052472951",
+     "nof": "LFFA",
+     "series": "E",
+     "number": 4185,
+     "year": 26,
+     "type": "N",
+     "qLine": {
+      "fir": "LFRR",
+      "code23": "SF",
+      "code45": "LT",
+      "traffic": "IV",
+      "purpose": "BO",
+      "scope": "A",
+      "lower": 0,
+      "upper": 999
+     },
+     "coordinates": "4743N00243W",
+     "radius": 5,
+     "itemA": "LFRV",
+     "startValidity": "2026-09-06T07:00:00Z",
+     "endValidity": "2026-09-20T16:00:00Z",
+     "startValidityFormat": "06 09 2026 07:00",
+     "endValidityFormat": "20 09 2026 16:00",
+     "itemD": "06 12 20 0700-1600, 09 16 0700-1030, 08 10 15 17 1200-1600",
+     "itemE": "AFIS ONLY IN FRENCH",
+     "multiLanguage": {
+      "itemE": "SERVICE AFIS EN FR UNIQUEMENT"
+     },
+     "marker": "+",
+     "valid": ""
+    }
+   ],
+   "meteorologie_equipements": [],
+   "reglementation_espace_aerien": [],
+   "avertissements_navigation": [],
+   "obstacles": [],
+   "autres_info": []
+  },
+  "FIR": {
+   "organisation_espace_procedures": [
+    {
+     "code23": "AF",
+     "sortedNotamsByImpactedAerodromes": [
+      {
+       "code": "LFBB LFEE LFFF LFMM LFRR",
+       "name": "FIR BORDEAUX/FIR REIMS/FIR PARIS FIR/FIR MARSEILLE/FIR BREST",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "BO",
+         "notam": [
+          {
+           "pibSection": "FIR",
+           "id": "400000052359707",
+           "nof": "LFFA",
+           "series": "M",
+           "number": 2950,
+           "year": 26,
+           "type": "N",
+           "qLine": {
+            "fir": "LFXX",
+            "code23": "AF",
+            "code45": "TT",
+            "traffic": "I",
+            "purpose": "BO",
+            "scope": "E",
+            "lower": 0,
+            "upper": 999
+           },
+           "coordinates": "4412N00040E",
+           "radius": 460,
+           "itemA": "LFBB LFEE LFFF LFMM LFRR",
+           "startValidity": "2026-09-03T00:00:00Z",
+           "endValidity": "2026-09-16T23:59:00Z",
+           "startValidityFormat": "03 09 2026 00:00",
+           "endValidityFormat": "16 09 2026 23:59",
+           "itemE": "TRIGGER NOTAM - PERM AIRAC AIP AMDT 09/26 WEF 03 SEP 2026.\nPROCEDURES PUBLISHED IN MIL AIP MIAC4 ARE CONVERTED FOR USE WITH QNH \nALTIMETER SETTING.\nREF CMIA NR 02/26.",
+           "multiLanguage": {
+            "itemE": "NOTAM TRIGGER - AMDT AIP AIRAC PERM 09/26 WEF 03 SEP 2026.\nLES PROCEDURES PUBLIEES AU MIL AIP MIAC4 SONT CONVERTIES POUR UNE UTILISATION AU CALAGE ALTIMETRIQUE QNH.\nREF CMIA NR 02/26."
+           },
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "services_circulation_aerienne_VOLMET": [
+    {
+     "code23": "SU",
+     "sortedNotamsByImpactedAerodromes": [
+      {
+       "code": "LFRR LFBB",
+       "name": "FIR BREST/FIR BORDEAUX",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "BO",
+         "notam": [
+          {
+           "pibSection": "FIR",
+           "id": "400000049422762",
+           "nof": "LFFA",
+           "series": "F",
+           "number": 212,
+           "year": 26,
+           "type": "N",
+           "qLine": {
+            "fir": "LFXX",
+            "code23": "SU",
+            "code45": "XX",
+            "traffic": "I",
+            "purpose": "BO",
+            "scope": "E",
+            "lower": 195,
+            "upper": 325
+           },
+           "coordinates": "4543N00221W",
+           "radius": 301,
+           "itemA": "LFRR LFBB",
+           "startValidity": "2026-02-19T00:00:00Z",
+           "endValidity": "2027-02-17T23:59:00Z",
+           "startValidityFormat": "19 02 2026 00:00",
+           "endValidityFormat": "17 02 2027 23:59",
+           "itemE": "REF. AIP FRANCE ENR 2.2.4.1 FLW SECTORS MODIFIED FOR \nEXPERIMENTATION\n-ACC/UAC BORDEAUX-SECTOR R1 MODIFIED AS FOLLOW :\nPART. 2-FL275 UNTIL FL295\n470240N,0001500W-470453N,0002709E-470015N,0005912E-463125N,0005707E-4\n55300N,0005424E-451136N,0010552E-450154N,0003924E-442348N,0000127E-44\n2356N,0001258W-444900N,0004300W-444900N,0014312W-455853N,0013936W-461\n248N,0005631W-463000N,0001500W-463735N,0001500W-470240N,0001500W\nPART. 1-FL195 UNTIL FL275\n470240N,0001500W-470453N,0002709E-470015N,0005912E-463125N,0005707E-4\n55300N,0005424E-451136N,0010552E-450154N,0003924E-442348N,0000127E-44\n2356N,0001258W-444900N,0004300W-444900N,0014312W-455853N,0013936W-463\n000N,0012552W-464529N,0011827W-465429N,0010706W-470240N,0001500W\n-ACC/UAC BREST-SECTOR NS MODIFIED AS FOLLOW :\nPART. 3-FL305 UNTIL FL325\n482744N,0001500W-463000N,0001500W-461248N,0005631W-455853N,0013936W-4\n61304N,0024000W-461841N,0030105W-463722N,0030621W-471705N,0025751W-48\n0251N,0021532W-481050N,0004457W-482744N,0001500W\nPART. 2-FL275 UNTIL FL305\n482744N,0001500W-475600N,0001500W-473116N,0004138W-471000N,0001500W-4\n63000N,0001500W-461248N,0005631W-455853N,0013936W-461304N,0024000W-46\n1841N,0030105W-463722N,0030621W-471705N,0025751W-480251N,0021532W-481\n050N,0004457W-482744N,0001500W\nPART. 1-FL195 UNTIL FL275\n482744N,0001500W-475600N,0001500W-473116N,0004138W-471000N,0001500W-4\n70240N,0001500W-465429N,0010706W-464529N,0011827W-463000N,0012552W-45\n5853N,0013936W-461304N,0024000W-461841N,0030105W-463722N,0030621W-471\n705N,0025751W-480251N,0021532W-481050N,0004457W-482744N,0001500W",
+           "multiLanguage": {
+            "itemE": "REF. AIP FRANCE ENR 2.2.4.1 SECTEURS SUIVANTS MODIFIES POUR\nEXPERIMENTATION\n-ACC/UAC BORDEAUX-SECTEUR R1 MODIFIE COMME SUIT :\nPART. 2-FL275 JUSQUE FL295\n470240N,0001500W-470453N,0002709E-470015N,0005912E-463125N,0005707E-4\n55300N,0005424E-451136N,0010552E-450154N,0003924E-442348N,0000127E-44\n2356N,0001258W-444900N,0004300W-444900N,0014312W-455853N,0013936W-461\n248N,0005631W-463000N,0001500W-463735N,0001500W-470240N,0001500W\nPART. 1-FL195 JUSQUE FL275\n470240N,0001500W-470453N,0002709E-470015N,0005912E-463125N,0005707E-4\n55300N,0005424E-451136N,0010552E-450154N,0003924E-442348N,0000127E-44\n2356N,0001258W-444900N,0004300W-444900N,0014312W-455853N,0013936W-463\n000N,0012552W-464529N,0011827W-465429N,0010706W-470240N,0001500W\n-ACC/UAC BREST-SECTEUR NS MODIFIE COMME SUIT :\nPART. 3-FL305 JUSQUE FL325\n482744N,0001500W-463000N,0001500W-461248N,0005631W-455853N,0013936W-4\n61304N,0024000W-461841N,0030105W-463722N,0030621W-471705N,0025751W-48\n0251N,0021532W-481050N,0004457W-482744N,0001500W\nPART. 2-FL275 JUSQUE FL305\n482744N,0001500W-475600N,0001500W-473116N,0004138W-471000N,0001500W-4\n63000N,0001500W-461248N,0005631W-455853N,0013936W-461304N,0024000W-46\n1841N,0030105W-463722N,0030621W-471705N,0025751W-480251N,0021532W-481\n050N,0004457W-482744N,0001500W\nPART. 1-FL195 JUSQUE FL275\n482744N,0001500W-475600N,0001500W-473116N,0004138W-471000N,0001500W-4\n70240N,0001500W-465429N,0010706W-464529N,0011827W-463000N,0012552W-45\n5853N,0013936W-461304N,0024000W-461841N,0030105W-463722N,0030621W-471\n705N,0025751W-480251N,0021532W-481050N,0004457W-482744N,0001500W"
+           },
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "code23": "SC",
+     "sortedNotamsByImpactedAerodromes": [
+      {
+       "code": "LFRR LFFF LFEE LFBB",
+       "name": "FIR BREST/FIR PARIS FIR/FIR REIMS/FIR BORDEAUX",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "NBO",
+         "notam": [
+          {
+           "pibSection": "FIR",
+           "id": "400000047259075",
+           "nof": "LFFA",
+           "series": "F",
+           "number": 1418,
+           "year": 25,
+           "type": "N",
+           "qLine": {
+            "fir": "LFXX",
+            "code23": "SC",
+            "code45": "XX",
+            "traffic": "IV",
+            "purpose": "NBO",
+            "scope": "E",
+            "lower": 0,
+            "upper": 999
+           },
+           "coordinates": "4912N00005E",
+           "radius": 325,
+           "itemA": "LFRR LFFF LFEE LFBB",
+           "startValidity": "2025-10-10T00:00:00Z",
+           "endValidity": "PERM",
+           "startValidityFormat": "10 10 2025 00:00",
+           "endValidityFormat": "PERM",
+           "itemE": "DUE TO A TECHNICAL UPDATE,SOME PHONE NUMBERS OF THE \n'CINQ-MARS-LA-PILE' CTL AND DETECTION CENTER '(CDC)' ARE CHANGING.\nONLY THE FLW PHONE NUMBERS HAVE TO BE USED :\n'CSCAM': +33 2.45.34.16.02 (862 927 1602)\n'BIV': +33 2.45.34.16.03 (862 927 1603)\n'MC': +33 2.45.34.16.05 (862 927 1605) AND +33 2.45.34.16.06 (862 \n927 1606)\n'TPO': +33 2.45.34.16.09 (862 927 1609)\n'OMC': +33 2.45.34.16.10 (862 927 1610)\n'FA': +33 2.45.34.16.11 (862 927 1611)\n'OPS MANAGER' : +33 2.45.34.14.00 (862 927 1400)\n'CDC CINQ MARS LA PILE POC' : +33 2 45 34 28 63",
+           "multiLanguage": {
+            "itemE": "EN RAISON D'UNE MISE A JOUR TECHNIQUE, CERTAINS NUMEROS DE\nTELEPHONES DU CENTRE DE DETECTION ET DE CONTROLE (CDC) DE\nCINQ-MARS-LA-PILE VONT CHANGER.\nSEULS LES NUMEROS SUIVANTS DOIVENT ETRE UTILISES:\nCSCAM: 02.45.34.16.02 (862 927 1602)\nBIV: 02.45.34.16.03 (862 927 1603)\nMC: 02.45.34.16.05 (862 927 1605) ET 02.45.34.16.06 (862 927 1606)\nTPO: 02.45.34.16.09 (862 927 1609)\nOMC: 02.45.34.16.10 (862 927 1610)\nFA: 02.45.34.16.11 (862 927 1611)\nCHEF OPS: 02.45.34.14.00 (862 927 1400)\nCDC CINQ MARS LA PILE POC : 02 45 34 28 63"
+           },
+           "marker": "-",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "installations_com_surveillance": [
+    {
+     "code23": "CA",
+     "sortedNotamsByImpactedAerodromes": [
+      {
+       "code": "LFRR LFBB LFFF",
+       "name": "FIR BREST/FIR BORDEAUX/FIR PARIS FIR",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "BO",
+         "notam": [
+          {
+           "pibSection": "FIR",
+           "id": "400000052228506",
+           "nof": "LFFA",
+           "series": "F",
+           "number": 1715,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "F",
+           "referredNumber": 1081,
+           "referredYear": 26,
+           "qLine": {
+            "fir": "LFXX",
+            "code23": "CA",
+            "code45": "CS",
+            "traffic": "IV",
+            "purpose": "BO",
+            "scope": "E",
+            "lower": 0,
+            "upper": 115
+           },
+           "coordinates": "4720N00118W",
+           "radius": 96,
+           "itemA": "LFRR LFBB LFFF",
+           "startValidity": "2026-08-18T14:05:00Z",
+           "endValidity": "2026-11-02T23:59:00Z",
+           "startValidityFormat": "18 08 2026 14:05",
+           "endValidityFormat": "02 11 2026 23:59",
+           "itemE": "POSSIBLE IMPLEMENTATION OF AN AUTOMATIC AREA INFORMATION \nTRANSMITTER ON ONE OR SEVERAL 'NANTES INFO' FREQ OF 'NANTES' FIS \nAREA.",
+           "multiLanguage": {
+            "itemE": "MISE EN OEUVRE POSSIBLE D'UN RAIZ SUR UNE OU PLUSIEURS FREQUENCES\n'NANTES INFO' DU SIV 'NANTES'."
+           },
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "code23": "CD",
+     "sortedNotamsByImpactedAerodromes": [
+      {
+       "code": "LFBB LFEE LFMM LFRR LFFF",
+       "name": "FIR BORDEAUX/FIR REIMS/FIR MARSEILLE/FIR BREST/FIR PARIS FIR",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "BO",
+         "notam": [
+          {
+           "pibSection": "FIR",
+           "id": "400000047879352",
+           "nof": "LFFA",
+           "series": "F",
+           "number": 1665,
+           "year": 25,
+           "type": "R",
+           "referredSeries": "F",
+           "referredNumber": 1658,
+           "referredYear": 25,
+           "qLine": {
+            "fir": "LFXX",
+            "code23": "CD",
+            "code45": "CS",
+            "traffic": "I",
+            "purpose": "BO",
+            "scope": "E",
+            "lower": 195,
+            "upper": 999
+           },
+           "coordinates": "4412N00040E",
+           "radius": 460,
+           "itemA": "LFBB LFEE LFMM LFRR LFFF",
+           "startValidity": "2025-11-19T09:49:00Z",
+           "endValidity": "PERM",
+           "startValidityFormat": "19 11 2025 09:49",
+           "endValidityFormat": "PERM",
+           "itemE": "EUROCONTROL LOGON LIST FUNCTIONALITY SET UP FOR THE EN-ROUTE \nCENTRES OF BORDEAUX ACC, BREST ACC, MARSEILLE ACC, PARIS ACC AND \nREIMS ACC. \nONLY AIRCRAFT VALIDATED BY EUROCONTROL IN THE LOGON LIST CAN CONNECT \nTO THE CPDLC SERVICES OF THESE ACC.",
+           "multiLanguage": {
+            "itemE": "MISE EN SERVICE DE LA FONCTONNALITE LOGON LIST D'EUROCONTROL POUR\nLES CENTRES EN-ROUTE DE BORDEAUX ACC, BREST ACC, MARSEILLE ACC, PARIS ACC ET REIMS ACC. \nSEULS LES AERONEFS VALIDES PAR EUROCONTROL DANS LA LOGON\nLIST PEUVENT SE CONNECTER AUX SERVICES CPDLC DE CES ACC."
+           },
+           "marker": "-",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "GNSS_installations_radionav": [],
+   "reglementation_espace_aerien": [
+    {
+     "code23": "RT",
+     "sortedNotamsByImpactedAerodromes": [
+      {
+       "code": "LFBB LFEE LFFF LFRR",
+       "name": "FIR BORDEAUX/FIR REIMS/FIR PARIS FIR/FIR BREST",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "BO",
+         "notam": [
+          {
+           "pibSection": "WAR",
+           "id": "400000050289801",
+           "nof": "LFFA",
+           "series": "R",
+           "number": 1000,
+           "year": 26,
+           "type": "N",
+           "qLine": {
+            "fir": "LFXX",
+            "code23": "RT",
+            "code45": "TT",
+            "traffic": "IV",
+            "purpose": "BO",
+            "scope": "W",
+            "lower": 125,
+            "upper": 215
+           },
+           "coordinates": "4830N00131E",
+           "radius": 238,
+           "itemA": "LFBB LFEE LFFF LFRR",
+           "startValidity": "2026-04-16T00:00:00Z",
+           "endValidity": "2028-04-12T23:59:00Z",
+           "startValidityFormat": "16 04 2026 00:00",
+           "endValidityFormat": "12 04 2028 23:59",
+           "itemE": "TRIGGER NOTAM - AIP SUP 053/26 :\nCREATION OF 95 TEMPORARY RESTRICTED AREAS ('ZRT') AND OF 4 TEMPORARY \nDANGEROUS AREAS ('ZDT') AT MEDIUM AND HIGH ALTITUDE FOR THE TRANSIT \nAND EVOLUTION OF STATE DRONES IN THE NORTH OF FRANCE.\nTHE 'ZRT' ARE ACTIVABLE BY NOTAM WITH 0600 NOTICE WHEN ACTIVATED FOR \nSECURITY REASONS AND AT D-1 BEFORE 1100 (SUM -1HR) FOR EXERCISE OR \nTRAINING PURPOSES.\nTHIS AIP SUP IS AVBL AT WWW.SIA.AVIATION-CIVILE.GOUV.FR",
+           "multiLanguage": {
+            "itemE": "NOTAM TRIGGER - SUP AIP 053/26 :\nCREATION DE 95 ZONES REGLEMENTEES TEMPORAIRES ('ZRT') ET DE 4 ZONES \nDANGEREUSES TEMPORAIRES ('ZDT') EN MOYENNE ET HAUTE ALTITUDE POUR LE TRANSIT ET LES EVOLUTIONS DE DRONES D'ETAT DANS LE NORD DE LA FRANCE.LES ZRT SONT ACTIVABLES PAR NOTAM AVEC UN PREAVIS DE 6HR LORSQUE \nACTIVEES POUR RAISON DE SURETE ET A J-1 OUVRE AVANT 1100 (ETE -1HR) \nDANS LE CADRE D'EXERCICE OU D'ENTRAINEMENT.\nCE SUP AIP EST DISPONIBLE SUR WWW.SIA.AVIATION-CIVILE.GOUV.FR"
+           },
+           "itemF": "FL125",
+           "itemG": "FL215",
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "code": "LFRR LFBB",
+       "name": "FIR BREST/FIR BORDEAUX",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "BO",
+         "notam": [
+          {
+           "pibSection": "WAR",
+           "id": "400000051441003",
+           "nof": "LFFA",
+           "series": "R",
+           "number": 1871,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "R",
+           "referredNumber": 3154,
+           "referredYear": 25,
+           "qLine": {
+            "fir": "LFXX",
+            "code23": "RT",
+            "code45": "TT",
+            "traffic": "IV",
+            "purpose": "BO",
+            "scope": "W",
+            "lower": 0,
+            "upper": 999
+           },
+           "coordinates": "4551N00432W",
+           "radius": 190,
+           "itemA": "LFRR LFBB",
+           "startValidity": "2026-06-18T14:25:00Z",
+           "endValidity": "2027-01-21T23:59:00Z",
+           "startValidityFormat": "18 06 2026 14:25",
+           "endValidityFormat": "21 01 2027 23:59",
+           "itemE": "TRIGGER NOTAM - AIRAC AIP SUP 207/25 MODIFIED :\nMISSILE FIRING IN THE ATLANTIC OCEAN REQUIRING THE CREATION OF 6 \nTEMPORARY RESTRICTED AREAS ('ZRT'), OF 16 TEMPORARY DANGEROUS AREAS \n('ZDT') AND FLIGHT PLAN BUFFER ZONE (FBZ) ASSOCIATED.\nTHESE 'ZRT/ZDT' ARE ACTIVATED BY NOTAM AT D-7.\n-----------------------------------------------------------------\nCHANGE :\n- PAGE 8 : REPLACE LFDB21Z COORDINATES BY :\n455421N 0013949W - 455643N 0013942W - 455237N 0011542W - \n455136N 0011253W - 454929N 0011048W - 453516N 0010344W - \n453127N 0010358W - 452845N 0011022W - 452848N 0014111W - \n453113N 0014103W - 453110N 0015559W - 453117N 0015703W - \n453136N 0015801W - 453207N 0015848W - 453246N 0015919W - \n453330N 0015933W - 453415N 0015928W - 453848N 0015754W - \n453930N 0020815W - 454128N 0025012W - 454139N 0025119W - \n454203N 0025217W - 454239N 0025301W - 454323N 0025327W - \n454410N 0025333W - 454714N 0025311W - 454756N 0025257W - \n454833N 0025227W - 455904N 0024055W - 455942N 0023954W - \n460001N 0023837W - 460136N 0022359W - 460134N 0022236W - \n455421N 0013949W.\n- AS FROM 23/06/2026, LA ROCHELLE INFO FREQ : READ '124.205MHZ' \n(INSTEAD OF '124.200MHZ').\n------------------------------------------------------------------\nTHIS AIP SUP IS AVBL AT WWW.SIA.AVIATION-CIVILE.GOUV.FR",
+           "multiLanguage": {
+            "itemE": "NOTAM TRIGGER - SUP AIP AIRAC 207/25 MODIFIE :\nTIRS DE MISSILE EN ATLANTIQUE NECESSITANT LA CREATION DE 6 ZONES \nREGLEMENTEES TEMPORAIRES ('ZRT'), DE 16 ZONES DANGEREUSES \nTEMPORAIRES ('ZDT') ET FBZ ASSOCIEES.\nCES 'ZRT/ZDT' SONT ACTIVEES PAR NOTAM A J-7.\n-----------------------------------------------------------------\nMODIFICATIONS :\n- PAGE 8 : REMPLACER LES COORDONNES DE LA ZONE LFDB21Z PAR :\n455421N 0013949W - 455643N 0013942W - 455237N 0011542W - \n455136N 0011253W - 454929N 0011048W - 453516N 0010344W - \n453127N 0010358W - 452845N 0011022W - 452848N 0014111W - \n453113N 0014103W - 453110N 0015559W - 453117N 0015703W - \n453136N 0015801W - 453207N 0015848W - 453246N 0015919W - \n453330N 0015933W - 453415N 0015928W - 453848N 0015754W - \n453930N 0020815W - 454128N 0025012W - 454139N 0025119W - \n454203N 0025217W - 454239N 0025301W - 454323N 0025327W - \n454410N 0025333W - 454714N 0025311W - 454756N 0025257W - \n454833N 0025227W - 455904N 0024055W - 455942N 0023954W - \n460001N 0023837W - 460136N 0022359W - 460134N 0022236W - \n455421N 0013949W.\n- A COMPTER DU 23/06/2026, FREQ LA ROCHELLE INFO : LIRE '124.205MHZ' (AU LIEU DE '124.200MHZ').\n------------------------------------------------------------------\nCE SUP AIP EST DISPONIBLE SUR WWW.SIA.AVIATION-CIVILE.GOUV.FR"
+           },
+           "itemF": "SFC",
+           "itemG": "UNL",
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "code": "LFBB LFRR",
+       "name": "FIR BORDEAUX/FIR BREST",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "BO",
+         "notam": [
+          {
+           "pibSection": "WAR",
+           "id": "400000050481835",
+           "nof": "LFFA",
+           "series": "R",
+           "number": 1168,
+           "year": 26,
+           "type": "N",
+           "qLine": {
+            "fir": "LFXX",
+            "code23": "RT",
+            "code45": "TT",
+            "traffic": "IV",
+            "purpose": "BO",
+            "scope": "W",
+            "lower": 0,
+            "upper": 95
+           },
+           "coordinates": "4720N00522W",
+           "radius": 181,
+           "itemA": "LFBB LFRR",
+           "startValidity": "2026-05-01T00:00:00Z",
+           "endValidity": "2027-04-30T23:59:00Z",
+           "startValidityFormat": "01 05 2026 00:00",
+           "endValidityFormat": "30 04 2027 23:59",
+           "itemE": "TRIGGER NOTAM - AIP SUP 077/26.\nCREATION OF 7 TEMPORARY RESTRICTED AREAS ('ZRT') FOR SPECIFIC \nDEFENSE ACTIVITIES, MOTHBALLING OF AREAS LF-D18A1 AND A2 AND \nMODIFICATION OF AREAS LF-D18A3 AND A5 IN FIR BREST AND BORDEAUX.\nTHE COMPULSORY BYPASS, IN ONE OR MORE 'ZRT', FOR GAT VFR FLIGHTS \nWILL BE ANNOUNCED BY NOTAM ON D-2.\nTHIS AIP SUP IS AVBL AT WWW.SIA.AVIATION-CIVILE.GOUV.FR",
+           "multiLanguage": {
+            "itemE": "NOTAM TRIGGER - SUP AIP 077/26.\nCREATION DE 7 ZONES REGLEMENTEES TEMPORAIRES ('ZRT') AU PROFIT \nD'ACTIVITES SPECIFIQUES DEFENSE, MISE EN SOMMEIL DES ZONES LF-D18A1 \nET A2 ET MODIFICATION DES ZONES LF-D18A3 ET A5 EN FIR BREST ET \nBORDEAUX.\nLE CONTOURNEMENT OBLIGATOIRE, DANS UNE OU PLUSIEURS 'ZRT', POUR LES\nVOLS CAG VFR SERA ANNONCE PAR NOTAM A J-2.\nCE SUP AIP EST DISPONIBLE SUR WWW.SIA.AVIATION-CIVILE.GOUV.FR"
+           },
+           "itemF": "SFC",
+           "itemG": "FL095",
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "code": "LFRR",
+       "name": "FIR BREST",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "BO",
+         "notam": [
+          {
+           "pibSection": "WAR",
+           "id": "400000048315935",
+           "nof": "LFFA",
+           "series": "R",
+           "number": 3089,
+           "year": 25,
+           "type": "N",
+           "qLine": {
+            "fir": "LFRR",
+            "code23": "RT",
+            "code45": "TT",
+            "traffic": "IV",
+            "purpose": "BO",
+            "scope": "W",
+            "lower": 0,
+            "upper": 30
+           },
+           "coordinates": "4712N00239W",
+           "radius": 11,
+           "itemA": "LFRR",
+           "startValidity": "2026-01-01T00:00:00Z",
+           "endValidity": "2027-12-31T23:59:00Z",
+           "startValidityFormat": "01 01 2026 00:00",
+           "endValidityFormat": "31 12 2027 23:59",
+           "itemE": "TRIGGER NOTAM - AIP SUP 206/25.\nUNMANNED AIRCRAFT FLYING OUT OF SIGHT OFF 'LE CROISIC' REQUIRING THE \nCREATION OF 3 TEMPORARY RESTRICTED AREAS ('ZRT').\nTHIS AIP SUP IS AVBL AT WWW.SIA.AVIATION-CIVILE.GOUV.FR",
+           "multiLanguage": {
+            "itemE": "NOTAM TRIGGER - SUP AIP 206/25.\nVOLS HORS VUE D'AERONEFS SANS EQUIPAGE A BORD AU LARGE DU CROISIC \nNECESSITANT LA CREATION DE 3 ZONES REGLEMENTEES TEMPORAIRES ('ZRT').\nCE SUP AIP EST DISPONIBLE SUR WWW.SIA.AVIATION-CIVILE.GOUV.FR"
+           },
+           "itemF": "SFC",
+           "itemG": "3000FT AGL",
+           "marker": "-",
+           "valid": ""
+          },
+          {
+           "pibSection": "WAR",
+           "id": "400000050312065",
+           "nof": "LFFA",
+           "series": "R",
+           "number": 1024,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "R",
+           "referredNumber": 135,
+           "referredYear": 26,
+           "qLine": {
+            "fir": "LFRR",
+            "code23": "RT",
+            "code45": "TT",
+            "traffic": "IV",
+            "purpose": "BO",
+            "scope": "W",
+            "lower": 0,
+            "upper": 35
+           },
+           "coordinates": "4818N00130W",
+           "radius": 8,
+           "itemA": "LFRR",
+           "startValidity": "2026-04-03T14:21:00Z",
+           "endValidity": "2026-09-24T23:59:00Z",
+           "startValidityFormat": "03 04 2026 14:21",
+           "endValidityFormat": "24 09 2026 23:59",
+           "itemE": "TRIGGER NOTAM - AIP SUP 187/25 MODIFIED.\nEXPANSION PROJECT OF THE LF-R151 'LA LANDE D'OUEE' AT NORTH EAST OF \nRENNES REGION REQUIRING THE CREATION OF 2 TEMPORARY RESTRICTED AREAS \n('ZRT RAPACE ALPHA' AND 'ZRT RAPACE BRAVO'). \n------------------------------------------------------------------\nMODIFICATIONS :\n- PAGE 3\nRELEVANT AUTHORITIES CONTACT DETAILS/DURING ACTIVITY/DIREX/PHONE :\n+33 (0)6.28.31.48.08\n- PAGE 3\nMODIFIED SIDE BOUNDARIES TO PRECISELY MATCH THE CONTOURS OF THE \n'LF-R151'. \n- ZRT RAPACE ALPHA\n482053N 0013217W\n481928N 0013814W\n481734N 0013807W\n481507N 0013929W\n481417N 0013754W\n481553N 0012830W\n481600N 0012900W\n481614N 0012917W\n481647N 0012918W\n481658N 0012850W\n482053N 0013217W\n- ZRT RAPACE BRAVO\n482157N 0012655W\n482017N 0012016W\n481919N 0012008W\n481609N 0012524W\n481606N 0012649W\n481626N 0012642W\n481707N 0012832W\n481658N 0012850W\n482053N 0013217W\n482157N 0012655W\n------------------------------------------------------------------\nTHIS AIP SUP IS AVBL AT WWW.SIA.AVIATION-CIVILE.GOUV.FR",
+           "multiLanguage": {
+            "itemE": "NOTAM TRIGGER - SUP AIP 187/25 MODIFIE.\nPROJET D'EXTENSION DE LA LF-R151 'LA LANDE D'OUEE' AU NORD EST DE\nRENNES NECESSITANT LA CREATION DE 2 ZONES REGLEMENTEES TEMPORAIRES\n('ZRT RAPACE ALPHA' ET 'ZRT RAPACE BRAVO'). \n------------------------------------------------------------------\nMODIFICATIONS:\n- PAGE 3\nORGANISMES A CONTACTER/PENDANT L'ACTIVITE/DIREX/TELEPHONE :\n06.28.31.48.08\n- PAGE 3\nLIMITES LATERALES MODIFIEES POUR S'AJUSTER PRECISEMENT AUX CONTOURS\nDE LA R151. \nZRT RAPACE ALPHA\n482053N 0013217W\n481928N 0013814W\n481734N 0013807W\n481507N 0013929W\n481417N 0013754W\n481553N 0012830W\n481600N 0012900W\n481614N 0012917W\n481647N 0012918W\n481658N 0012850W\n482053N 0013217W\nZRT RAPACE BRAVO\n482157N 0012655W\n482017N 0012016W\n481919N 0012008W\n481609N 0012524W\n481606N 0012649W\n481626N 0012642W\n481707N 0012832W\n481658N 0012850W\n482053N 0013217W\n482157N 0012655W\n------------------------------------------------------------------\nCE SUP AIP EST DISPONIBLE SUR WWW.SIA.AVIATION-CIVILE.GOUV.FR"
+           },
+           "itemF": "SFC",
+           "itemG": "3500FT AMSL",
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "code": "LFRH",
+       "name": "LORIENT LANN BIHOUE",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "BO",
+         "notam": [
+          {
+           "pibSection": "WAR",
+           "id": "400000048793685",
+           "nof": "LFFA",
+           "series": "R",
+           "number": 53,
+           "year": 26,
+           "type": "N",
+           "qLine": {
+            "fir": "LFRR",
+            "code23": "RT",
+            "code45": "TT",
+            "traffic": "IV",
+            "purpose": "BO",
+            "scope": "AW",
+            "lower": 0,
+            "upper": 40
+           },
+           "coordinates": "4736N00314W",
+           "radius": 9,
+           "itemA": "LFRH",
+           "startValidity": "2026-01-27T00:00:00Z",
+           "endValidity": "2027-01-27T23:59:00Z",
+           "startValidityFormat": "27 01 2026 00:00",
+           "endValidityFormat": "27 01 2027 23:59",
+           "itemE": "TRIGGER NOTAM - AIP SUP 005/26.\nUNMANNED AICRAFT FLYING OUT OF SIGHT CLOSED TO 'LORIENT LANN BIHOUE' \nAD REQUIRING THE CREATION OF A TEMPORARY RESTRICTED AREA ('ZRT \nPLOUHARNEL').\nTHE 'ZRT' WILL BE ACTIVATED WITH 24HR PRIOR NOTICE.\nTHIS AIP SUP IS AVBL AT WWW.SIA.AVIATION-CIVILE.GOUV.FR",
+           "multiLanguage": {
+            "itemE": "NOTAM TRIGGER - SUP AIP 005/26.\nEVOLUTIONS D'AERONEFS SANS EQUIPAGE A BORD HORS VUE A PROXIMITE DE \nL'AD DE LORIENT LANN BIHOUE NECESSITANT LA CREATION D'UNE ZONE \nREGLEMENTEE TEMPORAIRE ('ZRT PLOUHARNEL').\nLA ZRT SERA ACTIVEE PAR NOTAM AVEC UN PREAVIS DE 24HR.\nCE SUP AIP EST DISPONIBLE SUR WWW.SIA.AVIATION-CIVILE.GOUV.FR"
+           },
+           "itemF": "SFC",
+           "itemG": "4000FT AMSL",
+           "marker": "+",
+           "valid": ""
+          },
+          {
+           "pibSection": "WAR",
+           "id": "400000049840753",
+           "nof": "LFFA",
+           "series": "R",
+           "number": 661,
+           "year": 26,
+           "type": "N",
+           "qLine": {
+            "fir": "LFRR",
+            "code23": "RT",
+            "code45": "TT",
+            "traffic": "IV",
+            "purpose": "BO",
+            "scope": "AW",
+            "lower": 0,
+            "upper": 40
+           },
+           "coordinates": "4746N00326W",
+           "radius": 5,
+           "itemA": "LFRH",
+           "startValidity": "2026-03-19T00:00:00Z",
+           "endValidity": "2027-04-14T23:59:00Z",
+           "startValidityFormat": "19 03 2026 00:00",
+           "endValidityFormat": "14 04 2027 23:59",
+           "itemE": "TRIGGER NOTAM - AIP SUP 035/26 :\nCREATION OF 2 TEMPORARY RESTRICTED AREAS (ZRT) ON AD LORIENT LANN \nBIHOUE.\nTHIS AIP SUP IS AVBL AT WWW.SIA.AVIATION-CIVILE.GOUV.FR",
+           "multiLanguage": {
+            "itemE": "NOTAM TRIGGER - SUP AIP 035/26 :\nCREATION DE 2 ZONES REGLEMENTEES TEMPORAIRES (ZRT) SUR L'AERODROME \nLORIENT LANN BIHOUE.\nCE SUP AIP EST DISPONIBLE SUR WWW.SIA.AVIATION-CIVILE.GOUV.FR"
+           },
+           "itemF": "SFC",
+           "itemG": "4000FT AMSL",
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "avertissements_navigation": [
+    {
+     "code23": "WU",
+     "sortedNotamsByImpactedAerodromes": [
+      {
+       "code": "LFRR",
+       "name": "FIR BREST",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "BO",
+         "notam": [
+          {
+           "pibSection": "WAR",
+           "id": "400000051884689",
+           "nof": "LFFA",
+           "series": "W",
+           "number": 1531,
+           "year": 26,
+           "type": "N",
+           "qLine": {
+            "fir": "LFRR",
+            "code23": "WU",
+            "code45": "LW",
+            "traffic": "IV",
+            "purpose": "BO",
+            "scope": "W",
+            "lower": 0,
+            "upper": 11
+           },
+           "coordinates": "4808N00243W",
+           "radius": 5,
+           "itemA": "LFRR",
+           "startValidity": "2026-07-25T04:38:00Z",
+           "endValidity": "2027-04-15T19:01:00Z",
+           "startValidityFormat": "25 07 2026 04:38",
+           "endValidityFormat": "15 04 2027 19:01",
+           "itemD": "SR-SS",
+           "itemE": "MODEL FLYING ACT NR 8549 'SAINT-BARNABE' CHANGED :\nPSN CHANGED : 480809N 0024325W (2500M DISPLACEMENT WESTWARD)",
+           "multiLanguage": {
+            "itemE": "ACTIVITE AEROMODELISME NR 8549 'SAINT-BARNABE' MODIFIEE :\nPSN MODIFIE : 480809N 0024325W (DEPLACEMENT DE 2500M VERS L'OUEST)"
+           },
+           "itemF": "SFC",
+           "itemG": "500FT AGL",
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "code": "LFEB",
+       "name": "DINAN TRELIVAN",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "BO",
+         "notam": [
+          {
+           "pibSection": "WAR",
+           "id": "400000051499532",
+           "nof": "LFFA",
+           "series": "W",
+           "number": 1277,
+           "year": 26,
+           "type": "N",
+           "qLine": {
+            "fir": "LFRR",
+            "code23": "WU",
+            "code45": "LW",
+            "traffic": "IV",
+            "purpose": "BO",
+            "scope": "AW",
+            "lower": 0,
+            "upper": 9
+           },
+           "coordinates": "4827N00206W",
+           "radius": 5,
+           "itemA": "LFEB",
+           "startValidity": "2026-06-30T12:00:00Z",
+           "endValidity": "2026-09-29T17:52:00Z",
+           "startValidityFormat": "30 06 2026 12:00",
+           "endValidityFormat": "29 09 2026 17:52",
+           "itemD": "MON-FRI 1200-SS",
+           "itemE": "MODEL FLYING ACT ON AD DINAN ON PAVED RWY 07/25 :\nPSN: 482636N 0020612W.",
+           "multiLanguage": {
+            "itemE": "ACTIVITE AEROMODELISME SUR A/D DINAN TRELIVAN SUR PISTE REVETUE\n07/25 :\nPSN: 482636N 0020612W."
+           },
+           "itemF": "SFC",
+           "itemG": "500FT AGL",
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "code23": "WB",
+     "sortedNotamsByImpactedAerodromes": [
+      {
+       "code": "LFRH",
+       "name": "LORIENT LANN BIHOUE",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "M",
+         "notam": [
+          {
+           "pibSection": "WAR",
+           "id": "400000051562803",
+           "nof": "LFFA",
+           "series": "W",
+           "number": 1327,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "W",
+           "referredNumber": 434,
+           "referredYear": 26,
+           "qLine": {
+            "fir": "LFRR",
+            "code23": "WB",
+            "code45": "XX",
+            "traffic": "IV",
+            "purpose": "M",
+            "scope": "AW",
+            "lower": 17,
+            "upper": 50
+           },
+           "coordinates": "4750N00329W",
+           "radius": 3,
+           "itemA": "LFRH",
+           "startValidity": "2026-06-28T00:51:00Z",
+           "endValidity": "2026-09-28T23:59:00Z",
+           "startValidityFormat": "28 06 2026 00:51",
+           "endValidityFormat": "28 09 2026 23:59",
+           "itemE": "AEROBATICS ACTIVITY NR 6367 'LORIENT LANN-BIHOUE OUEST' SUSPENDED.",
+           "multiLanguage": {
+            "itemE": "ACTIVITE VOLTIGE NR 6367 'LORIENT LANN-BIHOUE OUEST' SUSPENDUE."
+           },
+           "itemF": "1700FT AMSL",
+           "itemG": "5000FT AMSL",
+           "marker": "+",
+           "valid": ""
+          },
+          {
+           "pibSection": "WAR",
+           "id": "400000052410071",
+           "nof": "LFFA",
+           "series": "W",
+           "number": 1863,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "W",
+           "referredNumber": 1862,
+           "referredYear": 26,
+           "qLine": {
+            "fir": "LFRR",
+            "code23": "WB",
+            "code45": "LW",
+            "traffic": "IV",
+            "purpose": "M",
+            "scope": "AW",
+            "lower": 17,
+            "upper": 50
+           },
+           "coordinates": "4750N00333W",
+           "radius": 5,
+           "itemA": "LFRH",
+           "startValidity": "2026-09-01T12:06:00Z",
+           "endValidity": "2026-11-25T16:28:00Z",
+           "startValidityFormat": "01 09 2026 12:06",
+           "endValidityFormat": "25 11 2026 16:28",
+           "itemD": "SR-SS",
+           "itemE": "AEROBATICS 'QUIMPERLE SUD (29)' - RDL307/6.9NM LFRH :\n-PSN : 474957N 0033320W\n-AXIS : ORIENTED 020/200 CENTRED ON PSN\n-LENGTH : 3200M\n-INFO :\nLORIENT TWR : 122.700MHZ\nLORIENT APP : 123.000MHZ\nIROISE INFO : 135.830MHZ.",
+           "multiLanguage": {
+            "itemE": "VOLTIGE QUIMPERLE SUD (29) - RDL307/6.9NM LFRH :\n-PSN : 474957N 0033320W\n-AXE : ORIENTE 020/200 CENTRE SUR PSN\n-LONGUEUR : 3200M\n-ACTIVITE CONNUE PAR :\nLORIENT TOUR : 122.700 MHZ\nLORIENT APP : 123.000 MHZ\nIROISE INFO : 135.830 MHZ"
+           },
+           "itemF": "1700FT AMSL",
+           "itemG": "5000FT AMSL",
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "code23": "WG",
+     "sortedNotamsByImpactedAerodromes": [
+      {
+       "code": "LFRR",
+       "name": "FIR BREST",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "M",
+         "notam": [
+          {
+           "pibSection": "WAR",
+           "id": "400000051002180",
+           "nof": "LFFA",
+           "series": "W",
+           "number": 916,
+           "year": 26,
+           "type": "N",
+           "qLine": {
+            "fir": "LFRR",
+            "code23": "WG",
+            "code45": "LW",
+            "traffic": "IV",
+            "purpose": "M",
+            "scope": "W",
+            "lower": 0,
+            "upper": 25
+           },
+           "coordinates": "4817N00223W",
+           "radius": 5,
+           "itemA": "LFRR",
+           "startValidity": "2026-05-22T04:22:00Z",
+           "endValidity": "2027-05-21T19:50:00Z",
+           "startValidityFormat": "22 05 2026 04:22",
+           "endValidityFormat": "21 05 2027 19:50",
+           "itemD": "SR-SS",
+           "itemE": "PARAGLIDING WINCHING ACTIVITY OVER 'ROUILLAC' - RDL 232/14.4NM \nLFEB ARP :\n- PSN : 481729N 0022250W\n- WINCH EQUIPPED WITH SEQUENCED FLASHING LIGHT.",
+           "multiLanguage": {
+            "itemE": "ACTIVITE DE TREUILLAGE PARAPENTE A 'ROUILLAC' - RDL 232/14.4NM ARP LFEB :\n- PSN : 481729N 0022250W\n- TREUIL EQUIPE D'UN FEU A ECLATS."
+           },
+           "itemF": "SFC",
+           "itemG": "2450FT AMSL",
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "obstacles": [
+    {
+     "code23": "OB",
+     "sortedNotamsByImpactedAerodromes": [
+      {
+       "code": "LFXX",
+       "name": "Undefined",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "M",
+         "notam": [
+          {
+           "pibSection": "FIR",
+           "id": "400000047474868",
+           "nof": "LFFA",
+           "series": "P",
+           "number": 3598,
+           "year": 25,
+           "type": "N",
+           "qLine": {
+            "fir": "LFRR",
+            "code23": "OB",
+            "code45": "CE",
+            "traffic": "IV",
+            "purpose": "M",
+            "scope": "AE",
+            "lower": 0,
+            "upper": 4
+           },
+           "coordinates": "4807N00142W",
+           "radius": 1,
+           "itemA": "LFXX",
+           "startValidity": "2025-10-27T07:00:00Z",
+           "endValidity": "2027-06-30T23:59:00Z",
+           "startValidityFormat": "27 10 2025 07:00",
+           "endValidityFormat": "30 06 2027 23:59",
+           "itemE": "'RENNES PONTCHAILLOU BRAVO CENTRE HOSPITALIER' HLP\nCRANE OPR:\n- PSN: 480708.894N  0014135.920W\n- MAX HGT: 72M\n- ELEV: 361FT\n- LGT:  NGT AND DAY\n- CRANE BOOM IS CLOSE TO NORTH-EAST TKOF FUNNEL",
+           "multiLanguage": {
+            "itemE": "HLP 'RENNES PONTCHAILLOU BRAVO CENTRE HOSPITALIER'\nGRUE ERIGEE :\n- PSN : 480708.894N  0014135.920W\n- HAUTEUR MAX : 72M\n- ALT AU SOMMET: 361FT\n- BALISAGE :  JOUR ET NUIT\n- LA FLECHE JOUXTE LE CONE D'ENVOL NORD EST"
+           },
+           "marker": "-",
+           "valid": ""
+          },
+          {
+           "pibSection": "FIR",
+           "id": "400000051914796",
+           "nof": "LFFA",
+           "series": "P",
+           "number": 2778,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "P",
+           "referredNumber": 2545,
+           "referredYear": 25,
+           "qLine": {
+            "fir": "LFRR",
+            "code23": "OB",
+            "code45": "CE",
+            "traffic": "IV",
+            "purpose": "M",
+            "scope": "AE",
+            "lower": 0,
+            "upper": 4
+           },
+           "coordinates": "4807N00142W",
+           "radius": 1,
+           "itemA": "LFXX",
+           "startValidity": "2026-07-24T12:19:00Z",
+           "endValidity": "2027-01-31T19:00:00Z",
+           "startValidityFormat": "24 07 2026 12:19",
+           "endValidityFormat": "31 01 2027 19:00",
+           "itemE": "RENNES PONT CHAILLOU BRAVO CENTRE HOSPITALIER HLP :\nOBST : 3 TOWER CRANES OPR NEARBY HLP RENNES PONT CHAILLOU BRAVO \nCENTRE HOSPITALIER\nRDL136/0.05NM ARP HLP\nAVERAGE PSN : 480708N 0014135W\nHEIGHT : 236FT\nELEV : 361FT\nLIGHTING : DAY AND NIGHT",
+           "multiLanguage": {
+            "itemE": "RENNES PONT CHAILLOU BRAVO CENTRE HOSPITALIER HLP :\nOBST : 3 GRUES A TOUR ERIGEES A PROXIMITE RENNES PONT CHAILLOU CH\nRDL136/0.05NM ARP HELISTATION HREP\nPSN MOY : 480708N 0014135W\nHAUTEUR : 236FT\nALT AU SOMMET : 361FT\nBALISAGE : JOUR ET NUIT"
+           },
+           "marker": "+",
+           "valid": ""
+          },
+          {
+           "pibSection": "FIR",
+           "id": "400000052350471",
+           "nof": "LFFA",
+           "series": "P",
+           "number": 3108,
+           "year": 26,
+           "type": "N",
+           "qLine": {
+            "fir": "LFRR",
+            "code23": "OB",
+            "code45": "CE",
+            "traffic": "IV",
+            "purpose": "M",
+            "scope": "AE",
+            "lower": 0,
+            "upper": 3
+           },
+           "coordinates": "4721N00309W",
+           "radius": 1,
+           "itemA": "LFXX",
+           "startValidity": "2026-08-31T17:00:00Z",
+           "endValidity": "2027-07-31T17:00:00Z",
+           "startValidityFormat": "31 08 2026 17:00",
+           "endValidityFormat": "31 07 2027 17:00",
+           "itemE": "BELLE-ILE-EN-MER CENTRE HOSPITALIER\nCRANE OPR RDL048/0.32NM HLP\nPSN: 472055N 0030923W\nHGT 180FT\nELEV 207FT\nLGT DAY NGT",
+           "multiLanguage": {
+            "itemE": "BELLE-ILE-EN-MER CENTRE HOSPITALIER\nGRUE ERIGEE RDL048/0.32NM HELISTATION\nPSN: 472055N 0030923W\nHAUTEUR 180FT\nALTITUDE 207FT\nBALISAGE JOURT NUIT"
+           },
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "code": "LFRR",
+       "name": "FIR BREST",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "M",
+         "notam": [
+          {
+           "pibSection": "FIR",
+           "id": "400000051882557",
+           "nof": "LFFA",
+           "series": "P",
+           "number": 2727,
+           "year": 26,
+           "type": "N",
+           "qLine": {
+            "fir": "LFRR",
+            "code23": "OB",
+            "code45": "CE",
+            "traffic": "IV",
+            "purpose": "M",
+            "scope": "E",
+            "lower": 0,
+            "upper": 8
+           },
+           "coordinates": "4753N00150W",
+           "radius": 1,
+           "itemA": "LFRR",
+           "startValidity": "2026-07-22T12:30:00Z",
+           "endValidity": "PERM",
+           "startValidityFormat": "22 07 2026 12:30",
+           "endValidityFormat": "PERM",
+           "itemE": "MEASURING MAST OPR AT 'ST MALO DE PHILY', RDL 306/9.1NM ARP LFSS\nPSN : 475250.86N 0014934.61W\nHGT : 404FT \nELEV : 726FT\nLGT : DAY AND NGT\nREF AIP FRANCE DATASET ENR 5.4",
+           "multiLanguage": {
+            "itemE": "MAT DE MESURE A 'ST MALO DE PHILY', RDL 306/9.1NM ARP LFSS\nPSN : 475250.86N 0014934.61W\nHAUT : 404FT \nALT AU SOMMET : 726FT\nBALISAGE : JOUR ET NUIT\nREF AIP FRANCE DATASET ENR 5.4"
+           },
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "code23": "OL",
+     "sortedNotamsByImpactedAerodromes": [
+      {
+       "code": "LFRR",
+       "name": "FIR BREST",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "M",
+         "notam": [
+          {
+           "pibSection": "FIR",
+           "id": "400000051404104",
+           "nof": "LFFA",
+           "series": "P",
+           "number": 2243,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "P",
+           "referredNumber": 2242,
+           "referredYear": 26,
+           "qLine": {
+            "fir": "LFRR",
+            "code23": "OL",
+            "code45": "AS",
+            "traffic": "IV",
+            "purpose": "M",
+            "scope": "E",
+            "lower": 0,
+            "upper": 9
+           },
+           "coordinates": "4809N00256W",
+           "radius": 1,
+           "itemA": "LFRR",
+           "startValidity": "2026-06-16T09:26:00Z",
+           "endValidity": "2026-09-16T23:59:00Z",
+           "startValidityFormat": "16 06 2026 09:26",
+           "endValidityFormat": "16 09 2026 23:59",
+           "itemE": "LGT ON TOP OF OBSTACLE NR E560H U/S (7 WINDTURBINES OVER 11)\nRDL 355/5.54NM LFED ARP\nCONCERNED TURBINES : E560H-3, E560H-4, E560H-6, E560H-7, E560H-8,\nE560H-9 AND E560H-10\nMID PSN: 480850N 0025602W\nHGT : 391FT AGL\nELEV: 873FT AMSL",
+           "multiLanguage": {
+            "itemE": "BALISAGE AU SOMMET DE L OBSTACLE NR E560H HS (SEPT EOLIENNES SUR\nONZE)\nRDL 355/5.54NM LFED ARP\nEOLIENNE CONCERNEES : E560H-3, E560H-4, E560H-6, E560H-7, E560H-8,\nE560H-9 ET E560H-10\nPSN MOY: 480850N 0025602W\nHAUTEUR : 391 FT AGL\nALTITUDE AU SOMMET MAX: 873 FT AMSL"
+           },
+           "marker": "+",
+           "valid": ""
+          },
+          {
+           "pibSection": "FIR",
+           "id": "400000051498792",
+           "nof": "LFFA",
+           "series": "P",
+           "number": 2322,
+           "year": 26,
+           "type": "N",
+           "qLine": {
+            "fir": "LFRR",
+            "code23": "OL",
+            "code45": "AS",
+            "traffic": "IV",
+            "purpose": "M",
+            "scope": "E",
+            "lower": 0,
+            "upper": 9
+           },
+           "coordinates": "4807N00243W",
+           "radius": 1,
+           "itemA": "LFRR",
+           "startValidity": "2026-06-23T14:04:00Z",
+           "endValidity": "2026-09-23T00:00:00Z",
+           "startValidityFormat": "23 06 2026 14:04",
+           "endValidityFormat": "23 09 2026 00:00",
+           "itemE": "WINTURBINE E220C-6 LGT U/S RDL 066/9.1NM LFED:\nPSN: 480656.66N 0024306.07W\nHGT 410FT\nELEV 889FT",
+           "multiLanguage": {
+            "itemE": "BALISAGE AU SOMMET EOLIENNE E220C-6 HORS SERVICE RDL 066/9.1NM LFED:\nPSN: 480656.66N 0024306.07W\nHAUTEUR 410FT\nALTITUDE AU SOMMET 889FT"
+           },
+           "marker": "+",
+           "valid": ""
+          },
+          {
+           "pibSection": "FIR",
+           "id": "400000051593909",
+           "nof": "LFFA",
+           "series": "P",
+           "number": 2432,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "P",
+           "referredNumber": 2092,
+           "referredYear": 26,
+           "qLine": {
+            "fir": "LFRR",
+            "code23": "OL",
+            "code45": "AS",
+            "traffic": "IV",
+            "purpose": "M",
+            "scope": "E",
+            "lower": 0,
+            "upper": 6
+           },
+           "coordinates": "4710N00236W",
+           "radius": 5,
+           "itemA": "LFRR",
+           "startValidity": "2026-06-30T12:23:00Z",
+           "endValidity": "2026-09-30T23:59:00Z",
+           "startValidityFormat": "30 06 2026 12:23",
+           "endValidityFormat": "30 09 2026 23:59",
+           "itemE": "OBST LIGHTS U/S\n'SAINT-NAZAIRE' OFFSHORE WINDPARK NR E4445 : 9 WINDTURBINES \nLIGHTING U/S (RDL238/10NM LFRE) :\n-E4445-6  : 470811.15N 0023817.28W\n-E4445-47 : 470827.57N 0023052.51W\n-E4445-52 : 471036.23N 0023758.10W\n-E4445-53 : 471024.80N 0023716.34W\n-E4445-54 : 471012.42N 0023632.36W\n-E4445-66 : 471133.62N 0023851.12W\n-E4445-67 : 471003.10N 0023826.89W\n-E4445-74 : 471231.62N 0023937.18W\n-E4445-75 : 471202.85N 0023915.41W\n-HEIGHT : 591FT\n-ELEV : 591FT",
+           "multiLanguage": {
+            "itemE": "PARC EOLIEN MARITIME E4445 SAINT NAZAIRE : BALISAGE DE 9 EOLIENNES\nHORS SERVICE (RDL238/10NM LFRE) :\n-E4445-6  : 470811.15N 0023817.28W\n-E4445-47 : 470827.57N 0023052.51W\n-E4445-52 : 471036.23N 0023758.10W\n-E4445-53 : 471024.80N 0023716.34W\n-E4445-54 : 471012.42N 0023632.36W\n-E4445-66 : 471133.62N 0023851.12W\n-E4445-67 : 471003.10N 0023826.89W\n-E4445-74 : 471231.62N 0023937.18W\n-E4445-75 : 471202.85N 0023915.41W\n-HAUTEUR : 591FT\n-ALTITUDE AU SOMMET : 591FT"
+           },
+           "marker": "+",
+           "valid": ""
+          },
+          {
+           "pibSection": "FIR",
+           "id": "400000051902003",
+           "nof": "LFFA",
+           "series": "P",
+           "number": 2748,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "P",
+           "referredNumber": 2024,
+           "referredYear": 26,
+           "qLine": {
+            "fir": "LFRR",
+            "code23": "OL",
+            "code45": "AS",
+            "traffic": "IV",
+            "purpose": "M",
+            "scope": "E",
+            "lower": 0,
+            "upper": 9
+           },
+           "coordinates": "4807N00243W",
+           "radius": 1,
+           "itemA": "LFRR",
+           "startValidity": "2026-07-23T15:47:00Z",
+           "endValidity": "2026-10-22T23:59:00Z",
+           "startValidityFormat": "23 07 2026 15:47",
+           "endValidityFormat": "22 10 2026 23:59",
+           "itemE": "WINDTURBINE E220C-6 LGT U/S RDL 066/9.12NM LFED:\nPSN: 480657N 0024306W\nHGT 410FT\nELEV 889FT",
+           "multiLanguage": {
+            "itemE": "BALISAGE EOLIENNE E220C-6 HORS SERVICE RDL 066/9.12NM LFED:\nPSN: 480657N 0024306W\nHAUTEUR 410FT\nALTITUDE 889FT"
+           },
+           "marker": "+",
+           "valid": ""
+          },
+          {
+           "pibSection": "FIR",
+           "id": "400000052099882",
+           "nof": "LFFA",
+           "series": "P",
+           "number": 2915,
+           "year": 26,
+           "type": "N",
+           "qLine": {
+            "fir": "LFRR",
+            "code23": "OL",
+            "code45": "AS",
+            "traffic": "IV",
+            "purpose": "M",
+            "scope": "E",
+            "lower": 0,
+            "upper": 9
+           },
+           "coordinates": "4800N00247W",
+           "radius": 1,
+           "itemA": "LFRR",
+           "startValidity": "2026-08-07T15:21:00Z",
+           "endValidity": "2026-11-06T23:59:00Z",
+           "startValidityFormat": "07 08 2026 15:21",
+           "endValidityFormat": "06 11 2026 23:59",
+           "itemE": "OBSTACLES NR E560K-3 AND E560K-4 LIGHTING U/S (2 WINDTURBINES \nAMONG 4) - RDL 119/6.83NM LFED ARP\nPSN: 475958N 0024630W\nHEIGHT: 463FT \nELEV: 804FT",
+           "multiLanguage": {
+            "itemE": "BALISAGE AU SOMMET DES OBSTACLES NR E560K-3 ET E560K-4 HORS SERVICE (DEUX EOLIENNES SUR QUATRE) - RDL 119/6.83NM LFED ARP\nPSN: 475958N 0024630W\nHAUTEUR : 463FT \nALTITUDE AU SOMMET: 804FT"
+           },
+           "marker": "+",
+           "valid": ""
+          },
+          {
+           "pibSection": "FIR",
+           "id": "400000052238913",
+           "nof": "LFFA",
+           "series": "P",
+           "number": 2991,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "P",
+           "referredNumber": 2990,
+           "referredYear": 26,
+           "qLine": {
+            "fir": "LFRR",
+            "code23": "OL",
+            "code45": "AS",
+            "traffic": "IV",
+            "purpose": "M",
+            "scope": "E",
+            "lower": 0,
+            "upper": 10
+           },
+           "coordinates": "4754N00231W",
+           "radius": 1,
+           "itemA": "LFRR",
+           "startValidity": "2026-08-19T09:18:00Z",
+           "endValidity": "2026-11-19T23:59:00Z",
+           "startValidityFormat": "19 08 2026 09:18",
+           "endValidityFormat": "19 11 2026 23:59",
+           "itemE": "OBST NR E560C-2 SUMMIT LGT U/S :\n- RDL 221/8.5NM ARP LFRP\n- PSN : 475339.64N 0023058.24W\n- HGT : 457FT\n- ELEV : 946FT",
+           "multiLanguage": {
+            "itemE": "BALISAGE AU SOMMET DE L'OBSTACLE NR E560C-2 HORS SERVICE :\n- RDL 221/8.5NM LFRP ARP\n- PSN : 475339.64N 0023058.24W\n- HAUTEUR : 457FT\n- ALT AU SOMMET : 946FT"
+           },
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "code": "LFED",
+       "name": "PONTIVY",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "M",
+         "notam": [
+          {
+           "pibSection": "FIR",
+           "id": "400000051884673",
+           "nof": "LFFA",
+           "series": "P",
+           "number": 2730,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "P",
+           "referredNumber": 1621,
+           "referredYear": 26,
+           "qLine": {
+            "fir": "LFRR",
+            "code23": "OL",
+            "code45": "AS",
+            "traffic": "IV",
+            "purpose": "M",
+            "scope": "AE",
+            "lower": 0,
+            "upper": 9
+           },
+           "coordinates": "4805N00249W",
+           "radius": 1,
+           "itemA": "LFED",
+           "startValidity": "2026-07-22T14:51:00Z",
+           "endValidity": "2026-10-21T23:59:00Z",
+           "startValidityFormat": "22 07 2026 14:51",
+           "endValidityFormat": "21 10 2026 23:59",
+           "itemE": "OBSTACLE NR E5601-6 (1 WINDTURBINE OUT OF 6) LIGHTING U/S :\nRDL: 069/4.83NM LFED ARP\nPSN: 480506N 0024840W\nHEIGHT: 382FT AGL\nELEV  : 891FT AMSL",
+           "multiLanguage": {
+            "itemE": "BALISAGE AU SOMMET DE L'OBSTACLE NR E5601-6 HORS SERVICE (1 EOLIENNE SUR 6) : RDL 069/4.83NM LFED ARP\nPSN: 480506N 0024840W\nHAUTEUR : 382FT AGL\nALTITUDE AU SOMMET: 891FT AMSL"
+           },
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "autres_info": [
+    {
+     "code23": "XX",
+     "sortedNotamsByImpactedAerodromes": [
+      {
+       "code": "LFBB LFFF LFRR LFEE LFMM",
+       "name": "FIR BORDEAUX/FIR PARIS FIR/FIR BREST/FIR REIMS/FIR MARSEILLE",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "BO",
+         "notam": [
+          {
+           "pibSection": "FIR",
+           "id": "400000051541886",
+           "nof": "LFFA",
+           "series": "F",
+           "number": 1408,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "F",
+           "referredNumber": 1114,
+           "referredYear": 26,
+           "qLine": {
+            "fir": "LFXX",
+            "code23": "XX",
+            "code45": "CH",
+            "traffic": "I",
+            "purpose": "BO",
+            "scope": "E",
+            "lower": 0,
+            "upper": 999
+           },
+           "coordinates": "4412N00040E",
+           "radius": 460,
+           "itemA": "LFBB LFFF LFRR LFEE LFMM",
+           "startValidity": "2026-06-26T06:40:00Z",
+           "endValidity": "2026-09-21T23:59:00Z",
+           "startValidityFormat": "26 06 2026 06:40",
+           "endValidityFormat": "21 09 2026 23:59",
+           "itemE": "DUE TO SECURITY SITUATION IN MALI, FRENCH AIR CARRIERS AND \nCAPTAINS OF AIRCRAFT IN CHARGE OF AIR SERVICES OPERATED BY CARRIERS \nHOLDING AN OPERATING LICENSE ISSUED BY FRANCE, WHETHER THEY ARE \nCONTRACTUAL\nCARRIERS AND/OR OPERATING CARRIERS, OR PERFORMING AIR SERVICES\nTHROUGH A WET LEASE OR A CODESHARE AGREEMENT AS WELL AS FOR ANY\nFLIGHT MADE WITH AN AIRCRAFT REGISTERED IN FRANCE ARE REQUESTED TO\nMAINTAIN AT ALL TIMES A FLIGHT LEVEL ABOVE OR EQUAL TO FL320 IN THE\nPART OF FIR DAKAR (GOOO) AND IN THE PART OF FIR NIAMEY (DRRR) LOCATED\nABOVE THE MALIAN TERRITORY AND NOT TO SERVE OR IDENTIFY AS ALTERNATE\nBAMAKO MODIBO - KEITA AERODROME (GABS).\nTHIS NOTAM SUPERSEDES THE RESTRICTIONS CONCERNING MALI ISSUED IN\nPARAGRAPH 3.11 MALI OF THE AIC NR A11/26 CURRENTLY IN EFFECT.",
+           "multiLanguage": {
+            "itemE": "EN RAISON DE LA SITUATION SECURITAIRE AU MALI, IL EST DEMANDE AUX\nTRANSPORTEURS AERIENS FRANCAIS ET AUX COMMANDANTS DE BORD DES AERONEFS EFFECTUANT DES SERVICES AERIENS EXPLOITES PAR LES TRANSPORTEURS TITULAIRES D'UNE LICENCE D'EXPLOITATION DELIVRE PAR LA FRANCE, QU'ILS SOIENT TRANSPORTEUR CONTRACTUEL ET/OU TRANSPORTEUR DE FAIT OU EFFECTUANT DES SERVICES AERIENS AU TRAVERS D'UN ACCORD COMMERCIAL D'AFFRETEMENT OU DE PARTAGE DE CODE AINSI QUE POUR TOUT VOL EFFECTUE AVEC UN AERONEF IMMATRICULE EN FRANCE DE MAINTENIR EN PERMANENCE UN NIVEAU DE VOL SUPERIEUR OU EGAL AU FL320 DANS LES PARTIES DES FIR DAKAR (GOOO) ET FIR NIAMEY (DRRR) SITUES AU-DESSUS DU TERRITOIRE MALIEN ET DE NE PAS DESSERVIR NI IDENTIFIER EN DEROUTEMENT L'AERODROME MODIBO - KEITA DE BAMAKO (GABS).\nCE NOTAM REMPLACE LES RESTRICTIONS CONCERNANT L'ESPACE AERIEN MALIEN\nPUBLIE DANS LE PARAGRAPHE 3.11 MALI DE L'AIC NR A11/26 ACTUELLEMENT EN VIGUEUR."
+           },
+           "marker": "+",
+           "valid": ""
+          },
+          {
+           "pibSection": "FIR",
+           "id": "400000052328045",
+           "nof": "LFFA",
+           "series": "F",
+           "number": 1767,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "F",
+           "referredNumber": 1454,
+           "referredYear": 26,
+           "qLine": {
+            "fir": "LFXX",
+            "code23": "XX",
+            "code45": "CH",
+            "traffic": "I",
+            "purpose": "BO",
+            "scope": "E",
+            "lower": 0,
+            "upper": 999
+           },
+           "coordinates": "4412N00040E",
+           "radius": 460,
+           "itemA": "LFBB LFFF LFRR LFEE LFMM",
+           "startValidity": "2026-08-26T08:23:00Z",
+           "endValidity": "2026-09-30T23:59:00Z",
+           "startValidityFormat": "26 08 2026 08:23",
+           "endValidityFormat": "30 09 2026 23:59",
+           "itemE": "FRENCH AIR CARRIERS AND CAPTAINS OF AIRCRAFT IN CHARGE OF AIR\nSERVICES OPERATED BY CARRIERS HOLDING AN OPERATING LICENSE ISSUED BY\nFRANCE, WHETHER THEY ARE CONTRACTUAL CARRIERS AND/OR OPERATING\nCARRIERS, OR PERFORMING AIR SERVICES THROUGH A WET LEASE OR A\nCODESHARE AGREEMENT AS WELL AS FOR ANY FLIGHT MADE WITH AN AIRCRAFT\nREGISTERED IN FRANCE ARE REQUESTED TO EXERCISE GREAT CAUTION WHEN \nOPERATING INTO THE AIRSPACE OF SAUDI ARABIA (FIR JEDDAH (OEJD)).\nTHE AIR OPERATOR MUST CARRY OUT A ROBUST RISK ASSESSMENT TO ENSURE \nTHAT THE FLIGHT CAN BE CONDUCTED UNDER SATISFACTORY SAFETY AND \nSECURITY CONDITIONS BEFORE ENTERING THIS AIRSPACE OF SAUDI ARABIA. \nTHIS NOTAM SUPERSEDES THE RESTRICTIONS CONCERNING SAUDI ARABIA\nAIRSPACE (FIR JEDDAH (OEJD)) ISSUED IN PARAGRAPH 3.13. SAUDI ARABIA \nOF THE AIC NR A011/26 CURRENTLY IN EFFECT.",
+           "multiLanguage": {
+            "itemE": "IL EST DEMANDE AUX TRANSPORTEURS AERIENS FRANCAIS ET AUX\nCOMMANDANTS DE BORD DES AERONEFS EFFECTUANT DES SERVICES AERIENS\nEXPLOITES PAR LES TRANSPORTEURS TITULAIRES D'UNE LICENCE\nD'EXPLOITATION DELIVREE PAR LA FRANCE, QU'ILS SOIENT TRANSPORTEUR\nCONTRACTUEL ET/OU TRANSPORTEUR DE FAIT OU EFFECTUANT DES SERVICES\nAERIENS AU TRAVERS D'UN ACCORD COMMERCIAL D'AFFRETEMENT OU DE PARTAGE\nDE CODE AINSI QUE POUR TOUT VOL EFFECTUE AVEC UN AERONEF IMMATRICULE\nEN FRANCE D'EXERCER UNE VIGILANCE ACCRUE LORS DU SURVOL DE L'ESPACE\nAERIEN D'ARABIE SAOUDITE (FIR JEDDAH OEJD).\nL'OPERATEUR AERIEN DOIT REALISER UNE ANALYSE DU RISQUE ROBUSTE PERMETTANT DE GARANTIR LA REALISATION DU VOL DANS DES CONDITIONS DE SECURITE ET DE SURETE SATISFAISANTS AVANT TOUTE PENETRATION DANS L'ESPACE AERIEN D'ARABIE SAOUDITE\nCE NOTAM REMPLACE LES RESTRICTIONS CONCERNANT L'ESPACE AERIEN SAOUDIEN (FIR JEDDAH (OEJD)) EMISES DANS LE PARAGRAPHE 3.13. ARABIE SAOUDITE DE L'AIC A011/26 ACTUELLEMENT EN VIGUEUR."
+           },
+           "marker": "+",
+           "valid": ""
+          },
+          {
+           "pibSection": "FIR",
+           "id": "400000052328052",
+           "nof": "LFFA",
+           "series": "F",
+           "number": 1768,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "F",
+           "referredNumber": 1455,
+           "referredYear": 26,
+           "qLine": {
+            "fir": "LFXX",
+            "code23": "XX",
+            "code45": "CH",
+            "traffic": "I",
+            "purpose": "BO",
+            "scope": "E",
+            "lower": 0,
+            "upper": 999
+           },
+           "coordinates": "4412N00040E",
+           "radius": 460,
+           "itemA": "LFBB LFFF LFRR LFEE LFMM",
+           "startValidity": "2026-08-26T08:24:00Z",
+           "endValidity": "2026-09-30T23:59:00Z",
+           "startValidityFormat": "26 08 2026 08:24",
+           "endValidityFormat": "30 09 2026 23:59",
+           "itemE": "FRENCH AIR CARRIERS AND CAPTAINS OF AIRCRAFT IN CHARGE OF AIR\nSERVICES OPERATED BY CARRIERS HOLDING AN OPERATING LICENSE ISSUED BY\nFRANCE, WHETHER THEY ARE CONTRACTUAL CARRIERS AND/OR OPERATING\nCARRIERS, OR PERFORMING AIR SERVICES THROUGH A WET LEASE OR A\nCODESHARE AGREEMENT AS WELL AS FOR ANY FLIGHT MADE WITH AN AIRCRAFT\nREGISTERED IN FRANCE ARE REQUESTED TO EXERCISE GREAT CAUTION WHEN \nOPERATING INTO THE AIRSPACE OF OMAN (FIR MUSCAT (OOMM)).\nTHE AIR OPERATOR MUST CARRY OUT A ROBUST RISK ASSESSMENT TO ENSURE \nTHAT THE FLIGHT CAN BE CONDUCTED UNDER SATISFACTORY SAFETY AND \nSECURITY CONDITIONS BEFORE ENTERING THIS AIRSPACE OF OMAN.",
+           "multiLanguage": {
+            "itemE": "IL EST DEMANDE AUX TRANSPORTEURS AERIENS FRANCAIS ET AUX\nCOMMANDANTS DE BORD DES AERONEFS EFFECTUANT DES SERVICES AERIENS\nEXPLOITES PAR LES TRANSPORTEURS TITULAIRES D'UNE LICENCE\nD'EXPLOITATION DELIVREE PAR LA FRANCE, QU'ILS SOIENT TRANSPORTEUR\nCONTRACTUEL ET/OU TRANSPORTEUR DE FAIT OU EFFECTUANT DES SERVICES\nAERIENS AU TRAVERS D'UN ACCORD COMMERCIAL D'AFFRETEMENT OU DE PARTAGE\nDE CODE AINSI QUE POUR TOUT VOL EFFECTUE AVEC UN AERONEF IMMATRICULE\nEN FRANCE D'EXERCER UNE VIGILANCE ACCRUE LORS DU SURVOL DE L'ESPACE\nAERIEN DE OMAN (FIR MUSCAT (OOMM)).\nL'OPERATEUR AERIEN DOIT REALISER UNE ANALYSE DU RISQUE ROBUSTE PERMETTANT DE GARANTIR LA REALISATION DU VOL DANS DES CONDITIONS DE SECURITE ET DE SURETE SATISFAISANTS AVANT TOUTE PENETRATION DANS L'ESPACE AERIEN DE OMAN."
+           },
+           "marker": "+",
+           "valid": ""
+          },
+          {
+           "pibSection": "FIR",
+           "id": "400000052328058",
+           "nof": "LFFA",
+           "series": "F",
+           "number": 1769,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "F",
+           "referredNumber": 1456,
+           "referredYear": 26,
+           "qLine": {
+            "fir": "LFXX",
+            "code23": "XX",
+            "code45": "CH",
+            "traffic": "I",
+            "purpose": "BO",
+            "scope": "E",
+            "lower": 0,
+            "upper": 999
+           },
+           "coordinates": "4412N00040E",
+           "radius": 460,
+           "itemA": "LFBB LFFF LFRR LFEE LFMM",
+           "startValidity": "2026-08-26T08:25:00Z",
+           "endValidity": "2026-09-30T23:59:00Z",
+           "startValidityFormat": "26 08 2026 08:25",
+           "endValidityFormat": "30 09 2026 23:59",
+           "itemE": "FRENCH AIR CARRIERS AND CAPTAINS OF AIRCRAFT IN CHARGE OF AIR\nSERVICES OPERATED BY CARRIERS HOLDING AN OPERATING LICENSE ISSUED BY\nFRANCE, WHETHER THEY ARE CONTRACTUAL CARRIERS AND/OR OPERATING\nCARRIERS, OR PERFORMING AIR SERVICES THROUGH A WET LEASE OR A\nCODESHARE AGREEMENT AS WELL AS FOR ANY FLIGHT MADE WITH AN AIRCRAFT\nREGISTERED IN FRANCE ARE REQUESTED TO EXERCISE GREAT CAUTION WHEN\nOPERATING INTO THE AIRSPACE OF UNITED ARAB EMIRATES (FIR EMIRATES\n(OMAE)).\nTHE AIR OPERATOR MUST CARRY OUT A ROBUST RISK ASSESSMENT TO ENSURE\nTHAT THE FLIGHT CAN BE CONDUCTED UNDER SATISFACTORY SAFETY AND\nSECURITY CONDITIONS BEFORE ENTERING THIS AIRSPACE OF UNITED ARAB\nEMIRATES.",
+           "multiLanguage": {
+            "itemE": "IL EST DEMANDE AUX TRANSPORTEURS AERIENS FRANCAIS ET AUX COMMANDANTS\nDE BORD DES AERONEFS EFFECTUANT DES SERVICES AERIENS EXPLOITES PAR LES TRANSPORTEURS TITULAIRES D'UNE LICENCE D'EXPLOITATION DELIVREE PAR LA FRANCE, QU'ILS SOIENT TRANSPORTEUR CONTRACTUEL ET/OU TRANSPORTEUR DE FAIT OU EFFECTUANT DES SERVICES AERIENS AU TRAVERS D'UN ACCORD COMMERCIAL D'AFFRETEMENT OU DE PARTAGE DE CODE AINSI QUE POUR TOUT VOL EFFECTUE AVEC UN AERONEF IMMATRICULE EN FRANCE D'EXERCER UNE VIGILANCE ACCRUE LORS DU SURVOL DE L'ESPACE AERIEN DES EMIRATS ARABES UNIS (FIR EMIRATES (OMAE)).\nL'OPERATEUR AERIEN DOIT REALISER UNE ANALYSE DU RISQUE ROBUSTE\nPERMETTANT DE GARANTIR LA REALISATION DU VOL DANS DES CONDITIONS DE\nSECURITE ET DE SURETE SATISFAISANTS AVANT TOUTE PENETRATION DANS L'ESPACE AERIEN DES EMIRATS ARABES UNIS."
+           },
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "code": "LFMM LFFF LFRR LFEE LFBB",
+       "name": "FIR MARSEILLE/FIR PARIS FIR/FIR BREST/FIR REIMS/FIR BORDEAUX",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "NBO",
+         "notam": [
+          {
+           "pibSection": "FIR",
+           "id": "400000051985523",
+           "nof": "LFFA",
+           "series": "F",
+           "number": 1624,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "F",
+           "referredNumber": 988,
+           "referredYear": 26,
+           "qLine": {
+            "fir": "LFXX",
+            "code23": "XX",
+            "code45": "CH",
+            "traffic": "I",
+            "purpose": "NBO",
+            "scope": "E",
+            "lower": 0,
+            "upper": 999
+           },
+           "coordinates": "4412N00042E",
+           "radius": 455,
+           "itemA": "LFMM LFFF LFRR LFEE LFBB",
+           "startValidity": "2026-07-30T07:23:00Z",
+           "endValidity": "2026-11-23T23:59:00Z",
+           "startValidityFormat": "30 07 2026 07:23",
+           "endValidityFormat": "23 11 2026 23:59",
+           "itemE": "RUSSIA AND BELARUS RESTRICTIONS :\n1- ALL AIRCRAFT REGISTERED IN RUSSIA OR OPERATED BY RUSSIAN AIR \nCARRIERS, INCLUDING AS A MARKETING CARRIER IN CODE-SHARING OR \nBLOCKED-SPACE ARRANGEMENTS OR OWNED, CHARTERED OR OPERATED BY A \nRUSSIAN NATURAL OR LEGAL PERSON, ENTITY OR BODY ARE PROHIBITED TO \nLAND IN, TAKE OFF FROM OR OVERFLY THE FRENCH SOVEREIGN AIRSPACE \nEXCEPT IN CASE OF EMERGENCY LANDING OR EMERGENCY OVERFLIGHT AND \nEXCEPT FOR FLIGHTS HOLDING A PERMISSION DELIVERED IN ACCORDANCE WITH \nTHE APPROPRIATE EU REGULATION BY THE FRENCH AUTHORITIES\n2- ALL AIRCRAFT OPERATED BY BELARUSIAN AIR CARRIERS, INCLUDING AS A \nMARKETING CARRIER IN CODE-SHARING OR BLOCKED-SPACE ARRANGEMENTS, ARE \nPROHIBITED TO LAND IN, TAKE OFF FROM OR OVERFLY THE FRENCH SOVEREIGN \nAIRSPACE \nEXCEPT IN CASE OF EMERGENCY LANDING OR EMERGENCY OVERFLIGHT AND \nEXCEPT FOR FLIGHTS HOLDING A PERMISSION DELIVERED IN ACCORDANCE WITH \nTHE APPROPRIATE EU REGULATION BY THE FRENCH AUTHORITIES\n3- IT SHALL BE PROHIBITED TO PARTICIPATE, KNOWINGLY AND \nINTENTIONALLY, IN ACTIVITIES THE OBJECT OR EFFECT OF WHICH IS TO \nCIRCUMVENT THESE PROHIBITIONS.",
+           "multiLanguage": {
+            "itemE": "RESTRICTIONS RUSSIE ET BIELORUSSIE :\n1- IL EST INTERDIT A TOUT AERONEF EXPLOITE PAR DES TRANSPORTEURS AERIENS RUSSES, Y COMPRIS EN TANT QUE TRANSPORTEUR CONTRACTUEL DANS LE CADRE D'ACCORDS DE PARTAGE DE CODES OU DE RESERVATION DE CAPACITE, A TOUT AERONEF IMMATRICULE EN RUSSIE, A TOUT AERONEF NON IMMATRICULE EN RUSSIE QUI EST DETENU, AFFRETE OU CONTROLE D'UNE AUTRE MANIERE PAR UNE PERSONNE PHYSIQUE OU MORALE, UNE ENTITE OU UN ORGANISME RUSSE, D'ENTRER, DE QUITTER OU DE SURVOLER L'ESPACE AERIEN SOUVERAIN FRANCAIS, SAUF EN CAS D'ATTERRISAGE OU DE SURVOL D'URGENCE ET SAUF POUR LES VOLS TITULAIRES D'UNE AUTORISATION DEROGATOIRE DELIVREE PAR LES AUTORITEES FRANCAISES CONFORMEMENT AUX DISPOSITIONS EUROPENNES APPLICABLES \n2- IL EST INTERDIT A TOUT AERONEF EXPLOITE PAR DES TRANSPORTEURS AERIENS BIELORUSSES, Y COMPRIS EN TANT QUE TRANSPORTEUR CONTRACTUEL DANS LE CADRE D'ACCORDS DE PARTAGE DE CODES OU DE RESERVATION DE CAPACITE, D'ENTRER, DE QUITTER OU DE SURVOLER L'ESPACE AERIEN SOUVERAIN FRANCAIS SAUF EN CAS D'URGENCE ET SAUF POUR LES VOLS TITULAIRES D'UNE AUTORISATION DEROGATOIRE DELIVREE PAR LES AUTORITES FRANCAISES CONFORMEMENT AUX DISPOSITIONS EUROPENNES APPLICABLES\n3- IL EST INTERDIT DE PARTICIPER SCIEMMENT ET VOLONTAIREMENT A DES ACTIVITES AYANT POUR OBJET OU POUR EFFET DE CONTOURNER LES PRESENTES INTERDICTIONS."
+           },
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "code": "LFBB LFEE LFFF LFMM LFRR",
+       "name": "FIR BORDEAUX/FIR REIMS/FIR PARIS FIR/FIR MARSEILLE/FIR BREST",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "BO",
+         "notam": [
+          {
+           "pibSection": "FIR",
+           "id": "400000051986281",
+           "nof": "LFFA",
+           "series": "F",
+           "number": 1625,
+           "year": 26,
+           "type": "N",
+           "qLine": {
+            "fir": "LFXX",
+            "code23": "XX",
+            "code45": "CH",
+            "traffic": "I",
+            "purpose": "BO",
+            "scope": "E",
+            "lower": 0,
+            "upper": 999
+           },
+           "coordinates": "4412N00040E",
+           "radius": 460,
+           "itemA": "LFBB LFEE LFFF LFMM LFRR",
+           "startValidity": "2026-07-30T08:08:00Z",
+           "endValidity": "2026-10-28T23:59:00Z",
+           "startValidityFormat": "30 07 2026 08:08",
+           "endValidityFormat": "28 10 2026 23:59",
+           "itemE": "FRENCH AIR CARRIERS AND CAPTAINS OF AIRCRAFT IN CHARGE OF AIR\nSERVICES OPERATED BY CARRIERS HOLDING AN OPERATING LICENSE ISSUED BY\nFRANCE, WHETHER THEY ARE CONTRACTUAL CARRIERS AND/OR OPERATING\nCARRIERS, OR PERFORMING AIR SERVICES THROUGH A WET LEASE OR A\nCODESHARE AGREEMENT AS WELL AS FOR ANY FLIGHT MADE WITH AN AIRCRAFT\nREGISTERED IN FRANCE ARE REQUESTED NOT TO PENETRATE INTO THE AIRSPACE\nOF LIBYA (FIR TRIPOLI (HLLL)) EXCEPT OF :\n-THE TWO-WAY ROUTES SEGMENTS M999 (ZARZAITINE  SEBHA) AND G655 (SEBHA\nGARIN), ON WHICH A FLIGHT LEVEL ABOVE OR EQUAL TO FL320 IS REQUESTED\nTO BE MAINTAINED AT ALL TIMES.\n-THE ROUTE R778 (DITAR-KUFRA-TONBA), ON WHICH A FLIGHT LEVEL ABOVE OR\nEQUAL TO FL320 IS REQUESTED TO BE MAINTAINED AT ALL TIMES.\nTHE AIR OPERATOR MUST CARRY OUT A ROBUST RISK ASSESSMENT TO ENSURE\nTHAT THE FLIGHT CAN BE CONDUCTED UNDER SATISFACTORY SAFETY AND\nSECURITY CONDITIONS BEFORE ENTERING IN LIBYAN AIRSPACE.\nTHIS NOTAM SUPERSEDES THE RESTRICTIONS CONCERNING LIBYA AIRSPACE (FIR\nTRIPOLI (HLLL)) ISSUED IN PARAGRAPH 3.3 LIBYA OF THE AIC A011/26\nCURRENTLY IN EFFECT.",
+           "multiLanguage": {
+            "itemE": "IL EST DEMANDE AUX TRANSPORTEURS AERIENS FRANCAIS ET AUX COMMANDANTS\nDE BORD DES AERONEFS EFFECTUANT DES SERVICES AERIENS EXPLOITES PAR LES TRANSPORTEURS TITULAIRES D'UNE LICENCE D'EXPLOITATION DELIVREE PAR LA FRANCE, QU'ILS SOIENT TRANSPORTEUR CONTRACTUEL ET/OU TRANSPORTEUR DE FAIT OU EFFECTUANT DES SERVICES AERIENS AU TRAVERS D'UN ACCORD COMMERCIAL D'AFFRETEMENT OU DE PARTAGE DE CODE AINSI QUE POUR TOUT VOL EFFECTUE AVEC UN AERONEF IMMATRICULE EN FRANCE DE NE PAS FAIRE PENETRER LEURS AERONEFS DANS L'ESPACE AERIEN DE LIBYE (FIR HLLL (TRIPOLI)) A L'EXCEPTION :\n-DES SEGMENTS DE ROUTES BIDIRECTIONNELLES M999 (ZARZAITINE - SEBHA) ET G655 / M214 (SEBHA - GARIN) QUI POURRONT ETRE UTILISES EN MAINTENANT EN PERMANENCE UN NIVEAU DE VOL SUPERIEUR OU EGAL AU FL320\n-DE LA ROUTE R778 (DITAR-KUFRA-TONBA) QUI POURRA ETRE UTILISEE EN\nMAINTENANT EN PERMANENCE UN NIVEAU DE VOL SUPERIEUR OU EGAL AU FL320.\nLES OPERATEURS AERIENS DOIVENT REALISER UNE ANALYSE DU RISQUE ROBUSTE\nPERMETTANT DE GARANTIR LA REALISATION DES VOLS DANS DES CONDITIONS DE\nSECURITE ET DE SURETE SATISFAISANTES AVANT TOUTE PENETRATION DANS L'ESPACE AERIEN LIBYEN.\nCE NOTAM REMPLACE LES RESTRICTIONS CONCERNANT L'ESPACE AERIEN LIBYEN\n(FIR TRIPOLI (HLLL)) MISES DANS LE PARAGRAPHE 3.3 LIBYE DE L'AIC\nA011/26 ACTUELLEMENT EN VIGUEUR."
+           },
+           "marker": "+",
+           "valid": ""
+          },
+          {
+           "pibSection": "FIR",
+           "id": "400000052327998",
+           "nof": "LFFA",
+           "series": "F",
+           "number": 1765,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "F",
+           "referredNumber": 1446,
+           "referredYear": 26,
+           "qLine": {
+            "fir": "LFXX",
+            "code23": "XX",
+            "code45": "CH",
+            "traffic": "I",
+            "purpose": "BO",
+            "scope": "E",
+            "lower": 0,
+            "upper": 999
+           },
+           "coordinates": "4412N00040E",
+           "radius": 460,
+           "itemA": "LFBB LFEE LFFF LFMM LFRR",
+           "startValidity": "2026-08-26T08:20:00Z",
+           "endValidity": "2026-09-30T23:59:00Z",
+           "startValidityFormat": "26 08 2026 08:20",
+           "endValidityFormat": "30 09 2026 23:59",
+           "itemE": "FRENCH AIR CARRIERS AND CAPTAINS OF AIRCRAFT IN CHARGE OF AIR\nSERVICES OPERATED BY CARRIERS HOLDING AN OPERATING LICENSE ISSUED BY\nFRANCE, WHETHER THEY ARE CONTRACTUAL CARRIERS AND/OR OPERATING\nCARRIERS, OR PERFORMING AIR SERVICES THROUGH A WET LEASE OR A\nCODESHARE AGREEMENT AS WELL AS FOR ANY FLIGHT MADE WITH AN AIRCRAFT\nREGISTERED IN FRANCE ARE REQUESTED NOT TO PENETRATE INTO THE ENTIRE\nAIRSPACE OF IRAN (FIR TEHRAN (OIIX)).\nTHIS NOTAM SUPERSEDES THE RESTRICTIONS CONCERNING IRAN AIRSPACE (FIR\nTEHRAN (OIIX)) ISSUED IN PARAGRAPH 3.14 IRAN OF THE AIC NR A011/26 \nCURRENTLY IN EFFECT.",
+           "multiLanguage": {
+            "itemE": "IL EST DEMANDE AUX TRANSPORTEURS AERIENS FRANCAIS ET AUX COMMANDANTS DE BORD DES AERONEFS EFFECTUANT DES SERVICES AERIENS EXPLOITES PAR LES TRANSPORTEURS TITULAIRES D'UNE LICENCE D'EXPLOITATION DELIVREE PAR LA FRANCE, QU'ILS SOIENT TRANSPORTEUR CONTRACTUEL ET/OU TRANSPORTEUR DE FAIT OU EFFECTUANT DES SERVICES AERIENS AU TRAVERS D'UN ACCORD COMMERCIAL D'AFFRETEMENT OU DE PARTAGE DE CODE AINSI QUE POUR TOUT VOL EFFECTUE AVEC UN AERONEF IMMATRICULE EN FRANCE DE NE PAS PENETRER DANS LA TOTALITE DE L'ESPACE AERIEN\nIRANIEN (FIR TEHERAN (OIIX)).\nCE NOTAM REMPLACE LES RESTRICTIONS CONCERNANT L'ESPACE AERIEN IRANIEN\n(FIR TEHERAN (OIIX)) EMISES DANS LE PARAGRAPHE 3.14. IRAN DE L'AIC\nA011/26 ACTUELLEMENT EN VIGUEUR."
+           },
+           "marker": "+",
+           "valid": ""
+          },
+          {
+           "pibSection": "FIR",
+           "id": "400000052328029",
+           "nof": "LFFA",
+           "series": "F",
+           "number": 1766,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "F",
+           "referredNumber": 1447,
+           "referredYear": 26,
+           "qLine": {
+            "fir": "LFXX",
+            "code23": "XX",
+            "code45": "CH",
+            "traffic": "I",
+            "purpose": "BO",
+            "scope": "E",
+            "lower": 0,
+            "upper": 999
+           },
+           "coordinates": "4412N00040E",
+           "radius": 460,
+           "itemA": "LFBB LFEE LFFF LFMM LFRR",
+           "startValidity": "2026-08-26T08:21:00Z",
+           "endValidity": "2026-09-30T23:59:00Z",
+           "startValidityFormat": "26 08 2026 08:21",
+           "endValidityFormat": "30 09 2026 23:59",
+           "itemE": "FRENCH AIR CARRIERS AND CAPTAINS OF AIRCRAFT IN CHARGE OF AIR\nSERVICES OPERATED BY CARRIERS HOLDING AN OPERATING LICENSE ISSUED BY\nFRANCE, WHETHER THEY ARE CONTRACTUAL CARRIERS AND/OR OPERATING\nCARRIERS, OR PERFORMING AIR SERVICES THROUGH A WET LEASE OR A\nCODESHARE AGREEMENT AS WELL AS FOR ANY FLIGHT MADE WITH AN AIRCRAFT\nREGISTERED IN FRANCE ARE REQUESTED NOT TO PENETRATE INTO THE ENTIRE\nAIRSPACE OF IRAQ (FIR BAGHDAD (ORBB)).\nTHIS NOTAM SUPERSEDES THE RESTRICTIONS CONCERNING IRAQ AIRSPACE (FIR\nBAGHDAD (ORBB)) ISSUED IN PARAGRAPH 3.2 IRAQ OF THE AIC NR A011/26\nCURRENTLY IN EFFECT.",
+           "multiLanguage": {
+            "itemE": "IL EST DEMANDE AUX TRANSPORTEURS AERIENS FRANCAIS ET AUX\nCOMMANDANTS DE BORD DES AERONEFS EFFECTUANT DES SERVICES AERIENS\nEXPLOITES PAR LES TRANSPORTEURS TITULAIRES D'UNE LICENCE\nD'EXPLOITATION DELIVREE PAR LA FRANCE, QU'ILS SOIENT TRANSPORTEUR\nCONTRACTUEL ET/OU TRANSPORTEUR DE FAIT OU EFFECTUANT DES SERVICES\nAERIENS AU TRAVERS D'UN ACCORD COMMERCIAL D'AFFRETEMENT OU DE PARTAGE\nDE CODE AINSI QUE POUR TOUT VOL EFFECTUE AVEC UN AERONEF IMMATRICULE\nEN FRANCE DE NE PAS PENETRER DANS LA TOTALITE DE L'ESPACE AERIEN D'IRAK (FIR BAGDAD (ORBB)).\nCE NOTAM REMPLACE LES RESTRICTIONS CONCERNANT L'ESPACE AERIEN IRAKIEN\n(FIR BAGDAD (ORBB)) EMISES DANS LE PARAGRAPHE 3.2. IRAK DE L'AIC\nA011/26 ACTUELLEMENT EN VIGUEUR."
+           },
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "code": "LFBB LFFF LFRR LFMM LFEE",
+       "name": "FIR BORDEAUX/FIR PARIS FIR/FIR BREST/FIR MARSEILLE/FIR REIMS",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "BO",
+         "notam": [
+          {
+           "pibSection": "FIR",
+           "id": "400000052414358",
+           "nof": "LFFA",
+           "series": "F",
+           "number": 1805,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "F",
+           "referredNumber": 1771,
+           "referredYear": 26,
+           "qLine": {
+            "fir": "LFXX",
+            "code23": "XX",
+            "code45": "CH",
+            "traffic": "I",
+            "purpose": "BO",
+            "scope": "E",
+            "lower": 0,
+            "upper": 999
+           },
+           "coordinates": "4412N00040E",
+           "radius": 460,
+           "itemA": "LFBB LFFF LFRR LFMM LFEE",
+           "startValidity": "2026-09-01T15:57:00Z",
+           "endValidity": "2026-11-25T23:59:00Z",
+           "startValidityFormat": "01 09 2026 15:57",
+           "endValidityFormat": "25 11 2026 23:59",
+           "itemE": "FRENCH AIR CARRIERS AND CAPTAINS OF AIRCRAFT IN CHARGE OF AIR\nSERVICES OPERATED BY CARRIERS HOLDING AN OPERATING LICENSE ISSUED BY\nFRANCE, WHETHER THEY ARE CONTRACTUAL CARRIERS AND/OR OPERATING\nCARRIERS, OR PERFORMING AIR SERVICES THROUGH A WET LEASE OR A\nCODESHARE AGREEMENT AS WELL AS FOR ANY FLIGHT MADE WITH AN AIRCRAFT\nREGISTERED IN FRANCE ARE REQUESTED NOT TO PENETRATE INTO THE AIRSPACE\nOF LEBANON (FIR BEIRUT (OLBB)), EXCEPT FOR THE USE OF BEIRUT\nAERODROME (OLBA) AND SUBJECT TO THE FOLLOWING CONDITIONS:\n- APPROACH AND DEPARTURE BY SEA,\n- FULL COORDINATION WITH LOCAL AUTHORITIES AND AIR TRAFFIC CONTROL,\n- PRIOR CONDUCT OF A ROBUST RISK ASSESSMENT.",
+           "multiLanguage": {
+            "itemE": "IL EST DEMANDE AUX TRANSPORTEURS AERIENS FRANCAIS ET AUX COMMANDANTS\nDE BORD DES AERONEFS EFFECTUANT DES SERVICES AERIENS EXPLOITES PAR\nLES TRANSPORTEURS TITULAIRES D'UNE LICENCE D'EXPLOITATION DELIVREE\nPAR LA FRANCE, QU'ILS SOIENT TRANSPORTEUR CONTRACTUEL ET/OU\nTRANSPORTEUR DE FAIT OU EFFECTUANT DES SERVICES AERIENS AU TRAVERS\nD'UN ACCORD COMMERCIAL D'AFFRETEMENT OU DE PARTAGE DE CODE AINSI QUE\nPOUR TOUT VOL EFFECTUE AVEC UN AERONEF IMMATRICULE EN FRANCE DE NE\nPAS FAIRE PENETRER LEURS AERONEFS DANS L'ESPACE AERIEN DU LIBAN (FIR\nBEYROUTH (OLBB)) A L'EXCEPTION DE LA DESSERTE DE L'AEROPORT DE\nBEYROUTH (OLBA) ET SELON LES CONDITIONS SUIVANTES :\n- APPROCHE ET DEPART PAR LA MER,\n- COORDINATION TOTALE AVEC LES AUTORITES LOCALES ET LE CONTROLE AERIEN,\n- REALISATION PREALABLE D'UNE ANALYSE DU RISQUE ROBUSTE."
+           },
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "code": "LFBB LFFF LFMM LFRR LFEE",
+       "name": "FIR BORDEAUX/FIR PARIS FIR/FIR MARSEILLE/FIR BREST/FIR REIMS",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "BO",
+         "notam": [
+          {
+           "pibSection": "FIR",
+           "id": "400000052425337",
+           "nof": "LFFA",
+           "series": "F",
+           "number": 1810,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "F",
+           "referredNumber": 1761,
+           "referredYear": 26,
+           "qLine": {
+            "fir": "LFXX",
+            "code23": "XX",
+            "code45": "CH",
+            "traffic": "I",
+            "purpose": "BO",
+            "scope": "E",
+            "lower": 0,
+            "upper": 999
+           },
+           "coordinates": "4412N00040E",
+           "radius": 460,
+           "itemA": "LFBB LFFF LFMM LFRR LFEE",
+           "startValidity": "2026-09-02T10:07:00Z",
+           "endValidity": "2026-09-16T23:59:00Z",
+           "startValidityFormat": "02 09 2026 10:07",
+           "endValidityFormat": "16 09 2026 23:59",
+           "itemE": "FRENCH AIR CARRIERS AND CAPTAINS OF AIRCRAFT IN CHARGE OF AIR\nSERVICES OPERATED BY CARRIERS HOLDING AN OPERATING LICENSE ISSUED BY\nFRANCE, WHETHER THEY ARE CONTRACTUAL CARRIERS AND/OR OPERATING\nCARRIERS OR PERFORMING AIR SERVICES THROUGH A WET LEASE OR A\nCODESHARE AGREEMENT AS WELL AS FOR ANY FLIGHT MADE WITH AN AIRCRAFT\nREGISTERED IN FRANCE ARE REQUESTED NOT TO PENETRATE INTO THE ENTIRE\nAIRSPACE OF QATAR (FIR DOHA (OTDF)).",
+           "multiLanguage": {
+            "itemE": "IL EST DEMANDE AUX TRANSPORTEURS AERIENS FRANCAIS ET AUX\nCOMMANDANTS DE BORD DES AERONEFS EFFECTUANT DES SERVICES AERIENS\nEXPLOITES PAR LES TRANSPORTEURS TITULAIRES D'UNE LICENCE\nD'EXPLOITATION DELIVREE PAR LA FRANCE, QU'ILS SOIENT TRANSPORTEUR\nCONTRACTUEL ET/OU TRANSPORTEUR DE FAIT OU EFFECTUANT DES SERVICES\nAERIENS AU TRAVERS D'UN ACCORD COMMERCIAL D'AFFRETEMENT OU DE PARTAGE\nDE CODE AINSI QUE POUR TOUT VOL EFFECTUE AVEC UN AERONEF IMMATRICULE\nEN FRANCE DE NE PAS PENETRER DANS LA TOTALITE DE L'ESPACE AERIEN DU\nQATAR (FIR DOHA (OTDF))."
+           },
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "code": "LFFF LFBB LFRR LFEE LFMM",
+       "name": "FIR PARIS FIR/FIR BORDEAUX/FIR BREST/FIR REIMS/FIR MARSEILLE",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "BO",
+         "notam": [
+          {
+           "pibSection": "FIR",
+           "id": "400000052425366",
+           "nof": "LFFA",
+           "series": "F",
+           "number": 1811,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "F",
+           "referredNumber": 1762,
+           "referredYear": 26,
+           "qLine": {
+            "fir": "LFXX",
+            "code23": "XX",
+            "code45": "CH",
+            "traffic": "I",
+            "purpose": "BO",
+            "scope": "E",
+            "lower": 0,
+            "upper": 999
+           },
+           "coordinates": "4412N00040E",
+           "radius": 460,
+           "itemA": "LFFF LFBB LFRR LFEE LFMM",
+           "startValidity": "2026-09-02T10:08:00Z",
+           "endValidity": "2026-09-16T23:59:00Z",
+           "startValidityFormat": "02 09 2026 10:08",
+           "endValidityFormat": "16 09 2026 23:59",
+           "itemE": "FRENCH AIR CARRIERS AND CAPTAINS OF AIRCRAFT IN CHARGE OF AIR\nSERVICES OPERATED BY CARRIERS HOLDING AN OPERATING LICENSE ISSUED BY\nFRANCE, WHETHER THEY ARE CONTRACTUAL CARRIERS AND/OR OPERATING\nCARRIERS OR PERFORMING AIR SERVICES THROUGH A WET LEASE OR A\nCODESHARE AGREEMENT AS WELL AS FOR ANY FLIGHT MADE WITH AN AIRCRAFT\nREGISTERED IN FRANCE ARE REQUESTED NOT TO PENETRATE INTO THE ENTIRE\nAIRSPACE OF KUWAIT (FIR KUWAIT (OKAC)).",
+           "multiLanguage": {
+            "itemE": "IL EST DEMANDE AUX TRANSPORTEURS AERIENS FRANCAIS ET AUX\nCOMMANDANTS DE BORD DES AERONEFS EFFECTUANT DES SERVICES AERIENS\nEXPLOITES PAR LES TRANSPORTEURS TITULAIRES D'UNE LICENCE\nD'EXPLOITATION DELIVREE PAR LA FRANCE, QU'ILS SOIENT TRANSPORTEUR\nCONTRACTUEL ET/OU TRANSPORTEUR DE FAIT OU EFFECTUANT DES SERVICES\nAERIENS AU TRAVERS D'UN ACCORD COMMERCIAL D'AFFRETEMENT OU DE PARTAGE\nDE CODE AINSI QUE POUR TOUT VOL EFFECTUE AVEC UN AERONEF IMMATRICULE\nEN FRANCE DE NE PAS PENETRER DANS LA TOTALITE DE L'ESPACE AERIEN DU\nKOWEIT (FIR KOWEIT (OKAC))."
+           },
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "code": "LFFF LFBB LFMM LFEE LFRR",
+       "name": "FIR PARIS FIR/FIR BORDEAUX/FIR MARSEILLE/FIR REIMS/FIR BREST",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "BO",
+         "notam": [
+          {
+           "pibSection": "FIR",
+           "id": "400000052425425",
+           "nof": "LFFA",
+           "series": "F",
+           "number": 1812,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "F",
+           "referredNumber": 1763,
+           "referredYear": 26,
+           "qLine": {
+            "fir": "LFXX",
+            "code23": "XX",
+            "code45": "CH",
+            "traffic": "I",
+            "purpose": "BO",
+            "scope": "E",
+            "lower": 0,
+            "upper": 999
+           },
+           "coordinates": "4412N00040E",
+           "radius": 460,
+           "itemA": "LFFF LFBB LFMM LFEE LFRR",
+           "startValidity": "2026-09-02T10:09:00Z",
+           "endValidity": "2026-09-16T23:59:00Z",
+           "startValidityFormat": "02 09 2026 10:09",
+           "endValidityFormat": "16 09 2026 23:59",
+           "itemE": "FRENCH AIR CARRIERS AND CAPTAINS OF AIRCRAFT IN CHARGE OF AIR\nSERVICES OPERATED BY CARRIERS HOLDING AN OPERATING LICENSE ISSUED BY\nFRANCE, WHETHER THEY ARE CONTRACTUAL CARRIERS AND/OR OPERATING\nCARRIERS, OR PERFORMING AIR SERVICES THROUGH A WET LEASE OR A\nCODESHARE AGREEMENT AS WELL AS FOR ANY FLIGHT MADE WITH AN AIRCRAFT\nREGISTERED IN FRANCE ARE REQUESTED NOT TO PENETRATE INTO THE ENTIRE\nAIRSPACE OF BAHRAIN (FIR BAHRAIN (OBBB))",
+           "multiLanguage": {
+            "itemE": "IL EST DEMANDE AUX TRANSPORTEURS AERIENS FRANCAIS ET AUX\nCOMMANDANTS DE BORD DES AERONEFS EFFECTUANT DES SERVICES AERIENS\nEXPLOITES PAR LES TRANSPORTEURS TITULAIRES D'UNE LICENCE\nD'EXPLOITATION DELIVREE PAR LA FRANCE, QU'ILS SOIENT TRANSPORTEUR\nCONTRACTUEL ET/OU TRANSPORTEUR DE FAIT OU EFFECTUANT DES SERVICES\nAERIENS AU TRAVERS D'UN ACCORD COMMERCIAL D'AFFRETEMENT OU DE PARTAGE\nDE CODE AINSI QUE POUR TOUT VOL EFFECTUE AVEC UN AERONEF IMMATRICULE\nEN FRANCE DE NE PAS PENETRER DANS LA TOTALITE DE L'ESPACE AERIEN DU\nBAHREIN (FIR BAHREIN (OBBB))."
+           },
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "code": "LFFF LFBB LFEE LFRR LFMM",
+       "name": "FIR PARIS FIR/FIR BORDEAUX/FIR REIMS/FIR BREST/FIR MARSEILLE",
+       "notam": [],
+       "sortedNotamsByPurpose": [
+        {
+         "purpose": "BO",
+         "notam": [
+          {
+           "pibSection": "FIR",
+           "id": "400000052425441",
+           "nof": "LFFA",
+           "series": "F",
+           "number": 1813,
+           "year": 26,
+           "type": "R",
+           "referredSeries": "F",
+           "referredNumber": 1764,
+           "referredYear": 26,
+           "qLine": {
+            "fir": "LFXX",
+            "code23": "XX",
+            "code45": "CH",
+            "traffic": "I",
+            "purpose": "BO",
+            "scope": "E",
+            "lower": 0,
+            "upper": 999
+           },
+           "coordinates": "4412N00040E",
+           "radius": 460,
+           "itemA": "LFFF LFBB LFEE LFRR LFMM",
+           "startValidity": "2026-09-02T10:09:00Z",
+           "endValidity": "2026-09-16T23:59:00Z",
+           "startValidityFormat": "02 09 2026 10:09",
+           "endValidityFormat": "16 09 2026 23:59",
+           "itemE": "FRENCH AIR CARRIERS AND CAPTAINS OF AIRCRAFT IN CHARGE OF AIR\nSERVICES OPERATED BY CARRIERS HOLDING AN OPERATING LICENSE ISSUED BY\nFRANCE, WHETHER THEY ARE CONTRACTUAL CARRIERS AND/OR OPERATING\nCARRIERS, OR PERFORMING AIR SERVICES THROUGH A WET LEASE OR A\nCODESHARE AGREEMENT AS WELL AS FOR ANY FLIGHT MADE WITH AN AIRCRAFT\nREGISTERED IN FRANCE ARE REQUESTED NOT TO PENETRATE INTO THE ENTIRE\nAIRSPACE OF JORDAN (FIR AMMAN (OJAC)).",
+           "multiLanguage": {
+            "itemE": "IL EST DEMANDE AUX TRANSPORTEURS AERIENS FRANCAIS ET AUX\nCOMMANDANTS DE BORD DES AERONEFS EFFECTUANT DES SERVICES AERIENS\nEXPLOITES PAR LES TRANSPORTEURS TITULAIRES D'UNE LICENCE\nD'EXPLOITATION DELIVREE PAR LA FRANCE, QU'ILS SOIENT TRANSPORTEUR\nCONTRACTUEL ET/OU TRANSPORTEUR DE FAIT OU EFFECTUANT DES SERVICES\nAERIENS AU TRAVERS D'UN ACCORD COMMERCIAL D'AFFRETEMENT OU DE PARTAGE\nDE CODE AINSI QUE POUR TOUT VOL EFFECTUE AVEC UN AERONEF IMMATRICULE\nEN FRANCE DE NE PAS PENETRER DANS LA TOTALITE DE L'ESPACE AERIEN DE\nJORDANIE (FIR AMMAN (OJAC))."
+           },
+           "marker": "+",
+           "valid": ""
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "Other": []
+ },
+ "nbNotams": 62,
+ "waypoints": [
+  "4804N00144W",
+  "4743N00243W"
+ ],
+ "snowtams": []
+}

@@ -1690,3 +1690,77 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr) {
 
     return yB + 16;
 }
+
+/* ================================================================
+ * ANNEXE NOTAM — les NOTAM cochés du dossier SOFIA (10/09, local).
+ * Ajoutée APRÈS drawNavLogPdf sur le même doc : une à N pages A5,
+ * groupées comme le panneau (Départ → En route → points de passage →
+ * Arrivée), texte en français quand la traduction existe.
+ * ================================================================ */
+export function drawNotamAnnex(doc, items, isFr = true) {
+    if (!items?.length) return doc;
+    const W = doc.internal.pageSize.getWidth();
+    const H = doc.internal.pageSize.getHeight();
+    const M = 28;
+    const SZ_T = 11, SZ_G = 8.5, SZ_B = 7.5;
+    let y = 0;
+
+    const newPage = () => { doc.addPage(); y = M; };
+    const need = (h) => { if (y + h > H - M) newPage(); };
+
+    // En-tête de l'annexe
+    newPage();
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(SZ_T);
+    doc.text(isFr ? 'NOTAM sélectionnés — dossier de vol' : 'Selected NOTAM — flight dossier', M, y);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5);
+    doc.text(isFr ? 'Source : SOFIA-Briefing (SIA) — extrait du dossier NOTAM du plan' : 'Source: SOFIA-Briefing (SIA)', M, y + 11);
+    y += 24;
+
+    let lastGrp = '';
+    for (const n of items) {
+        const grp = n._grp || '';
+        if (grp !== lastGrp) {
+            lastGrp = grp;
+            need(18);
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(SZ_G);
+            doc.text(grp.toUpperCase(), M, y);
+            y += 12;
+        }
+        // Ligne titre : P 3953/25 · OBST — validités
+        need(24);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(SZ_B);
+        const title = notamTitleLocal(n) + '  —  ' + notamPeriodLocal(n, isFr);
+        doc.text(title, M, y);
+        y += 9;
+        // Corps (traduction FR prioritaire), replié à la largeur, multiligne
+        doc.setFont('helvetica', 'normal');
+        const body = notamBodyLocal(n);
+        const lines = doc.splitTextToSize(body, W - 2 * M) || [];
+        for (const l of lines) {
+            need(10);
+            doc.text(l, M, y);
+            y += 8.5;
+        }
+        y += 7;
+    }
+    return doc;
+}
+
+// Helpers locaux (même logique que js/notam.js, sans dépendance croisée)
+function notamTitleLocal(n) {
+    const q = n.qLine?.code23 || '';
+    return `${n.series || ''} ${n.number || ''}/${String(n.year || '').slice(-2)}${q ? ' · ' + q : ''}`.trim();
+}
+function notamPeriodLocal(n, isFr) {
+    const fmt = (iso) => {
+        if (!iso) return '';
+        const d = new Date(iso);
+        const p = (x) => String(x).padStart(2, '0');
+        return `${p(d.getUTCDate())}/${p(d.getUTCMonth() + 1)} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}Z`;
+    };
+    let s = n.startValidityFormat || fmt(n.startValidity);
+    return `${s || '?'} → ${n.endValidityFormat || fmt(n.endValidity) || '?'}${n.itemD ? ' (' + n.itemD.trim() + ')' : ''}`;
+}
+function notamBodyLocal(n) {
+    return (n.multiLanguage && n.multiLanguage.itemE) || n.itemE || '';
+}
