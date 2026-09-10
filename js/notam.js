@@ -16,7 +16,7 @@
  * chaque demande, jamais cachés).
  * ================================================================ */
 import { config } from './config.js';
-import { getAirportByICAO } from './ui-module.js';
+import { getAirportByICAO, getAirportsInBbox } from './ui-module.js';
 import { state } from './core.js';
 import { makeCollapsible } from './collapsible.js';
 
@@ -155,6 +155,27 @@ export function decToSofiaDms(lat, lon) {
     return { lat: fmt(lat, 'N', 'S', 2), long: fmt(lon, 'E', 'W', 3) };
 }
 
+/** Terrains à moins de radiusNm du centre, triés par distance (pur, testé).
+ * Retourne le centre en tête + ses voisins — chaîne pour les appels legs,
+ * chaque tronçon rapportant le dossier du terrain de départ. */
+export function airfieldsWithinNm(centerLat, centerLon, radiusNm, allAirports, max = 10) {
+    const R = 3440.1;   // rayon terrestre en NM
+    const toRad = (d) => d * Math.PI / 180;
+    const dist = (a, b) => {
+        const dLat = toRad(b.lat - a.lat), dLon = toRad(b.lon - a.lon);
+        const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2;
+        return 2 * R * Math.asin(Math.sqrt(h));
+    };
+    const centre = { lat: centerLat, lon: centerLon };
+    const proches = (allAirports || [])
+        .filter(a => Number.isFinite(a.lat) && Number.isFinite(a.lon) && a.icao)
+        .map(a => ({ a, d: dist(centre, a) }))
+        .filter(x => x.d <= radiusNm)
+        .sort((x, y) => x.d - y.d)
+        .slice(0, max);
+    return proches.map(x => x.a.icao);
+}
+
 /** Legs [A,B] pour les points de passage intermédiaires (purs, testable). */
 export function waypointLegs(route) {
     const clean = (route || []).filter(Boolean);
@@ -230,11 +251,17 @@ const GROUPS_LOCAL = () => (isFr() ? {
 /** Dossier NOTAM « vol local » : cylindre 30 NM autour du terrain observé. */
 export async function fetchZonePib(icao, lat, lon, opts = {}) {
     const dms = decToSofiaDms(lat, lon);
+    // Dossiers de TOUS les terrains de la zone (retour pilote 10/09) :
+    // l'anneau est chaîné, chaque tronçon rapporte le dossier de son départ.
+    const ring = opts.ring || [icao];
+    const legs = ring.length > 1
+        ? ring.slice(0, -1).map((a, i) => [a, ring[i + 1]])
+        : [];
     try {
         const res = await fetch(config.NOTAM_RELAY_URL, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...buildPibRequest([icao], opts), route: [icao],
-                area: { lat: dms.lat, long: dms.long, radiusNm: opts.radiusNm || 30 } }),
+            body: JSON.stringify({ ...buildPibRequest([icao], opts), route: ring,
+                legs, area: { lat: dms.lat, long: dms.long, radiusNm: opts.radiusNm || 30 } }),
         });
         const data = await res.json();
         if (!res.ok || data.error) return { error: data.error || `relais HTTP ${res.status}` };
@@ -278,7 +305,7 @@ function _renderPib(pib, planRoute = [], opts = {}) {
     const wpKeys = Object.keys(wps);
     let wpHtml = '';
     if (wpKeys.length) {
-        wpHtml += `<h4 style="font-size:12px;margin:10px 0 4px;">${t ? 'Points de passage' : 'Waypoints'}</h4>`;
+        wpHtml += `<h4 style="font-size:12px;margin:10px 0 4px;">${local ? (t ? 'Terrains dans la zone (30 NM)' : 'Airfields in the zone (30 NM)') : (t ? 'Points de passage' : 'Waypoints')}</h4>`;
         for (const icao of wpKeys) {
             const dos = wps[icao] || {};
             const vfr2 = {};
@@ -298,7 +325,9 @@ function _renderPib(pib, planRoute = [], opts = {}) {
     }
     const ordre = [];
     if (local) {
-        if (dep) ordre.push(['ADSur', `${groups.ADSur} ${dep}`]);
+        // Ordre pilote 10/09 : dossier des TERRAINS de la zone (l AD observé
+        // en tête d anneau) puis zones/FIR du rayon 30 NM.
+        ordre.push(['__WP__', null]);
         ordre.push(['FIR', groups.FIR], ['Other', groups.Other]);
     } else {
         if (dep) ordre.push(['ADDep', `${groups.ADDep} ${dep}`]);
@@ -348,9 +377,25 @@ async function _search(body, planRoute) {
     body.innerHTML = `<p style="font-size:12px;">${tr ? 'Recherche du dossier NOTAM…' : 'Fetching NOTAM…'}</p>`;
     const local = !!planRoute._local;
     const route = local ? planRoute.icaos : planRoute;
-    const pib = local
-        ? await fetchZonePib(route[0], planRoute._lat, planRoute._lon, { flUpper: planFlUpper() })
-        : await fetchRoutePib(buildPibRequest(route, { flUpper: planFlUpper() }));
+    let pib;
+    if (local) {
+        const { _lat: lat, _lon: lon } = planRoute;
+        let ring = airfieldsWithinNm(lat, lon, 30,
+            getAirportsInBbox(lat - 0.6, lon - 0.75, lat + 0.6, lon + 0.75));
+        if (!ring.includes(route[0])) ring.unshift(route[0]);
+        if (ring.length === 1) {
+            // Aucun voisin à 30 NM (ou base encore en chargement) : un tronçon
+            // vers le terrain CONNU le plus proche suffit — seul le dossier du
+            // DÉPART du tronçon (le centre) nous intéresse.
+            const proches = airfieldsWithinNm(lat, lon, 150,
+                getAirportsInBbox(lat - 2.5, lon - 3, lat + 2.5, lon + 3), 4)
+                .filter(i => i !== route[0]);
+            if (proches.length) ring.push(proches[0]);
+        }
+        pib = await fetchZonePib(route[0], lat, lon, { flUpper: planFlUpper(), ring });
+    } else {
+        pib = await fetchRoutePib(buildPibRequest(route, { flUpper: planFlUpper() }));
+    }
     if (pib.error) {
         body.innerHTML = `<p style="font-size:12px;color:#F87171;">${tr ? 'Erreur : ' : 'Error: '}${pib.error}</p>`;
         return;

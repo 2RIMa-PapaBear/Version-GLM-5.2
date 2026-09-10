@@ -105,3 +105,22 @@ test('collectFlatLocal : zone 30 NM + FIR + Autres, annotés', () => {
     assert.ok(flat[0]._grp.startsWith('Zone 30 NM'));
     assert.ok(flat[1]._grp.startsWith('Autres'));
 });
+
+// Vol local : anneau des terrains à moins de 30 NM (retour pilote 10/09)
+import { airfieldsWithinNm } from '../js/notam.js';
+
+const APS = [
+    { icao: 'LFRV', lat: 47.66, lon: -2.72 },   // centre
+    { icao: 'LFRN', lat: 47.75, lon: -2.07 },   // ~26 NM
+    { icao: 'LFEB', lat: 48.05, lon: -2.63 },   // ~24 NM
+    { icao: 'LFOT', lat: 47.80, lon: -4.42 },   // ~68 NM → hors zone
+];
+
+test('airfieldsWithinNm : centre + voisins 30 NM, hors zone écarté, tri par distance', () => {
+    const ring = airfieldsWithinNm(47.66, -2.72, 30, APS);
+    assert.deepEqual(ring, ['LFRV', 'LFEB', 'LFRN'], 'centre en tête, LFOT écarté');
+    assert.deepEqual(airfieldsWithinNm(47.66, -2.72, 30, []), []);
+    // plafond du nombre de terrains
+    const many = Array.from({ length: 20 }, (_, i) => ({ icao: 'LF' + String(i).padStart(2, '0'), lat: 47.7, lon: -2.7 + i * 0.01 }));
+    assert.ok(airfieldsWithinNm(47.66, -2.72, 30, many, 5).length <= 5);
+});

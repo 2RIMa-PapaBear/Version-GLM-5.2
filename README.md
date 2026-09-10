@@ -67,7 +67,9 @@ dans une PWA installable qui fonctionne aussi hors ligne.
 - **Dossier NOTAM officiel (SOFIA-Briefing, SIA)** : dans le panneau
   « NOTAM (SOFIA) » — en navigation, le dossier suit le **plan** (départ,
   FIR, points de passage vérifiés un à un — même sans NOTAM, arrivée) ; en
-  vol local, une **zone 30 NM autour du terrain** observé. NOTAM filtrés
+  vol local, une **zone 30 NM autour du terrain** observé — avec le dossier
+  de **chaque terrain situé dans ce rayon** (l'AD observé en tête, « aucun
+  NOTAM VFR » affiché quand un terrain n'en a pas). NOTAM filtrés
   **VFR**, plafond **FL du plan**, texte **traduit en français**, groupés
   par familles officielles. **Cases par NOTAM et par catégorie** : seuls
   les cochés sont ajoutés en **annexe du log de nav PDF**. Fraîcheur
@@ -233,7 +235,7 @@ npm run pub -- "message du commit"   # commit + push + attente du déploiement
 - **2026-09-05** — FICHE TERRAIN v3 — feu vert pilote après aperçu PDF (Apercu_fiche_terrain.pdf, 3 terrains LFRN/LFRV/LFPF) : section Terrain en LIGNES LIBELL…
 - **2026-09-05** — FICHE TERRAIN v2 (retours pilote : ordre + lisibilité) : ① FRÉQUENCES en tête (sans sous-titre redondant) ② PISTES (seuils officiels affiché…
 - **2026-09-05** — FICHE TERRAIN COMPLÈTE dans l onglet « Fréquences & info terrain » (demande pilote, 4 arbitrages validés) : ① IDENTITÉ en chips — élévation,…
-<!-- docs:lastSha=ea69ae733d5553cf298a063b1d185c889462fef7 -->
+<!-- docs:lastSha=c4c0c5424a0a838cf556fe3025e28ad8fb0eead0 -->
 
 
 
