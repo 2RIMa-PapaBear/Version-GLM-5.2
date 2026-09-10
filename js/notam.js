@@ -537,8 +537,20 @@ const _poll = setInterval(() => {
     }
 }, 500);
 setTimeout(() => clearInterval(_poll), 120000);
-window.addEventListener('route-changed', _refreshSummary);
-window.addEventListener('navplan-changed', _refreshSummary);
+// Bascule Local ↔ Navigation (retour pilote 10/09) : le dossier affiché
+// appartient à l'ancien mode — on le VIDE (résumé recalculé, sélection
+// annulée) pour ne jamais montrer des NOTAM d'un autre contexte.
+function _resetOnModeChange() {
+    _flat = [];
+    const results = _body?.querySelector('#notam-results');
+    if (results) results.innerHTML = '';
+    _refreshSummary();
+}
+document.addEventListener('clear-route', _resetOnModeChange);
+// Un plan qui CHANGE invalide le dossier affiché (sécurité : ne jamais
+// montrer des NOTAM d'un autre trajet) — remise à zéro, comme en mode.
+window.addEventListener('route-changed', _resetOnModeChange);
+window.addEventListener('navplan-changed', _resetOnModeChange);
 window.__notamApi = { getSelectedNotams };   // hook QA
 }
 
