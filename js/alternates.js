@@ -106,49 +106,60 @@ function _corridorAirports(minLat, minLon, maxLat, maxLon) {
 }
 
 /**
- * SÉLECTION RÉPARTIE le long du trajet (retour pilote 06/09 : ne pas
- * concentrer la sélection près du départ/arrivée). La route est découpée
- * en maxRows tronçons égaux ; 1er passage : le MEILLEUR candidat de
- * CHAQUE tronçon (viabilité puis écart à la route) ; 2ᵉ passage :
- * complément avec les meilleurs restants, tous tronçons confondus.
- * Retour : maxRows terrains au plus, dans l'ordre du vol (position
- * croissante le long de la route). Fonction pure — testée sous Node.
+ * SÉLECTION RÉGULIÈRE le long du trajet (retour pilote 11/09 : « les 8
+ * terrains les plus proches, régulièrement répartis, avec ou sans station
+ * météo »). La route est découpée en maxRows SECTEURS ÉGAUX, chacun
+ * représenté par une ANCRE au centre du secteur. Coût d'un terrain pour une
+ * ancre = hypot(écart à la route, écart le long de la route) — distance
+ * réelle au point idéal du trajet. Affectation gloutonne sur toutes les
+ * paires (ancre, terrain) triées par coût croissant, chaque ancre et chaque
+ * terrain ne servant qu'une fois, et une paire n'étant éligible que sous le
+ * RAYON D'ANCRAGE : une grappe dense ne peut pas coloniser un secteur
+ * lointain, et un secteur sans terrain à portée reste vide (trou réel du
+ * couloir — mer, montagne) au lieu d'être comblé par un terrain agglutiné
+ * ailleurs. La MÉTÉO ne joue AUCUN rôle dans la sélection — elle n'est
+ * qu'une information affichée ensuite (METAR propre, sinon station la plus
+ * proche via _attachMetars).
+ * Fonction pure — testée sous Node.
+ * @returns {Array} maxRows terrains au plus, dans l'ordre du vol.
  */
-export function _pickSpread(rows, maxRows, routeLen) {
-    const catPriority = { VFR: 0, MVFR: 1, IFR: 2, LIFR: 3 };
-    const mieux = (x, y) => (catPriority[x.cat.cat] ?? 9) - (catPriority[y.cat.cat] ?? 9) || x.offsetNm - y.offsetNm;
-    const bin = (r) => Math.min(maxRows - 1, Math.floor((r.atdNm / (routeLen || 1)) * maxRows));
-    const pris = new Set();
-    const choisis = [];
-    for (let b = 0; b < maxRows && choisis.length < maxRows; b++) {
-        let meilleur = null;
-        for (const r of rows) {
-            if (pris.has(r.code) || bin(r) !== b) continue;
-            if (!meilleur || mieux(r, meilleur) < 0) meilleur = r;
-        }
-        if (meilleur) { pris.add(meilleur.code); choisis.push(meilleur); }
+export function _pickEvenSpread(rows, maxRows, routeLen, anchorRadiusNm = 25) {
+    const anchors = Array.from({ length: maxRows }, (_, i) => (i + 0.5) * (routeLen || 1) / maxRows);
+    const pairs = [];
+    rows.forEach((r, ri) => {
+        anchors.forEach((a, ai) => {
+            const cost = Math.hypot(r.offsetNm, r.atdNm - a);
+            if (cost <= anchorRadiusNm) pairs.push({ ai, ri, cost });
+        });
+    });
+    pairs.sort((x, y) => x.cost - y.cost);
+    const usedRow = new Set(), usedAnchor = new Set(), picks = [];
+    for (const p of pairs) {
+        if (usedAnchor.has(p.ai) || usedRow.has(p.ri)) continue;
+        usedAnchor.add(p.ai); usedRow.add(p.ri);
+        picks.push(rows[p.ri]);
+        if (picks.length >= maxRows) break;
     }
-    for (const r of rows) {
-        if (choisis.length >= maxRows) break;
-        if (!pris.has(r.code)) { pris.add(r.code); choisis.push(r); }
-    }
-    choisis.sort((a, b) => a.atdNm - b.atdNm);
-    return choisis;
+    picks.sort((a, b) => a.atdNm - b.atdNm);
+    return picks;
 }
 
 /**
- * Alternates viables le long d'une route.
+ * Alternates répartis régulièrement le long d'une route (retour pilote
+ * 11/09) : les maxRows terrains les plus proches d'autant de points d'ancrage
+ * réguliers, SANS distinction de leur météo — un terrain sans station
+ * émettrice reçoit le METAR de la plus proche (marqué metarFrom/metarDistNm).
  * @param {Array<{icao:string, lat:number, lon:number}>} routePts points de la
  *   route (départ, waypoints éventuels, destination).
  * @param {number} [maxOffsetNm=25] écart max à gauche ou à droite de la route.
- * @param {number} [maxRows=6] nombre de terrains retenus.
+ * @param {number} [maxRows=8] nombre de terrains retenus.
  * @returns {Promise<Array<{code,name,cat,visiM,ceilHund,wind,offsetNm,side,
- *   metarFrom,metarDistNm}>|null>} null si les données ne sont pas
+ *   atdNm,metarFrom,metarDistNm}>|null>} null si les données ne sont pas
  *   récupérables (la section est alors omise du PDF) ; sinon les terrains
- *   triés par viabilité (catégorie puis écart). metarFrom non nul = METAR
- *   repris de la station émettrice la plus proche (à metarDistNm).
+ *   dans l'ordre du vol. metarFrom non nul = METAR repris de la station
+ *   émettrice la plus proche (à metarDistNm).
  */
-export async function getEnRouteAlternates(routePts, maxOffsetNm = 25, maxRows = 6) {
+export async function getEnRouteAlternates(routePts, maxOffsetNm = 25, maxRows = 8) {
     if (!Array.isArray(routePts) || routePts.length < 2) return null;
     try {
         // Bbox englobante de la route + marge couloir (corrigée en longitude
@@ -209,7 +220,14 @@ export async function getEnRouteAlternates(routePts, maxOffsetNm = 25, maxRows =
             }
         }
         if (!kept.length) return null;
-        kept.sort((a, b) => a.offsetNm - b.offsetNm);
+
+        // ---- SÉLECTION AVANT la météo (retour pilote 11/09) : les maxRows
+        // terrains les plus proches d'ancres régulières, quel que soit leur
+        // équipement météo — la météo ne peut plus influencer la répartition.
+        // Rayon d'ancrage = couloir : un secteur sans terrain à portée reste
+        // vide plutôt que de tirer un terrain agglutiné ailleurs.
+        const picked = _pickEvenSpread(kept, maxRows, routeLen, maxOffsetNm);
+        if (!picked.length) return null;
 
         // ---- METAR : pool des stations émettrices du couloir élargi, puis
         // substitution par la plus proche pour les terrains sans METAR.
@@ -225,7 +243,7 @@ export async function getEnRouteAlternates(routePts, maxOffsetNm = 25, maxRows =
             .map(s => ({ code: _validIcao(s.icaoId || s.id), name: s.site || s.name || '', lat: s.lat, lon: s.lon }))
             .filter(s => s.code && s.lat != null && s.lon != null);
 
-        const metarIds = [...new Set([...pool.map(s => s.code), ...kept.slice(0, 24).map(c => c.code).filter(Boolean)])].slice(0, 60);
+        const metarIds = [...new Set([...picked.map(c => c.code).filter(Boolean), ...pool.map(s => s.code)])].slice(0, 60);
         const metarUrl = `https://aviationweather.gov/api/data/metar?ids=${metarIds.join(',')}&format=json`;
         const metars = await fetchAvecRelais(metarUrl, 'json');
         if (!Array.isArray(metars)) return null;
@@ -235,7 +253,7 @@ export async function getEnRouteAlternates(routePts, maxOffsetNm = 25, maxRows =
             if (code) metarByCode[code] = m.rawOb || m.rawMetar || m.rawText || '';
         });
 
-        const rows = _attachMetars(kept.slice(0, 60), metarByCode, pool)
+        const rows = _attachMetars(picked, metarByCode, pool)
             .map(s => {
                 const cat = _categoryFromMetar(s.raw);
                 if (!cat) return null;
@@ -243,10 +261,7 @@ export async function getEnRouteAlternates(routePts, maxOffsetNm = 25, maxRows =
             })
             .filter(Boolean);
         if (!rows.length) return null;
-
-        const catPriority = { VFR: 0, MVFR: 1, IFR: 2, LIFR: 3 };
-        rows.sort((a, b) => (catPriority[a.cat.cat] ?? 9) - (catPriority[b.cat.cat] ?? 9) || a.offsetNm - b.offsetNm);
-        return _pickSpread(rows, maxRows, routeLen);
+        return rows;   // _pickEvenSpread a déjà établi l'ordre du vol
     } catch (e) {
         console.warn('En-route alternates load failed:', e);
         return null;
