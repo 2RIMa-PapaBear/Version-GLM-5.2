@@ -105,6 +105,20 @@ export function handleDestinationChange() {
             clearElevationChart('elevation-profile-container');
         }
     }
+    // Alternates « le long du trajet » (même sélection que le log de nav) :
+    // recalcul au changement de destination — débouncé, la frappe émet cet
+    // événement à chaque caractère (et une destination vidée y repasse le
+    // widget en mode « autour du terrain »).
+    _scheduleRouteAlternates();
+}
+
+let _altTimer = null;
+function _scheduleRouteAlternates() {
+    clearTimeout(_altTimer);
+    _altTimer = setTimeout(() => {
+        const dep = _navDepRef();
+        if (dep && getFlightMode() === 'nav') showAlternates(dep);
+    }, 900);
 }
 
 // Coordonnées d'un terrain (base locale enrichie + mémo), ou null.
@@ -806,6 +820,11 @@ document.addEventListener('DOMContentLoaded', async function () {
         wpInput.value = formatWaypointsField(wps);
         wpInput.dispatchEvent(new Event('change'));
     });
+
+    // Waypoints modifiés : la géométrie du trajet change — les alternates
+    // « le long du trajet » suivent (débounce partagé avec la saisie de la
+    // destination ; navplan-changed est émis après chaque recalcul du plan).
+    window.addEventListener('navplan-changed', _scheduleRouteAlternates);
 
     // Autocomplétion du champ Destination : code OACI ou nom de terrain,
     // résultats priorisés par distance depuis le départ.

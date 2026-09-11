@@ -526,6 +526,10 @@ body.mode-nav .dep-dest-toggle { display: flex; }
     border-radius: var(--radius-sm);
     overflow: hidden;
 }
+/* Mode « le long du trajet » : 6e colonne Écart (± NM et côté). */
+.alternates-grid.route {
+    grid-template-columns: 1.8fr 0.8fr 1fr 1.1fr 1.4fr 1.1fr;
+}
 .alt-header {
     background: var(--inner-bg);
     padding: 8px 10px;
@@ -554,9 +558,15 @@ body.mode-nav .dep-dest-toggle { display: flex; }
     .alternates-grid { grid-template-columns: 1.5fr 1fr 1fr; }
     /* En mobile, on masque les colonnes Plafond (4) et Vent (5).
        Chaque ligne fait 5 cellules (nom, cat, visi, plafond, vent) ;
-       on cible la 4e et la 5e de chaque groupe de 5. */
-    .alternates-grid > *:nth-child(5n+4),
-    .alternates-grid > *:nth-child(5n) { display: none; }
+       on cible la 4e et la 5e de chaque groupe de 5. :not(.route) — la
+       grille « trajet » a 6 cellules par ligne, ses propres règles suivent. */
+    .alternates-grid:not(.route) > *:nth-child(5n+4),
+    .alternates-grid:not(.route) > *:nth-child(5n) { display: none; }
+    /* Grille « trajet » : lignes de 6 (l'Écart en 6e) — on garde
+       nom/cat/visi/écart, on masque Plafond (4) et Vent (5). */
+    .alternates-grid.route { grid-template-columns: 1.5fr 1fr 1fr 1fr; }
+    .alternates-grid.route > *:nth-child(6n+4),
+    .alternates-grid.route > *:nth-child(6n+5) { display: none; }
 }
 
 /* ================================================================
