@@ -215,8 +215,15 @@ async function pibNotam(request) {
         const dossiers = await Promise.all(legs.map(async ([a, b]) => {
             if (!/^[A-Z][A-Z0-9]{3}$/.test(a) || !/^[A-Z][A-Z0-9]{3}$/.test(b)) return [a, null];
             try {
-                const lp = new URLSearchParams(body);
-                lp.delete('route[]');
+                // Corps tronçon PROPRE : opération narrow-route SANS les
+                // paramètres zone (lat/long/radius) — sinon SOFIA répond une
+                // zone sans dossier AD (bug « NOTAM AD absents en vol local »).
+                const lp = new URLSearchParams();
+                for (const [k, v] of body.entries()) {
+                    if (k === 'route[]' || k === 'lat' || k === 'long' || k === 'radius') continue;
+                    if (k === ':operation') { lp.set(k, 'postNarrowRoutePibRequest'); continue; }
+                    lp.append(k, v);
+                }
                 lp.append('route[]', a); lp.append('route[]', b);
                 const res = await fetch(`${SOFIA}/sofia`, {
                     method: 'POST',

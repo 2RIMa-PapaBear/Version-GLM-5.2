@@ -94,7 +94,12 @@ const server = http.createServer(async (req, res) => {
             const dossiers = await Promise.all(legs.map(async ([a, b]) => {
                 if (!OACI.test(a) || !OACI.test(b)) return [a, null];
                 try {
-                    const lb = baseBody({ ...p, route: [a, b] });
+                    // Corps tronçon PROPRE : narrow-route sans paramètres zone.
+                const lb = new URLSearchParams();
+                for (const [k, v] of baseBody({ ...p, route: [a, b] }).entries()) {
+                    if (k === 'lat' || k === 'long' || k === 'radius') continue;
+                    lb.append(k, v);
+                }
                     const leg = await sofiaPib(lb);
                     const dep = {};
                     for (const [cat, list] of Object.entries(leg.listnotams?.ADDep || {}))
