@@ -46,6 +46,9 @@ dans une PWA installable qui fonctionne aussi hors ligne.
   alphanumérique, ex. CNU8 ou K6RE), waypoints intelligents ou libres,
   alternates, compagnie du trajet, autocomplétion. Le champ « Waypoints »
   affiche les **vrais noms** des repères (VOR, NDB, points de repère VFR).
+  Panneau « Alternates » : en navigation, les **8 terrains régulièrement
+  espacés le long du trajet** (même sélection que le log de nav) ; en vol
+  local, les terrains viables autour du terrain observé.
 - **Log de nav PDF multi-pages** : au-delà de 9 tronçons, une page « VFR
   Flight Log (suite) » prolonge le log dans la même trame (lignes vierges +
   checks en bas de page) ; le tableau des calculs remplit la page avant
@@ -242,7 +245,7 @@ npm run pub -- "message du commit"   # commit + push + attente du déploiement
 - **2026-09-05** — FICHE TERRAIN v3 — feu vert pilote après aperçu PDF (Apercu_fiche_terrain.pdf, 3 terrains LFRN/LFRV/LFPF) : section Terrain en LIGNES LIBELL…
 - **2026-09-05** — FICHE TERRAIN v2 (retours pilote : ordre + lisibilité) : ① FRÉQUENCES en tête (sans sous-titre redondant) ② PISTES (seuils officiels affiché…
 - **2026-09-05** — FICHE TERRAIN COMPLÈTE dans l onglet « Fréquences & info terrain » (demande pilote, 4 arbitrages validés) : ① IDENTITÉ en chips — élévation,…
-<!-- docs:lastSha=95007875712ac35e9f66559264e0332888ca2db3 -->
+<!-- docs:lastSha=0725eb5264a1dc3d2a170ece878257c0fb63c47a -->
 
 
 

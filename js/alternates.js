@@ -277,6 +277,30 @@ export async function showAlternates(icao) {
     const container = document.getElementById('alternates-container');
     if (!container) return;
 
+    const depIcao = String(icao || '').toUpperCase();
+
+    // Mode Navigation avec destination (retour pilote 11/09) : le panneau
+    // affiche les alternates RÉGULIÈREMENT RÉPARTIS LE LONG DU TRAJET — le
+    // MÊME algorithme que le log de nav PDF (8 terrains, météo sans rôle,
+    // substitution « * »). Classe .mode-nav posée par flight-mode.js (pas
+    // d'import ici : flight-mode importe déjà ce module — cycle évité).
+    const toVal = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
+    if (document.body.classList.contains('mode-nav')
+        && /^[A-Z][A-Z0-9]{3}$/.test(toVal) && toVal !== depIcao) {
+        const pts = _routePtsFromUI(depIcao, toVal);
+        if (pts) {
+            const token = ++_altSeq;
+            const rows = await getEnRouteAlternates(pts, 25, 8);
+            if (token !== _altSeq) return;   // saisie plus récente en cours
+            if (rows && rows.length) {
+                _render(rows, depIcao, { mode: 'route' });
+                container.style.display = 'block';
+                return;
+            }
+        }
+        // Trajet non exploitable (coords manquantes, réseau…) : widget local.
+    }
+
     const apt = getAirportByICAO(icao);
     const memo = memoGet(icao);
     const lat = memo?.lat ?? apt?.lat ?? null;
@@ -331,7 +355,7 @@ export async function showAlternates(icao) {
         const catPriority = { VFR: 0, MVFR: 1, IFR: 2, LIFR: 3 };
         rows.sort((a, b) => (catPriority[a.cat.cat] ?? 9) - (catPriority[b.cat.cat] ?? 9) || a.dist - b.dist);
 
-        _render(rows.slice(0, 6), icao);
+        _render(rows.slice(0, 6), icao, { mode: 'local' });
         container.style.display = 'block';
 
     } catch (e) {
@@ -340,24 +364,57 @@ export async function showAlternates(icao) {
     }
 }
 
-function _render(rows, destIcao) {
+let _altSeq = 0;   // invalide un calcul de route lancé pour une saisie dépassée
+
+// Séquence de la navigation courante (départ → waypoints → destination),
+// coordonnées résolues par la base locale puis le cache mémoire. La séquence
+// state.route n'est reprise que si elle correspond au départ/destination
+// SAISIS (un plan pas encore recalculé ne doit pas imposer sa géométrie).
+function _routePtsFromUI(depIcao, toVal) {
+    let seq = [depIcao, toVal];
+    if (Array.isArray(state.route) && state.route.length >= 2) {
+        const first = String(state.route[0] || '').toUpperCase();
+        const last = String(state.route[state.route.length - 1] || '').toUpperCase();
+        if (first === depIcao && last === toVal) {
+            seq = state.route.map(c => String(c || '').toUpperCase());
+        }
+    }
+    const pts = [];
+    for (const code of seq) {
+        const apt = getAirportByICAO(code);
+        const memo = memoGet(code);
+        const lat = memo?.lat ?? apt?.lat ?? null, lon = memo?.lon ?? apt?.lon ?? null;
+        if (lat == null || lon == null) continue;   // p.ex. ZZxx non résolu
+        pts.push({ icao: code, lat, lon });
+    }
+    return pts.length >= 2 ? pts : null;
+}
+
+function _render(rows, depIcao, ctx = { mode: 'local' }) {
     const isFr = state.lang === 'fr';
     const list = document.getElementById('alternates-list');
     if (!list) return;
 
     const catColors = CAT_COLORS;
+    const isRoute = ctx.mode === 'route';
 
-    const lblCat = isFr ? 'Cat.' : 'Cat.';
-    const lblVisi = isFr ? 'Visi' : 'Visi';
-    const lblCeil = isFr ? 'Plafond' : 'Ceiling';
-    const lblWind = isFr ? 'Vent' : 'Wind';
+    // Titre du panneau : le suivi du mode doit survivre aux changements de
+    // langue (setLanguage réécrit #lbl-alternates, puis showAlternates est
+    // rappelé et repose le bon titre).
+    const titleEl = document.getElementById('lbl-alternates');
+    if (titleEl) {
+        titleEl.textContent = isRoute
+            ? (isFr ? 'Alternates — répartis le long du trajet (± 25 NM)' : 'Alternates — evenly spaced along the route (± 25 NM)')
+            : (I18N[state.lang]?.alternatesTitle || 'Alternates');
+    }
 
-    let html = `<div class="alternates-grid">`;
+    let html = `<div class="alternates-grid${isRoute ? ' route' : ''}">`;
     html += `<div class="alt-header">${isFr ? 'Terrain' : 'Airfield'}</div>`;
-    html += `<div class="alt-header">${lblCat}</div>`;
-    html += `<div class="alt-header">${lblVisi}</div>`;
-    html += `<div class="alt-header">${lblCeil}</div>`;
-    html += `<div class="alt-header">${lblWind}</div>`;
+    html += `<div class="alt-header">${isFr ? 'Cat.' : 'Cat.'}</div>`;
+    html += `<div class="alt-header">${isFr ? 'Visi' : 'Visi'}</div>`;
+    html += `<div class="alt-header">${isFr ? 'Plafond' : 'Ceiling'}</div>`;
+    html += `<div class="alt-header">${isFr ? 'Vent' : 'Wind'}</div>`;
+    if (isRoute) html += `<div class="alt-header">${isFr ? 'Écart' : 'Off rte'}</div>`;
 
     rows.forEach(r => {
         const color = catColors[r.cat.cat];
@@ -366,27 +423,36 @@ function _render(rows, destIcao) {
         const wind = r.cat.wind;
 
         const visiStr = visiM >= 10000 ? '>10km' : `${visiM}m`;
-        const ceilStr = ceilFt !== null ? `${ceilFt}ft` : (isFr ? '∞' : '∞');
+        const ceilStr = ceilFt !== null ? `${ceilFt}ft` : '∞';
         const windStr = wind ? `${wind.dir === null ? 'VRB' : String(wind.dir).padStart(3, '0') + '°'} ${wind.speed}${wind.gust ? 'G' + wind.gust : ''}` : '—';
+        const star = r.metarFrom ? '*' : '';
+        const nameTitle = r.metarFrom
+            ? `${r.name} — ${isFr ? 'METAR de' : 'METAR from'} ${r.metarFrom} (${r.metarDistNm} NM)`
+            : r.name;
 
         html += `
-            <div class="alt-cell alt-cell-name" title="${escapeHtml(r.name)}" data-icao="${escapeHtml(r.code)}">
-                <span class="alt-code">${escapeHtml(r.code)}</span>
+            <div class="alt-cell alt-cell-name" title="${escapeHtml(nameTitle)}" data-icao="${escapeHtml(r.code)}">
+                <span class="alt-code">${escapeHtml(r.code)}${star}</span>
                 <span class="alt-name">${escapeHtml(r.name)}</span>
             </div>
             <div class="alt-cell" style="color:${color}; font-weight:800;">${r.cat.cat}</div>
             <div class="alt-cell" style="${visiM < 5000 ? 'color:#FCA5A5;' : ''}">${visiStr}</div>
             <div class="alt-cell" style="${ceilFt !== null && ceilFt < 1500 ? 'color:#FCA5A5;' : ''}">${ceilStr}</div>
             <div class="alt-cell">${windStr}</div>
+            ${isRoute ? `<div class="alt-cell">${r.offsetNm} NM ${r.side >= 0 ? (isFr ? 'D' : 'R') : (isFr ? 'G' : 'L')}</div>` : ''}
         `;
     });
     html += `</div>`;
 
     html += `<div style="font-size:11px; color:var(--text-muted); margin-top:10px; line-height:1.5;">
         <i data-lucide="info" style="width:13px;height:13px;vertical-align:middle;"></i>
-        ${isFr
-            ? `Alternates viables autour de <strong>${escapeHtml(destIcao)}</strong>, triés par viabilité (catégorie de vol puis proximité). Cliquez un terrain pour le charger.`
-            : `Viable alternates around <strong>${escapeHtml(destIcao)}</strong>, sorted by flight category then proximity. Click a field to load it.`}
+        ${isRoute
+            ? (isFr
+                ? `8 terrains régulièrement espacés le long du trajet, dans l'ordre du vol. « * » : METAR de la station la plus proche. Cliquez un terrain pour le charger.`
+                : `8 airfields evenly spaced along the route, in flight order. "*": METAR from the nearest reporting station. Click a field to load it.`)
+            : (isFr
+                ? `Alternates viables autour de <strong>${escapeHtml(depIcao)}</strong>, triés par viabilité (catégorie de vol puis proximité). Cliquez un terrain pour le charger.`
+                : `Viable alternates around <strong>${escapeHtml(depIcao)}</strong>, sorted by flight category then proximity. Click a field to load it.`)}
     </div>`;
 
     list.innerHTML = html;
