@@ -3,6 +3,7 @@ import { getAirportByICAO, getAirportsInBbox, enrichAirport } from './ui-module.
 import { parseWaypointsField, formatWaypointsField, registerFreeWpResolver, _wpDisplayName } from './flight-planner-ui.js';
 import { parseVisiToMeters, getCeiling } from './core.js';
 import { showRouteWeather, resetRouteFit } from './route-weather.js';
+import { greatCircleDistanceNm } from './flight-planner.js';
 import { createPrecipController } from './radar-layer.js';
 import { createAirspaceController } from './airspaces.js';
 import { createRadioPointsController } from './radio-points-layer.js';
@@ -18,6 +19,7 @@ let _currentBaseLayer = null;
 let _airportMarkers = [];
 let _neighborMarkers = [];
 let _metarByIcao = {};   // METARs bruts des voisins (déjà fetchés pour la catégorie VFR).
+let _stationPosByIcao = {};   // Position officielle des stations émettrices vues (substitution des terrains sans METAR).
 let _displayedNeighborsIcao = new Set();  // Anti-doublon : voisins déjà affichés.
 let _currentIcao = null;
 
@@ -887,6 +889,18 @@ async function _loadNeighborCategories(minLat, minLon, maxLat, maxLon) {
         // Conserve les METARs bruts pour le popup "clic sur un aéroport"
         // (fusion : les zones chargées au fil des déplacements s'accumulent).
         _metarByIcao = { ..._metarByIcao, ...metarByCode };
+        _stationPosByIcao = { ..._stationPosByIcao, ...stationPos };
+
+        // Stations émettrices connues (METAR + position) : la météo de
+        // SUBSTITUTION des terrains sans émission propre (retour pilote
+        // 11/09) — même règle que les alternates et la recherche, la
+        // station la plus proche qui émet.
+        const emitters = Object.keys(_metarByIcao)
+            .map(code => {
+                const p = _stationPosByIcao[code] || getAirportByICAO(code);
+                return (p && Number.isFinite(p.lat) && Number.isFinite(p.lon)) ? { code, lat: p.lat, lon: p.lon } : null;
+            })
+            .filter(Boolean);
 
         // 3. Affiche les aérodromes de la zone NON ENCORE AFFICHÉS (accumulation :
         // se déplacer sur la carte ajoute les nouveaux terrains sans effacer les anciens).
@@ -904,7 +918,22 @@ async function _loadNeighborCategories(minLat, minLon, maxLat, maxLon) {
                     return;
                 }
             }
-            // Pas de METAR ou non catégorisable → marker gris.
+            // Terrain sans émission propre : pastille et étiquette IDENTIQUES
+            // aux terrains équipés, sur le METAR de la station la plus proche
+            // (substitution marquée « * » + provenance dans le popup).
+            if (emitters.length > 0) {
+                let best = null;
+                for (const s of emitters) {
+                    const d = greatCircleDistanceNm(pos.lat, pos.lon, s.lat, s.lon);
+                    if (!best || d < best.d) best = { s, d };
+                }
+                const subRaw = _metarByIcao[best.s.code];
+                const cat = _categoryFromMetar(subRaw);
+                _addAirportMarker(pos.lat, pos.lon, a.icao, a.name, cat, false, subRaw, { from: best.s.code, distNm: Math.round(best.d) });
+                _displayedNeighborsIcao.add(a.icao);
+                return;
+            }
+            // Aucune station émettrice connue dans la zone → marker gris.
             _addAirportMarker(pos.lat, pos.lon, a.icao, a.name, null, false, raw);
             _displayedNeighborsIcao.add(a.icao);
         });
@@ -1002,10 +1031,13 @@ function _decodeMetarForPopup(raw) {
     return d;
 }
 
-function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null) {
+function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null, sub = null) {
     if (!_map) return;
 
-    const color = isCurrent ? '#FBBF24' : (cat ? CAT_PIN_COLORS[cat.cat] || '#94A3B8' : '#94A3B8');
+    // Pastille/étiquette : couleur par le METAR PROPRE uniquement — un terrain
+    // substitué reste GRIS « Sans METAR » comme avant (retour pilote 11/09) ;
+    // seule sa POPUP montre la météo de la station la plus proche.
+    const color = isCurrent ? '#FBBF24' : (cat && !sub ? CAT_PIN_COLORS[cat.cat] || '#94A3B8' : '#94A3B8');
     const radius = isCurrent ? 10 : 7;
 
     const marker = L.circleMarker([lat, lon], {
@@ -1027,7 +1059,7 @@ function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null
 
     const label = isCurrent
         ? `<strong>${escapeHtml(icao)}</strong>${name ? ' — ' + escapeHtml(name) : ''}<br><em>${state.lang === 'fr' ? 'Terrain courant' : 'Current airport'}</em>`
-        : cat
+        : (cat && !sub)
             ? `<strong>${escapeHtml(icao)}</strong>${name ? ' — ' + escapeHtml(name) : ''}<br><span style="color:${color};font-weight:700;">${cat.cat}</span>`
             : `<strong>${escapeHtml(icao)}</strong>${name ? ' — ' + escapeHtml(name) : ''}<br><span style="color:#94A3B8;font-weight:700;">${state.lang === 'fr' ? 'Sans METAR' : 'No METAR'}</span>`;
 
@@ -1060,16 +1092,19 @@ function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null
         if (rawMetar) {
             const dec = _decodeMetarForPopup(rawMetar);
             const catColor = cat ? (CAT_PIN_COLORS[cat.cat] || '#94A3B8') : '#94A3B8';
+            // Substitution : la provenance du METAR est la 1ʳᵉ ligne du détail —
+            // jamais de doute sur le terrain réellement observé.
             const rows = dec ? [
+                ...(sub ? [[isFr ? 'Météo de' : 'Weather from', `${sub.from} · ${sub.distNm} NM`]] : []),
                 [isFr ? 'Vent' : 'Wind', dec.wind],
                 [isFr ? 'Visi' : 'Vis', dec.visi],
                 [isFr ? 'Plafond' : 'Ceiling', dec.ceiling],
                 ['T/Td', (dec.temp || dec.dew) ? `${dec.temp ?? '—'} / ${dec.dew ?? '—'}` : null],
                 ['QNH', dec.qnh],
-            ] : [];
+            ] : (sub ? [[isFr ? 'Météo de' : 'Weather from', `${sub.from} · ${sub.distNm} NM`]] : []);
             hit.bindPopup(`
                 <div class="mp-inner">
-                    <div class="mp-title"><strong>${escapeHtml(icao)}</strong>${name ? ' · ' + escapeHtml(name) : ''}</div>
+                    <div class="mp-title"><strong>${escapeHtml(icao)}${sub ? '*' : ''}</strong>${name ? ' · ' + escapeHtml(name) : ''}</div>
                     ${cat ? `<div class="mp-cat" style="background:${catColor};">${cat.cat}</div>` : ''}
                     <div class="mp-rows">
                         ${rows.map(([k, v]) => v ? `<div class="mp-row"><span class="mp-k">${k}</span><span class="mp-v">${escapeHtml(v)}</span></div>` : '').join('')}
@@ -1124,6 +1159,7 @@ function _clearNeighborMarkers() {
     _neighborMarkers = [];
     _displayedNeighborsIcao.clear();
     _metarByIcao = {};
+    _stationPosByIcao = {};
 }
 
 function _destinationPoint(lat, lon, bearing, distM) {
