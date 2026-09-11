@@ -393,7 +393,7 @@ async function _generateNavLogPdfInto(tab) {
     const routePts = (isMulti && plan.waypoints?.length)
         ? plan.waypoints.map(w => ({ icao: w.icao, lat: w.lat, lon: w.lon }))
         : [plan.from, plan.to].map(a => ({ icao: a.icao, lat: a.lat, lon: a.lon }));
-    const altRows = await getEnRouteAlternates(routePts, 25, 6).catch(() => null);
+    const altRows = await getEnRouteAlternates(routePts, 25, 8).catch(() => null);
     let alternates = null;
     if (altRows?.length) {
         alternates = {

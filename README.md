@@ -119,6 +119,9 @@ dans une PWA installable qui fonctionne aussi hors ligne.
   le plan de nav en mode navigation.
 - **Log de nav PDF** (3–4 pages) : waypoints, alternates, météo, terrain,
   performances et centrage — généré dans le navigateur, sans serveur.
+  Alternates : **8 terrains régulièrement espacés le long du trajet**
+  (± 25 NM de la route, le plus proche dans chaque secteur, avec ou sans
+  station météo propre — « * » = METAR de la station la plus proche).
 
 ### Général
 - **PWA installable** sur l'adresse HTTPS de Free :
@@ -239,7 +242,7 @@ npm run pub -- "message du commit"   # commit + push + attente du déploiement
 - **2026-09-05** — FICHE TERRAIN v3 — feu vert pilote après aperçu PDF (Apercu_fiche_terrain.pdf, 3 terrains LFRN/LFRV/LFPF) : section Terrain en LIGNES LIBELL…
 - **2026-09-05** — FICHE TERRAIN v2 (retours pilote : ordre + lisibilité) : ① FRÉQUENCES en tête (sans sous-titre redondant) ② PISTES (seuils officiels affiché…
 - **2026-09-05** — FICHE TERRAIN COMPLÈTE dans l onglet « Fréquences & info terrain » (demande pilote, 4 arbitrages validés) : ① IDENTITÉ en chips — élévation,…
-<!-- docs:lastSha=bf5865cd33e50469c315b70b31ccc90e539748f4 -->
+<!-- docs:lastSha=95007875712ac35e9f66559264e0332888ca2db3 -->
 
 
 

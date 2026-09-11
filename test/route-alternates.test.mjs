@@ -4,7 +4,7 @@
 import test from 'node:test';
 import { ok, equal } from 'node:assert';
 import assert from 'node:assert/strict';
-import { _distToSegmentNm, _attachMetars, _pickSpread } from '../js/alternates.js';
+import { _distToSegmentNm, _attachMetars, _pickEvenSpread } from '../js/alternates.js';
 import { _wetFromTokens } from '../js/takeoff-performance.js';
 
 // ---------------------------------------------------------------- géométrie
@@ -114,43 +114,81 @@ test('NOSIG / CAVOK / nuages ne déclenchent rien', () => {
 });
 
 
-// ---- Répartition le long du trajet (retour pilote 06/09) ----------------------
-test('_pickSpread : la sélection couvre le MILIEU, pas seulement les extrémités', () => {
-    const VFR = { cat: { cat: 'VFR' } }, MVFR = { cat: { cat: 'MVFR' } };
-    // Route de 240 NM. Grappe dense de VFR sur le 1er et le dernier tronçon
-    // (8 terrains), milieu plus pauvre (3 MVFR sur les tronçons 3-4).
+// ---- Répartition régulière le long du trajet (retour pilote 11/09 :
+// 8 terrains les plus proches, espacés régulièrement, météo sans rôle) --------
+test('_pickEvenSpread : la sélection couvre le MILIEU, pas seulement les extrémités', () => {
+    // Route de 240 NM → 8 ancres aux centres de secteur : 15, 45, …, 225 NM.
+    // Grappe dense de VFR sur les extrémités, milieu plus pauvre (3 MVFR).
     const rows = [
-        { code: 'AAAA', ...VFR, offsetNm: 3, atdNm: 5 },
-        { code: 'AAAB', ...VFR, offsetNm: 4, atdNm: 10 },
-        { code: 'AAAC', ...VFR, offsetNm: 5, atdNm: 15 },
-        { code: 'AAAD', ...VFR, offsetNm: 6, atdNm: 20 },
-        { code: 'ZZZA', ...VFR, offsetNm: 3, atdNm: 220 },
-        { code: 'ZZZB', ...VFR, offsetNm: 4, atdNm: 228 },
-        { code: 'ZZZC', ...VFR, offsetNm: 5, atdNm: 234 },
-        { code: 'ZZZD', ...VFR, offsetNm: 6, atdNm: 238 },
-        { code: 'MMMM', ...MVFR, offsetNm: 8, atdNm: 110 },
-        { code: 'MMMN', ...MVFR, offsetNm: 9, atdNm: 130 },
-        { code: 'MMMS', ...MVFR, offsetNm: 10, atdNm: 150 },
+        { code: 'AAAA', offsetNm: 3, atdNm: 5 },
+        { code: 'AAAB', offsetNm: 4, atdNm: 10 },
+        { code: 'AAAC', offsetNm: 5, atdNm: 15 },
+        { code: 'AAAD', offsetNm: 6, atdNm: 20 },
+        { code: 'ZZZA', offsetNm: 3, atdNm: 220 },
+        { code: 'ZZZB', offsetNm: 4, atdNm: 228 },
+        { code: 'ZZZC', offsetNm: 5, atdNm: 234 },
+        { code: 'ZZZD', offsetNm: 6, atdNm: 238 },
+        { code: 'MMMM', offsetNm: 8, atdNm: 110 },
+        { code: 'MMMN', offsetNm: 9, atdNm: 130 },
+        { code: 'MMMS', offsetNm: 10, atdNm: 150 },
     ];
-    const picks = _pickSpread(rows, 6, 240);
-    // Au moins un alternate du tiers CENTRAL (80-160 NM) est retenu…
-    ok(picks.some(r => r.atdNm >= 80 && r.atdNm <= 160), 'le milieu de route est couvert');
+    const picks = _pickEvenSpread(rows, 8, 240);
+    // Le tiers CENTRAL (80-160 NM) est couvert malgré la grappe VFR des extrémités…
+    ok(picks.filter(r => r.atdNm >= 80 && r.atdNm <= 160).length >= 2, 'le milieu de route est couvert');
     // …et le résultat est dans l'ordre du vol.
     const pos = picks.map(r => r.atdNm);
     ok(pos.every((v, i) => i === 0 || v > pos[i - 1]), 'ordre du vol (positions croissantes)');
-    ok(picks.length <= 6, 'max 6');
+    ok(picks.length <= 8, 'max 8');
 });
 
-test('_pickSpread : tronçon sans candidat — le complément prend les meilleurs restants', () => {
-    const VFR = { cat: { cat: 'VFR' } };
+test('_pickEvenSpread : une grappe dense ne colonise pas plusieurs secteurs', () => {
+    // 6 terrains quasi confondus près du départ + 1 au milieu + 1 vers la fin.
+    // L'ancien complément « tous tronçons confondus » agglutinait la grappe ;
+    // les ancres ne prennent qu'un terrain chacune → 2 au plus pour la grappe.
     const rows = [
-        { code: 'AAAA', ...VFR, offsetNm: 2, atdNm: 10 },
-        { code: 'BBBB', ...VFR, offsetNm: 3, atdNm: 70 },
-        { code: 'CCCC', ...VFR, offsetNm: 4, atdNm: 190 },
-        { code: 'DDDD', ...VFR, offsetNm: 5, atdNm: 12 },
-        { code: 'EEEE', ...VFR, offsetNm: 6, atdNm: 72 },
+        { code: 'GR01', offsetNm: 2, atdNm: 10 },
+        { code: 'GR02', offsetNm: 3, atdNm: 11 },
+        { code: 'GR03', offsetNm: 4, atdNm: 12 },
+        { code: 'GR04', offsetNm: 5, atdNm: 13 },
+        { code: 'GR05', offsetNm: 6, atdNm: 14 },
+        { code: 'GR06', offsetNm: 7, atdNm: 15 },
+        { code: 'MID1', offsetNm: 4, atdNm: 130 },
+        { code: 'END1', offsetNm: 5, atdNm: 200 },
     ];
-    const picks = _pickSpread(rows, 6, 200);
-    equal(picks.length, 5, 'tout est retenu quand il y a de la place');
-    ok(picks.some(r => r.code === 'DDDD') && picks.some(r => r.code === 'AAAA'), 'complément après le 1er passage');
+    const picks = _pickEvenSpread(rows, 8, 200);
+    equal(picks.filter(r => r.code.startsWith('GR')).length, 2, 'la grappe fournit 2 alternates au plus (secteurs 1-2)');
+    ok(picks.some(r => r.code === 'MID1') && picks.some(r => r.code === 'END1'), 'milieu et fin couverts');
+});
+
+test('_pickEvenSpread : la météo ne joue AUCUN rôle — le plus proche de l’ancre gagne', () => {
+    // Dans le même secteur : un IFR à 2 NM de la route et un VFR à 10 NM.
+    // L'ancien tri par viabilité préférait le VFR ; la sélection pilote veut
+    // le terrain le PLUS PROCHE, sa catégorie n'est qu'une info affichée.
+    const rows = [
+        { code: 'IFR1', cat: { cat: 'IFR' }, offsetNm: 2, atdNm: 120 },
+        { code: 'VFR1', cat: { cat: 'VFR' }, offsetNm: 10, atdNm: 125 },
+    ];
+    const picks = _pickEvenSpread(rows, 8, 200);
+    ok(picks.some(r => r.code === 'IFR1'), 'le terrain le plus proche est retenu même IFR');
+});
+
+test('_pickEvenSpread : moins de candidats que de secteurs → tout est retenu', () => {
+    const rows = [
+        { code: 'AAAA', offsetNm: 2, atdNm: 10 },
+        { code: 'BBBB', offsetNm: 3, atdNm: 70 },
+        { code: 'CCCC', offsetNm: 4, atdNm: 130 },
+        { code: 'DDDD', offsetNm: 5, atdNm: 190 },
+    ];
+    const picks = _pickEvenSpread(rows, 8, 200);
+    equal(picks.length, 4, 'chaque terrain prend une ancre, aucun rejet');
+});
+
+test('_pickEvenSpread : alternates équidistants sur trajet équilibré', () => {
+    // Un terrain tous les 25 NM sur 200 NM : les 8 plus proches des 8 ancres
+    // (12.5, 37.5, …, 187.5) sont exactement un par secteur.
+    const rows = Array.from({ length: 8 }, (_, i) => ({ code: `T${i}`, offsetNm: 5, atdNm: 12.5 + i * 25 }));
+    const picks = _pickEvenSpread(rows, 8, 200);
+    equal(picks.length, 8, '8 terrains retenus');
+    const gaps = picks.slice(1).map((r, i) => r.atdNm - picks[i].atdNm);
+    ok(gaps.every(g => Math.abs(g - 25) < 1), `espacement régulier (~25 NM) : ${gaps.join(',')}`);
 });

@@ -352,65 +352,99 @@
       "rows": [
         {
           "code": "LFPT",
-          "name": "Pontoise-Cormeilles",
+          "name": "Cergy Pontoise",
           "cat": "VFR",
           "visiStr": ">10 km",
           "ceilStr": "—",
-          "windStr": "310° 8 kt",
+          "windStr": "270° 08kt",
           "offsetNm": 14,
-          "side": "D"
+          "side": "D",
+          "metarFrom": null,
+          "metarDistNm": null
         },
         {
           "code": "LFPK",
-          "name": "Coulommiers-Voisins",
+          "name": "Saint Quentin",
           "cat": "VFR",
           "visiStr": ">10 km",
           "ceilStr": "—",
-          "windStr": "290° 6 kt",
+          "windStr": "280° 10kt",
           "offsetNm": 21,
           "side": "D",
-          "metarFrom": "LFPB",
-          "metarDistNm": 21
+          "metarFrom": null,
+          "metarDistNm": null
         },
         {
           "code": "LFPO",
-          "name": "Paris-Orly",
-          "cat": "VFR",
-          "visiStr": ">10 km",
-          "ceilStr": "—",
-          "windStr": "320° 10 kt",
+          "name": "Paris Orly",
+          "cat": "MVFR",
+          "visiStr": "8000 m",
+          "ceilStr": "3000 ft",
+          "windStr": "290° 12kt",
           "offsetNm": 24,
-          "side": "G"
+          "side": "G",
+          "metarFrom": null,
+          "metarDistNm": null
         },
         {
           "code": "LFOJ",
-          "name": "Ancenis",
-          "cat": "VFR",
-          "visiStr": "9999 m",
-          "ceilStr": "3500 ft",
-          "windStr": "280° 9 kt",
-          "offsetNm": 27,
-          "side": "G"
-        },
-        {
-          "code": "LFPX",
-          "name": "Chavenay-Villepreux",
-          "cat": "MVFR",
-          "visiStr": "8000 m",
-          "ceilStr": "2500 ft",
-          "windStr": "VRB 4 kt",
-          "offsetNm": 9,
-          "side": "D"
-        },
-        {
-          "code": "LFAR",
-          "name": "Mayenne",
+          "name": "Auxerre Branches",
           "cat": "VFR",
           "visiStr": ">10 km",
           "ceilStr": "—",
-          "windStr": "270° 7 kt",
-          "offsetNm": 38,
-          "side": "G"
+          "windStr": "300° 09kt",
+          "offsetNm": 18,
+          "side": "G",
+          "metarFrom": null,
+          "metarDistNm": null
+        },
+        {
+          "code": "LFPX",
+          "name": "Chalon Champforgeuil",
+          "cat": "MVFR",
+          "visiStr": "9999 m",
+          "ceilStr": "2500 ft",
+          "windStr": "310° 11kt",
+          "offsetNm": 9,
+          "side": "D",
+          "metarFrom": null,
+          "metarDistNm": null
+        },
+        {
+          "code": "LFAR",
+          "name": "Varennes Vauzelles",
+          "cat": "VFR",
+          "visiStr": ">10 km",
+          "ceilStr": "—",
+          "windStr": "320° 08kt",
+          "offsetNm": 16,
+          "side": "G",
+          "metarFrom": null,
+          "metarDistNm": null
+        },
+        {
+          "code": "LFLY",
+          "name": "Villefranche Tarare",
+          "cat": "VFR",
+          "visiStr": ">10 km",
+          "ceilStr": "—",
+          "windStr": "330° 10kt",
+          "offsetNm": 12,
+          "side": "D",
+          "metarFrom": "LFLI",
+          "metarDistNm": 14
+        },
+        {
+          "code": "LFHS",
+          "name": "Ambérieu",
+          "cat": "IFR",
+          "visiStr": "4800 m",
+          "ceilStr": "1200 ft",
+          "windStr": "340° 14kt",
+          "offsetNm": 20,
+          "side": "G",
+          "metarFrom": "LFLL",
+          "metarDistNm": 22
         }
       ]
     }

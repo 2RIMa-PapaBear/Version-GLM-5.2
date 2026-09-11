@@ -933,8 +933,8 @@ function _drawPerfPage(doc, p) {
 
         doc.setFont('helvetica', 'italic'); doc.setFontSize(7); _setInk(doc, MUTED);
         const note = fr
-            ? `Terrains de dérivation à moins de ${al.maxOffsetNm} NM de la route prévue, triés par catégorie de vol puis écart. METAR capturés à la génération du PDF.`
-            : `Diversion fields within ${al.maxOffsetNm} NM of the planned route, sorted by flight category then offset. METARs captured when the PDF was generated.`;
+            ? `Terrains de dérivation à moins de ${al.maxOffsetNm} NM de la route, régulièrement espacés le long du trajet, dans l'ordre du vol. « * » : METAR de la station la plus proche.`
+            : `Diversion fields within ${al.maxOffsetNm} NM of the route, evenly spaced along the route, in flight order. "*": METAR from the nearest reporting station.`;
         _wrap(doc, note, W - 4).slice(0, 2).forEach((l, i) => doc.text(l, L + 1.5, y + 7 + i * 8.5));
         y += 12;
     } else {
