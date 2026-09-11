@@ -398,13 +398,14 @@ function _render(rows, depIcao, ctx = { mode: 'local' }) {
     const catColors = CAT_COLORS;
     const isRoute = ctx.mode === 'route';
 
-    // Titre du panneau : le suivi du mode doit survivre aux changements de
-    // langue (setLanguage réécrit #lbl-alternates, puis showAlternates est
-    // rappelé et repose le bon titre).
+    // Titre du panneau (retour pilote 11/09 soir : simplement « Alternates »
+    // dans les deux modes — la note en bas distingue trajet / autour du
+    // terrain). setLanguage réécrit #lbl-alternates, puis showAlternates est
+    // rappelé et repose le bon titre.
     const titleEl = document.getElementById('lbl-alternates');
     if (titleEl) {
         titleEl.textContent = isRoute
-            ? (isFr ? 'Alternates — répartis le long du trajet (± 25 NM)' : 'Alternates — evenly spaced along the route (± 25 NM)')
+            ? (isFr ? 'Alternates' : 'Alternates')
             : (I18N[state.lang]?.alternatesTitle || 'Alternates');
     }
 
