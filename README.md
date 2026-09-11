@@ -99,7 +99,10 @@ dans une PWA installable qui fonctionne aussi hors ligne.
   horaires du service et avitaillement en sous-sections repliables).
 - **Pastilles de la carte régionale** : clic = METAR + bouton
   « Carte VAC » du terrain ; **clic droit = ajout au plan de vol** comme
-  waypoint.
+  waypoint. Terrains sans station METAR propre (pastille grise) : le clic
+  ouvre le METAR de la **station la plus proche** — station et distance en
+  tête du popup, code marqué « * » — et tout terrain de la carte peut
+  servir de départ, d'arrivée ou d'étape.
 - **Carte VAC « Atterrissage à vue »** intégrée : Atlas-VAC officiel du
   SIA (421 terrains de France, AIRAC), visionneuse pdfjs avec zoom et
   pages, **consultable hors ligne** après première ouverture (cache
@@ -236,7 +239,7 @@ npm run pub -- "message du commit"   # commit + push + attente du déploiement
 - **2026-09-05** — FICHE TERRAIN v3 — feu vert pilote après aperçu PDF (Apercu_fiche_terrain.pdf, 3 terrains LFRN/LFRV/LFPF) : section Terrain en LIGNES LIBELL…
 - **2026-09-05** — FICHE TERRAIN v2 (retours pilote : ordre + lisibilité) : ① FRÉQUENCES en tête (sans sous-titre redondant) ② PISTES (seuils officiels affiché…
 - **2026-09-05** — FICHE TERRAIN COMPLÈTE dans l onglet « Fréquences & info terrain » (demande pilote, 4 arbitrages validés) : ① IDENTITÉ en chips — élévation,…
-<!-- docs:lastSha=dcf6c67ddd9dc0a13a308969f396ab46f0e7f0d5 -->
+<!-- docs:lastSha=bf5865cd33e50469c315b70b31ccc90e539748f4 -->
 
 
 
