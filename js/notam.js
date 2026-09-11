@@ -155,6 +155,22 @@ export function decToSofiaDms(lat, lon) {
     return { lat: fmt(lat, 'N', 'S', 2), long: fmt(lon, 'E', 'W', 3) };
 }
 
+/** Rayon de la zone NOTAM en vol local : 20 NM par défaut, borné 10-40
+ * (retour pilote 11/09) — persisté en localStorage. Pur, testé. */
+export const NOTAM_RADIUS_DEFAULT = 20;
+export function clampRadiusNm(v) {
+    const n = parseInt(v, 10);
+    if (!Number.isFinite(n)) return NOTAM_RADIUS_DEFAULT;
+    return Math.min(40, Math.max(10, n));
+}
+function getRadiusNm() {
+    try { return clampRadiusNm(localStorage.getItem('mt-notam-radius')); }
+    catch { return NOTAM_RADIUS_DEFAULT; }
+}
+function setRadiusNm(v) {
+    try { localStorage.setItem('mt-notam-radius', String(clampRadiusNm(v))); } catch { /* quota */ }
+}
+
 /** Terrains à moins de radiusNm du centre, triés par distance (pur, testé).
  * Retourne le centre en tête + ses voisins — chaîne pour les appels legs,
  * chaque tronçon rapportant le dossier du terrain de départ. */
@@ -261,7 +277,7 @@ export async function fetchZonePib(icao, lat, lon, opts = {}) {
         const res = await fetch(config.NOTAM_RELAY_URL, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ...buildPibRequest([icao], opts), route: ring,
-                legs, area: { lat: dms.lat, long: dms.long, radiusNm: opts.radiusNm || 30 } }),
+                legs, area: { lat: dms.lat, long: dms.long, radiusNm: opts.radiusNm || NOTAM_RADIUS_DEFAULT } }),
         });
         const data = await res.json();
         if (!res.ok || data.error) return { error: data.error || `relais HTTP ${res.status}` };
@@ -305,7 +321,7 @@ function _renderPib(pib, planRoute = [], opts = {}) {
     const wpKeys = Object.keys(wps);
     let wpHtml = '';
     if (wpKeys.length) {
-        wpHtml += `<h4 style="font-size:12px;margin:10px 0 4px;">${local ? (t ? 'Terrains dans la zone (30 NM)' : 'Airfields in the zone (30 NM)') : (t ? 'Points de passage' : 'Waypoints')}</h4>`;
+        wpHtml += `<h4 style="font-size:12px;margin:10px 0 4px;">${local ? (t ? `Terrains dans la zone (${opts.radiusNm || 20} NM)` : `Airfields in the zone (${opts.radiusNm || 20} NM)`) : (t ? 'Points de passage' : 'Waypoints')}</h4>`;
         for (const icao of wpKeys) {
             const dos = wps[icao] || {};
             const vfr2 = {};
@@ -380,19 +396,23 @@ async function _search(body, planRoute) {
     let pib;
     if (local) {
         const { _lat: lat, _lon: lon } = planRoute;
-        let ring = airfieldsWithinNm(lat, lon, 30,
-            getAirportsInBbox(lat - 0.6, lon - 0.75, lat + 0.6, lon + 0.75));
+        const radiusNm = getRadiusNm();
+        // Degrés du rayon (marge 10 %) pour la bbox de recherche — l'AD de
+        // départ est TOUJOURS en tête d'anneau (priorité, retour 11/09).
+        const dLat = (radiusNm / 60) * 1.1, dLon = dLat / Math.cos(lat * Math.PI / 180);
+        let ring = airfieldsWithinNm(lat, lon, radiusNm,
+            getAirportsInBbox(lat - dLat, lon - dLon, lat + dLat, lon + dLon));
         if (!ring.includes(route[0])) ring.unshift(route[0]);
         if (ring.length === 1) {
-            // Aucun voisin à 30 NM (ou base encore en chargement) : un tronçon
+            // Aucun voisin dans le rayon (ou base en chargement) : un tronçon
             // vers le terrain CONNU le plus proche suffit — seul le dossier du
-            // DÉPART du tronçon (le centre) nous intéresse.
+            // DÉPART du tronçon (l'AD, prioritaire) nous intéresse.
             const proches = airfieldsWithinNm(lat, lon, 150,
                 getAirportsInBbox(lat - 2.5, lon - 3, lat + 2.5, lon + 3), 4)
                 .filter(i => i !== route[0]);
             if (proches.length) ring.push(proches[0]);
         }
-        pib = await fetchZonePib(route[0], lat, lon, { flUpper: planFlUpper(), ring });
+        pib = await fetchZonePib(route[0], lat, lon, { flUpper: planFlUpper(), ring, radiusNm });
     } else {
         pib = await fetchRoutePib(buildPibRequest(route, { flUpper: planFlUpper() }));
     }
@@ -401,7 +421,7 @@ async function _search(body, planRoute) {
         return;
     }
     _flat = local ? collectFlatLocal(pib, route) : collectFlat(pib, route);
-    const rendered = _renderPib(pib, route, { local });
+    const rendered = _renderPib(pib, route, { local, radiusNm: local ? getRadiusNm() : undefined });
     const again = document.createElement('button');
     again.className = 'btn-primary';
     again.style.cssText = 'margin:8px 0;padding:6px 12px;font-size:12px;';
@@ -498,10 +518,28 @@ function _mount() {
     _body = makeCollapsible(_panel, title, 'file-text');
     _body.innerHTML = `
         <p id="notam-summary" style="font-size:12px;color:var(--text-muted);margin:2px 0 6px;"></p>
+        <div id="notam-radius-row" style="display:none;align-items:center;gap:6px;margin:0 0 6px;font-size:12px;">
+            <label for="notam-radius">${tr ? 'Rayon' : 'Radius'}</label>
+            <input id="notam-radius" type="number" min="10" max="40" step="1" value="${getRadiusNm()}"
+                style="width:58px;background:var(--input-bg,#0F172A);border:1px solid var(--border-color,#334155);border-radius:6px;color:var(--text-color,#E2E8F0);padding:3px 6px;font-family:'DM Mono',monospace;">
+            <span>NM</span>
+            <span style="color:var(--text-muted,#94A3B8);font-size:10px;">10–40</span>
+        </div>
         <button id="notam-search" class="btn-primary" style="padding:6px 12px;font-size:12px;">
             ${tr ? 'Obtenir le dossier NOTAM' : 'Get NOTAM briefing'}
         </button>
         <div id="notam-results"></div>`;
+    const radiusInput = _body.querySelector('#notam-radius');
+    radiusInput?.addEventListener('change', () => {
+        const v = clampRadiusNm(radiusInput.value);
+        radiusInput.value = v;
+        setRadiusNm(v);
+        // Le dossier affiché correspond à l'ancien rayon → remise à zéro.
+        const results = _body.querySelector('#notam-results');
+        if (results) results.innerHTML = '';
+        _flat = [];
+        _refreshSummary();
+    });
     _body.querySelector('#notam-search')?.addEventListener('click', () => _search(_body.querySelector('#notam-results'), _routeFromApp()));
     _refreshSummary();
 }
@@ -513,10 +551,13 @@ function _refreshSummary() {
     const route = _routeFromApp();
     const fl = planFlUpper();
     const flTxt = fl >= 999 ? 'FL 0-999' : `FL 0-${fl}`;
+    const radiusRow = document.getElementById('notam-radius-row');
+    if (radiusRow) radiusRow.style.display = route._local ? 'flex' : 'none';
     if (route._local) {
+        const r = getRadiusNm();
         el.textContent = isFr()
-            ? `Zone 30 NM autour de ${route.icaos[0]} · ${flTxt} · VFR`
-            : `30 NM zone around ${route.icaos[0]} · ${flTxt} · VFR`;
+            ? `Zone ${r} NM autour de ${route.icaos[0]} · ${flTxt} · VFR`
+            : `${r} NM zone around ${route.icaos[0]} · ${flTxt} · VFR`;
         return;
     }
     el.textContent = route.length

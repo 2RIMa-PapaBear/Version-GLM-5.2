@@ -124,3 +124,15 @@ test('airfieldsWithinNm : centre + voisins 30 NM, hors zone écarté, tri par di
     const many = Array.from({ length: 20 }, (_, i) => ({ icao: 'LF' + String(i).padStart(2, '0'), lat: 47.7, lon: -2.7 + i * 0.01 }));
     assert.ok(airfieldsWithinNm(47.66, -2.72, 30, many, 5).length <= 5);
 });
+
+// Rayon zone locale (retour pilote 11/09) : 20 par défaut, borné 10-40
+import { clampRadiusNm, NOTAM_RADIUS_DEFAULT } from '../js/notam.js';
+
+test('clampRadiusNm : defaut 20, bornes 10-40', () => {
+    assert.equal(NOTAM_RADIUS_DEFAULT, 20);
+    assert.equal(clampRadiusNm('15'), 15);
+    assert.equal(clampRadiusNm(7), 10);
+    assert.equal(clampRadiusNm(99), 40);
+    assert.equal(clampRadiusNm('abc'), 20);
+    assert.equal(clampRadiusNm(null), 20);
+});
