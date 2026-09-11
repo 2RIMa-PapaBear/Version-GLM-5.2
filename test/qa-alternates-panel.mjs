@@ -42,7 +42,7 @@ const route = await page.evaluate(() => {
 console.log(`Titre : ${route.title}`);
 route.rows.forEach(r => console.log(`  ${r.code}`));
 route.visible ? ok('panneau visible') : ko('panneau masqué');
-route.title.includes('le long du trajet') ? ok('titre mode trajet') : ko(`titre : «${route.title}»`);
+route.title.trim() === 'Alternates' ? ok('titre « Alternates » (mode trajet)') : ko(`titre : «${route.title}»`);
 route.rows.length === 8 ? ok('8 lignes') : ko(`${route.rows.length} lignes`);
 route.gridChildren === 6 + 8 * 6 ? ok(`grille 6 colonnes (${route.gridChildren} cellules)`) : ko(`grille : ${route.gridChildren} cellules (attendu 54)`);
 route.stars >= 1 ? ok(`${route.stars} substitution(s) marquée(s) *`) : ko('aucune étoile (substitution attendue sur cette route)');
