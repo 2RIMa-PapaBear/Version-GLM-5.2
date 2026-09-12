@@ -126,10 +126,14 @@ export function flattenFirList(list) {
     return out;
 }
 
+/** Codes des repères libres (clic droit carte) : des points UTILES AU PLAN
+ * mais inconnus de SOFIA — les envoyer au PIB fait répondre HTTP 400. */
+const FREE_WP_RE = /^ZZ[A-Z]{2}$/;
+
 /** Construit le payload relais depuis l'état du plan (pur, testable). */
 export function buildPibRequest(route, opts = {}) {
     const clean = (route || []).map(c => String(c || '').toUpperCase().trim())
-        .filter(c => /^[A-Z][A-Z0-9]{3}$/.test(c));
+        .filter(c => /^[A-Z][A-Z0-9]{3}$/.test(c) && !FREE_WP_RE.test(c));
     return {
         route: clean,
         validFrom: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
@@ -311,6 +315,11 @@ function _renderPib(pib, planRoute = [], opts = {}) {
         ${t ? 'Dossier généré par SOFIA-Briefing (SIA)' : 'Bulletin from SOFIA-Briefing (SIA)'} ·
         ${pib.nbNotams ?? '?'} NOTAM · ${t ? 'valide de' : 'valid'} ${pib.validFrom || ''} ${t ? 'à' : 'to'} ${pib.validTo || ''}
     </p>`;
+    if (!local && opts.excluded?.length) {
+        html += `<p style="font-size:11px;color:var(--text-muted);margin:0 0 6px;">${t
+            ? `Repère${opts.excluded.length > 1 ? 's' : ''} libre${opts.excluded.length > 1 ? 's' : ''} ${opts.excluded.join(', ')} non interrogé${opts.excluded.length > 1 ? 's' : ''} (terrain inconnu de SOFIA)`
+            : `Free waypoint${opts.excluded.length > 1 ? 's' : ''} ${opts.excluded.join(', ')} skipped (unknown to SOFIA)`}</p>`;
+    }
     const cats = { ...CATS(), ...CATS_FIR() }, groups = local ? GROUPS_LOCAL() : GROUPS();
     // Ordre du VOL (retour pilote 10/09) : Départ → Points de passage → Arrivée
     // → En route → Dégagements → Survollés → Autres. Départ/Arrivée TOUJOURS
@@ -392,7 +401,11 @@ async function _search(body, planRoute) {
     const tr = isFr();
     body.innerHTML = `<p style="font-size:12px;">${tr ? 'Recherche du dossier NOTAM…' : 'Fetching NOTAM…'}</p>`;
     const local = !!planRoute._local;
-    const route = local ? planRoute.icaos : planRoute;
+    // Repères libres exclus du dossier : SOFIA ne connaît que des terrains —
+    // un code ZZxx dans la route fait échouer toute la requête (HTTP 400).
+    const excluded = local ? [] : planRoute.filter(c => FREE_WP_RE.test(String(c || '').toUpperCase()));
+    const route = local ? planRoute.icaos
+        : planRoute.filter(c => !FREE_WP_RE.test(String(c || '').toUpperCase()));
     let pib;
     if (local) {
         const { _lat: lat, _lon: lon } = planRoute;
@@ -421,7 +434,7 @@ async function _search(body, planRoute) {
         return;
     }
     _flat = local ? collectFlatLocal(pib, route) : collectFlat(pib, route);
-    const rendered = _renderPib(pib, route, { local, radiusNm: local ? getRadiusNm() : undefined });
+    const rendered = _renderPib(pib, route, { local, radiusNm: local ? getRadiusNm() : undefined, excluded });
     const again = document.createElement('button');
     again.className = 'btn-primary';
     again.style.cssText = 'margin:8px 0;padding:6px 12px;font-size:12px;';
@@ -560,8 +573,11 @@ function _refreshSummary() {
             : `${r} NM zone around ${route.icaos[0]} · ${flTxt} · VFR`;
         return;
     }
-    el.textContent = route.length
-        ? (isFr() ? `Trajet : ${route.join(' → ')} · demi-couloir 15 NM · rayon AD 30 NM · ${flTxt} · VFR` : `Route: ${route.join(' → ')} · corridor 15 NM · AD radius 30 NM · ${flTxt} · VFR`)
+    const excluded = Array.isArray(route) ? route.filter(c => FREE_WP_RE.test(String(c || '').toUpperCase())) : [];
+    const clean = Array.isArray(route) ? route.filter(c => !FREE_WP_RE.test(String(c || '').toUpperCase())) : route;
+    const exclTxt = excluded.length ? (isFr() ? ` (+${excluded.length} repère libre)` : ` (+${excluded.length} free wp)`) : '';
+    el.textContent = (Array.isArray(clean) ? clean.length : false)
+        ? (isFr() ? `Trajet : ${clean.join(' → ')}${exclTxt} · demi-couloir 15 NM · rayon AD 30 NM · ${flTxt} · VFR` : `Route: ${clean.join(' → ')}${exclTxt} · corridor 15 NM · AD radius 30 NM · ${flTxt} · VFR`)
         : (isFr() ? 'Aucun plan actif.' : 'No active plan.');
 }
 

@@ -38,6 +38,9 @@ const CORS = {
     'Access-Control-Allow-Headers': '*',
 };
 
+// Fusion des dossiers PIB du repli « tronçon par tronçon » (module pur testé).
+import { mergePibChunks } from './fusion-pib.mjs';
+
 const TTL_PDF_SEC = 7 * 86400;   // cartes AIRAC : URL par cycle, jamais périmée
 
 export default {
@@ -154,7 +157,10 @@ async function handleGet(request, env, ctx) {
 async function pibNotam(request) {
     const SOFIA = 'https://sofia-briefing.aviation-civile.gouv.fr';
     const params = await request.json();
-    const route = (params.route || []).filter(c => /^[A-Z][A-Z0-9]{3}$/.test(String(c || '').toUpperCase()));
+    // ZZxx = repères libres de l'app : inconnus de SOFIA → HTTP 400. Ils sont
+    // déjà filtrés côté client ; ce filtre protège tout client futur.
+    const isCode = (c) => { const s = String(c || '').toUpperCase(); return /^[A-Z][A-Z0-9]{3}$/.test(s) && !/^ZZ[A-Z]{2}$/.test(s); };
+    const route = (params.route || []).filter(isCode);
     if (route.length < 1) return reponse(400, JSON.stringify({ error: 'route vide' }), 'application/json');
 
     // 1. Session (cookie) — un GET préalable suffit.
@@ -203,7 +209,50 @@ async function pibNotam(request) {
         return JSON.parse(JSON.parse(txt)['status.message']);
     };
 
-    const inner = await appelSofia({});
+    // Appel PIB sur UN tronçon [a→b] : corps narrow-route PROPRE, sans les
+    // paramètres zone (lat/long/radius) — sinon SOFIA répond une zone sans
+    // dossier AD (bug « NOTAM AD absents en vol local »). Sert au repli
+    // tronçons (route refusée en global) et aux dossiers des points de
+    // passage. Retourne le PIB interne complet, ou null si tronçon refusé.
+    const legPib = async (a, b) => {
+        const lp = new URLSearchParams();
+        for (const [k, v] of body.entries()) {
+            if (k === 'route[]' || k === 'lat' || k === 'long' || k === 'radius') continue;
+            if (k === ':operation') { lp.set(k, 'postNarrowRoutePibRequest'); continue; }
+            lp.append(k, v);
+        }
+        lp.append('route[]', a); lp.append('route[]', b);
+        const res = await fetch(`${SOFIA}/sofia`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                ...(cookie ? { 'Cookie': cookie } : {}),
+                'Referer': `${SOFIA}/sofia/pages/notamform.html`,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json, text/javascript, */*; q=0.01',
+                'User-Agent': 'papabear56-meteo-relais/1.0',
+            },
+            body: lp.toString(),
+        });
+        const t = await res.text();
+        if (res.status !== 200 || !t.trim().startsWith('{')) return null;
+        return JSON.parse(JSON.parse(t)['status.message']);
+    };
+
+    const inner = await appelSofia({}).catch(async (e) => {
+        // REPLI TRONÇONS : SOFIA rejette les couloirs multi-segments qui
+        // reviennent en arrière (HTTP 400, message générique « consultez la
+        // FAQ ») — vérifié : LFRV→LFTA→LFBH échoue, les mêmes terrains dans
+        // l'ordre de progression passent, et chaque tronçon isolé (ligne
+        // droite) passe toujours. On interroge la route tronçon par tronçon
+        // et on fusionne les dossiers (NOTAM dédupliqués par id).
+        if (route.length < 2 || params.area) throw e;
+        const chunks = await Promise.all(route.slice(0, -1).map((_, i) =>
+            legPib(route[i], route[i + 1]).catch(() => null)));
+        const valid = chunks.filter(c => c && c.listnotams);
+        if (!valid.length) throw e;
+        return mergePibChunks(valid);
+    });
     if (!inner || !inner.listnotams) throw new Error('PIB sans listnotams');
 
     // Dossiers des POINTS DE PASSAGE (retour pilote 10/09) : SOFIA ne remplit
@@ -213,36 +262,12 @@ async function pibNotam(request) {
     const legs = Array.isArray(params.legs) ? params.legs : [];
     if (legs.length) {
         const dossiers = await Promise.all(legs.map(async ([a, b]) => {
-            if (!/^[A-Z][A-Z0-9]{3}$/.test(a) || !/^[A-Z][A-Z0-9]{3}$/.test(b)) return [a, null];
+            if (!isCode(a) || !isCode(b)) return [a, null];
             try {
-                // Corps tronçon PROPRE : opération narrow-route SANS les
-                // paramètres zone (lat/long/radius) — sinon SOFIA répond une
-                // zone sans dossier AD (bug « NOTAM AD absents en vol local »).
-                const lp = new URLSearchParams();
-                for (const [k, v] of body.entries()) {
-                    if (k === 'route[]' || k === 'lat' || k === 'long' || k === 'radius') continue;
-                    if (k === ':operation') { lp.set(k, 'postNarrowRoutePibRequest'); continue; }
-                    lp.append(k, v);
-                }
-                lp.append('route[]', a); lp.append('route[]', b);
-                const res = await fetch(`${SOFIA}/sofia`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                        ...(cookie ? { 'Cookie': cookie } : {}),
-                        'Referer': `${SOFIA}/sofia/pages/notamform.html`,
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Accept': 'application/json, text/javascript, */*; q=0.01',
-                        'User-Agent': 'papabear56-meteo-relais/1.0',
-                    },
-                    body: lp.toString(),
-                });
-                const t = await res.text();
-                if (res.status !== 200 || !t.trim().startsWith('{')) return [a, null];
-                const leg = JSON.parse(JSON.parse(t)['status.message']);
+                const leg = await legPib(a, b);
                 const dep = {};
                 let n = 0;
-                for (const [cat, list] of Object.entries(leg.listnotams?.ADDep || {}))
+                for (const [cat, list] of Object.entries(leg?.listnotams?.ADDep || {}))
                     if (Array.isArray(list) && list.length) { dep[cat] = list; n += list.length; }
                 return [a, n ? dep : {}];
             } catch { return [a, null]; }
