@@ -96,11 +96,13 @@ await page.waitForFunction(() => {
 // Plan AVEC repère libre : exactement l'état qui provoquait « SOFIA HTTP 400 ».
 // (dispatch sur WINDOW, comme le vrai code flight-planner-ui/recalc ;
 // config.local.js dévie le relay vers wrangler dev — on reforce le VRAI
-// worker pour tester le chemin applicatif réel.)
+// worker pour tester le chemin applicatif réel. ZZAB est typé VOR : les
+// mentions d'exclusion doivent détailler sa nature — retour pilote 12/09.)
 await page.evaluate(async () => {
-    const { state } = await import('/js/core.js');
+    const { state, memoSet } = await import('/js/core.js');
     const { config } = await import('/js/config.js');
     config.NOTAM_RELAY_URL = 'https://meteo-relais.papabear56.workers.dev/notam';
+    memoSet('ZZAB', { name: 'MENUY (VOR)', lat: 47, lon: -2, frequencies: [{ freq: 114.5, type: 'VOR', primary: true }] });
     state.route = ['LFRV', 'ZZAB', 'LFRC'];
     window.dispatchEvent(new CustomEvent('route-changed'));
 });
@@ -114,7 +116,7 @@ console.log('dbg:', JSON.stringify(dbg));
 
 const summary = await page.evaluate(() => document.getElementById('notam-summary')?.textContent || '');
 summary.includes('LFRV → LFRC') ? ok(`résumé sur la route interrogée : « ${summary.slice(0, 70)}… »`) : ko(`résumé inattendu : « ${summary} »`);
-summary.includes('repère libre') ? ok('résumé mentionne le repère libre exclu') : ko('résumé sans mention du repère exclu');
+summary.includes('repère libre dont 1 VOR') ? ok('résumé détaille la nature : « dont 1 VOR »') : ko(`résumé sans nature détaillée : « ${summary} »`);
 
 // Demande du dossier : DOIT aboutir (sans le filtre, le vrai worker répond
 // « SOFIA HTTP 400 » — c'est le bug du 12/09).
@@ -127,7 +129,7 @@ await page.waitForFunction(() => {
 const resTxt = await page.evaluate(() => document.getElementById('notam-results')?.textContent || '');
 !resTxt.includes('Erreur') && !resTxt.includes('Error') ? ok('dossier NOTAM rendu SANS erreur (vrai worker SOFIA)') : ko(`erreur affichée : « ${resTxt.slice(0, 120)} »`);
 resTxt.includes('SOFIA-Briefing (SIA)') ? ok('en-tête du dossier présent') : ko('en-tête du dossier absent');
-resTxt.includes('ZZAB') && resTxt.includes('inconnu de SOFIA') ? ok('mention « repère libre ZZAB non interrogé » affichée') : ko('mention du repère exclu absente du dossier');
+resTxt.includes('VOR MENUY') && resTxt.includes('inconnu de SOFIA') ? ok('mention « VOR MENUY non interrogé (terrain inconnu de SOFIA) » affichée') : ko(`mention typée absente du dossier : « ${resTxt.slice(0, 160)} »`);
 
 // La requête réellement partie ne contenait PAS le ZZxx.
 const mainPost = notamPosts[0];

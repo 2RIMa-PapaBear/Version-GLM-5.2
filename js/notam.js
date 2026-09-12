@@ -17,7 +17,7 @@
  * ================================================================ */
 import { config } from './config.js';
 import { getAirportByICAO, getAirportsInBbox } from './ui-module.js';
-import { state } from './core.js';
+import { state, memoGet } from './core.js';
 import { makeCollapsible } from './collapsible.js';
 
 const isFr = () => state.lang === 'fr';
@@ -129,6 +129,45 @@ export function flattenFirList(list) {
 /** Codes des repères libres (clic droit carte) : des points UTILES AU PLAN
  * mais inconnus de SOFIA — les envoyer au PIB fait répondre HTTP 400. */
 const FREE_WP_RE = /^ZZ[A-Z]{2}$/;
+
+/** Nature lisible d'un ZZxx exclu : VOR / NDB / point VFR quand le repère
+ *  vient de la couche radiophares (fréquence typée conservée au memo),
+ *  repère libre sinon (posé au clic droit). Retourne le libellé FR et EN. */
+export function _freeWpNature(code) {
+    const f = memoGet(code)?.frequencies?.[0]?.type;
+    if (f === 'VOR') return { fr: 'VOR', en: 'VOR' };
+    if (f === 'NDB') return { fr: 'NDB', en: 'NDB' };
+    if (f === 'VRP') return { fr: 'point VFR', en: 'VFR point' };
+    return null;
+}
+
+/** Libellé groupé des exclusions pour le résumé : « dont 1 VOR, 2 points
+ *  VFR » (retourne null si rien à détailler). */
+export function _excludedBreakdown(codes, t) {
+    const n = { VOR: 0, NDB: 0, VRP: 0, libre: 0 };
+    for (const c of codes) {
+        const nat = _freeWpNature(c);
+        if (nat) n[nat.fr === 'point VFR' ? 'VRP' : nat.fr]++;
+        else n.libre++;
+    }
+    const parts = [];
+    if (n.VOR) parts.push(`${n.VOR} VOR`);
+    if (n.NDB) parts.push(`${n.NDB} NDB`);
+    if (n.VRP) parts.push(t ? `${n.VRP} point${n.VRP > 1 ? 's' : ''} VFR` : `${n.VRP} VFR point${n.VRP > 1 ? 's' : ''}`);
+    if (n.libre) parts.push(t ? `${n.libre} repère${n.libre > 1 ? 's' : ''} libre${n.libre > 1 ? 's' : ''}` : `${n.libre} free w${n.libre > 1 ? 'ps' : 'p'}`);
+    return parts.length ? parts.join(', ') : null;
+}
+
+/** Liste nominative des exclus pour l'en-tête du dossier : nature + nom du
+ *  repère (le suffixe « (VOR)/(NDB) » du nom est retiré, la nature l'indique). */
+export function _excludedItems(codes, t) {
+    return codes.map(code => {
+        const nat = _freeWpNature(code);
+        const name = (memoGet(code)?.name || code).replace(/\s*\((VOR|NDB)\)$/, '');
+        if (!nat) return t ? `repère libre ${name}` : `free waypoint ${name}`;
+        return `${nat.fr === 'point VFR' ? (t ? 'point VFR' : 'VFR point') : nat.fr} ${name}`;
+    });
+}
 
 /** Construit le payload relais depuis l'état du plan (pur, testable). */
 export function buildPibRequest(route, opts = {}) {
@@ -315,10 +354,10 @@ function _renderPib(pib, planRoute = [], opts = {}) {
         ${t ? 'Dossier généré par SOFIA-Briefing (SIA)' : 'Bulletin from SOFIA-Briefing (SIA)'} ·
         ${pib.nbNotams ?? '?'} NOTAM · ${t ? 'valide de' : 'valid'} ${pib.validFrom || ''} ${t ? 'à' : 'to'} ${pib.validTo || ''}
     </p>`;
-    if (!local && opts.excluded?.length) {
+    if (!local && opts.excludedDetails?.length) {
         html += `<p style="font-size:11px;color:var(--text-muted);margin:0 0 6px;">${t
-            ? `Repère${opts.excluded.length > 1 ? 's' : ''} libre${opts.excluded.length > 1 ? 's' : ''} ${opts.excluded.join(', ')} non interrogé${opts.excluded.length > 1 ? 's' : ''} (terrain inconnu de SOFIA)`
-            : `Free waypoint${opts.excluded.length > 1 ? 's' : ''} ${opts.excluded.join(', ')} skipped (unknown to SOFIA)`}</p>`;
+            ? `Non interrogé${opts.excludedDetails.length > 1 ? 's' : ''} (terrain${opts.excludedDetails.length > 1 ? 's' : ''} inconnu${opts.excludedDetails.length > 1 ? 's' : ''} de SOFIA) : ${opts.excludedDetails.join(' · ')}`
+            : `Skipped (unknown to SOFIA): ${opts.excludedDetails.join(' · ')}`}</p>`;
     }
     const cats = { ...CATS(), ...CATS_FIR() }, groups = local ? GROUPS_LOCAL() : GROUPS();
     // Ordre du VOL (retour pilote 10/09) : Départ → Points de passage → Arrivée
@@ -406,6 +445,7 @@ async function _search(body, planRoute) {
     const excluded = local ? [] : planRoute.filter(c => FREE_WP_RE.test(String(c || '').toUpperCase()));
     const route = local ? planRoute.icaos
         : planRoute.filter(c => !FREE_WP_RE.test(String(c || '').toUpperCase()));
+    const excludedDetails = excluded.length ? _excludedItems(excluded, tr) : null;
     let pib;
     if (local) {
         const { _lat: lat, _lon: lon } = planRoute;
@@ -434,7 +474,7 @@ async function _search(body, planRoute) {
         return;
     }
     _flat = local ? collectFlatLocal(pib, route) : collectFlat(pib, route);
-    const rendered = _renderPib(pib, route, { local, radiusNm: local ? getRadiusNm() : undefined, excluded });
+    const rendered = _renderPib(pib, route, { local, radiusNm: local ? getRadiusNm() : undefined, excludedDetails });
     const again = document.createElement('button');
     again.className = 'btn-primary';
     again.style.cssText = 'margin:8px 0;padding:6px 12px;font-size:12px;';
@@ -575,7 +615,16 @@ function _refreshSummary() {
     }
     const excluded = Array.isArray(route) ? route.filter(c => FREE_WP_RE.test(String(c || '').toUpperCase())) : [];
     const clean = Array.isArray(route) ? route.filter(c => !FREE_WP_RE.test(String(c || '').toUpperCase())) : route;
-    const exclTxt = excluded.length ? (isFr() ? ` (+${excluded.length} repère libre)` : ` (+${excluded.length} free wp)`) : '';
+    // « (+2 repères libres dont 1 VOR, 1 point VFR) » : la nature des exclus
+    // est détaillée quand ils viennent de la couche radiophares.
+    const breakdown = excluded.length ? _excludedBreakdown(excluded, isFr()) : null;
+    // « (+2 repères libres dont 1 VOR, 1 point VFR) » ; si des exclus non
+    // typés figurent déjà dans la liste (« 2 repères libres »), pas d'unité
+    // avant « dont » — sinon elle serait répétée.
+    const unit = isFr() ? `repère libre${excluded.length > 1 ? 's' : ''}` : `free w${excluded.length > 1 ? 'ps' : 'p'}`;
+    const anyUntyped = excluded.some(c => !_freeWpNature(c));
+    const exclTxt = !excluded.length ? ''
+        : ` (+${excluded.length}${breakdown ? (anyUntyped ? ` ${isFr() ? 'dont' : 'incl.'} ${breakdown}` : ` ${unit} ${isFr() ? 'dont' : 'incl.'} ${breakdown}`) : ` ${unit}`})`;
     el.textContent = (Array.isArray(clean) ? clean.length : false)
         ? (isFr() ? `Trajet : ${clean.join(' → ')}${exclTxt} · demi-couloir 15 NM · rayon AD 30 NM · ${flTxt} · VFR` : `Route: ${clean.join(' → ')}${exclTxt} · corridor 15 NM · AD radius 30 NM · ${flTxt} · VFR`)
         : (isFr() ? 'Aucun plan actif.' : 'No active plan.');
