@@ -43,6 +43,22 @@ test('buildPibRequest : repères libres ZZxx écartés (SOFIA les rejette en HTT
     assert.deepEqual(waypointLegs(r.route), []);
 });
 
+// Nature des exclusions (retour pilote 12/09 « dont VOR/NDB/point VFR ») :
+// un ZZxx venu de la couche radiophares porte sa fréquence typée au memo.
+import { memoSet } from '../js/core.js';
+import { _freeWpNature, _excludedBreakdown, _excludedItems } from '../js/notam.js';
+
+test('nature des ZZxx exclus : VOR/NDB/point VFR typés, repère libre sinon', () => {
+    memoSet('ZZAB', { name: 'MENUY (VOR)', lat: 47, lon: -2, frequencies: [{ freq: 114.5, type: 'VOR', primary: true }] });
+    memoSet('ZZCD', { name: 'Pont de Saint-Nazaire', lat: 47.2, lon: -2.2, frequencies: [{ freq: 0, type: 'VRP' }] });
+    assert.equal(_freeWpNature('ZZAB').fr, 'VOR');
+    assert.equal(_freeWpNature('ZZCD').fr, 'point VFR');
+    assert.equal(_freeWpNature('ZZEF'), null, 'repère libre sans fréquence typée');
+    assert.equal(_excludedBreakdown(['ZZAB', 'ZZCD'], true), '1 VOR, 1 point VFR');
+    assert.equal(_excludedItems(['ZZAB'], true)[0], 'VOR MENUY', 'suffixe « (VOR) » du nom retiré');
+    assert.equal(_excludedItems(['ZZEF'], false)[0], 'free waypoint ZZEF', 'sans memo : repli code');
+});
+
 // Groupes complets + filtre VFR + FL du plan (retours pilote 10/09)
 import { isVfrNotam } from '../js/notam.js';
 

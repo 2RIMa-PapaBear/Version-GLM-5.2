@@ -31,19 +31,23 @@ function _getMainFreq(icao) {
  *  standard VFR en l'absence de fréquence spécifique). Retourne
  *  { freq, type } ou null. */
 function _legMainFreq(icao) {
+    // VOLMET = diffusion météo automatique à ÉCOUTER, pas une fréquence de
+    // contact du terrain : jamais retenue comme fréquence d'étape (retour
+    // pilote 12/09 « 123.500 VOLMET » sur LFOO → LFTA).
     const { source, freqs } = getAirportFreqs(icao, getAirportByICAO(icao)?.frequencies || []);
-    if (freqs.length) {
+    const usable = freqs.filter(x => x.type !== 'VOLMET');
+    if (usable.length) {
         // Ordre de préférence : tour/AFIS du terrain, puis approche, FIS,
         // ATIS, et enfin A/A (air-air : seul service de nombreux petits
         // terrains — Ploërmel, LFEV…).
         const prio = ['TWR', 'AFIS', 'APP', 'FIS', 'ATIS', 'A/A'];
         for (const t of prio) {
-            let f = freqs.find(x => x.type === t);
+            let f = usable.find(x => x.type === t);
             // Plusieurs A/A publiées (ex. LFOM : « SAINT LAURENT » 123.500
             // ET « LESSAY » 128.930) : celle au nom du terrain d'abord,
             // sinon une valeur différente de la standard 123.500.
             if (t === 'A/A') {
-                const cands = freqs.filter(x => x.type === t);
+                const cands = usable.filter(x => x.type === t);
                 if (cands.length > 1) {
                     const apt = getAirportByICAO(icao);
                     const word = (apt?.name || '').split(/[\s-]/)[0]?.toUpperCase();
@@ -54,7 +58,7 @@ function _legMainFreq(icao) {
             }
             if (f) return f;
         }
-        return freqs[0];
+        return usable[0];
     }
     if (/^LF/.test(String(icao || '')) && getAirportByICAO(icao)) {
         return { freq: 123.5, type: 'STD' };

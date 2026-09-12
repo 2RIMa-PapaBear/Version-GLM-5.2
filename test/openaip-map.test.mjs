@@ -39,6 +39,20 @@ test('fréquence openAIP sans type connu → COM (inchangé)', () => {
     assert.equal(f[0].type, 'COM');
 });
 
+test('VOLMET codée mais nommée « A/A » : le nom PRIME (retour pilote 12/09 — LFTA 123.500)', () => {
+    // openAIP publie La Tranche-sur-Mer : 123.500, type 12 (VOLMET), nom « A/A ».
+    // Le code numérique fait de cette diffusion météo la « fréquence d étape » ;
+    // le nom explicite requalifie en A/A — le vrai rôle VFR de la 123.5.
+    const fs = apt([
+        { type: 12, value: '123.500', name: 'A/A', primary: true },
+        { type: 12, value: '126.4', name: 'VOLMET' },            // vrai VOLMET : conservé
+        { type: 5, value: '118.4', name: 'AFIS' },               // rôle fort : inchangé
+    ]).frequencies;
+    assert.equal(fs.find(x => x.freq === 123.5).type, 'A/A', 'nom « A/A » requalifie la VOLMET codée');
+    assert.equal(fs.find(x => x.freq === 126.4).type, 'VOLMET', 'VOLMET sans nom contradicatoire : conservée');
+    assert.equal(fs.find(x => x.freq === 118.4).type, 'AFIS', 'type réel non VOLMET : inchangé');
+});
+
 test('aucune fréquence ne sort jamais étiquetée UNK', () => {
     const fs = apt([
         { type: 16, value: '118.255', name: 'A/A' },

@@ -80,11 +80,13 @@ export function _relabelUnk(name) {
 }
 
 /** Assainit un aéroport issu du cache IDB : requalifie ses fréquences
- *  « UNK » (entrées écrites avant la règle _relabelUnk) et repersiste. */
+ *  « UNK » (entrées écrites avant la règle _relabelUnk) et les rôles
+ *  communautaires douteux contredits par un nom explicite, puis repersiste. */
 function _sanitizeCachedAirport(key, data) {
-    if (Array.isArray(data?.frequencies) && data.frequencies.some(f => f && f.type === 'UNK')) {
+    if (Array.isArray(data?.frequencies) && data.frequencies.some(f => f && _relabelUnk(f?.name) && ['UNK', 'COM', 'VOLMET'].includes(f.type))) {
         for (const f of data.frequencies) {
-            if (f && f.type === 'UNK') f.type = _relabelUnk(f.name);
+            const byName = f && _relabelUnk(f.name);
+            if (f && byName && ['UNK', 'COM', 'VOLMET'].includes(f.type)) f.type = byName;
         }
         _idbPut(key, data);   // repersiste propre (fire-and-forget)
     }
@@ -150,11 +152,18 @@ export function _mapAirport(aip) {
     const frequencies = (aip.frequencies || [])
         .filter(f => f && f.value)
         .map(f => {
-            const label = FREQ_TYPE_LABELS[f.type] ?? 'COM';
+            let label = FREQ_TYPE_LABELS[f.type] ?? 'COM';
+            if (label === 'UNK') label = _relabelUnk(f.name);
+            // Le NOM désigne parfois le vrai rôle alors que le code numérique
+            // dit « VOLMET » (LFTA : 123.500 nommée « A/A » mais codée 12) :
+            // un nom explicite prime sur les types communautaires douteux —
+            // une diffusion météo ne doit jamais devenir la fréquence d'étape.
+            const byName = _relabelUnk(f.name);
+            if (byName && ['UNK', 'COM', 'VOLMET'].includes(label)) label = byName;
             return {
                 freq: parseFloat(f.value),
                 name: f.name || '',
-                type: label === 'UNK' ? _relabelUnk(f.name) : label,
+                type: label,
                 primary: !!f.primary,
             };
         })
