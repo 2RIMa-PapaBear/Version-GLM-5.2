@@ -55,6 +55,21 @@ function _navDepRef() {
     return (_viewingDest ? _depIcao : state.requestedIcao) || state.requestedIcao;
 }
 
+// Changement de DÉPART (carte « Définir comme départ », favori, historique) :
+// le plan repart à zéro — les waypoints de l'ancien plan n'ont plus de sens
+// depuis un autre terrain (même politique que le changement de destination ;
+// arbitrage pilote 12/09). Les repères libres restent posés sur la carte,
+// réutilisables via leur popup « + Plan ». Sans vrai changement de tête
+// (consultation destination, import dont le METAR arrive en retard), ne
+// touche à rien.
+function _resetRouteOnDepartureChange(dep) {
+    if (!dep || !Array.isArray(state.route) || state.route.length < 3) return;
+    if (String(state.route[0] || '').toUpperCase() === String(dep).toUpperCase()) return;
+    const wpInput = document.getElementById('fp-waypoints');
+    if (wpInput && wpInput.value.trim()) wpInput.value = '';
+    state.route = null;
+}
+
 // Applique un changement de destination : nom du terrain, route sur la carte
 // régionale, plan de navigation et profil d'élévation.
 let _lastPlannedDest = null;   // destination du plan courant (reset waypoints si changement)
@@ -461,6 +476,14 @@ export function telechargerMessage(typeMessage) {
         refreshWbWidget(state.requestedIcao);
         // Affiche les fréquences radio du terrain (alimenté par OpenAIP).
         showFrequenciesWidget(state.requestedIcao);
+        // Le comparateur d'alternates et le calcul de navigation utilisent le
+        // DÉPART (_depIcao si on consulte la destination, sinon codeOaciFinal).
+        const depForNav = _viewingDest ? _depIcao : codeOaciFinal;
+        // Le départ vient de changer (carte « Définir comme départ », favori,
+        // historique…) : le plan repart à zéro AVANT tout re-rendu — sinon
+        // state.route garde l'ancien départ en tête et prime sur le départ
+        // passé au planificateur et à la carte dès qu'elle a ≥ 3 étapes.
+        _resetRouteOnDepartureChange(depForNav);
         // Quand on consulte la destination via le toggle, on ne touche PAS à la
         // carte régionale ni au route planner : le trajet reste départ→destination.
         if (!_viewingDest) {
@@ -468,9 +491,6 @@ export function telechargerMessage(typeMessage) {
             const routeFromDisplay = document.getElementById('route-from-display');
             if (routeFromDisplay) routeFromDisplay.textContent = codeOaciFinal;
         }
-        // Le comparateur d'alternates et le calcul de navigation utilisent le
-        // DÉPART (_depIcao si on consulte la destination, sinon codeOaciFinal).
-        const depForNav = _viewingDest ? _depIcao : codeOaciFinal;
         if (depForNav && getFlightMode() === 'nav') {
             showAlternates(depForNav);
             // Flight planner : visible si une destination est saisie.

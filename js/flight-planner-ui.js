@@ -109,6 +109,11 @@ function _writePerf(acId, tasKt, fuelBurnLph) {
 // Déclaré au niveau module — sinon ReferenceError dans le callback de re-render.
 let _recalculating = false;
 
+// Jeton d'obsolescence des calculs de plan : deux showFlightPlanner peuvent
+// se chevaucher (ex. changement de départ pendant un calcul multi-étapes) ;
+// le rendu du calcul le plus ANCIEN ne doit pas écraser celui du plus récent.
+let _plannerToken = 0;
+
 export async function showFlightPlanner(fromIcao, toIcao) {
     const container = document.getElementById('flight-planner-panel');
     if (!container) return;
@@ -118,6 +123,7 @@ export async function showFlightPlanner(fromIcao, toIcao) {
         container.style.display = 'none';
         return;
     }
+    const myToken = ++_plannerToken;
 
     const isFr = state.lang === 'fr';
     const acId = getActiveAircraftId();
@@ -137,12 +143,21 @@ export async function showFlightPlanner(fromIcao, toIcao) {
 
     _renderLoading(body, fromIcao, toIcao, cruiseAlt, tasKt, burn, isNight, isFr);
 
-    // Multi-waypoints si state.route est défini (≥3 OACI), sinon plan A→B simple.
-    const route = (Array.isArray(state.route) && state.route.length >= 3)
-        ? state.route : [fromIcao, toIcao];
+    // Multi-waypoints si state.route est défini (≥3 OACI) ET cohérent avec le
+    // départ/destination demandés — une séquence périmée (ancien départ en
+    // tête après un changement) serait calculée telle quelle. Sinon plan A→B.
+    const seq = Array.isArray(state.route) ? state.route : [];
+    const route = (seq.length >= 3
+        && String(seq[0]).toUpperCase() === fromIcao.toUpperCase()
+        && String(seq[seq.length - 1]).toUpperCase() === toIcao.toUpperCase())
+        ? seq : [fromIcao, toIcao];
     const plan = route.length >= 3
         ? await computeMultiLegFlightPlan(route, { cruiseAltFt: cruiseAlt, tasKt, fuelBurnLph: burn, isNight })
         : await computeFlightPlan(fromIcao, toIcao, { cruiseAltFt: cruiseAlt, tasKt, fuelBurnLph: burn, isNight });
+
+    // Un calcul plus récent a pris la main (changement de départ/destination
+    // pendant les fetchs) : ce rendu périmé ne doit pas l'écraser.
+    if (myToken !== _plannerToken) return;
 
     if (!plan) {
         _renderError(body, fromIcao, toIcao, isFr);
@@ -158,7 +173,7 @@ export async function showFlightPlanner(fromIcao, toIcao) {
     // Pré-charge les fréquences des waypoints en arrière-plan puis re-rend.
     if (plan.isMultiLeg && plan.waypoints) {
         _preloadWaypointFreqs(plan, () => {
-            if (!_recalculating) _renderResult(body, plan, isFr, isNight, cruiseAlt, tasKt, burn);
+            if (!_recalculating && myToken === _plannerToken) _renderResult(body, plan, isFr, isNight, cruiseAlt, tasKt, burn);
         });
     }
 
