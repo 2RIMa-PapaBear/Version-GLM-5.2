@@ -13,9 +13,11 @@
 // pour la production (déployé à part, sur feu vert du pilote).
 // ============================================================================
 import http from 'node:http';
+import { mergePibChunks } from '../worker/fusion-pib.mjs';
 
 const SOFIA = 'https://sofia-briefing.aviation-civile.gouv.fr';
 const OACI = /^[A-Z][A-Z0-9]{3}$/;
+const isCode = (c) => OACI.test(c) && !/^ZZ[A-Z]{2}$/.test(c);   // ZZxx inconnus de SOFIA
 
 // Session SOFIA (cookie JSESSIONID) — un GET préalable, réutilisé par appel.
 let _cookie = '';
@@ -83,16 +85,29 @@ const server = http.createServer(async (req, res) => {
     if (req.method !== 'POST' || !req.url.startsWith('/notam')) { res.writeHead(404); return res.end(); }
     try {
         const p = JSON.parse(await new Promise((ok) => { let d = ''; req.on('data', c => d += c); req.on('end', () => ok(d)); }));
-        const route = (p.route || []).map(c => String(c).toUpperCase()).filter(c => OACI.test(c));
+        const route = (p.route || []).map(c => String(c).toUpperCase()).filter(isCode);
         if (!route.length) return json(400, { error: 'route vide' });
 
-        const inner = await sofiaPib(baseBody({ ...p, route }));
+        let inner;
+        try {
+            inner = await sofiaPib(baseBody({ ...p, route }));
+        } catch (e) {
+            // REPLI TRONÇONS (miroir du worker) : SOFIA rejette les couloirs
+            // multi-segments qui reviennent en arrière (HTTP 400) — chaque
+            // tronçon isolé passe ; on fusionne les dossiers.
+            if (route.length < 2 || p.area) throw e;
+            const chunks = await Promise.all(route.slice(0, -1).map((_, i) =>
+                sofiaPib(baseBody({ ...p, route: [route[i], route[i + 1]] })).catch(() => null)));
+            const valid = chunks.filter(c => c && c.listnotams);
+            if (!valid.length) throw e;
+            inner = mergePibChunks(valid);
+        }
         if (!inner?.listnotams) return json(502, { error: 'PIB sans listnotams' });
 
         const legs = Array.isArray(p.legs) ? p.legs : [];
         if (legs.length) {
             const dossiers = await Promise.all(legs.map(async ([a, b]) => {
-                if (!OACI.test(a) || !OACI.test(b)) return [a, null];
+                if (!isCode(a) || !isCode(b)) return [a, null];
                 try {
                     // Corps tronçon PROPRE : narrow-route sans paramètres zone.
                 const lb = new URLSearchParams();

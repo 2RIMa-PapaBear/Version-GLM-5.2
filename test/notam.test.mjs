@@ -35,6 +35,14 @@ test('buildPibRequest : route nettoyée + paramètres par défaut', () => {
     assert.ok(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(r.validFrom));
 });
 
+test('buildPibRequest : repères libres ZZxx écartés (SOFIA les rejette en HTTP 400)', () => {
+    const r = buildPibRequest(['LFRV', 'ZZAB', 'LFRC', 'ZZCD']);
+    assert.deepEqual(r.route, ['LFRV', 'LFRC'], 'seuls les terrains réels partent au PIB');
+    // Le plan est réduite aux terrains AVANT le calcul des tronçons : les
+    // legs n'héritent jamais d'un ZZxx.
+    assert.deepEqual(waypointLegs(r.route), []);
+});
+
 // Groupes complets + filtre VFR + FL du plan (retours pilote 10/09)
 import { isVfrNotam } from '../js/notam.js';
 
