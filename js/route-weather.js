@@ -40,9 +40,14 @@ export async function showRouteWeather(map, fromIcao, toIcao, opts = {}) {
 
     _clearRoute(map);
 
-    // Construit la liste des points : A→B simple, ou multi-waypoints si state.route est défini.
-    const route = (Array.isArray(state.route) && state.route.length >= 3)
-        ? state.route : [fromIcao, toIcao];
+    // Construit la liste des points : A→B simple, ou multi-waypoints si
+    // state.route est définie ET cohérente avec le départ/destination passés
+    // (une séquence périmée garderait l'ancien départ relié au plan).
+    const seq = Array.isArray(state.route) ? state.route : [];
+    const route = (seq.length >= 3
+        && String(seq[0]).toUpperCase() === fromIcao.toUpperCase()
+        && String(seq[seq.length - 1]).toUpperCase() === toIcao.toUpperCase())
+        ? seq : [fromIcao, toIcao];
     const routePoints = [];
     for (const icao of route) {
         if (!icao) continue;
