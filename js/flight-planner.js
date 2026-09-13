@@ -8,6 +8,7 @@ import { computeRouteAirspaces, routeBbox } from './airspace-profile.js';
 import { fetchAirspacesForBbox } from './airspaces.js';
 import { loadFreqSources, getServiceFreq } from './freq-sia.js';
 import { getSiaAirfield } from './sia-data.js';
+import { _distToSegmentNm } from './alternates.js';
 
 // Élévation OFFICIELLE d'un terrain en ft (SIA AdRefAltFt, repli base locale
 // openAIP déjà convertie) — pour ancrer les extrémités du profil d'élévation
@@ -39,6 +40,63 @@ async function loadRouteAirspaces(elevProfile, cruiseAltFt) {
 
 const RESERVE_MIN_DAY = 30;
 const RESERVE_MIN_NIGHT = 45;
+
+// Couloir de prise en compte des obstacles SIA autour de la polyligne (A6) —
+// 0,5 NM couvre largement la bande réglementaire de 600 m autour de la route.
+const OBSTACLE_CORRIDOR_NM = 0.5;
+
+/**
+ * Obstacles SIA (base AIXM officielle) à moins de OBSTACLE_CORRIDOR_NM de la
+ * polyligne de route, positionnés le long du trajet (frac 0-1) : leur sommet
+ * (topFt, AMSL) alimente la marge mini (evaluateClearance) et la Z sécu du
+ * log. Non bloquant : null si la base n'est pas disponible.
+ * @returns {Promise<Array<{frac:number, topFt:number, hFt:number|null,
+ *   type:string, name:string, distNm:number}>|null>}
+ */
+async function _routeObstacles(elevProfile) {
+    try {
+        if (!elevProfile?.points?.length) return null;
+        const pts = elevProfile.points.filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lon));
+        if (pts.length < 2) return null;
+        const mod = await import('./radio-points.js');
+        const data = await mod.loadObstacles();
+        if (!data?.obstacles?.length) return null;
+
+        // Longueurs cumulées des segments du profil (NM) → frac global.
+        const cumNm = [0];
+        let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+        for (let i = 0; i < pts.length; i++) {
+            if (i) cumNm.push(cumNm[i - 1] + greatCircleDistanceNm(pts[i - 1].lat, pts[i - 1].lon, pts[i].lat, pts[i].lon));
+            if (pts[i].lat < minLat) minLat = pts[i].lat;
+            if (pts[i].lat > maxLat) maxLat = pts[i].lat;
+            if (pts[i].lon < minLon) minLon = pts[i].lon;
+            if (pts[i].lon > maxLon) maxLon = pts[i].lon;
+        }
+        const totalNm = cumNm[cumNm.length - 1] || 1;
+
+        const out = [];
+        for (const o of data.obstacles) {
+            if (o.elevFt == null) continue;
+            if (o.lat < minLat - 0.02 || o.lat > maxLat + 0.02
+                || o.lon < minLon - 0.03 || o.lon > maxLon + 0.03) continue;
+            let best = null;
+            for (let i = 0; i < pts.length - 1; i++) {
+                const d = _distToSegmentNm(o, pts[i], pts[i + 1]);
+                if (!best || d.nm < best.nm) best = { nm: d.nm, atdNm: cumNm[i] + d.atdNm };
+            }
+            if (best && best.nm <= OBSTACLE_CORRIDOR_NM) {
+                out.push({
+                    frac: Math.min(1, Math.max(0, best.atdNm / totalNm)),
+                    topFt: o.elevFt, hFt: o.hFt ?? null,
+                    type: o.type || '', name: o.name || '',
+                    distNm: Math.round(best.nm * 10) / 10,
+                });
+            }
+        }
+        out.sort((a, b) => a.frac - b.frac);
+        return out.length ? out : null;
+    } catch { return null; }
+}
 
 const KT_TO_KMH = 1.852;
 const KMH_TO_KT = 1 / KT_TO_KMH;
@@ -143,6 +201,53 @@ export function computeFuel(legTimeMin, fuelBurnLph, reserveMin) {
     };
 }
 
+/**
+ * Branche DÉGAGEMENT du devis carburant (arrêté du 24/07/1991 : carburant
+ * pour rejoindre la destination, PUIS le terrain de dégagement, PLUS la
+ * réserve 30/45 min). Distance et temps depuis la DESTINATION vers le
+ * dégagement, à la vitesse sol de référence du plan (vent du plan pris en
+ * compte) ; sans GS de référence exploitable, seul le distance est rendu.
+ * Fonction pure — testée sous Node.
+ * @returns {{distNm:number, timeMin:number|null, fuelL:number|null}|null}
+ */
+export function computeDiversionLeg(destLat, destLon, divLat, divLon, fuelBurnLph, refGsKt) {
+    if (!Number.isFinite(destLat) || !Number.isFinite(destLon)
+        || !Number.isFinite(divLat) || !Number.isFinite(divLon)) return null;
+    const distNm = greatCircleDistanceNm(destLat, destLon, divLat, divLon);
+    const out = { distNm: Math.round(distNm * 10) / 10, timeMin: null, fuelL: null };
+    if (!(refGsKt > 0) || !(fuelBurnLph > 0)) return out;
+    const timeMin = distNm / refGsKt * 60;
+    out.timeMin = Math.round(timeMin);
+    out.fuelL = Math.round(timeMin / 60 * fuelBurnLph * 10) / 10;
+    return out;
+}
+
+// Résout l'ICAO du dégagement (base locale + mémo) et calcule sa branche.
+// Retourne { icao, distNm, timeMin, fuelL } ou null (ICAO inconnu).
+function _diversionFor(toLat, toLon, diversionIcao, fuelBurnLph, refGsKt) {
+    const code = String(diversionIcao || '').toUpperCase();
+    if (!code) return null;
+    const apt = getAirportByICAO(code);
+    const memo = memoGet(code);
+    const lat = memo?.lat ?? apt?.lat ?? null;
+    const lon = memo?.lon ?? apt?.lon ?? null;
+    if (lat == null || lon == null) return null;
+    const d = computeDiversionLeg(toLat, toLon, lat, lon, fuelBurnLph, refGsKt);
+    return d ? { icao: code, ...d } : null;
+}
+
+// Enrichit le bloc fuel du plan avec la branche dégagement : diversionL et
+// totalL = trajet + dégagement + réserve (les autres champs inchangés).
+function _withDiversion(fuel, diversion) {
+    if (!diversion?.fuelL) return { ...fuel, diversion: diversion ?? null, diversionL: 0 };
+    return {
+        ...fuel,
+        diversion,
+        diversionL: diversion.fuelL,
+        totalL: Math.round((fuel.totalL + diversion.fuelL) * 10) / 10,
+    };
+}
+
 export async function computeFlightPlan(fromIcao, toIcao, params) {
     if (!fromIcao || !toIcao || fromIcao === toIcao) return null;
     if (!params || typeof params.cruiseAltFt !== 'number') return null;
@@ -178,13 +283,19 @@ export async function computeFlightPlan(fromIcao, toIcao, params) {
     const gsKt = wc.gsKt > 0 ? wc.gsKt : params.tasKt;
     const legTimeMin = distNm / gsKt * 60;
 
-    const reserveMin = params.isNight ? RESERVE_MIN_NIGHT : RESERVE_MIN_DAY;
-    const fuel = computeFuel(legTimeMin, params.fuelBurnLph, reserveMin);
+    // Réserve EFFECTIVE : 30/45 min réglementaires + majoration personnelle
+    // de l'avion actif (flotte) — le devis et le PDF affichent cette valeur.
+    const reserveMin = (params.isNight ? RESERVE_MIN_NIGHT : RESERVE_MIN_DAY)
+        + (Number.isFinite(params.reserveExtraMin) ? Math.max(0, Math.min(60, params.reserveExtraMin)) : 0);
+    const fuel = _withDiversion(
+        { ...computeFuel(legTimeMin, params.fuelBurnLph, reserveMin), reserveMin },
+        _diversionFor(toLat, toLon, params.diversionIcao, params.fuelBurnLph, gsKt));
 
     const elevProfile = await fetchRouteElevation(fromLat, fromLon, toLat, toLon, null,
         [_officialElevFt(fromIcao, fromApt), _officialElevFt(toIcao, toApt)]);
+    const routeObstacles = await _routeObstacles(elevProfile);
     const clearance = elevProfile
-        ? evaluateClearance(elevProfile, params.cruiseAltFt)
+        ? evaluateClearance(elevProfile, params.cruiseAltFt, 1000, routeObstacles)
         : null;
     const routeAirspaces = await loadRouteAirspaces(elevProfile, params.cruiseAltFt);
 
@@ -205,6 +316,7 @@ export async function computeFlightPlan(fromIcao, toIcao, params) {
         cruiseAltFt: params.cruiseAltFt,
         tasKt: params.tasKt,
         elevationProfile: elevProfile,
+        obstacles: routeObstacles,
         clearance,
         routeAirspaces,
     };
@@ -217,6 +329,7 @@ export function getDefaultAircraftPerf() {
     return {
         tasKt: ac?.cruiseSpeedKt ?? 110,
         fuelBurnLph: ac?.fuelBurnLph ?? 35,
+        reserveExtraMin: ac?.reserveExtraMin ?? 0,
     };
 }
 
@@ -247,7 +360,8 @@ export async function computeMultiLegFlightPlan(route, params) {
     const legs = [];
     let totalDistanceNm = 0, totalTimeMin = 0;
     let totalTripFuelL = 0;
-    const reserveMin = params.isNight ? RESERVE_MIN_NIGHT : RESERVE_MIN_DAY;
+    const reserveMin = (params.isNight ? RESERVE_MIN_NIGHT : RESERVE_MIN_DAY)
+        + (Number.isFinite(params.reserveExtraMin) ? Math.max(0, Math.min(60, params.reserveExtraMin)) : 0);
 
     // Vent moyen sur l'ensemble de la route (point milieu global) — un seul fetch.
     const midIdx = Math.floor((waypoints.length - 1) / 2);
@@ -297,10 +411,22 @@ export async function computeMultiLegFlightPlan(route, params) {
         legCoords.push([waypoints[i].lat, waypoints[i].lon, waypoints[i + 1].lat, waypoints[i + 1].lon]);
     }
     const elevProfile = await fetchMultiSegmentElevation(legCoords, waypoints.map(w => w.elevFt));
-    const clearance = elevProfile ? evaluateClearance(elevProfile, params.cruiseAltFt) : null;
+    const routeObstacles = await _routeObstacles(elevProfile);
+    const clearance = elevProfile ? evaluateClearance(elevProfile, params.cruiseAltFt, 1000, routeObstacles) : null;
     const routeAirspaces = await loadRouteAirspaces(elevProfile, params.cruiseAltFt);
 
     const totalReserveL = (reserveMin / 60) * params.fuelBurnLph;
+    // Branche dégagement : depuis la DESTINATION (dernier waypoint), à la GS
+    // moyenne réelle du plan (totalDistance / temps total — vent intégré).
+    const dest = waypoints[waypoints.length - 1];
+    const avgGsKt = totalTimeMin > 0 ? totalDistanceNm / (totalTimeMin / 60) : 0;
+    const diversion = _diversionFor(dest.lat, dest.lon, params.diversionIcao, params.fuelBurnLph, avgGsKt);
+    const fuel = _withDiversion({
+        tripFuelL: Math.round(totalTripFuelL * 10) / 10,
+        reserveL: Math.round(totalReserveL * 10) / 10,
+        totalL: Math.round((totalTripFuelL + totalReserveL) * 10) / 10,
+        reserveMin,
+    }, diversion);
     return {
         waypoints,
         legs,
@@ -309,14 +435,11 @@ export async function computeMultiLegFlightPlan(route, params) {
         totalTimeMin: Math.round(totalTimeMin),
         wind: wind ? { ...wind, altFt: params.cruiseAltFt } : null,
         declination,
-        fuel: {
-            tripFuelL: Math.round(totalTripFuelL * 10) / 10,
-            reserveL: Math.round(totalReserveL * 10) / 10,
-            totalL: Math.round((totalTripFuelL + totalReserveL) * 10) / 10,
-        },
+        fuel,
         cruiseAltFt: params.cruiseAltFt,
         tasKt: params.tasKt,
         elevationProfile: elevProfile,
+        obstacles: routeObstacles,
         clearance,
         routeAirspaces,
         isMultiLeg: true,

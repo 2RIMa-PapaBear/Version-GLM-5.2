@@ -15,6 +15,7 @@
  * ================================================================ */
 
 import { state } from './core.js';
+import { bigDataUrl } from './data-base.js';
 
 // ---- Index des cartes disponibles (data/vac-sia/index.json, ~5 Ko) ---------
 
@@ -22,7 +23,7 @@ let _indexPromise = null;
 function loadVacIndex() {
     _indexPromise ??= (async () => {
         try {
-            const r = await fetch('data/vac-sia/index.json', { cache: 'no-cache' });
+            const r = await fetch(bigDataUrl('data/vac-sia/index.json'), { cache: 'no-cache' });
             if (!r.ok) return null;
             const d = await r.json();
             return (d && Array.isArray(d.icacos)) ? d : null;
@@ -37,12 +38,19 @@ export function hasVac(icao) {
     return loadVacIndex().then(idx => !!(idx?.icacos?.includes(code)));
 }
 
+/** Infos de l'index Atlas-VAC — cycle AIRAC courant (B1 : attestation
+ *  de la page de garde du dossier de vol). */
+export async function getVacIndexInfo() {
+    const idx = await loadVacIndex();
+    return { airac: idx?.airac || '', count: idx?.icacos?.length || 0 };
+}
+
 /** URL de la carte VAC locale (versionnée par cycle pour les caches). */
 export async function vacUrl(icao) {
     const code = String(icao || '').toUpperCase();
     const idx = await loadVacIndex();
     const airac = idx?.airac || '';
-    return `data/vac-sia/${code}.pdf${airac ? `?v=${airac}` : ''}`;
+    return `${bigDataUrl(`data/vac-sia/${code}.pdf`)}${airac ? `?v=${airac}` : ''}`;
 }
 
 // ---- Cache IndexedDB (une carte ≈ 300 Ko, cycle inclus) --------------------
@@ -94,7 +102,7 @@ export async function fetchVac(icao) {
         return { blob: cached.blob, airac, offline: true };
     }
     try {
-        const res = await fetch(`data/vac-sia/${code}.pdf${airac ? `?v=${airac}` : ''}`, { signal: AbortSignal.timeout(20000) });
+        const res = await fetch(`${bigDataUrl(`data/vac-sia/${code}.pdf`)}${airac ? `?v=${airac}` : ''}`, { signal: AbortSignal.timeout(20000) });
         if (res.ok) {
             const blob = await res.blob();
             if (blob.size > 500) {
@@ -148,7 +156,26 @@ export async function openVac(icao) {
     _buildOverlay(code, pdf.numPages, data, isFr);
     _ui.pdf = pdf;
     await _showPage(1);
+    _traceVacConsult(code);   // B1 : atteste la consultation (tuile Dossier de vol)
     return true;
+}
+
+// B1 (dossier de vol) : dernière consultation de chaque VAC — atteste que le
+// pilote a ouvert la carte du terrain (localStorage, clé 'vac-consulted').
+const LS_VAC_SEEN = 'vac-consulted';
+function _traceVacConsult(icao) {
+    try {
+        const m = JSON.parse(localStorage.getItem(LS_VAC_SEEN) || '{}');
+        m[String(icao).toUpperCase()] = Date.now();
+        localStorage.setItem(LS_VAC_SEEN, JSON.stringify(m));
+    } catch {   }
+}
+/** Date de dernière consultation de la VAC d'un terrain (ms), ou null. */
+export function getVacConsultedTs(icao) {
+    try {
+        const m = JSON.parse(localStorage.getItem(LS_VAC_SEEN) || '{}');
+        return m[String(icao || '').toUpperCase()] || null;
+    } catch { return null; }
 }
 
 async function _showPage(n) {

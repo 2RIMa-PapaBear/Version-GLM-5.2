@@ -20,9 +20,27 @@ import {
     windCorrection,
     trueToMagneticHdg,
     computeFuel,
+    computeDiversionLeg,
     cheapestWaypointInsertion,
     RESERVES,
 } from '../js/flight-planner.js';
+
+describe('computeDiversionLeg (branche dégagement du devis carburant)', () => {
+    test('distance / temps / carburant depuis la destination (0,5° lat ≈ 30 NM)', () => {
+        const d = computeDiversionLeg(47.0, -3.0, 47.5, -3.0, 30, 100);
+        assert.equal(d.distNm, 30);   // 0,5° × 60 NM
+        assert.equal(d.timeMin, 18);  // 30 NM / 100 kt × 60
+        assert.equal(d.fuelL, 9);     // 18 min / 60 × 30 L/h
+    });
+
+    test('sans GS ni conso → distance seule ; coordonnées invalides → null', () => {
+        const d = computeDiversionLeg(47, -3, 47.5, -3, 0, 0);
+        assert.equal(d.distNm, 30);
+        assert.equal(d.timeMin, null);
+        assert.equal(d.fuelL, null);
+        assert.equal(computeDiversionLeg(null, -3, 47.5, -3, 30, 100), null);
+    });
+});
 
 describe('greatCircleDistanceNm', () => {
     test('distance Paris → Lyon ≈ 240 NM', () => {

@@ -23,7 +23,10 @@
  * — couvre toute la plage VFR de transit.
  *
  * On interpole linéairement entre les niveaux pour obtenir le vent
- * à n'importe quelle altitude (ft MSL).
+ * à n'importe quelle altitude. ATTENTION : les niveaux demandés sont
+ * au-dessus du SOL (AGL) alors que l'altitude de croisière du plan est
+ * AMSL/QNH — la réponse Open-Meteo porte l'élévation du modèle au point
+ * interrogé, qui sert à convertir (cf. getWindAtAltitude).
  *
  * CACHE
  * -----
@@ -73,6 +76,12 @@ export async function fetchWindsAloft(lat, lon) {
         const cur = data?.current;
         if (!cur) return null;
 
+        // Élévation du modèle au point (m) : les niveaux sont AGL, la
+        // croisière du plan est AMSL — sans cette conversion, le vent
+        // au-dessus d'un relief était pris trop haut de l'élévation du sol.
+        const groundElevFt = Number.isFinite(data.elevation)
+            ? Math.round(data.elevation * FT_PER_M) : null;
+
         // Assemble la liste des vents par niveau.
         const winds = LEVELS_M.map(h => {
             const speedKmh = cur[`windspeed_${h}m`];
@@ -85,6 +94,8 @@ export async function fetchWindsAloft(lat, lon) {
 
         if (winds.length === 0) return null;
 
+        if (groundElevFt != null) winds.groundElevFt = groundElevFt;
+
         _cache.set(key, { winds, ts: Date.now() });
         return winds;
     } catch (e) {
@@ -94,14 +105,21 @@ export async function fetchWindsAloft(lat, lon) {
 }
 
 /**
- * Obtient le vent interpolé à une altitude donnée (ft MSL).
- * Interpolation linéaire entre les niveaux connus.
- * @param {Array} winds Liste issue de fetchWindsAloft.
- * @param {number} altFt Altitude cible (ft MSL).
+ * Obtient le vent interpolé à l'altitude de croisière du plan.
+ * Interpolation linéaire entre les niveaux connus (AGL).
+ * @param {Array} winds Liste issue de fetchWindsAloft — porte
+ *   winds.groundElevFt (élévation du modèle au point) quand elle est connue.
+ * @param {number} altFt Altitude cible (ft AMSL/QNH).
  * @returns {{speedKt:number, dir:number}|null}
  */
 export function getWindAtAltitude(winds, altFt) {
     if (!Array.isArray(winds) || winds.length === 0) return null;
+
+    // Croisière AMSL → AGL quand l'élévation du sol est connue : les niveaux
+    // Open-Meteo (80 m…3000 m) sont donnés au-dessus du sol. Sur un plateau
+    // à 1500 ft, « 3000 ft AMSL » = 1500 ft AGL — sans conversion le vent
+    // était lu ~1500 ft trop haut (dérive/GS fausses en zone de relief).
+    if (Number.isFinite(winds.groundElevFt)) altFt -= winds.groundElevFt;
 
     // Sous le niveau le plus bas → on renvoie le plus bas.
     if (altFt <= winds[0].altFt) return { speedKt: winds[0].speedKt, dir: winds[0].dir };

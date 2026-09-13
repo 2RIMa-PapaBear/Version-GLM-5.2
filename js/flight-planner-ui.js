@@ -1,9 +1,14 @@
 import { state, escapeHtml, fetchAvecRelais } from './core.js';
 import { getAirportByICAO, enrichAirport } from './ui-module.js';
 import { getActiveAircraftId, getActiveAircraft, getFleet, updateAircraft } from './aircraft-fleet.js';
-import { getActiveRunwayNameForIcao, evaluateTakeoffFromRaw, getAircraftRef } from './takeoff-performance.js';
-import { drawNavLogPdf, drawNotamAnnex } from './navlog-pdf.js';
-import { getSelectedNotams } from './notam.js';
+import { getActiveRunwayNameForIcao, evaluateTakeoffFromRaw, evaluateLandingAtDestination, fetchTafWithFallback, getAircraftRef } from './takeoff-performance.js';
+import { showTakeoffWidget } from './takeoff-ui.js';
+import { collectFileInputs, computeFileTiles, showFlightFile } from './flight-file.js';
+import { getVacIndexInfo, getVacConsultedTs } from './vac-viewer.js';
+import { getLastMetarObsMs } from './data-age.js';
+import { getLastNotamFetchTs } from './notam.js';
+import { drawNavLogPdf, drawNotamAnnex, drawFileCover, drawWeatherPage } from './navlog-pdf.js';
+import { getSelectedNotams, getCurrentNotams } from './notam.js';
 import { computeWb, resolveLoads, normalizeEnvelope } from './wb-core.js';
 import { makeCollapsible } from './collapsible.js';
 import { computeFlightPlan, computeMultiLegFlightPlan, getDefaultAircraftPerf, greatCircleDistanceNm, RESERVES } from './flight-planner.js';
@@ -97,7 +102,11 @@ function _readPerf(acId) {
             }
         } catch {   }
     }
-    return { tasKt: tasKt ?? def.tasKt, fuelBurnLph: fuelBurnLph ?? def.fuelBurnLph };
+    return {
+        tasKt: tasKt ?? def.tasKt,
+        fuelBurnLph: fuelBurnLph ?? def.fuelBurnLph,
+        reserveExtraMin: Number.isFinite(ac.reserveExtraMin) ? ac.reserveExtraMin : (def.reserveExtraMin ?? 0),
+    };
 }
 
 function _writePerf(acId, tasKt, fuelBurnLph) {
@@ -119,6 +128,15 @@ let _recalculating = false;
 let _plannerToken = 0;
 
 export async function showFlightPlanner(fromIcao, toIcao) {
+    // PRÉCHAUFFAGE (retour pilote 13/09 « perfs atterrissage lentes ») :
+    // la météo de l'ARRIVÉE part EN TÊTE de la file relais, AVANT les
+    // fetchs du plan (TAF, vents, relief, alternates, NOTAM…) — quand le
+    // widget « Performances piste » se rend, le cache (10 min) répond
+    // immédiatement. Fire-and-forget : n'entrave jamais le plan.
+    const dest = String(toIcao || '').toUpperCase();
+    if (/^[A-Z][A-Z0-9]{3}$/.test(dest) && dest !== String(fromIcao || '').toUpperCase()) {
+        evaluateLandingAtDestination(dest).catch(() => {});
+    }
     const container = document.getElementById('flight-planner-panel');
     if (!container) return;
     loadFreqSources();   // SIA + overrides : fréquences réelles des étapes
@@ -156,8 +174,8 @@ export async function showFlightPlanner(fromIcao, toIcao) {
         && String(seq[seq.length - 1]).toUpperCase() === toIcao.toUpperCase())
         ? seq : [fromIcao, toIcao];
     const plan = route.length >= 3
-        ? await computeMultiLegFlightPlan(route, { cruiseAltFt: cruiseAlt, tasKt, fuelBurnLph: burn, isNight })
-        : await computeFlightPlan(fromIcao, toIcao, { cruiseAltFt: cruiseAlt, tasKt, fuelBurnLph: burn, isNight });
+        ? await computeMultiLegFlightPlan(route, { cruiseAltFt: cruiseAlt, tasKt, fuelBurnLph: burn, isNight, diversionIcao: state.diversionIcao || null, reserveExtraMin: perf.reserveExtraMin ?? 0 })
+        : await computeFlightPlan(fromIcao, toIcao, { cruiseAltFt: cruiseAlt, tasKt, fuelBurnLph: burn, isNight, diversionIcao: state.diversionIcao || null, reserveExtraMin: perf.reserveExtraMin ?? 0 });
 
     // Un calcul plus récent a pris la main (changement de départ/destination
     // pendant les fetchs) : ce rendu périmé ne doit pas l'écraser.
@@ -191,6 +209,27 @@ export async function showFlightPlanner(fromIcao, toIcao) {
     } else {
         clearElevationChart('elevation-profile-container');
     }
+
+    // Le plan vient d'être (re)calculé : la section ATTERRISSAGE du widget
+    // « Performances piste » dépend de la DESTINATION — le widget n'étant
+    // sinon rendu qu'au chargement du METAR, une destination saisie
+    // APRÈS ce chargement ne l'actualisait jamais (div vide). On re-rend
+    // sur le terrain OBSERVÉ (consultation départ/arrivée comprise).
+    showTakeoffWidget(state.requestedIcao || fromIcao);
+    // Idem pour le panneau « Dossier de vol » : la tuile Carburant suit le
+    // PLAN (total requis) — retour pilote 13/09 : elle ne bougeait pas à
+    // la modification du PV.
+    showFlightFile();
+}
+
+// Choix/retrait du terrain de dégagement (panneau Alternates, état
+// state.diversionIcao) : recalcul complet du plan — le devis carburant
+// (Trajet + Dégagement + Réserve) et le pré-remplissage du centrage suivent.
+if (typeof document !== 'undefined') {
+    document.addEventListener('diversion-changed', (e) => {
+        const { from, to } = e.detail || {};
+        if (from && to) showFlightPlanner(from, to);
+    });
 }
 
 function _renderLoading(container, from, to, alt, tas, burn, isNight, isFr) {
@@ -215,21 +254,28 @@ function _renderLoading(container, from, to, alt, tas, burn, isNight, isFr) {
 // Notes), piste en service, tronçons du plan avec Z sécu calculée (relief max
 // du tronçon + 1000 ft, arrondi aux 500 ft sup). Les champs inconnus (pilote,
 // c/sign, heures, horamètres, HEA/HRA) restent vides à remplir à la main.
-async function _generateNavLogPdf() {
+async function _generateNavLogPdf(opts = {}) {
     // L'onglet est ouvert immédiatement, pendant que le geste utilisateur est
     // encore actif (la génération attend un METAR : un window.open tardif serait
     // bloqué comme popup). Le PDF s'y chargera une fois généré ; en cas
     // d'échec, l'onglet est refermé.
     const tab = window.open('', '_blank');
     try {
-        await _generateNavLogPdfInto(tab);
+        await _generateNavLogPdfInto(tab, opts);
     } catch (err) {
         console.error('Nav log PDF generation failed:', err);
         try { tab?.close(); } catch { /* déjà fermé */ }
     }
 }
 
-async function _generateNavLogPdfInto(tab) {
+/** PDF UNIQUE du dossier de vol (B1 phase 2) : le bouton du panneau
+ *  « Dossier de vol » (flight-file.js, import dynamique anti-cycle). */
+export function printFlightFile() {
+    const isFr = state.lang === 'fr';
+    _confirmNavLogPdf(isFr, { file: true }).then(ok => { if (ok) _generateNavLogPdf({ file: true }); });
+}
+
+async function _generateNavLogPdfInto(tab, { file = false } = {}) {
     const stash = state._lastNavPlan;
     if (!stash?.plan) return;
     const { plan, tas } = stash;
@@ -279,6 +325,12 @@ async function _generateNavLogPdfInto(tab) {
             if (p.frac == null) continue;
             const f = p.frac * cum;
             if (f >= a - 1 && f <= b + 1 && p.elevFt > max) max = p.elevFt;
+        }
+        // Obstacles SIA du couloir (A6) : le sommet le plus élevé du tronçon
+        // compte comme le relief — Z sécu = max(relief, obstacle) + 1000 ft.
+        for (const o of (plan.obstacles || [])) {
+            const f = (o.frac ?? -1) * cum;
+            if (f >= a - 1 && f <= b + 1 && o.topFt > max) max = o.topFt;
         }
         return max === -Infinity ? '' : Math.ceil((max + 1000) / 500) * 500;
     };
@@ -333,7 +385,11 @@ async function _generateNavLogPdfInto(tab) {
         timeLabel,
         fuel: {
             tripL: fuel.tripFuelL, reserveL: fuel.reserveL, totalL: fuel.totalL,
-            reserveMin: stash.isNight ? RESERVES.NIGHT_MIN : RESERVES.DAY_MIN,
+            reserveMin: fuel.reserveMin ?? (stash.isNight ? RESERVES.NIGHT_MIN : RESERVES.DAY_MIN),
+            diversionL: fuel.diversionL || 0,
+            divIcao: fuel.diversion?.icao || null,
+            divDistNm: fuel.diversion?.distNm ?? null,
+            divTimeMin: fuel.diversion?.timeMin ?? null,
         },
         clearance: plan.clearance ? {
             maxFt: plan.elevationProfile?.maxFt ?? '',
@@ -455,13 +511,116 @@ async function _generateNavLogPdfInto(tab) {
         metarRaw, rows, calc, perf, centro,
     });
     // Annexe NOTAM : les NOTAM cochés du dossier SOFIA (10/09) prolongent le
-    // log de vol sur des pages dédiées — aucune annexe si rien n'est coché.
+    // log de vol sur des pages dédiées. Dossier complet (B1) : aucune case
+    // cochée alors que le dossier est chargé → annexe du dossier ENTIER
+    // (retour pilote 13/09 : « si le dossier NOTAM est OK il doit être
+    // ajouté à la suite du PDF »).
     try {
-        const selNotams = getSelectedNotams();
+        let selNotams = getSelectedNotams();
+        if (file && !selNotams.length) selNotams = getCurrentNotams();
         if (selNotams.length) drawNotamAnnex(doc, selNotams, state.lang === 'fr');
     } catch (e) { console.warn('annexe NOTAM ignorée :', e.message); }
+
+    // ---- B1 phase 2 : PDF UNIQUE du dossier — page de garde datée (statut
+    // des six rubriques + attestation VAC) et page météo capturée, AJOUTÉES
+    // en fin de document puis remontées en tête (doc.movePage). Arbitrage
+    // ②=A : ~1 Mo, VAC non intégrées.
+    if (file) {
+        try {
+            const finp = await collectFileInputs();
+            const tiles = computeFileTiles(finp);
+            const vacInfo = await getVacIndexInfo();
+            const hhmm = (ts) => ts ? new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+            const lvlTxt = (l) => l === 'ok' ? 'OK' : (l === 'caution' ? '!' : '!!');
+            const rows = [
+                { status: tiles.weather.status, label: isFr3 ? 'Météo' : 'Weather',
+                    detail: `METAR ${finp.metarAgeMin != null ? finp.metarAgeMin + ' min' : '—'} · TAF `
+                        + (finp.tafState === 'loaded' ? 'OK' : finp.tafState === 'none' ? (isFr3 ? 'sans objet' : 'n/a') : (isFr3 ? 'à charger' : 'missing'))
+                        + (finp.arrWeather != null ? ` · ${isFr3 ? 'arrivée' : 'dest.'} ${finp.arrWeather ? 'OK' : '?'}` : ''),
+                    ref: hhmm(getLastMetarObsMs()) },
+                { status: tiles.notam.status, label: 'NOTAM',
+                    detail: finp.notamCount
+                        ? `${finp.notamCount} NOTAM · ${isFr3 ? 'générés il y a' : 'fetched'} ${finp.notamAgeMin ?? '—'} min`
+                        : (isFr3 ? 'aucun dossier chargé' : 'no briefing loaded'),
+                    ref: hhmm(getLastNotamFetchTs()) },
+                { status: tiles.vac.status, label: 'VAC',
+                    detail: `${tiles.vac.items.filter(v => v.consulted).length}/${tiles.vac.items.length} ${isFr3 ? 'consultées' : 'viewed'}`,
+                    ref: vacInfo.airac || '' },
+                { status: tiles.fuel.status, label: isFr3 ? 'Carburant' : 'Fuel',
+                    detail: finp.fuelRequired != null
+                        ? `${isFr3 ? 'requis' : 'req.'} ${finp.fuelRequired} L · ${isFr3 ? 'embarqué' : 'on board'} ${finp.fuelOnBoard ?? '—'} L`
+                            + (finp.mode === 'nav' ? ` · ${isFr3 ? 'dégagement' : 'alt.'} ${state.diversionIcao || '—'}` : '')
+                        : (isFr3 ? 'devis non renseigné' : 'no fuel plan yet'), ref: '' },
+                { status: tiles.perf.status, label: isFr3 ? 'Perfs piste' : 'Rwy perf',
+                    detail: `${isFr3 ? 'décollage' : 'takeoff'} ${finp.takeoffLevel ? lvlTxt(finp.takeoffLevel) : '—'} · ${isFr3 ? 'atterrissage' : 'landing'} ${finp.landingLevel ? lvlTxt(finp.landingLevel) : '—'}`, ref: '' },
+                { status: tiles.wb.status, label: isFr3 ? 'Centrage' : 'Balance',
+                    detail: tiles.wb.status === 'ok' ? (isFr3 ? 'dans l\u2019enveloppe' : 'within envelope')
+                        : tiles.wb.status === 'danger' ? (isFr3 ? 'HORS LIMITES' : 'OUT OF LIMITS')
+                        : (isFr3 ? 'non configuré (flotte)' : 'not configured (fleet)'), ref: '' },
+            ];
+            const generatedLabel = new Date().toLocaleString([], { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+            const ac = getActiveAircraft() || {};
+            const n0 = doc.getNumberOfPages();
+            drawFileCover(doc, {
+                isFr: isFr3, generatedLabel,
+                routeLabel: `${fromIcao} - ${toIcao}${state.diversionIcao ? ` · ${isFr3 ? 'dégagement' : 'alt.'} ${state.diversionIcao}` : ''}`,
+                aircraftLabel: `${ac.name || ''}${ac.registration ? ' (' + ac.registration + ')' : ''}`.trim() || '—',
+                rows, vac: tiles.vac.items.map(v => ({ icao: v.icao, ts: getVacConsultedTs(v.icao) })),
+                vacAirac: vacInfo.airac,
+            });
+            const displayed = (document.getElementById('tafInput')?.value || '').trim().split('\n')[0] || '';
+            const depType = state.lastParsed?.isMetar === false ? 'TAF' : 'METAR';
+            let dep = null;
+            if (displayed) {
+                const isDepMsg = String(state.requestedIcao || '').toUpperCase() === fromIcao;
+                dep = {
+                    title: isDepMsg
+                        ? `${isFr3 ? 'Départ' : 'Departure'} ${fromIcao} - ${depType}`
+                        : `${isFr3 ? 'Message affiché' : 'Displayed message'} - ${depType}`,
+                    raw: displayed,
+                    decode: depType === 'METAR',
+                };
+            }
+            // Spécification pilote 13/09 (la lettre) : DÉROUTEMENT puis
+            // ARRIVÉE, chacun en GRAPHIQUE TAF (capturé du moteur réel,
+            // substitution olive grise mentionnée si le terrain n'émet pas)
+            // au-dessus du texte BRUT — PAS de METAR pour ces deux terrains.
+            const { captureTafChartPng } = await import('./taf-chart-capture.js');
+            const terrains = [];
+            const addTafBlock = async (role, icao) => {
+                if (!icao) return;
+                const tf = await fetchTafWithFallback(icao);
+                if (!tf?.raw) return;
+                const t = {
+                    label: `${role} ${icao}`,
+                    tafRaw: tf.raw,
+                    note: tf.from ? `${isFr3 ? 'station' : 'stn'} ${tf.from}, ${tf.distNm} NM` : undefined,
+                };
+                const cap = await captureTafChartPng(tf.raw);
+                if (cap) { t.chart = cap.png; t.chartRatio = cap.ratio; t.chartFmt = cap.fmt; }
+                terrains.push(t);
+            };
+            if (state.diversionIcao && state.diversionIcao !== toIcao) {
+                await addTafBlock(isFr3 ? 'Déroutement' : 'Alternate', state.diversionIcao);
+            }
+            await addTafBlock(isFr3 ? 'Arrivée' : 'Destination', toIcao);
+            drawWeatherPage(doc, { isFr: isFr3, generatedLabel, dep, terrains });
+            // Remonte garde puis météo en tête (indices 1-based ; la météo
+            // RESTE à n1 après la remontée de la garde — vérifié par
+            // test/_diag-movepage.mjs).
+            const n1 = doc.getNumberOfPages();
+            if (n1 - n0 === 2) {
+                doc.movePage(n0 + 1, 1);
+                doc.movePage(n1, 2);
+            }
+        } catch (e) {
+            console.warn('pages dossier de vol ignorées :', e.message);
+        }
+    }
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const filename = `Log-nav_${fromIcao}-${toIcao}_${today}.pdf`;
+    const filename = file
+        ? `Dossier_${fromIcao}-${toIcao}_${today}.pdf`
+        : `Log-nav_${fromIcao}-${toIcao}_${today}.pdf`;
     // Le PDF s'ouvre dans un onglet, dans une PAGE HTML HABILLÉE : il y est
     // embarqué en <iframe src="data:application/pdf;base64,…">. En HTTPS le
     // visualiseur du navigateur l'affiche ; surtout, sur une origine HTTP
@@ -473,7 +632,9 @@ async function _generateNavLogPdfInto(tab) {
         try {
             const dataUri = doc.output('datauristring');
             const blobUrl = URL.createObjectURL(doc.output('blob'));
-            const title = isFr3 ? `Log de nav ${fromIcao}-${toIcao}` : `Nav log ${fromIcao}-${toIcao}`;
+            const title = file
+                ? (isFr3 ? `Dossier de vol ${fromIcao}-${toIcao}` : `Flight file ${fromIcao}-${toIcao}`)
+                : (isFr3 ? `Log de nav ${fromIcao}-${toIcao}` : `Nav log ${fromIcao}-${toIcao}`);
             tab.document.open();
             tab.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
 <style>html,body{margin:0;height:100%;overflow:hidden}iframe{border:0;width:100%;height:100%}
@@ -596,13 +757,18 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
 
         <div class="fp-section" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color);">
             <div class="fp-section-title">${isFr ? 'Carburant' : 'Fuel'}</div>
-            <div class="fp-grid fp-grid-3" style="margin-top:6px;">
+            <div class="fp-grid ${fuel.diversion ? 'fp-grid-4' : 'fp-grid-3'}" style="margin-top:6px;">
                 <div class="fp-cell">
                     <div class="fp-label">${isFr ? 'Trajet' : 'Trip'}</div>
                     <div class="fp-value">${fuel.tripFuelL} L</div>
                 </div>
+                ${fuel.diversion ? `
+                <div class="fp-cell" title="${isFr ? 'Rejoindre le terrain de dégagement depuis l\u2019arrivée' : 'Reach the alternate field from destination'} : ${fuel.diversion.distNm} NM · ${fuel.diversion.timeMin ?? '—'} min">
+                    <div class="fp-label">${isFr ? 'Dégagement' : 'Alternate'} ${fuel.diversion.icao}</div>
+                    <div class="fp-value">${fuel.diversion.fuelL != null ? fuel.diversion.fuelL : '—'} L</div>
+                </div>` : ''}
                 <div class="fp-cell">
-                    <div class="fp-label">${isFr ? 'Réserve' : 'Reserve'} (${isNight ? RESERVES.NIGHT_MIN : RESERVES.DAY_MIN}min)</div>
+                    <div class="fp-label">${isFr ? 'Réserve' : 'Reserve'} (${fuel.reserveMin ?? (isNight ? RESERVES.NIGHT_MIN : RESERVES.DAY_MIN)}min)</div>
                     <div class="fp-value">${fuel.reserveL} L</div>
                 </div>
                 <div class="fp-cell">
@@ -622,10 +788,23 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
                     </div>
                     <div class="fp-cell">
                         <div class="fp-label">${isFr ? 'Marge mini' : 'Min clearance'}</div>
-                        <div class="fp-value" style="color:${clearColor}; font-weight:700;">
+                        <div class="fp-value" style="color:${clearColor};">
                             ${cl.minClearanceFt >= 0 ? '+' : ''}${cl.minClearanceFt} ft
                         </div>
                     </div>
+                    ${(() => {
+                        // Obstacle SIA dominant du couloir (A6) : intégré à la
+                        // marge mini ci-dessus et à la Z sécu du log de nav.
+                        const obs = plan.obstacles || [];
+                        if (!obs.length) return '';
+                        const top = obs.reduce((m, o) => (o.topFt > (m?.topFt ?? -Infinity) ? o : m), null);
+                        if (!top) return '';
+                        const lib = top.type || top.name || (isFr ? 'obstacle' : 'obstacle');
+                        return `<div class="fp-cell" title="${isFr ? 'Sommet d\u2019obstacle le plus élevé du couloir (± 0,5 NM, base SIA) — compris dans la marge mini et la Z sécu' : 'Highest obstacle top in the corridor (±0.5 NM, SIA) — included in min clearance and MSA'}">
+                            <div class="fp-label">${isFr ? 'Obstacle max' : 'Max obstacle'}</div>
+                            <div class="fp-value" style="color:${top.topFt >= (plan.elevationProfile.maxFt ?? 0) ? '#F59E0B' : 'inherit'};">${top.topFt} ft · ${escapeHtml(lib)}</div>
+                        </div>`;
+                    })()}
                 </div>
                 ${cl.level !== 'ok' ? `
                     <div style="margin-top:6px; padding:6px 10px; background:rgba(${cl.level === 'danger' ? '239,68,68' : '245,158,11'},0.1); border-radius:6px; font-size:11px; color:${clearColor};">
@@ -692,10 +871,11 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
     _wireInputs(container, from, to);
 }
 
-// Fenêtre de confirmation avant génération du log de nav PDF : rappelle que le
-// document est calculé automatiquement et liste ce que le pilote doit vérifier
-// avant de l'utiliser en vol. Promesse → true si l'utilisateur confirme.
-function _confirmNavLogPdf(isFr) {
+// Fenêtre de confirmation avant génération du log de nav PDF (ou du DOSSIER
+// complet, {file:true}) : rappelle que le document est calculé automatiquement
+// et liste ce que le pilote doit vérifier avant de l'utiliser en vol.
+// Promesse → true si l'utilisateur confirme.
+function _confirmNavLogPdf(isFr, { file = false } = {}) {
     return new Promise(resolve => {
         document.getElementById('navlog-confirm-modal')?.remove();
         const modal = document.createElement('div');
@@ -725,7 +905,9 @@ function _confirmNavLogPdf(isFr) {
                 <div class="modal-header">
                     <h2 style="display:flex;align-items:center;gap:10px;">
                         <i data-lucide="alert-triangle" style="width:20px;height:20px;color:#F59E0B;"></i>
-                        ${isFr ? 'À vérifier avant d\'imprimer' : 'Verify before printing'}
+                        ${file
+                            ? (isFr ? 'Dossier de vol — à vérifier avant impression' : 'Flight file — verify before printing')
+                            : (isFr ? 'À vérifier avant d\'imprimer' : 'Verify before printing')}
                     </h2>
                     <button class="btn-close-modal" data-cancel title="${isFr ? 'Annuler' : 'Cancel'}" aria-label="${isFr ? 'Annuler' : 'Cancel'}"><i data-lucide="x"></i></button>
                 </div>
@@ -742,6 +924,29 @@ function _confirmNavLogPdf(isFr) {
                                 <span>${txt}</span>
                             </div>`).join('')}
                     </div>
+                    <div style="margin:0 0 10px 0; padding-top:8px; border-top:1px dashed var(--border-color);">
+                        <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:var(--text-muted); margin-bottom:6px;">
+                            <i data-lucide="clipboard-check" style="width:12px;height:12px;vertical-align:middle;"></i>
+                            ${isFr ? ' Documents à bord — cochez après vérification' : 'Documents on board — tick after checking'}
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px 12px;">
+                            ${(isFr ? [
+                                '<b>Licence</b> et certificat médical (ou licence ULM) à jour',
+                                '<b>Carnet de vol</b> à jour',
+                                '<b>Documents avion</b> : immatriculation, assurance RC, manuel de vol / fiche de pesée',
+                                '<b>Cartes du jour</b> : VAC départ / arrivée / dégagement + log de nav',
+                            ] : [
+                                '<b>Licence</b> and medical (or microlight licence) valid',
+                                '<b>Logbook</b> up to date',
+                                '<b>Aircraft documents</b>: registration, RC insurance, POH / weight &amp; balance sheet',
+                                '<b>Today\u2019s charts</b>: departure / destination / alternate VAC + nav log',
+                            ]).map(d => `
+                                <label style="display:flex; gap:7px; align-items:center; cursor:pointer; font-size:12px;">
+                                    <input type="checkbox" class="docs-check" style="accent-color:var(--primary); width:14px; height:14px; flex-shrink:0;">
+                                    <span>${d}</span>
+                                </label>`).join('')}
+                        </div>
+                    </div>
                     <p style="margin:0 0 10px 0; color:var(--text-muted);">
                         ${isFr
                             ? 'Les champs laissés vides (pilote, c/sign, heures, horomètres, HEA/HRA, checks) sont à <b>compléter à la main</b>.'
@@ -756,9 +961,11 @@ function _confirmNavLogPdf(isFr) {
                 </div>
                 <div class="modal-footer">
                     <button class="btn-secondary" data-cancel>${isFr ? 'Annuler' : 'Cancel'}</button>
-                    <button class="btn-primary" data-ok>
+                    <button class="btn-primary" data-ok disabled>
                         <i data-lucide="printer" style="width:14px;height:14px;"></i>
-                        ${isFr ? 'J\'ai vérifié — générer et ouvrir' : 'Verified — generate & open'}
+                        ${file
+                            ? (isFr ? 'J\'ai vérifié — générer le dossier' : 'Verified — generate the file')
+                            : (isFr ? 'J\'ai vérifié — générer et ouvrir' : 'Verified — generate & open')}
                     </button>
                 </div>
             </div>`;
@@ -776,6 +983,21 @@ function _confirmNavLogPdf(isFr) {
         modal.querySelector('[data-ok]').addEventListener('click', () => done(true));
         modal.addEventListener('click', e => { if (e.target === modal) done(false); });
         document.addEventListener('keydown', onKey);
+
+        // Le bouton de génération reste GRISÉ tant que les 4 cases « Documents
+        // à bord » ne sont pas toutes cochées (retour pilote 13/09 : la
+        // vérification doit être effective, pas sautable).
+        const docsBoxes = [...modal.querySelectorAll('.docs-check')];
+        const okBtn = modal.querySelector('[data-ok]');
+        const syncOk = () => {
+            const all = docsBoxes.length > 0 && docsBoxes.every(b => b.checked);
+            okBtn.disabled = !all;
+            okBtn.style.opacity = all ? '' : '0.45';
+            okBtn.style.cursor = all ? '' : 'not-allowed';
+        };
+        docsBoxes.forEach(b => b.addEventListener('change', syncOk));
+        syncOk();
+
         modal.querySelector('[data-ok]').focus();
     });
 }

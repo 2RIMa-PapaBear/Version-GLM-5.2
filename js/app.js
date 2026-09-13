@@ -23,6 +23,7 @@ import { toggleRegionalMap, showRegionalMapFor } from './regional-map.js';
 import { showAlternates } from './alternates.js';
 import { preloadDeclination } from './magvar.js';
 import { showTakeoffWidget } from './takeoff-ui.js';
+import { showFlightFile } from './flight-file.js';
 import { refreshWbWidget } from './wb-ui.js';
 import { showFrequenciesWidget } from './frequencies-ui.js';
 import { showFlightPlanner, parseWaypointsField, formatWaypointsField } from './flight-planner-ui.js';
@@ -186,6 +187,7 @@ export function genererGraphique() {
         displayWeatherAlerts(null);
         renderGoNoGo(); // masque la bannière (state.lastParsed est null ou invalide)
         showTakeoffWidget(null); // masque le widget décollage
+        showFlightFile(null); // masque le dossier de vol (B1)
         refreshWbWidget(null); // masque le widget centrage
         showFrequenciesWidget(null); // masque le widget fréquences
         const fpPanel = document.getElementById('flight-planner-panel');
@@ -280,6 +282,7 @@ export function genererGraphique() {
     // message affiché, qu'il soit départ ou destination).
     renderGoNoGo();
     showTakeoffWidget(state.requestedIcao || res.code);
+    showFlightFile(state.requestedIcao || res.code);
     refreshWbWidget(state.requestedIcao || res.code);
 
     // Met à jour le label du bouton lecture audio selon le type de message.
@@ -473,6 +476,7 @@ export function telechargerMessage(typeMessage) {
         _enrichFromOpenAIP(state.requestedIcao);
         // Affiche le widget de performance décollage (densité-altitude vs piste).
         showTakeoffWidget(state.requestedIcao);
+        showFlightFile(state.requestedIcao);
         refreshWbWidget(state.requestedIcao);
         // Affiche les fréquences radio du terrain (alimenté par OpenAIP).
         showFrequenciesWidget(state.requestedIcao);

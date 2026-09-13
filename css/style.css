@@ -526,9 +526,10 @@ body.mode-nav .dep-dest-toggle { display: flex; }
     border-radius: var(--radius-sm);
     overflow: hidden;
 }
-/* Mode « le long du trajet » : 6e colonne Écart (± NM et côté). */
+/* Mode « le long du trajet » : 6e colonne Écart (± NM et côté), 7e colonne
+   Dégagement (bouton — branche carburant du plan). */
 .alternates-grid.route {
-    grid-template-columns: 1.8fr 0.8fr 1fr 1.1fr 1.4fr 1.1fr;
+    grid-template-columns: 1.8fr 0.8fr 1fr 1.1fr 1.4fr 1.1fr 1.1fr;
 }
 .alt-header {
     background: var(--inner-bg);
@@ -554,19 +555,41 @@ body.mode-nav .dep-dest-toggle { display: flex; }
 .alt-code { font-weight: 800; color: var(--primary); }
 .alt-name { font-family: 'DM Sans', sans-serif; font-size: 10px; color: var(--text-muted); font-weight: 400; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* Bouton « terrain de dégagement » (7e colonne, mode trajet) : désignation
+   du dégagement du devis carburant — proposition « Recommandé » soulignée
+   d'ambre, choix du pilote en voyant primaire. */
+.alt-div-cell { flex-direction: column; justify-content: center; gap: 3px; }
+.alt-divert {
+    height: 26px; min-width: 44px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    background: transparent; color: var(--text-muted);
+    cursor: pointer; transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.alt-divert:hover { border-color: var(--primary); color: var(--primary); }
+.alt-divert.reco { border-color: #F59E0B; color: #F59E0B; }
+.alt-divert.on { background: var(--primary); border-color: var(--primary); color: #FFFFFF; }
+.alt-reco {
+    font-family: 'DM Sans', sans-serif; font-size: 9px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px; color: #F59E0B;
+    text-align: center; line-height: 1;
+}
+
 @media (max-width: 700px) {
     .alternates-grid { grid-template-columns: 1.5fr 1fr 1fr; }
     /* En mobile, on masque les colonnes Plafond (4) et Vent (5).
        Chaque ligne fait 5 cellules (nom, cat, visi, plafond, vent) ;
        on cible la 4e et la 5e de chaque groupe de 5. :not(.route) — la
-       grille « trajet » a 6 cellules par ligne, ses propres règles suivent. */
+       grille « trajet » a 7 cellules par ligne, ses propres règles suivent. */
     .alternates-grid:not(.route) > *:nth-child(5n+4),
     .alternates-grid:not(.route) > *:nth-child(5n) { display: none; }
-    /* Grille « trajet » : lignes de 6 (l'Écart en 6e) — on garde
-       nom/cat/visi/écart, on masque Plafond (4) et Vent (5). */
-    .alternates-grid.route { grid-template-columns: 1.5fr 1fr 1fr 1fr; }
-    .alternates-grid.route > *:nth-child(6n+4),
-    .alternates-grid.route > *:nth-child(6n+5) { display: none; }
+    /* Grille « trajet » : lignes de 7 (Écart en 6e, Dégagement en 7e) —
+       on garde nom/cat/visi/écart/dégagement (le choix du dégagement reste
+       accessible sur tablette/téléphone), on masque Plafond (4) et Vent (5). */
+    .alternates-grid.route { grid-template-columns: 1.5fr 0.9fr 1fr 1fr 1.2fr; }
+    .alternates-grid.route > *:nth-child(7n+4),
+    .alternates-grid.route > *:nth-child(7n+5) { display: none; }
 }
 
 /* ================================================================
@@ -2183,10 +2206,14 @@ body.map-overlay-open { overflow: hidden; }
     grid-template-columns: 1fr 1fr 1fr;
     gap: 6px 12px;
 }
+.fp-grid-4 {
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 6px 10px;
+}
 
 @media (max-width: 600px) {
     .fp-inputs { grid-template-columns: 1fr 1fr; }
-    .fp-grid, .fp-grid-3 { grid-template-columns: 1fr; }
+    .fp-grid, .fp-grid-3, .fp-grid-4 { grid-template-columns: 1fr 1fr; }
 }
 
 /* === Log de navigation (tableau waypoints) === */
@@ -2671,3 +2698,23 @@ html.theme-light .neighbors-loading { background: rgba(255, 255, 255, 0.9); colo
 html.theme-light .data-age-badge.age-fresh { color: #15803D; background: rgba(34, 197, 94, 0.12); }
 html.theme-light .data-age-badge.age-aging { color: #B45309; background: rgba(245, 158, 11, 0.14); }
 html.theme-light .data-age-badge.age-old   { color: #B91C1C; background: rgba(239, 68, 68, 0.12); }
+
+/* === Dossier de vol (B1) : tuiles de statut === */
+.ff-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ff-tile {
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px 10px;
+    display: flex; flex-direction: column; gap: 4px;
+    font-size: 11px;
+}
+.ff-tile-head {
+    display: flex; align-items: center; gap: 6px;
+    font-weight: 700; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--text-muted);
+}
+.ff-tile-detail { color: var(--text-color); line-height: 1.5; display: flex; flex-direction: column; gap: 3px; }
+@media (max-width: 800px) { .ff-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 520px) { .ff-grid { grid-template-columns: 1fr; } }

@@ -60,8 +60,12 @@
     "fuel": {
       "tripL": 21.4,
       "reserveL": 8,
-      "totalL": 29.4,
-      "reserveMin": 30
+      "totalL": 33.6,
+      "reserveMin": 30,
+      "divIcao": "LFRD",
+      "diversionL": 4.2,
+      "divDistNm": 22,
+      "divTimeMin": 9
     },
     "clearance": {
       "maxFt": 660,

@@ -130,9 +130,21 @@ export function dataAgeUpdate(metarText, opts = {}) {
             obsTimeMs = t;
         }
     }
+    // B1 (dossier de vol) : heure d'obs du dernier METAR chargé — la tuile
+    // Météo doit rester juste même après un chargement TAF (le badge suit
+    // le message AFFICHÉ, lui).
+    if (obsTimeMs && type === 'metar') _lastMetarObsMs = obsTimeMs;
     _ageState = nextAgeState(_ageState, { obsTimeMs, offline: !!opts.offline, type });
     _ensureBadge();
     _render();
+}
+
+let _lastMetarObsMs = null;
+
+/** Heure d'observation (ms) du dernier METAR chargé — âge de la tuile
+ *  « Météo » du Dossier de vol (B1). null si aucun METAR depuis le boot. */
+export function getLastMetarObsMs() {
+    return _lastMetarObsMs;
 }
 
 /** Monte le badge (au premier chargement de l'app). */

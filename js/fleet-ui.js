@@ -132,6 +132,9 @@ function _render() {
                         <span title="${isFr ? 'Marge de sécurité' : 'Safety margin'}">${ac.safetyMargin}%</span>
                         ${ac.cruiseSpeedKt ? `<span>·</span><span title="${isFr ? 'Vitesse de croisière (TAS)' : 'Cruise speed (TAS)'}">${ac.cruiseSpeedKt} kt</span>` : ''}
                         ${ac.fuelBurnLph ? `<span>·</span><span title="${isFr ? 'Consommation horaire' : 'Fuel burn'}">${ac.fuelBurnLph} L/h</span>` : ''}
+                        ${ac.xwindLimitKt ? `<span>·</span><span title="${isFr ? 'Limite vent traversier' : 'Crosswind limit'}">Xw ${ac.xwindLimitKt} kt</span>` : ''}
+                        ${ac.reserveExtraMin ? `<span>·</span><span title="${isFr ? 'Majoration personnelle de réserve' : 'Personal reserve'}">+${ac.reserveExtraMin} min</span>` : ''}
+                        ${ac.ldgRoll ? `<span>·</span><span title="${isFr ? 'Atterrissage POH (roulement / 50 ft)' : 'POH landing (roll / 50 ft)'}">${ac.ldgRoll}/${ac.ldgFifty} ft</span>` : ''}
                     </div>
                 </div>
                 <div class="fleet-item-actions">
@@ -192,6 +195,14 @@ function _render() {
             <div class="fleet-form-row">
                 <label>${isFr ? 'Vitesse croisière (kt)' : 'Cruise speed (kt)'}<input type="number" id="fleet-cruise" placeholder="110" min="0" step="5"></label>
                 <label>${isFr ? 'Conso croisière (L/h)' : 'Cruise burn (L/h)'}<input type="number" id="fleet-burn" placeholder="35" min="0" step="1"></label>
+            </div>
+            <div class="fleet-form-row">
+                <label title="${isFr ? 'Limite vent traversier (manuel de vol / école) — le GO/NO-GO l\u2019utilise à la place des seuils génériques 12/15 kt' : 'Crosswind limit (POH/club) — used by GO/NO-GO instead of generic 12/15 kt'}">${isFr ? 'Limite traversier (kt)' : 'Crosswind limit (kt)'}<input type="number" id="fleet-xwind" placeholder="${isFr ? 'ex. 12' : 'e.g. 12'}" min="0" max="40" step="1"></label>
+                <label title="${isFr ? 'Minutes AJOUTÉES à la réserve réglementaire (30 jour / 45 nuit) dans le devis carburant' : 'Minutes ADDED to the legal reserve (30 day / 45 night) in the fuel plan'}">${isFr ? 'Réserve perso (min)' : 'Personal reserve (min)'}<input type="number" id="fleet-reserve-extra" placeholder="0" min="0" max="60" step="5"></label>
+            </div>
+            <div class="fleet-form-row">
+                <label title="${isFr ? 'Distances d\u2019atterrissage POH niveau mer/ISA (roulement et franchissement 50 ft) — alimentent la section Atterrissage quand le terrain observé est la destination' : 'POH landing distances at SL/ISA (roll and 50 ft) — feed the Landing section when the observed field is the destination'}">${isFr ? 'Atterr. roulement (ft)' : 'Landing roll (ft)'}<input type="number" id="fleet-ldg-roll" placeholder="725" min="0" step="10"></label>
+                <label>${isFr ? 'Atterr. 50ft (ft)' : 'Landing 50ft (ft)'}<input type="number" id="fleet-ldg-50ft" placeholder="1400" min="0" step="10"></label>
             </div>
             <details class="fleet-wb" id="fleet-wb-section">
                 <summary>
@@ -428,6 +439,10 @@ function _fillForm(id) {
     document.getElementById('fleet-50ft').value = ac.fiftyFt || '';
     document.getElementById('fleet-cruise').value = ac.cruiseSpeedKt || '';
     document.getElementById('fleet-burn').value = ac.fuelBurnLph || '';
+    document.getElementById('fleet-xwind').value = ac.xwindLimitKt || '';
+    document.getElementById('fleet-reserve-extra').value = ac.reserveExtraMin || '';
+    document.getElementById('fleet-ldg-roll').value = ac.ldgRoll || '';
+    document.getElementById('fleet-ldg-50ft').value = ac.ldgFifty || '';
 
     _wbDraft = ac.wb ? _wbDraftFrom(ac) : _defaultWbDraft();
     _wbTouched = false; _wbRemove = false;
@@ -451,6 +466,10 @@ function _resetForm() {
     document.getElementById('fleet-50ft').value = '';
     document.getElementById('fleet-cruise').value = '';
     document.getElementById('fleet-burn').value = '';
+    document.getElementById('fleet-xwind').value = '';
+    document.getElementById('fleet-reserve-extra').value = '';
+    document.getElementById('fleet-ldg-roll').value = '';
+    document.getElementById('fleet-ldg-50ft').value = '';
     _wbDraft = _defaultWbDraft();
     _wbTouched = false; _wbRemove = false;
     _renderWbSection();
@@ -760,6 +779,10 @@ function _doSave() {
     // Champs optionnels : vides → null (retour aux défauts du planificateur).
     const cruise = document.getElementById('fleet-cruise').value.trim();
     const burn = document.getElementById('fleet-burn').value.trim();
+    const xwind = document.getElementById('fleet-xwind').value.trim();
+    const reserveExtra = document.getElementById('fleet-reserve-extra').value.trim();
+    const ldgRoll = document.getElementById('fleet-ldg-roll').value.trim();
+    const ldgFifty = document.getElementById('fleet-ldg-50ft').value.trim();
 
     const data = {
         name,
@@ -770,6 +793,10 @@ function _doSave() {
         fiftyFt: ft50,
         cruiseSpeedKt: cruise || null,
         fuelBurnLph: burn || null,
+        xwindLimitKt: xwind || null,
+        reserveExtraMin: reserveExtra || 0,
+        ldgRoll: ldgRoll || null,
+        ldgFifty: ldgFifty || null,
     };
     // Bloc centrage : écrit seulement si la section a été touchée — sinon
     // l'édition d'un autre champ préserve la configuration existante. Un

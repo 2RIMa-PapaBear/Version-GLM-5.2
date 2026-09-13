@@ -4,7 +4,7 @@
 import test from 'node:test';
 import { ok, equal } from 'node:assert';
 import assert from 'node:assert/strict';
-import { _distToSegmentNm, _attachMetars, _pickEvenSpread } from '../js/alternates.js';
+import { _distToSegmentNm, _attachMetars, _pickEvenSpread, _diversionScore } from '../js/alternates.js';
 import { _wetFromTokens } from '../js/takeoff-performance.js';
 
 // ---------------------------------------------------------------- géométrie
@@ -191,4 +191,32 @@ test('_pickEvenSpread : alternates équidistants sur trajet équilibré', () => 
     equal(picks.length, 8, '8 terrains retenus');
     const gaps = picks.slice(1).map((r, i) => r.atdNm - picks[i].atdNm);
     ok(gaps.every(g => Math.abs(g - 25) < 1), `espacement régulier (~25 NM) : ${gaps.join(',')}`);
+});
+
+// ---- Score de praticabilité comme terrain de DÉGAGEMENT (①=C du 13/09 :
+// proposition auto, JAMAIS la météo seule — cat + distance/destination +
+// H24 + privé) -----------------------------------------------------------------
+test('_diversionScore : un VFR un peu plus loin bat un IFR plus proche', () => {
+    const dest = { lat: 47.5, lon: -3 };
+    const vfr = { code: 'LFRE', lat: 47.6, lon: -3.1, cat: { cat: 'VFR' } };       // ~ 7 NM
+    const ifr = { code: 'LFRZ', lat: 47.55, lon: -3.02, cat: { cat: 'IFR' } };     // ~ 3.5 NM
+    const sVfr = _diversionScore(vfr, dest, { horAtsCode: 'H24', prive: false });
+    const sIfr = _diversionScore(ifr, dest, { horAtsCode: 'H24', prive: false });
+    ok(sVfr.score < sIfr.score, 'IFR sous les minimas = pénalité qui domine la distance');
+    equal(sVfr.h24, true);
+    equal(sVfr.prive, false);
+});
+
+test('_diversionScore : pénalités privé (+6) et horaires non H24 (+2)', () => {
+    const dest = { lat: 47.5, lon: -3 };
+    const r = { code: 'LFXX', lat: 47.6, lon: -3.1, cat: { cat: 'VFR' } };
+    const base = _diversionScore(r, dest, { horAtsCode: 'H24', prive: false });
+    const penal = _diversionScore(r, dest, { horAtsCode: 'HX', prive: true });
+    ok(Math.abs((penal.score - base.score) - 8) < 0.001, `écart attendu 8, obtenu ${penal.score - base.score}`);
+});
+
+test('_diversionScore : ordre des catégories VFR < MVFR < IFR', () => {
+    const dest = { lat: 47.5, lon: -3 };
+    const mk = (cat) => _diversionScore({ code: 'LF' + cat, lat: 47.6, lon: -3.1, cat: { cat } }, dest, null);
+    ok(mk('VFR').score < mk('MVFR').score && mk('MVFR').score < mk('IFR').score && mk('IFR').score < mk('LIFR').score);
 });

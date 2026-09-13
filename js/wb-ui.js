@@ -30,11 +30,26 @@ let _chartDispose = null;
 // (reset dès que l'embarqué atteint le requis, re-alerte ensuite si rechute).
 let _fuelWarnActive = false;
 
-/** Navigation + plan actif → carburant requis {totalL, tripFuelL, reserveL}, sinon null. */
+/** Carburant requis. En navigation : plan actif {totalL, tripFuelL, reserveL}.
+ *  En vol local (A4) : durée estimée saisie dans le widget + ROZ 30 min
+ *  (majorée de la réserve perso de l'avion) — null sans durée saisie. */
 function _requiredFuel() {
-    if (getFlightMode() !== 'nav') return null;
-    const f = state._lastNavPlan?.plan?.fuel;
-    return (f && f.totalL > 0) ? f : null;
+    if (getFlightMode() === 'nav') {
+        const f = state._lastNavPlan?.plan?.fuel;
+        return (f && f.totalL > 0) ? f : null;
+    }
+    const min = parseInt(document.getElementById('wb-local-min')?.value, 10);
+    if (!Number.isFinite(min) || min <= 0) return null;
+    const ac = getActiveAircraft();
+    const burn = ac?.fuelBurnLph ?? 35;
+    const reserveMin = 30 + (ac?.reserveExtraMin || 0);
+    const tripL = Math.round(min / 60 * burn * 10) / 10;
+    const reserveL = Math.round(reserveMin / 60 * burn * 10) / 10;
+    return {
+        local: true, tripMin: min, tripFuelL: tripL, reserveL, reserveMin,
+        reserveBaseMin: 30, reserveExtraMin: ac?.reserveExtraMin || 0,
+        totalL: Math.round((tripL + reserveL) * 10) / 10,
+    };
 }
 
 /** Masse affichée (unité de l'avion) → chaîne arrondie. */
@@ -131,6 +146,18 @@ function _render(body, ac, isFr) {
             <input type="hidden" id="wb-burn-l" data-key="burn" value="${loads.burnL || ''}">
             <div class="wb-burn-ro">${loads.burnL || 0}</div>
         </label>` : '';
+    // Vol local : devis carburant par DURÉE ESTIMÉE (A4) — durée + ROZ 30 min
+    // (majorée de la réserve perso de l'avion) ; le requis s'affiche et le
+    // champ « Carburant embarqué » passe en rouge s'il est insuffisant.
+    const durationCell = (fuelSt && !isNav) ? (() => {
+        let savedMin = '';
+        try { savedMin = String(parseInt(localStorage.getItem('wb-local-min'), 10) || ''); } catch {   }
+        return `
+        <label class="wb-load wb-load-fuel" title="${isFr ? 'Carburant requis = durée estimée du vol + réserve réglementaire 30 min + réserve perso de l\u2019avion (fenêtre Flotte) — le champ « Carburant embarqué » passe en rouge si la quantité est insuffisante.' : 'Required fuel = estimated duration + 30 min legal reserve + the aircraft\u2019s personal reserve (Fleet window) — the "Fuel on board" field turns red when short.'}">
+            <span class="wb-load-lab"><span class="lab">${isFr ? 'Durée prévue (min)' : 'Planned duration (min)'}</span> <span class="val dim" id="wb-local-req"></span></span>
+            <input type="number" step="5" min="0" max="600" id="wb-local-min" value="${savedMin}" placeholder="0">
+        </label>`;
+    })() : '';
     const line1 = stations.slice(0, 4);
     const rest = stations.slice(4);
 
@@ -141,7 +168,7 @@ function _render(body, ac, isFr) {
         </div>
         <div class="fleet-wb-sub">${isFr ? `CHARGEMENT DU JOUR (${u.mass.toUpperCase()})` : `TODAY'S LOADING (${u.mass.toUpperCase()})`}</div>
         ${line1.length ? `<div class="wb-load-grid">${line1.map(stCell).join('')}</div>` : ''}
-        ${(rest.length || fuelCell || burnCell) ? `<div class="wb-load-grid">${rest.map(stCell).join('')}${fuelCell}${burnCell}</div>` : ''}
+        ${(rest.length || fuelCell || burnCell) ? `<div class="wb-load-grid">${rest.map(stCell).join('')}${durationCell}${fuelCell}${burnCell}</div>` : ''}
         <div class="wb-chart-host"></div>
         <div class="wb-results">
             <div class="wb-res"><span class="wb-dot wb-dot-to"></span><span class="wb-res-val" id="wb-res-to"></span></div>
@@ -154,16 +181,22 @@ function _render(body, ac, isFr) {
             ${isFr
                 ? (isNav
                     ? 'Carburant embarqué pré-rempli du plan de nav (modifiable) ; essence consommée = trajet du plan de vol (non modifiable). Point Arrivée = carburant embarqué − essence consommée. Enveloppe, postes et masse à vide : fenêtre Flotte.'
-                    : 'Carburant embarqué : saisie libre, mémorisée pour cet avion. Enveloppe, postes et masse à vide : fenêtre Flotte.')
+                    : 'Durée prévue → carburant requis = durée estimée + réserve 30 min + réserve perso de l\u2019avion (fenêtre Flotte) ; le champ embarqué passe en rouge s\u2019il est insuffisant. Enveloppe, postes et masse à vide : fenêtre Flotte.')
                 : (isNav
                     ? 'Fuel on board pre-filled from the nav plan (editable); fuel burned = flight plan trip (read-only). Landing point = fuel on board − fuel burned. Envelope, stations and empty weight: Fleet window.'
-                    : 'Fuel on board: free entry, saved for this aircraft. Envelope, stations and empty weight: Fleet window.')}
+                    : 'Planned duration → required fuel (duration + 30 min reserve); the fuel field turns red when short. Envelope, stations and empty weight: Fleet window.')}
         </div>
     `;
     if (window.lucide) window.lucide.createIcons({ root: body });
 
     body.querySelectorAll('.wb-load-in, #wb-fuel-l').forEach(input => {
         input.addEventListener('input', () => _recalc(body, ac, isFr));
+    });
+    // Durée estimée du vol local (A4) : mémorisée, et le requis suit.
+    const durEl = body.querySelector('#wb-local-min');
+    durEl?.addEventListener('input', () => {
+        try { localStorage.setItem('wb-local-min', String(durEl.value || '')); } catch {   }
+        _recalc(body, ac, isFr);
     });
     // Sliders : pilotent le champ numérique associé (même data-key).
     body.querySelectorAll('input[type="range"].wb-load-range').forEach(rng => {
@@ -187,9 +220,23 @@ function _render(body, ac, isFr) {
             _fuelWarnActive = true;
             const plan = state._lastNavPlan.plan;
             const route = (plan?.from?.icao && plan?.to?.icao) ? ` (${plan.from.icao} → ${plan.to.icao})` : '';
+            // Détail du requis : vol estimé (local) / trajet + dégagement
+            // éventuel (navigation), puis réserve.
+            const partsFr = [req.local ? `vol estimé ${req.tripFuelL} L (${req.tripMin} min)` : `trajet ${req.tripFuelL} L`];
+            const partsEn = [req.local ? `estimated flight ${req.tripFuelL} L (${req.tripMin} min)` : `trip ${req.tripFuelL} L`];
+            if (req.diversionL) {
+                partsFr.push(`dégagement ${req.diversionL} L`);
+                partsEn.push(`alternate ${req.diversionL} L`);
+            }
+            partsFr.push(`réserve ${req.reserveL} L${req.local
+                ? (req.reserveExtraMin > 0 ? ` (30 + ${req.reserveExtraMin} perso)` : ' (30 min)')
+                : (req.reserveMin ? ` (${req.reserveMin} min)` : '')}`);
+            partsEn.push(`reserve ${req.reserveL} L${req.local
+                ? (req.reserveExtraMin > 0 ? ` (30 + ${req.reserveExtraMin} personal)` : ' (30 min)')
+                : (req.reserveMin ? ` (${req.reserveMin} min)` : '')}`);
             window.alert(isFr
-                ? `⚠ CARBURANT INSUFFISANT${route}\n\nEmbarqué : ${isFinite(fl2) ? fl2 : 0} L\nRequis : ${req.totalL} L (trajet ${req.tripFuelL} L + réserve ${req.reserveL} L)\n\nLe champ « Carburant embarqué » restera rouge jusqu'à ce que la quantité embarquée atteigne le total requis.`
-                : `⚠ INSUFFICIENT FUEL${route}\n\nOn board: ${isFinite(fl2) ? fl2 : 0} L\nRequired: ${req.totalL} L (trip ${req.tripFuelL} L + reserve ${req.reserveL} L)\n\nThe "Fuel on board" field stays red until the quantity on board reaches the required total.`);
+                ? `⚠ CARBURANT INSUFFISANT${route}\n\nEmbarqué : ${isFinite(fl2) ? fl2 : 0} L\nRequis : ${req.totalL} L (${partsFr.join(' + ')})\n\nLe champ « Carburant embarqué » restera rouge jusqu'à ce que la quantité embarquée atteigne le total requis.`
+                : `⚠ INSUFFICIENT FUEL${route}\n\nOn board: ${isFinite(fl2) ? fl2 : 0} L\nRequired: ${req.totalL} L (${partsEn.join(' + ')})\n\nThe "Fuel on board" field stays red until the quantity on board reaches the required total.`);
         }
     }
 }
@@ -229,6 +276,16 @@ function _recalc(body, ac, isFr) {
         const under = !!req && loads.fuelL + 0.05 < req.totalL;
         fuelIn.classList.toggle('wb-under', under);
         if (!under) _fuelWarnActive = false;
+        // Vol local (A4) : requis détaillé à côté de la durée — la formule
+        // est explicite, réserve perso comprise : « durée + 30 min + 15 perso ».
+        const reqEl = body.querySelector('#wb-local-req');
+        if (reqEl) {
+            if (req && req.local) {
+                const extra = req.reserveExtraMin > 0
+                    ? ` + ${req.reserveExtraMin} ${isFr ? 'perso' : 'personal'}` : '';
+                reqEl.textContent = `→ ${req.totalL} L (${isFr ? 'durée' : 'duration'} + 30 min${extra})`;
+            } else reqEl.textContent = '';
+        }
     }
     writeWbLoads(ac.id, loads);
 

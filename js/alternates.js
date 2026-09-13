@@ -1,6 +1,7 @@
 import { state, I18N, fetchAvecRelais, memoGet } from './core.js';
 import { getAirportByICAO, getAirportsInBbox } from './ui-module.js';
 import { parseVisiToMeters, getCeiling, CAT_COLORS } from './core.js';
+import { getSiaAirfield } from './sia-data.js';
 
 // ====================================================================
 // ALTERNATES DE ROUTE — TOUS les aérodromes à ± maxOffsetNm de la route
@@ -90,6 +91,23 @@ export function _attachMetars(candidates, metarByCode, pool) {
             metarDistNm: Math.round(best.d),
         };
     }).filter(Boolean);
+}
+
+/**
+ * Score de praticabilité d'un alternate comme terrain de DÉGAGEMENT
+ * (arbitrage ①=C du 13/09 : proposition automatique + choix du pilote —
+ * JAMAIS la météo seule). Composantes : catégorie de vol (pénalité forte
+ * IFR/LIFR), distance à la DESTINATION, ouverture H24 (SIA horAtsCode),
+ * terrain privé (pénalité). `afInfo` injectable pour les tests.
+ * @returns {{score:number, distNm:number, h24:boolean, prive:boolean}}
+ */
+export function _diversionScore(r, destPt, afInfo = null) {
+    const catPenalty = { VFR: 0, MVFR: 3, IFR: 12, LIFR: 25 }[r.cat?.cat] ?? 8;
+    const distNm = _haversineNm(destPt.lat, destPt.lon, r.lat, r.lon);
+    const af = afInfo !== null ? afInfo : getSiaAirfield(r.code);
+    const h24 = /H24/i.test(String(af?.horAtsCode || af?.horAts || ''));
+    const prive = !!af?.prive;
+    return { score: catPenalty + distNm * 0.15 + (h24 ? 0 : 2) + (prive ? 6 : 0), distNm: Math.round(distNm), h24, prive };
 }
 
 /** Tous les aérodromes du couloir — depuis la BASE LOCALE des terrains
@@ -293,7 +311,7 @@ export async function showAlternates(icao) {
             const rows = await getEnRouteAlternates(pts, 25, 8);
             if (token !== _altSeq) return;   // saisie plus récente en cours
             if (rows && rows.length) {
-                _render(rows, depIcao, { mode: 'route' });
+                _render(rows, depIcao, { mode: 'route', to: toVal, destPt: pts[pts.length - 1] });
                 container.style.display = 'block';
                 return;
             }
@@ -416,6 +434,25 @@ function _render(rows, depIcao, ctx = { mode: 'local' }) {
     html += `<div class="alt-header">${isFr ? 'Plafond' : 'Ceiling'}</div>`;
     html += `<div class="alt-header">${isFr ? 'Vent' : 'Wind'}</div>`;
     if (isRoute) html += `<div class="alt-header">${isFr ? 'Écart' : 'Off rte'}</div>`;
+    if (isRoute) html += `<div class="alt-header">${isFr ? 'Dégagement' : 'Alternate to'}</div>`;
+
+    // Dégagement courant : doit rester un terrain du trajet — destination
+    // changée → liste renouvelée sans lui → purge silencieuse.
+    if (isRoute && state.diversionIcao && !rows.some(r => r.code === state.diversionIcao)) {
+        state.diversionIcao = null;
+    }
+    // Proposition (①=C) : le plus praticable à défaut de choix du pilote —
+    // IFR/LIFR jamais proposés (terrain sous les minimas = pas un dégagement).
+    let recoCode = null;
+    if (isRoute && ctx.destPt && !state.diversionIcao) {
+        let best = null;
+        for (const r of rows) {
+            if (r.cat.cat === 'IFR' || r.cat.cat === 'LIFR') continue;
+            const s = _diversionScore(r, ctx.destPt);
+            if (!best || s.score < best.score) best = { code: r.code, s };
+        }
+        recoCode = best?.code ?? null;
+    }
 
     rows.forEach(r => {
         const color = catColors[r.cat.cat];
@@ -441,6 +478,24 @@ function _render(rows, depIcao, ctx = { mode: 'local' }) {
             <div class="alt-cell" style="${ceilFt !== null && ceilFt < 1500 ? 'color:#FCA5A5;' : ''}">${ceilStr}</div>
             <div class="alt-cell">${windStr}</div>
             ${isRoute ? `<div class="alt-cell">${r.offsetNm} NM ${r.side >= 0 ? (isFr ? 'D' : 'R') : (isFr ? 'G' : 'L')}</div>` : ''}
+            ${isRoute ? (() => {
+                const chosen = state.diversionIcao === r.code;
+                const reco = recoCode === r.code;
+                const d = ctx.destPt ? _diversionScore(r, ctx.destPt) : { distNm: null, h24: false, prive: false };
+                const bits = d.distNm != null ? [`${d.distNm} NM ${isFr ? 'de l\u2019arrivée' : 'from destination'}`] : [];
+                if (d.h24) bits.push('H24');
+                if (d.prive) bits.push(isFr ? 'privé' : 'private');
+                const title = chosen
+                    ? (isFr ? `Terrain de dégagement du devis carburant (${bits.join(' · ')}) — cliquer pour retirer` : `Fuel plan alternate field (${bits.join(' · ')}) — click to clear`)
+                    : (isFr ? `Utiliser comme terrain de dégagement — branche carburant du plan (${bits.join(' · ')})` : `Use as alternate field — fuel plan branch (${bits.join(' · ')})`);
+                return `<div class="alt-cell alt-div-cell">
+                    <button class="alt-divert${chosen ? ' on' : ''}${reco ? ' reco' : ''}" data-icao="${escapeHtml(r.code)}"
+                        title="${escapeHtml(title)}" aria-pressed="${chosen ? 'true' : 'false'}">
+                        <i data-lucide="${chosen ? 'flag' : 'plus'}" style="width:13px;height:13px;"></i>
+                    </button>
+                    ${reco ? `<span class="alt-reco">${isFr ? 'Recommandé' : 'Suggested'}</span>` : ''}
+                </div>`;
+            })() : ''}
         `;
     });
     html += `</div>`;
@@ -449,8 +504,8 @@ function _render(rows, depIcao, ctx = { mode: 'local' }) {
         <i data-lucide="info" style="width:13px;height:13px;vertical-align:middle;"></i>
         ${isRoute
             ? (isFr
-                ? `8 terrains régulièrement espacés le long du trajet, dans l'ordre du vol. « * » : METAR de la station la plus proche. Cliquez un terrain pour le charger.`
-                : `8 airfields evenly spaced along the route, in flight order. "*": METAR from the nearest reporting station. Click a field to load it.`)
+                ? `8 terrains régulièrement espacés le long du trajet, dans l'ordre du vol. « * » : METAR de la station la plus proche. Cliquez un terrain pour le charger. Le bouton <strong>+</strong> le désigne <strong>terrain de dégagement</strong> : la branche carburant (destination → dégagement) s'ajoute au devis — Trajet + Dégagement + Réserve 30 min.`
+                : `8 airfields evenly spaced along the route, in flight order. "*": METAR from the nearest reporting station. Click a field to load it. The <strong>+</strong> button marks it as the <strong>alternate field</strong>: its fuel branch (destination → alternate) is added to the fuel plan — Trip + Alternate + Reserve.`)
             : (isFr
                 ? `Alternates viables autour de <strong>${escapeHtml(depIcao)}</strong>, triés par viabilité (catégorie de vol puis proximité). Cliquez un terrain pour le charger.`
                 : `Viable alternates around <strong>${escapeHtml(depIcao)}</strong>, sorted by flight category then proximity. Click a field to load it.`)}
@@ -469,6 +524,21 @@ function _render(rows, depIcao, ctx = { mode: 'local' }) {
             }
         });
     });
+
+    // Bouton « terrain de dégagement » (mode trajet) : toggle du choix pilote,
+    // re-render local (aucun réseau) et recalcul du plan — le devis carburant
+    // et le centrage suivent l'événement.
+    if (isRoute) {
+        list.querySelectorAll('.alt-divert').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const code = btn.dataset.icao;
+                state.diversionIcao = (state.diversionIcao === code) ? null : code;
+                _render(rows, depIcao, ctx);
+                document.dispatchEvent(new CustomEvent('diversion-changed', { detail: { from: depIcao, to: ctx.to } }));
+            });
+        });
+    }
 }
 
 function _categoryFromMetar(raw) {

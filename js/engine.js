@@ -353,8 +353,10 @@ export function dessinerGraphique(data, hppValue, activeTzOffset) {
     const getX = h => PADDING_LEFT + (h - data.startH) * pxPerH, AXIS_Y = PADDING_TOP - OFFSET_STEP;
     const geom = { ctx, getX, AXIS_Y, availableWidth, logicalHeight, PADDING_LEFT, PADDING_RIGHT, OFFSET_STEP, pxPerH, yConfig };
 
-    // 2. Couche soleil (dégradé nuit, courbe, lignes lever/coucher).
-    _drawSunLayer(geom, data, tr);
+    // 2. Couche soleil (dégradé nuit, courbe, lignes lever/coucher) —
+    // escamotable (captures PDF du dossier de vol : le gris de la nuit
+    // alourdit l'impression, retour pilote 13/09).
+    if (!state.chartNoSunLayer) _drawSunLayer(geom, data, tr);
 
     // 3. Axes temporels (grille + étiquettes).
     _drawTimeAxis(geom, data);

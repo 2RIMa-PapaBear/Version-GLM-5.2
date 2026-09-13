@@ -1,6 +1,10 @@
 import { config } from './config.js';
 import { state } from './core.js';
 import { getServiceFreq } from './freq-sia.js';
+import { horLabel } from './airspace-profile.js';
+import { bigDataUrl } from './data-base.js';
+import { getCurrentNotams } from './notam.js';
+import { zoneActivation, zoneActiveToday } from './azba.js';
 
 const BASE_URL = 'https://api.core.openaip.net/api/airspaces';
 
@@ -226,6 +230,7 @@ export function _expandFileItem(c) {
         lowerLimit: lim(c.lo), upperLimit: lim(c.up),
         frequencies: c.f || [], radius: Array.isArray(c.r) ? { value: c.r[0] } : null,
         activity: c.act || null,   // activité officielle des zones R/D/P (« Parachutage »)
+        hor: c.hor || null,        // code d'horaire d'activation SIA (« H24 », « NOTAM »…) — absent côté openAIP
         geometry,
     };
 }
@@ -245,7 +250,7 @@ function _loadCellItems(lat, lon) {
                 return cached.data;
             }
             try {
-                const res = await fetch(`data/airspaces/cells/${k}.json?t=${cached?.ts || 0}`, {
+                const res = await fetch(`${bigDataUrl(`data/airspaces/cells/${k}.json`)}?t=${cached?.ts || 0}`, {
                     signal: AbortSignal.timeout(12000),
                 });
                 if (res.status === 404) {
@@ -285,16 +290,18 @@ async function _loadSiaItems() {
         // existant, posé avant la correction de TYPE_MAP.
         const stamp = (arr) => { for (const it of arr) it._sia = true; return arr; };
         // v2 : la base du 29/08 corrige la géométrie (contours densifiés
-        // SIA — cercles cwa rendus en triangles avant) — nouveau clé = les
-        // clients re-téléchargent sans attendre le TTL de 7 j.
-        const cached = await _idbGet('sia:airspaces:v2');
+        // SIA — cercles cwa rendus en triangles avant).
+        // v3 : + champ hor (code d'horaire d'activation — H24, NOTAM…),
+        // absent des caches v2 — nouveau clé = les clients re-téléchargent
+        // sans attendre le TTL de 7 j.
+        const cached = await _idbGet('sia:airspaces:v3');
         if (cached?.data && Date.now() - cached.ts < CELL_TTL_MS) { _siaItems = stamp(cached.data); return _siaItems; }
         try {
             const res = await fetch(`data/sia-airspaces.json?t=${cached?.ts || 0}`, { signal: AbortSignal.timeout(15000) });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const d = await res.json();
             _siaItems = stamp(d.items.map(_expandFileItem));
-            _idbPut('sia:airspaces:v2', _siaItems);
+            _idbPut('sia:airspaces:v3', _siaItems);
         } catch { _siaItems = stamp(cached?.data || []); }
         return _siaItems;
     })();
@@ -598,6 +605,47 @@ function _baseFt(as) {
     return _limitFt(as.lowerLimit ?? as.lower) ?? 0;
 }
 
+/** Lever/coucher (minutes locales) au centroïde approximatif de la zone —
+ *  alimente les plages SR/SS de l'item D (azba). null si indisponible. */
+function _zoneSunTimes(as) {
+    try {
+        const ring = as.geometry?.coordinates?.[0];
+        if (Array.isArray(ring) && ring.length && window.SunCalc) {
+            let lat = 0, lon = 0;
+            for (const [lo, la] of ring.slice(0, 50)) { lat += la; lon += lo; }
+            const t = window.SunCalc.getTimes(Date.now(), lat / Math.min(50, ring.length), lon / Math.min(50, ring.length));
+            if (t?.sunrise instanceof Date && t?.sunset instanceof Date) {
+                return {
+                    sr: t.sunrise.getHours() * 60 + t.sunrise.getMinutes(),
+                    ss: t.sunset.getHours() * 60 + t.sunset.getMinutes(),
+                };
+            }
+        }
+    } catch {   }
+    return null;
+}
+
+/** Activation NOTAM de la zone (B2/AZBA) : croise le désignateur de la
+ *  zone avec les NOTAM du dossier courant (plages de l'item D, heure
+ *  locale ; SR/SS calculés à la position de la zone). null sans info. */
+function _activationLine(as, isFr) {
+    try {
+        const key = _rdpKey(as.name);
+        if (!key) return '';
+        const notams = getCurrentNotams();
+        if (!notams.length) return '';
+
+        const act = zoneActivation(key, notams, Date.now(), _zoneSunTimes(as));
+        if (!act) return '';
+        const hhmm = (s) => String(s).replace(/(\d{2})(\d{2})/g, '$1h$2');
+        const ref = `${act.notam.series} ${act.notam.number}/${String(act.notam.year).slice(-2)}`;
+        if (act.status === 'ACTIVE') {
+            return `<span style="color:#EF4444;font-weight:700;">${isFr ? 'ACTIVE maintenant' : 'ACTIVE now'}${act.detail && act.detail !== 'H24' ? ` · ${isFr ? 'jusqu\u2019à' : 'until'} ${hhmm(act.detail.split('-')[1])}` : ''} (${escapeHtml(ref)})</span><br>`;
+        }
+        return `<span style="color:#F59E0B;font-weight:600;">${isFr ? 'Active aujourd\u2019hui' : 'Active today'} ${hhmm(act.detail)} (${escapeHtml(ref)})</span><br>`;
+    } catch { return ''; }
+}
+
 function _geometryToLatLngs(geometry, radiusKm = 5) {
     if (!geometry || !geometry.coordinates) return [];
     const type = geometry.type;
@@ -753,6 +801,15 @@ export function createAirspaceController(map) {
             const kind = _decodeAirspace(as);
             if (!activeGroups.has(_KIND_TO_GROUP[kind.kind] || 'autres')) return;
             const style = AIRSPACE_STYLE[kind.kind] || AIRSPACE_STYLE.OTHER;
+            // B2 v2 (arbitrage pilote 13/09) : zone à activation « par
+            // NOTAM » (champ hor SIA) sans AUCUNE activation aujourd'hui
+            // dans le dossier → POINTILLÉ (représentation SIV), couleur
+            // inchangée. H24, hor indéterminé (HX…) et dossier non chargé
+            // restent en trait plein — pas d'info ≠ inactive.
+            const notams = getCurrentNotams();
+            const activeToday = notams.length === 0
+                || zoneActiveToday({ hor: as.hor, key: _rdpKey(as.name) }, notams, Date.now(), _zoneSunTimes(as));
+            const st = activeToday ? style : { ...style, dashArray: '8 5' };
             const radiusKm = (as.radius && typeof as.radius.value === 'number') ? as.radius.value : 5;
             const rings = _geometryToLatLngs(as.geometry, radiusKm);
 
@@ -774,29 +831,30 @@ export function createAirspaceController(map) {
                 })
                 .join('<br>');
             const tooltip = `<strong>${escapeHtml(name)}</strong><br>
-                <span style="color:${style.color};font-weight:700;">${style.label}</span>${clsDisplay}<br>
-                ${as.activity ? `<span style="font-style:italic;">${escapeHtml(as.activity)}</span><br>` : ''}${isFr ? 'Alt.' : 'Alt.'}: ${lower} → ${upper}
+                <span style="color:${st.color};font-weight:700;">${st.label}</span>${clsDisplay}<br>
+                ${as.activity ? `<span style="font-style:italic;">${escapeHtml(as.activity)}</span><br>` : ''}${as.hor ? `<span style="font-style:italic;">${escapeHtml(horLabel(as.hor, isFr))}</span><br>` : ''}${_activationLine(as, isFr)}${isFr ? 'Alt.' : 'Alt.'}: ${lower} → ${upper}
                 ${freqTxt ? `<br><span style="font-family:'DM Mono',monospace;">${freqTxt}</span>` : ''}`;
 
             rings.forEach((ring, ringIdx) => {
                 if (ring.length < 2) return;
-                // Contours POINTILLÉS (SIV) : un HALO sombre passe SOUS le
-                // trait — sans lui, toute ligne superposée (bordure CTR/TMA
-                // pleine, SIV voisin partageant la limite) remplit les trous
-                // et l'effet pointillé disparaît (retour pilote 09/09).
-                if (style.dashArray) {
+                // Contours POINTILLÉS (SIV et zones R/D/P non actives — B2
+                // v2) : un HALO sombre passe SOUS le trait — sans lui, toute
+                // ligne superposée (bordure CTR/TMA pleine, SIV voisin
+                // partageant la limite) remplit les trous et l'effet
+                // pointillé disparaît (retour pilote 09/09).
+                if (st.dashArray) {
                     L.polygon(ring, {
                         stroke: true, color: 'rgba(2,6,23,0.35)',
-                        weight: (style.weight || 2.5) + 1.5,
+                        weight: (st.weight || 2.5) + 1.5,
                         fill: false, interactive: false,
                     }).addTo(layerGroup);
                 }
                 const poly = L.polygon(ring, {
-                    color: style.color,
-                    weight: style.weight,
-                    fillColor: style.color,
-                    fillOpacity: parseFloat(style.fill.match(/[\d.]+(?=\))/)[0]) || 0.08,
-                    dashArray: style.dashArray,   // SIV en pointillés ; undefined = trait plein
+                    color: st.color,
+                    weight: st.weight,
+                    fillColor: st.color,
+                    fillOpacity: parseFloat(st.fill.match(/[\d.]+(?=\))/)[0]) || 0.08,
+                    dashArray: st.dashArray,   // SIV / zone non active ce jour ; undefined = trait plein
                     interactive: true,
 
                 });
@@ -821,9 +879,9 @@ export function createAirspaceController(map) {
                 });
 
                 polyMeta.set(poly, {
-                    ring, style, tooltip,
+                    ring, style: st, tooltip,
 
-                    summary: `${style.label} — ${escapeHtml(name)} (${lower} → ${upper})`,
+                    summary: `${st.label} — ${escapeHtml(name)} (${lower} → ${upper})`,
                 });
                 layerGroup.addLayer(poly);
                 count++;
@@ -967,6 +1025,11 @@ export function createAirspaceController(map) {
     // l'état de bascule, sinon le prochain clic sur la même zone serait avalé.
     map.on('popupclose', () => { openZonePopup = null; openZonePoly = null; });
 
+    // B2 (AZBA) : le dossier NOTAM arrive APRÈS le rendu des zones — on
+    // rejoue le rendu pour que les tooltips portent les activations.
+    const onNotamReady = () => { if (loaded && lastItems) _render(lastItems); };
+    document.addEventListener('notam-dossier-ready', onNotamReady);
+
     function setGroup(g, on) {
         if (!AIRSPACE_GROUPS[g]) return;
         if (on) activeGroups.add(g); else activeGroups.delete(g);
@@ -989,6 +1052,7 @@ export function createAirspaceController(map) {
             map.off('moveend', onMapMove);
             map.off('zoomend', onMapMove);
             map.off('click', onMapClick);
+            document.removeEventListener('notam-dossier-ready', onNotamReady);
             map.removeLayer(layerGroup);
             layerGroup = null;
             controlsEl = null;

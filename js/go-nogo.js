@@ -10,6 +10,7 @@ import { fetchSigmetAirmet } from './sigmet.js';
 import { getDeclinationForIcao } from './magvar.js';
 import { evaluateIcingRisk, fetchFreezingLevel } from './freezing-level.js';
 import { evaluateTakeoffPerformance } from './takeoff-performance.js';
+import { getActiveAircraft } from './aircraft-fleet.js';
 
 function _currentCategory() {
     const parsed = state.lastParsed;
@@ -171,16 +172,17 @@ export function evaluateGoNoGo() {
             const magWindDir = (((wind.dir - dec) % 360) + 360) % 360;
             const xw = Math.abs(wind.speed * Math.sin((magWindDir - rwyData.active.hdg) * Math.PI / 180));
 
-            if (xw >= 12) {
+            const xwT = xwindThresholds(getActiveAircraft()?.xwindLimitKt);
+            if (xw >= xwT.caution) {
                 if (verdict === 'GO') verdict = 'CAUTION';
                 reasons.push({
-                    level: xw >= 15 ? 'danger' : 'caution',
+                    level: xw >= xwT.danger ? 'danger' : 'caution',
                     icon: 'wind',
                     text: isFr
-                        ? `Vent traversier ${Math.round(xw)} kt sur ${rwyData.active.name} — vérifiez les limites avion`
-                        : `Crosswind ${Math.round(xw)} kt on ${rwyData.active.name} — check aircraft limits`,
+                        ? `Vent traversier ${Math.round(xw)} kt sur ${rwyData.active.name}${xwT.limit ? ` (limite avion ${xwT.limit} kt)` : ''} — vérifiez les limites avion`
+                        : `Crosswind ${Math.round(xw)} kt on ${rwyData.active.name}${xwT.limit ? ` (aircraft limit ${xwT.limit} kt)` : ''} — check aircraft limits`,
                 });
-                if (xw >= 15 && verdict !== 'NO-GO') verdict = 'NO-GO';
+                if (xw >= xwT.danger && verdict !== 'NO-GO') verdict = 'NO-GO';
             }
         }
     }
@@ -192,6 +194,23 @@ export function evaluateGoNoGo() {
     };
 
     return { verdict, reasons, color: colors[verdict] || '#94A3B8', cat: catObj.cat };
+}
+
+/**
+ * Seuils du critère vent traversier : la LIMITE DE L'AVION ACTIF (flotte)
+ * prime quand elle est renseignée — PRUDENCE dès 80 % de la limite
+ * (plafonné au seuil école 12 kt), NO-GO à la limite. Sans limite avion,
+ * seuils génériques 12/15 kt. Pur — testé sous Node.
+ * @param {number|null} xwindLimitKt limite avion (kt) ou null.
+ * @returns {{limit:number|null, caution:number, danger:number}}
+ */
+export function xwindThresholds(xwindLimitKt) {
+    const limit = Number.isFinite(xwindLimitKt) && xwindLimitKt > 0 ? xwindLimitKt : null;
+    return {
+        limit,
+        caution: limit ? Math.min(12, Math.round(limit * 0.8)) : 12,
+        danger: limit ?? 15,
+    };
 }
 
 let _trendIcao = null;

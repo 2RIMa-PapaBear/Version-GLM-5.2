@@ -152,3 +152,10 @@ test('_expandFileItem : activité officielle des zones R/D/P transportée', () =
     const sans = _expandFileItem({ i: 'x', n: 'TMA RENNES 2', ty: 5, ic: null, lo: null, up: null, f: null, g: null });
     assert.equal(sans.activity, null, 'champ absent → null');
 });
+
+test('_expandFileItem : code horaire SIA (hor) transporté', () => {
+    const it = _expandFileItem({ i: 'r114', n: 'R 114 B', ty: 15, ic: null, lo: [0, 1], up: [145, 6], f: null, act: 'Tir', hor: 'NOTAM', g: { t: 1, c: [[[-3, 47], [-2.9, 47], [-2.9, 47.1], [-3, 47]]] } });
+    assert.equal(it.hor, 'NOTAM');
+    const sans = _expandFileItem({ i: 'x', n: 'TMA RENNES 2', ty: 5, ic: null, lo: null, up: null, f: null, g: null });
+    assert.equal(sans.hor, null, 'champ absent → null (openAIP)');
+});

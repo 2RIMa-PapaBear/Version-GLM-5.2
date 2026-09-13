@@ -579,12 +579,23 @@ function _drawCalcPage(doc, c) {
          c.timeLabel || '—', { color: TEAL, size: 11 });
     y += 33;
 
-    // ---- Ligne carburant : Trajet / Réserve / Total requis ----
+    // ---- Ligne carburant : Trajet / [Dégagement] / Réserve / Total requis ----
     y = section(null, y);
-    const fw = (W - 2 * 12) / 3;
-    cell(L, y, fw, 29, fr ? 'Trajet' : 'Trip', `${c.fuel?.tripL ?? '—'} L`);
-    cell(L + fw + 12, y, fw, 29, `${fr ? 'Réserve' : 'Reserve'} (${c.fuel?.reserveMin ?? ''} min)`, `${c.fuel?.reserveL ?? '—'} L`);
-    cell(L + 2 * (fw + 12), y, fw, 29, fr ? 'Total requis' : 'Total req.', `${c.fuel?.totalL ?? '—'} L`, { color: BLUE, size: 12 });
+    if (c.fuel?.divIcao) {
+        const fw = (W - 3 * 12) / 4;
+        cell(L, y, fw, 29, fr ? 'Trajet' : 'Trip', `${c.fuel?.tripL ?? '—'} L`, { size: 9.5 });
+        cell(L + fw + 12, y, fw, 29, `${fr ? 'Dégagement' : 'Alternate'} ${c.fuel.divIcao}`,
+            `${c.fuel?.diversionL ?? '—'} L`, { size: 9.5 });
+        cell(L + 2 * (fw + 12), y, fw, 29, `${fr ? 'Réserve' : 'Reserve'} (${c.fuel?.reserveMin ?? ''} min)`,
+            `${c.fuel?.reserveL ?? '—'} L`, { size: 9.5 });
+        cell(L + 3 * (fw + 12), y, fw, 29, fr ? 'Total requis' : 'Total req.',
+            `${c.fuel?.totalL ?? '—'} L`, { color: BLUE, size: 12 });
+    } else {
+        const fw = (W - 2 * 12) / 3;
+        cell(L, y, fw, 29, fr ? 'Trajet' : 'Trip', `${c.fuel?.tripL ?? '—'} L`);
+        cell(L + fw + 12, y, fw, 29, `${fr ? 'Réserve' : 'Reserve'} (${c.fuel?.reserveMin ?? ''} min)`, `${c.fuel?.reserveL ?? '—'} L`);
+        cell(L + 2 * (fw + 12), y, fw, 29, fr ? 'Total requis' : 'Total req.', `${c.fuel?.totalL ?? '—'} L`, { color: BLUE, size: 12 });
+    }
     y += 33;
 
     // ---- Ligne relief (si disponible) : Altitude max sol / Marge mini ----
@@ -1433,11 +1444,14 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr) {
                     if (bx1 - bx0 < 2) continue;
                     // Seconde ligne du cadre : fréquence radio (TMA/CTA/CTR
                     // — propre ou empruntée au secteur sous-jacent), sinon
-                    // ACTIVITÉ officielle des zones R/D/P (« Parachutage »).
+                    // ACTIVITÉ officielle + code d'horaire d'activation SIA
+                    // des zones R/D/P (« Parachutage · H24 », « Tir · NOTAM »).
                     // Uniquement si le cadre est assez haut pour deux lignes.
                     const freq = !twoLines ? null
                         : (g.freq || (/^(TMA|CTA|CTR)\b/i.test(zone) ? _borrowFreq(s.fa, s.fb) : null));
-                    const sub = freq || (/^(R|D|P)\b/i.test(zone) ? (s.act || null) : null);
+                    const sub = freq || (/^(R|D|P)\b/i.test(zone)
+                        ? ([s.act, s.hor ? String(s.hor).toUpperCase() : null].filter(Boolean).join(' · ') || null)
+                        : null);
                     _boxLabels.push({
                         label: zone.replace(/\s+partie\s+/i, ' '),
                         freq: sub,
@@ -1763,4 +1777,212 @@ function notamPeriodLocal(n, isFr) {
 }
 function notamBodyLocal(n) {
     return (n.multiLanguage && n.multiLanguage.itemE) || n.itemE || '';
+}
+
+/* ================================================================
+ * DOSSIER DE VOL — page de garde + page météo (B1 phase 2, 13/09).
+ * Ajoutées APRÈS drawNavLogPdf/drawNotamAnnex puis remontées en TÊTE
+ * par le générateur (doc.movePage). Arbitrage ②=A : SANS VAC intégrées
+ * — la garde ATTESTE leur consultation (heure + cycle AIRAC).
+ * ================================================================ */
+
+/** Page de garde : statut daté des six rubriques + Cartes VAC.
+ *  d = { isFr, generatedLabel, routeLabel, aircraftLabel,
+ *        rows: [{status:'ok'|'warn'|'danger', label, detail, ref}],
+ *        vac: [{icao, ts|null}], vacAirac }
+ *  NB : la police PDF (helvetica/WINANSI) n'a pas de glyphe flèche — la
+ *  route est imprimée avec un tiret, jamais « → ». */
+export function drawFileCover(doc, d) {
+    const W = PAGE.w, M = 28;
+    const LVL = { ok: GREEN, warn: AMBER, danger: REDTX };
+    doc.addPage();
+    let y = 14.3;
+
+    // Bandeau titre — la date est SOUS le bandeau (retour pilote : elle
+    // se superposait au titre), l'ensemble aéré.
+    doc.setFillColor(...INK);
+    doc.rect(16.4, y, W - 2 * 16.4, 24, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(255, 255, 255);
+    doc.text(d.isFr ? 'Dossier de vol' : 'Flight file', W / 2, y + 16, { align: 'center' });
+    y += 32;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(d.generatedLabel, W / 2, y, { align: 'center' });
+    y += 16;
+
+    // Route + avion.
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(11); _setInk(doc, INK);
+    doc.text(String(d.routeLabel || '').replace(/→/g, '-'), W / 2, y, { align: 'center' });
+    y += 12;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text(d.aircraftLabel, W / 2, y, { align: 'center' });
+    y += 20;
+
+    // Rubriques : pastille + libellé + détail + référence (heure).
+    for (const r of d.rows || []) {
+        const c = LVL[r.status] || LINE;
+        doc.setFillColor(...c);
+        doc.circle(M + 3.5, y - 2.8, 3.2, 'F');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(9); _setInk(doc, INK);
+        doc.text(r.label, M + 13, y);
+        if (r.ref) {
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+            doc.setTextColor(100, 116, 139);
+            doc.text(r.ref, W - M, y, { align: 'right' });
+        }
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+        doc.setTextColor(51, 65, 85);
+        doc.text(r.detail || '', M + 13, y + 10);
+        y += 17;
+        doc.setDrawColor(...LINE); doc.setLineWidth(0.3);
+        doc.line(M, y, W - M, y);
+        y += 10;
+    }
+    y += 6;
+
+    // Cartes VAC (arbitrage ②=A : NON intégrées — consultation attestée
+    // horodatée ; une carte non consultée est dite en ambre).
+    if ((d.vac || []).length) {
+        const h = 18 + d.vac.length * 11 + 14;
+        doc.setDrawColor(...LINE); doc.setLineWidth(0.5);
+        doc.rect(M, y, W - 2 * M, h);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); _setInk(doc, INK);
+        doc.text('Cartes VAC', M + 8, y + 13);
+        let vy = y + 27;
+        for (const v of d.vac) {
+            const seen = v.ts
+                ? new Date(v.ts).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                : null;
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+            doc.text(v.icao, M + 8, vy);
+            doc.setFont('helvetica', seen ? 'normal' : 'bold');
+            if (seen) _setInk(doc, GREEN_INK);
+            else doc.setTextColor(...AMBER);
+            doc.text(seen
+                ? (d.isFr ? `consultée le ${seen} (hors ligne disponible)` : `viewed on ${seen} (offline available)`)
+                : (d.isFr ? 'NON CONSULTÉE — à visualiser avant le vol' : 'NOT VIEWED — open before flight'),
+                M + 40, vy);
+            _setInk(doc, INK);
+            vy += 11;
+        }
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+        doc.setTextColor(100, 116, 139);
+        doc.text((d.isFr ? 'Cycle AIRAC des cartes : ' : 'Charts AIRAC cycle: ') + (d.vacAirac || '—'), M + 8, vy + 2);
+        y += h + 14;
+    }
+
+    // Pied : responsabilité du commandant de bord.
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+    doc.setTextColor(100, 116, 139);
+    const warn = d.isFr
+        ? 'Document d\u2019aide à la préparation : chaque rubrique doit être vérifiée (vert) avant le vol. Ne remplace ni les sources officielles (SIA, SOFIA), ni le manuel de vol, ni le jugement du pilote. Le commandant de bord reste seul responsable de ses décisions.'
+        : 'Preparation aid: every item should be verified (green) before flight. Does not replace official sources, the POH, or pilot judgment. The pilot-in-command remains solely responsible.';
+    const lines = doc.splitTextToSize(warn, W - 2 * M);
+    doc.text(lines, M, PAGE.h - 30 - lines.length * 8);
+}
+
+/** METAR brut → une ligne claire (retour pilote : décoder sous le brut).
+ *  Autonome (regex), bilingue par préfixe. */
+function _metarSummary(raw, isFr) {
+    const s = String(raw || '');
+    const out = [];
+    const w = s.match(/\b(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?KT\b/);
+    if (w) out.push(`${isFr ? 'vent' : 'wind'} ${w[1] === 'VRB' ? (isFr ? 'variable' : 'variable') : w[1] + '\u00B0'} ${w[2]} kt${w[3] ? (isFr ? ', rafales ' : ', gusts ') + w[3] : ''}`);
+    if (/CAVOK/.test(s)) out.push('CAVOK');
+    else {
+        const v = s.match(/\s(\d{4})\s/);
+        if (v) out.push(`${isFr ? 'visibilité' : 'visibility'} ${+v[1] >= 9999 ? (isFr ? '10 km ou plus' : '10 km or more') : v[1] + ' m'}`);
+        const clouds = [...s.matchAll(/\b(FEW|SCT|BKN|OVC)(\d{3})\b/g)]
+            .map(m => `${m[1]} ${+m[2] * 100} ft`);
+        if (clouds.length) out.push(clouds.join(', '));
+    }
+    const t = s.match(/\s(M?\d{2})\/(M?\d{2})\s/);
+    if (t) out.push(`${isFr ? 'température' : 'temp'} ${t[1].replace('M', '-')}\u00B0C / ${isFr ? 'point de rosée' : 'dew point'} ${t[2].replace('M', '-')}\u00B0C`);
+    const q = s.match(/\bQ(\d{4})\b/);
+    if (q) out.push(`QNH ${q[1]} hPa`);
+    return out.join(' \u00B7 ');
+}
+
+/** Page « Météo au dossier » v5 — spécification pilote 13/09 (définitive) :
+ *   1. DÉPART : METAR brut + décodé en clair ;
+ *   2. DÉROUTEMENT TAF : GRAPHIQUE seul (pleine largeur) ;
+ *   3. ARRIVÉE TAF : GRAPHIQUE seul (pleine largeur).
+ *  Plus de texte brut TAF (retour pilote : « on ne garde que les
+ *  graphiques »). Une page : réduction symétrique si besoin.
+ *  d = { isFr, generatedLabel, dep: {title, raw, decode?} | null,
+ *        terrains: [{label, note?, chart?, chartRatio?, chartFmt?}] }
+ *  (ordre des terrains = affichage : déroutement puis arrivée.) */
+export function drawWeatherPage(doc, d) {
+    const W = PAGE.w, M = 28;
+    const INNER = W - 2 * M;
+    doc.addPage();
+
+    // ---- Pré-calcul : la page doit TOUT contenir, graphiques PLEINE
+    // LARGEUR par défaut — réduction SYMÉTRIQUE seulement si débordement.
+    let fixed = 26;   // titre de page + note
+    if (d.dep) {
+        const l = doc.splitTextToSize(String(d.dep.raw || ''), INNER - 8);
+        const dec = d.dep.decode ? doc.splitTextToSize(_metarSummary(d.dep.raw, d.isFr), INNER - 8) : [];
+        fixed += 17 + l.length * 8.5 + (dec.length ? dec.length * 8 + 3 : 0) + 9;
+    }
+    let sumRatios = 0, nCharts = 0;
+    for (const t of d.terrains || []) {
+        fixed += 17 + 9 + 12;
+        if (t.chart) { sumRatios += (t.chartRatio || 0.4); nCharts++; }
+    }
+    const dispo = PAGE.h - 2 * M - 10 - fixed;
+    let chartW = INNER;   // pleine largeur souhaitée
+    if (sumRatios > 0 && chartW * sumRatios > dispo) {
+        chartW = Math.max(INNER * 0.62, dispo / sumRatios);   // shrink symétrique borné
+    }
+
+    let y = 30;
+
+    // ---- Titre de page ----
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(11); _setInk(doc, INK);
+    doc.text(d.isFr ? 'Météo au dossier' : 'Weather at briefing', M, y);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+    doc.setTextColor(100, 116, 139);
+    doc.text((d.isFr ? 'Messages chargés au moment de la génération — ' : 'Messages loaded at generation time — ') + d.generatedLabel, M, y + 9);
+    y += 26;
+
+    const bande = (txt) => {
+        doc.setFillColor(...DARK);
+        doc.rect(M, y, INNER, 11, 'F');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(255, 255, 255);
+        doc.text(String(txt).replace(/→/g, '-'), M + 5, y + 7.6);
+        y += 17;
+    };
+
+    // ---- 1. Départ : METAR brut + décodé ----
+    if (d.dep) {
+        bande(d.dep.title);
+        const l = doc.splitTextToSize(String(d.dep.raw || ''), INNER - 8);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8); _setInk(doc, INK);
+        doc.text(l, M + 2, y);
+        y += l.length * 8.5 + 3;
+        const dec = d.dep.decode ? doc.splitTextToSize(_metarSummary(d.dep.raw, d.isFr), INNER - 8) : [];
+        if (dec.length) {
+            doc.setFont('helvetica', 'italic'); doc.setFontSize(7);
+            doc.setTextColor(71, 85, 105);
+            doc.text(dec, M + 2, y);
+            y += dec.length * 8 + 3;
+        }
+        y += 9;
+    }
+
+    // ---- 2 & 3. Déroutement puis arrivée : GRAPHIQUE TAF seul ----
+    for (const t of d.terrains || []) {
+        bande(`${t.label} · TAF${t.note ? ` (${t.note})` : ''}`);
+        if (t.chart) {
+            const ratio = t.chartRatio || 0.4;
+            const w = chartW, h = w * ratio;   // pleine largeur (ou shrink symétrique)
+            try {
+                doc.addImage(t.chart, t.chartFmt || 'PNG', M, y, w, h);
+            } catch (e) { console.warn('graphique TAF non inséré :', e.message); }
+            y += h + 9;
+        }
+        y += 12;
+    }
 }
