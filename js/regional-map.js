@@ -10,6 +10,7 @@ import { createRadioPointsController } from './radio-points-layer.js';
 import { getRunwayThresholds } from './runways-geo.js';
 import { hasVac, openVac } from './vac-viewer.js';
 import { registerMap } from './map-registry.js';
+import { mountWindLayer } from './wind-layer.js';
 
 let _map = null;
 let _precip = null;
@@ -360,6 +361,10 @@ function _initLayerControls() {
     // Ordre de la barre (une ligne) : Radar+lecture+horloge — Espaces —
     // Satellite (fond de carte) — Terrain — Cadrer plan — Plein cadre.
     try { _mountBasemapSwitcher(bar); } catch (e) { console.error('basemap switcher failed:', e.message); }
+
+    // B3 (14/09) : couche « Vent » — flèches à l'altitude du plan (OFF au
+    // départ, comme le radar ; re-rendu au déplacement/zoom de la carte).
+    try { mountWindLayer(_map, bar); } catch (e) { console.error('wind layer failed:', e.message); }
 
     _mountZoomAirfieldButton(bar);
     _wireFreeWaypointShortcuts();

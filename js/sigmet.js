@@ -1,7 +1,68 @@
 import { state, I18N, fetchAvecRelais } from './core.js';
 
+// C1 (14/09) : SIGMET France via AEROWEB (relais Worker /sigmet, compte du
+// pilote). Prioritaire en France ; repli NOAA (US) ailleurs ou en échec.
+const RELAY_SIGMET = 'https://meteo-relais.papabear56.workers.dev/sigmet';
+const EN_FRANCE = (lat, lon) => lat >= 41 && lat <= 52 && lon >= -6 && lon <= 11;
+
+/**
+ * Parse le XML AEROWEB (affichemessages_sigmet.php) : messages SIGMET/
+ * GAMET/AIRMET par FIR. PUR — testé sous Node (DOMParser en option).
+ * @param {string} xml réponse AEROWEB
+ * @param {{querySelectorAll:Function}} [doc] document pré-parsé (tests)
+ * @returns {Array<{raw:string, type:string}>}
+ */
+export function parseAerowebSigmetXml(xml, doc) {
+    const out = [];
+    try {
+        const d = doc
+            || (typeof DOMParser !== 'undefined' ? new DOMParser().parseFromString(xml, 'text/xml') : null);
+        if (!d) return out;
+        d.querySelectorAll('message').forEach(m => {
+            // <message id="LFRR" type="FIR"> peut contenir les bulletins ;
+            // les vrais messages arrivent en <bulletin>/<message> internes
+            // selon la version — on accepte les deux formes.
+            const raw = (m.textContent || '').trim();
+            if (!raw || /pas de sigmet/i.test(raw)) return;
+            for (const bloc of raw.split(/(?=(?:LF\w{2}|LFPW)\s+SIGMET\b)/i)) {
+                const t = bloc.trim();
+                if (/SIGMET/i.test(t) && t.length > 30) out.push({ raw: t, type: 'SIGMET' });
+            }
+        });
+    } catch {   }
+    return out;
+}
+
 export async function fetchSigmetAirmet(lat, lon, radiusDeg = 5) {
     if (lat == null || lon == null) return [];
+
+    // ---- Source FRANCE (AEROWEB via relais) : le flux NOAA ne couvre que
+    // les US — en France le GO/NO-GO restait muet sur les SIGMET.
+    if (EN_FRANCE(lat, lon)) {
+        try {
+            const xml = await fetchAvecRelais(RELAY_SIGMET + '?codes=LFFF%20LFEE%20LFRR%20LFBB%20LFMH', 'text', 240);
+            const items = parseAerowebSigmetXml(String(xml || ''));
+            if (items.length) {
+                return items.map(item => {
+                    const allCoords = _extractCoords(item.raw);
+                    return {
+                        raw: item.raw,
+                        type: item.type,
+                        hazard: _inferHazard(item.raw),
+                        obs: /OBS|OBSERVED/i.test(item.raw),
+                        coords: allCoords,
+                        polygon: allCoords.length >= 3 ? _toLeafletRing(allCoords) : null,
+                        center: allCoords.length ? _centroid(allCoords) : null,
+                        source: 'AEROWEB',
+                    };
+                });
+            }
+            // Réponse valide mais vide (aucun SIGMET en France) : silencieux,
+            // sans repli US (qui n'apporterait que du Kansas).
+            if (/<\/root>/.test(String(xml || ''))) return [];
+        } catch { /* relais indisponible → repli NOAA ci-dessous */ }
+    }
+
     try {
 
         const url = `https://aviationweather.gov/api/data/sigmet?format=json`;
