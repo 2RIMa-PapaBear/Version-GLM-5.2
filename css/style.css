@@ -2718,3 +2718,22 @@ html.theme-light .data-age-badge.age-old   { color: #B91C1C; background: rgba(23
 .ff-tile-detail { color: var(--text-color); line-height: 1.5; display: flex; flex-direction: column; gap: 3px; }
 @media (max-width: 800px) { .ff-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 520px) { .ff-grid { grid-template-columns: 1fr; } }
+
+/* === Couche Vent (B3) : flèches à l'altitude du plan === */
+.wind-arrow-wrap { background: none; border: none; }
+.wind-arrow {
+    position: absolute; left: 50%; top: 50%;
+    width: 0; height: 0;
+    margin-left: -5px; margin-top: -9px;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-bottom: 14px solid currentColor;
+    filter: drop-shadow(0 0 2px rgba(2,6,23,0.6));
+}
+.wind-arrow-kt {
+    position: absolute; left: 50%; top: 50%;
+    transform: translate(9px, 7px);
+    font: 600 8.5px 'DM Mono', monospace;
+    text-shadow: 0 0 3px rgba(2,6,23,0.8);
+    pointer-events: none;
+}
