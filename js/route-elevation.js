@@ -106,11 +106,12 @@ export async function fetchRouteElevation(fromLat, fromLon, toLat, toLon, sample
     }
 }
 
-export function evaluateClearance(profile, cruiseAltFt, minClearanceFt = 1000) {
-    if (!profile?.points?.length) return { minClearanceFt: null, worstPoint: null, level: 'ok' };
+export function evaluateClearance(profile, cruiseAltFt, minClearanceFt = 1000, obstacles = null) {
+    if (!profile?.points?.length) return { minClearanceFt: null, worstPoint: null, worstObstacle: null, level: 'ok' };
 
     let worst = profile.points[0];
     let worstClear = cruiseAltFt - worst.elevFt;
+    let worstObstacle = null;
 
     for (const p of profile.points) {
         const clear = cruiseAltFt - p.elevFt;
@@ -120,11 +121,25 @@ export function evaluateClearance(profile, cruiseAltFt, minClearanceFt = 1000) {
         }
     }
 
+    // Obstacles ponctuels du couloir (A6, base SIA) : un sommet d'obstacle
+    // plus proche de la croisière que le relief devient le pire point — la
+    // marge mini et le niveau (caution/danger) en tiennent compte.
+    if (Array.isArray(obstacles)) {
+        for (const o of obstacles) {
+            if (!Number.isFinite(o.topFt)) continue;
+            const clear = cruiseAltFt - o.topFt;
+            if (clear < worstClear) {
+                worstClear = clear;
+                worstObstacle = o;
+            }
+        }
+    }
+
     let level = 'ok';
     if (worstClear < 0) level = 'danger';
     else if (worstClear < minClearanceFt) level = 'caution';
 
-    return { minClearanceFt: worstClear, worstPoint: worst, level };
+    return { minClearanceFt: worstClear, worstPoint: worst, worstObstacle, level };
 }
 
 export function _clearCache() { _cache.clear(); }

@@ -123,6 +123,25 @@ export function serviceFreq(as) {
     return f ? String(f.value) : null;
 }
 
+/** Libellé du code d'horaire d'activation SIA (HorCode des zones —
+ *  distribution AIRAC 2026-09 : H24×603, HX×540, NOTAM×156, HO×122,
+ *  TS×60, HJ×44, HN×1). Seuls les codes au sens ICAO documenté sont
+ *  traduits ; toute autre valeur (« TS », horaire littéral…) est
+ *  affichée telle quelle — jamais d'invention. */
+export function horLabel(hor, isFr = true) {
+    const h = String(hor || '').trim().toUpperCase();
+    if (!h) return '';
+    const L = {
+        'H24':   { fr: 'H24 — jour et nuit', en: 'H24 — day & night' },
+        'HJ':    { fr: 'HJ — jour (lever→coucher du soleil)', en: 'HJ — day (sunrise→sunset)' },
+        'HN':    { fr: 'HN — nuit (coucher→lever du soleil)', en: 'HN — night (sunset→sunrise)' },
+        'HO':    { fr: 'HO — sur demande', en: 'HO — on request' },
+        'HX':    { fr: 'HX — horaires variables', en: 'HX — variable hours' },
+        'NOTAM': { fr: 'Activation par NOTAM', en: 'Activation by NOTAM' },
+    };
+    return L[h] ? L[h][isFr ? 'fr' : 'en'] : h;
+}
+
 // Fusionne les tronçons d'un même groupe séparés de < MERGE_TOL_FRAC.
 function _mergeRanges(ranges) {
     const sorted = ranges.map(r => [...r]).sort((a, b) => a[0] - b[0]);
@@ -183,9 +202,12 @@ export function computeRouteAirspaces(points, items, opts) {
         g.lo = Math.min(g.lo, lo);
         g.up = Math.max(g.up, up);
         g.ranges.push(...ranges);
-        // Activité officielle des zones R/D/P (« Parachutage ») : portée au
+        // Activité officielle des zones R/D/P (« Parachutage ») et code
+        // d'horaire d'activation SIA (« H24 », « NOTAM »…) : portés au
         // segment pour l'infobulle du profil écran et les cadres du PDF.
-        for (const [fa, fb] of ranges) g.segs.push({ fa, fb, up, zone, act: as.activity || null });
+        for (const [fa, fb] of ranges) {
+            g.segs.push({ fa, fb, up, zone, act: as.activity || null, hor: as.hor || null });
+        }
     }
 
     const groups = [...byKey.values()].map(g => {

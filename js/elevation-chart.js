@@ -1,4 +1,5 @@
 import { themeTokens } from './night-mode.js';
+import { horLabel } from './airspace-profile.js';
 /* ================================================================
  * ELEVATION CHART — Profil d'élévation interactif (canvas)
  * ================================================================
@@ -434,10 +435,15 @@ function _drawZoneTooltip({ g, seg }, cw, xOf) {
     // Secteur affiché seulement s'il précise l'organisme (un groupe sans
     // fréquence porte déjà le nom de SA zone : pas de doublon).
     const zone = seg.zone && seg.zone.toUpperCase() !== g.name.toUpperCase() ? seg.zone : null;
+    // Code d'horaire d'activation SIA (« H24 », « Activation par NOTAM »…)
+    // accolé à la 3e ligne : l'ouverture d'une zone conditionnelle compte
+    // autant que sa fréquence.
+    let line3 = g.freq ? `${g.freq} MHz` : (seg.act || `${nm} NM`);
+    if (seg.hor) line3 += `  ·  ${horLabel(seg.hor, true)}`;
     const lines = [
         g.name,
         `ALT MIN : ${_altTxt(g.lo)}   ALT MAX : ${_altTxt(seg.up)}`,
-        g.freq ? `${g.freq} MHz` : (seg.act || `${nm} NM`),
+        line3,
     ];
     _ctx.font = 'bold 10px "DM Sans", sans-serif';
     const w0 = _ctx.measureText(lines[0]).width;

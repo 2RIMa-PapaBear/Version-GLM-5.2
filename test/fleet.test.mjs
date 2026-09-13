@@ -215,3 +215,30 @@ test('chronoThresholdKt : VR − 5 kt, plancher 10 kt', () => {
     assert.equal(chronoThresholdKt(13), 10, 'plancher bas');
     assert.equal(chronoThresholdKt(90), 85);
 });
+
+// ---- A3 : limites par avion (vent traversier, réserve perso, atterrissage) --
+describe('flotte — limites par avion (A3)', () => {
+    test('limite traversier enregistrée si valide, null sinon (seuils génériques conservés)', () => {
+        const ok = fleet.addAircraft({ name: 'WT9', groundRoll: 500, fiftyFt: 1100, xwindLimitKt: 12 });
+        assert.equal(ok.xwindLimitKt, 12);
+        const vide = fleet.addAircraft({ name: 'X', groundRoll: 500, fiftyFt: 1100 });
+        assert.equal(vide.xwindLimitKt, null);
+        const absurde = fleet.addAircraft({ name: 'Y', groundRoll: 500, fiftyFt: 1100, xwindLimitKt: 99 });
+        assert.equal(absurde.xwindLimitKt, null, '> 40 kt écarté');
+    });
+
+    test('réserve perso : clamp 0–60, défaut 0', () => {
+        assert.equal(fleet.addAircraft({ name: 'A', groundRoll: 1, fiftyFt: 2 }).reserveExtraMin, 0);
+        assert.equal(fleet.addAircraft({ name: 'B', groundRoll: 1, fiftyFt: 2, reserveExtraMin: 15 }).reserveExtraMin, 15);
+        assert.equal(fleet.addAircraft({ name: 'C', groundRoll: 1, fiftyFt: 2, reserveExtraMin: 90 }).reserveExtraMin, 60);
+    });
+
+    test('références atterrissage optionnelles ; C172 par défaut les porte (POH)', () => {
+        const def = fleet.getActiveAircraft();   // flotte neuve → C172 par défaut
+        assert.equal(def.ldgRoll, 725);
+        assert.equal(def.ldgFifty, 1400);
+        const sans = fleet.addAircraft({ name: 'DR400', groundRoll: 500, fiftyFt: 1100 });
+        assert.equal(sans.ldgRoll, null);
+        assert.equal(sans.ldgFifty, null);
+    });
+});

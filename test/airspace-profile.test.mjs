@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
     limitToFt, routeBbox, pointInAirspace, crossedRanges,
-    serviceDisplayName, serviceFreq, computeRouteAirspaces,
+    serviceDisplayName, serviceFreq, computeRouteAirspaces, horLabel,
 } from '../js/airspace-profile.js';
 
 // Carré lon 1..2, lat 47..48.
@@ -147,4 +147,31 @@ test('computeRouteAirspaces : filtre altitude du vol (croisière 3500 ft, tolér
     assert.ok(all.includes('RENNES TWR'), 'sans altitude, la CTR est conservée');
     const zero = computeRouteAirspaces(ROUTE, items, { cruiseAltFt: 0 }).map(g => g.name);
     assert.equal(zero.length, 5);
+});
+
+test('horLabel : codes SIA documentés traduits, valeur brute sinon', () => {
+    assert.equal(horLabel('H24'), 'H24 — jour et nuit');
+    assert.equal(horLabel('hj'), 'HJ — jour (lever→coucher du soleil)');
+    assert.equal(horLabel('NOTAM', false), 'Activation by NOTAM');
+    assert.equal(horLabel('TS'), 'TS', 'code non documenté → affiché brut');
+    assert.equal(horLabel(''), '');
+    assert.equal(horLabel(null), '');
+});
+
+test('computeRouteAirspaces : code horaire d\u2019activation porté au segment', () => {
+    const pts = [
+        { frac: 0, lat: 47.5, lon: 1.4 },
+        { frac: 0.5, lat: 47.5, lon: 1.5 },
+        { frac: 1, lat: 47.5, lon: 1.6 },
+    ];
+    const zone = {
+        _sia: true, name: 'R 114 B', type: 15, activity: 'Tir', hor: 'NOTAM',
+        lowerLimit: { value: 0, unit: 1 }, upperLimit: { value: 145, unit: 6 },
+        geometry: { type: 'Polygon', coordinates: [[[1.3, 47.4], [1.7, 47.4], [1.7, 47.6], [1.3, 47.6], [1.3, 47.4]]] },
+    };
+    const g = computeRouteAirspaces(pts, [zone], { cruiseAltFt: 3000 });
+    assert.ok(g, 'zone traversée');
+    assert.equal(g[0].segs.length, 1);
+    assert.equal(g[0].segs[0].hor, 'NOTAM');
+    assert.equal(g[0].segs[0].act, 'Tir');
 });

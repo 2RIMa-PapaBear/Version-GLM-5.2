@@ -200,6 +200,32 @@ En local, la routine complète tient en une commande :
 npm run pub -- "message du commit"   # commit + push + attente du déploiement
 ```
 
+### Canal de test (`/test/`) — validation avant diffusion
+
+Chaque évolution est d'abord publiée sur le **canal test**, à côté de la
+production, pour approbation du pilote — la racine ne bouge ensuite que par
+`npm run pub` (feu vert) :
+
+```bash
+npm run deploy:test                  # publie l'ÉTAT LOCAL de travail sur /test/
+npm run deploy:test -- --dry-run     # montre le delta sans rien envoyer
+npm run deploy:test -- --mirror      # supprime aussi les fichiers distants disparus
+```
+
+- **URL** : <https://papabear56.pages-perso.free.fr/test/> (et
+  <http://papabear56.free.fr/test/>) — version affichée `vtest.<horodatage>`
+  au footer, manifeste suffixé « — TEST » (icône distincte si installée).
+- Publie le **working dir, modifications non commitées incluses** (c'est tout
+  son but) ; identifiants de `deploy.config.json`, comme `npm run cells`.
+- `data/airspaces/cells/` (257 Mo) et `data/vac-sia/` (123 Mo) ne sont **pas**
+  dupliqués : lus depuis la racine via `js/data-base.js` (`bigDataUrl`).
+- `js/config.local.js` n'est jamais uploadé : le canal test utilise le relais
+  Cloudflare public de `config.js`, comme un vrai utilisateur.
+- La production ne peut pas être touchée par ce script (dossier `test/` seul,
+  jamais la racine) ; et `deploy-ftp.mjs` (prod) ne publie de toute façon que
+  l'état **commité** du dépôt — le working dir ne peut pas y fuir par accident.
+
+
 ### Surveillance automatique
 
 - **Health-check toutes les 6 h** (`health-check.yml`) : site HTTPS en ligne
@@ -245,7 +271,7 @@ npm run pub -- "message du commit"   # commit + push + attente du déploiement
 - **2026-09-05** — FICHE TERRAIN v3 — feu vert pilote après aperçu PDF (Apercu_fiche_terrain.pdf, 3 terrains LFRN/LFRV/LFPF) : section Terrain en LIGNES LIBELL…
 - **2026-09-05** — FICHE TERRAIN v2 (retours pilote : ordre + lisibilité) : ① FRÉQUENCES en tête (sans sous-titre redondant) ② PISTES (seuils officiels affiché…
 - **2026-09-05** — FICHE TERRAIN COMPLÈTE dans l onglet « Fréquences & info terrain » (demande pilote, 4 arbitrages validés) : ① IDENTITÉ en chips — élévation,…
-<!-- docs:lastSha=e39e4d5de336153d6207f08b2e4378867491505d -->
+<!-- docs:lastSha=56b5f2cafca43064a190f62edc1cbd4e311d479c -->
 
 
 

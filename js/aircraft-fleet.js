@@ -37,6 +37,8 @@ const DEFAULT_C172 = {
     safetyMargin: 20,
     cruiseSpeedKt: 110,   // vitesse de croisière TAS (planificateur de nav)
     fuelBurnLph: 35,      // consommation horaire en croisière (L/h)
+    ldgRoll: 725,         // atterrissage POH : roulement (ft)
+    ldgFifty: 1400,       // atterrissage POH : franchissement 50 ft (ft)
 };
 
 /**
@@ -351,6 +353,10 @@ function _sanitize(data) {
     const sm = parseInt(data.safetyMargin, 10);
     const cs = parseInt(data.cruiseSpeedKt, 10);
     const fb = parseInt(data.fuelBurnLph, 10);
+    const xw = parseInt(data.xwindLimitKt, 10);
+    const rem = parseInt(data.reserveExtraMin, 10);
+    const lr = parseInt(data.ldgRoll, 10);
+    const lf = parseInt(data.ldgFifty, 10);
     const out = {
         name: String(data.name || 'Avion').slice(0, 40),
         registration: String(data.registration || '').slice(0, 12).toUpperCase(),
@@ -360,6 +366,15 @@ function _sanitize(data) {
         safetyMargin: isNaN(sm) ? 20 : Math.max(0, Math.min(50, sm)),
         cruiseSpeedKt: isNaN(cs) || cs <= 0 ? null : cs,
         fuelBurnLph: isNaN(fb) || fb <= 0 ? null : fb,
+        // Limite vent traversier (kt, manuel de vol/école) : OPTIONNELLE —
+        // le GO/NO-GO garde ses seuils génériques 12/15 kt sans elle.
+        xwindLimitKt: isNaN(xw) || xw <= 0 || xw > 40 ? null : xw,
+        // Majoration PERSONNELLE de la réserve (min, ajoutées aux 30/45
+        // réglementaires) : 0 par défaut, plafonnée à 60.
+        reserveExtraMin: isNaN(rem) ? 0 : Math.max(0, Math.min(60, rem)),
+        // Références ATTERRISSAGE (ft) : optionnelles, section masquée sans.
+        ldgRoll: isNaN(lr) || lr <= 0 ? null : lr,
+        ldgFifty: isNaN(lf) || lf <= 0 ? null : lf,
         wb: _sanitizeWb(data.wb),
     };
     // Uniquement si valide : ne pas écraser l'{ id: _uid(), ..._sanitize() }

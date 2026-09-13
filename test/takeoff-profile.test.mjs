@@ -145,3 +145,70 @@ test('svg : ids de pattern uniques entre instances', () => {
     assert.notEqual(idsA[0], idsB[0]);
     assert.match(a, new RegExp(`url\\(#${idsA[0]}\\)`), 'le rect référence bien son pattern');
 });
+
+// ---- A5 : schéma d'ATTERRISSAGE (descente 50 ft → toucher → arrêt) ---------
+import { landingProfileSvg, landingProfileLayout } from '../js/takeoff-profile.js';
+
+const LDG = {
+    // C172 POH 725/1400, piste confortable.
+    ok: { rollFt: 725, fiftyFt: 1400, runwayLength: 3300, margin: 1900, level: 'ok' },
+    // Marge faible (distance d'arrêt près de la fin).
+    caution: { rollFt: 725, fiftyFt: 1400, runwayLength: 1600, margin: 200, level: 'caution' },
+    // Distance d'arrêt AU-DELÀ de la piste.
+    danger: { rollFt: 725, fiftyFt: 1400, runwayLength: 1200, margin: -200, level: 'danger' },
+    unknown: { rollFt: 725, fiftyFt: 1400, runwayLength: null, margin: null, level: 'unknown' },
+};
+
+test('atterrissage layout : échelle fonctionnelle, arrêt ~2/3 de la largeur', () => {
+    const L = landingProfileLayout(LDG.ok, 340);
+    assert.equal(L.XR, 340, 'largeur = conteneur');
+    assert.ok(L.known, 'piste connue');
+    // Échelle : span = min(piste, arrêt × 1.6) — l'arrêt occupe ~62 %.
+    const span = Math.min(LDG.ok.runwayLength, LDG.ok.fiftyFt * 1.6);
+    const expectedStop = LDG.ok.fiftyFt / span * 340;
+    assert.ok(Math.abs(L.stopX - expectedStop) < 1, `stopX ≈ ${expectedStop}, obtenu ${L.stopX}`);
+    assert.ok(L.touchX > L.fiftyX, 'toucher après le seuil/50 ft');
+    assert.ok(L.touchX < L.stopX, 'toucher avant l\u2019arrêt');
+    assert.ok(L.descentAngle > 0, 'pente de descente positive');
+    // Piste bien plus longue que l'arrêt : excédent tronqué, pas de jalon.
+    assert.equal(L.rwyEndInFrame, false, 'fin de piste hors cadre (piste 3300 vs arrêt 1400)');
+});
+
+test('atterrissage layout : piste courte → piste entière dans le cadre, jalon au bord', () => {
+    const L = landingProfileLayout(LDG.caution, 340);   // piste 1600 vs arrêt 1400
+    assert.equal(L.rwyEndInFrame, true);
+    assert.ok(Math.abs(L.rwyEndX - 340) < 1, 'fin de piste au bord droit');
+    assert.ok(L.stopX / L.XR > 0.8, `arrêt en fin de piste (${Math.round(L.stopX / L.XR * 100)} %)`);
+});
+
+test('atterrissage étiquettes : « 50 ft » AVANT l\u2019avion en approche, « arrêt » AU-DESSUS de l\u2019avion posé', () => {
+    const L = landingProfileLayout(LDG.ok, 340);
+    // « 50 ft » : fin du texte au repère (anchor end), repère reculé du bord
+    // gauche pour que le texte tienne — jamais sous l'avion qui descend.
+    assert.equal(L.fiftyLblAnchor, 'end');
+    assert.ok(L.fiftyLblX < L.fiftyX, 'étiquette 50 ft en amont du repère');
+    assert.ok(L.fiftyLblX - 30 > 0, 'étiquette 50 ft dans le cadre');
+    assert.ok(L.fiftyX >= 40, 'repère 50 ft écarté du bord gauche');
+    // « arrêt » : au-dessus de la zone de l'avion posé (retour pilote 13/09).
+    assert.ok(L.stopLblY < 50, `stopLblY au-dessus de l'avion posé (y=${L.stopLblY})`);
+});
+
+test('atterrissage layout : arrêt au-delà de la piste → tronqué au bord droit', () => {
+    const L = landingProfileLayout(LDG.danger, 340);
+    assert.equal(L.stopInFrame, false);
+    assert.ok(L.stopX <= 338, 'arrêt dessiné borné au bord droit');
+});
+
+test('atterrissage svg : invariants de contenu sur les 4 verdicts', () => {
+    for (const name of Object.keys(LDG)) {
+        const svg = landingProfileSvg(LDG[name], true);
+        assert.ok(!svg.includes('NaN'), `${name}: pas de NaN`);
+        assert.ok(svg.includes('data-rwy="1"'), `${name}: ligne de piste`);
+        assert.ok(svg.includes('>50 ft<'), `${name}: étiquette 50 ft au seuil`);
+        assert.ok(/stroke="#10B981|#F59E0B|#EF4444|#38BDF8/.test(svg), `${name}: couleur de niveau`);
+    }
+    // Marge positive chiffrée, manque chiffré en danger, arrêt complet chiffré.
+    assert.ok(landingProfileSvg(LDG.ok, true).includes(`+${ftToM(LDG.ok.margin)} m`), 'marge +X m');
+    assert.ok(landingProfileSvg(LDG.danger, true).includes(`manque ${ftToM(Math.abs(LDG.danger.margin))} m`), 'manque X m');
+    assert.ok(landingProfileSvg(LDG.ok, true).includes(`arrêt · ${ftToM(LDG.ok.fiftyFt)} m`), 'étiquette arrêt');
+});

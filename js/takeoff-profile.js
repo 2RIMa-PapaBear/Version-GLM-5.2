@@ -268,11 +268,158 @@ function planeGrounded(x, y, scale) {
 /**
  * Avion en vol au 50 ft — même icône, assiette alignée sur la pente de
  * montée (l'inclinaison native est compensée : rotation ≈ 0 quand la
- * pente vaut PLANE_TILT).
+ * pente vaut PLANE_TILT). Angle NÉGATIF = pente descendante (approche).
  */
 function planeAirborne(x, y, scale, col, angle) {
     const r = (PLANE_TILT - angle).toFixed(1);
     return `<g transform="translate(${x} ${y}) rotate(${r}) scale(${scale}) translate(-12 -12)"`
         + ` fill="none" stroke="${col}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">`
         + `<path d="${PLANE_ICON_D}"/></g>`;
+}
+
+/* ================================================================
+ * LANDING PROFILE — Schéma d'ATTERRISSAGE en coupe (A5), miroir du
+ * décollage : avion en descente qui franchit les 50 ft au seuil,
+ * touche après la flare, roule et S'ARRÊTE ; marge restante (ou
+ * manque) mise en couleur. Même piste, mêmes conventions graphiques
+ * et typographiques que le schéma de décollage.
+ * ================================================================ */
+
+/**
+ * Layout du schéma d'atterrissage. `r` = résultat evaluateLandingPerformance
+ * ({rollFt, fiftyFt, runwayLength, margin, level}) — fiftyFt y est la
+ * distance TOTALE d'arrêt depuis 50 ft, rollFt le roulement seul.
+ */
+export function landingProfileLayout(r, width = 340) {
+    const W = Math.max(280, Math.round(width));
+    const XR = W;
+
+    const known = r.runwayLength != null && r.runwayLength > 0;
+    // ÉCHELLE FONCTIONNELLE (retour pilote 13/09 « trop serré ») : la
+    // DISTANCE D'ARRÊT occupe toujours ~2/3 de la largeur — sur une piste
+    // très longue, l'excédent est tronqué au bord droit (marge chiffrée
+    // exacte) ; sur une piste courte, la piste entière reste dans le cadre.
+    const spanFt = known ? Math.min(r.runwayLength, r.fiftyFt * 1.6) : r.fiftyFt * 1.15;
+    const pxPerFt = XR / spanFt;
+
+    const rollFt = Math.min(r.rollFt, r.fiftyFt);   // garde-fou
+    // Repère 50 ft au-dessus du seuil, écarté du bord gauche pour laisser
+    // place à son étiquette « 50 ft » POSÉE AVANT lui (fin du texte au
+    // repère : jamais sous l'avion en approche, qui démarre sa descente ici).
+    const fiftyX = 44;
+    const stopTrueX = r.fiftyFt * pxPerFt;           // arrêt réel (peut dépasser le cadre)
+    const stopX = Math.min(stopTrueX, XR - 2);       // arrêt dessiné (tronqué si danger)
+    const stopInFrame = stopTrueX <= XR - 1;
+    // Toucher = fin de la flare (distance totale − roulement), toujours
+    // après le repère 50 ft et avant l'arrêt.
+    const touchX = Math.max(fiftyX + 26, Math.min((r.fiftyFt - rollFt) * pxPerFt, stopX - 8));
+    const descentAngle = Math.atan2(CLIMB_RISE, Math.max(1, touchX - fiftyX)) * 180 / Math.PI;
+
+    const planeScale = 1.18 * Math.min(1.5, Math.max(1, W / 340));
+
+    // Étiquette « arrêt » AU-DESSUS de l'avion posé (retour pilote 13/09 :
+    // masquée par l'icône à hauteur de piste) — y commun retourné pour la QA.
+    const stopLblY = RWY_Y - 32;
+
+    // Fin de piste : dans le cadre (piste courte/modérée) ou tronquée au
+    // bord droit (piste bien plus longue que la distance d'arrêt).
+    const rwyEndX = known ? Math.min(r.runwayLength * pxPerFt, XR) : null;
+    const rwyEndInFrame = known && r.runwayLength * pxPerFt <= XR + 0.5;
+
+    return {
+        W, XR, known, pxPerFt, fiftyX, touchX, stopX, stopInFrame,
+        rwyEndX, rwyEndInFrame,
+        descentAngle, planeScale, stopLblY,
+        fiftyLblX: fiftyX - 6, fiftyLblAnchor: 'end', fiftyLblY: FT50_Y + 5,
+        col: LEVEL_COLORS[r.level] || LEVEL_COLORS.unknown,
+    };
+}
+
+/** Rend le schéma d'atterrissage en coupe (SVG inline). */
+export function landingProfileSvg(r, isFr = true, width = 340) {
+    const L = landingProfileLayout(r, width);
+    const uid = 'lp' + (++_uidSeq);
+    const muted = 'var(--text-muted)';
+    const p = [];
+
+    const aria = isFr
+        ? 'Profil d\u2019atterrissage : franchissement des 50 ft au seuil, toucher, roulement jusqu\u2019à l\u2019arrêt complet'
+        : 'Landing profile: 50 ft at the threshold, touchdown, roll to a full stop';
+
+    // ---- Coupe de sol + piste + jalons (identiques au décollage) ----
+    p.push(`<defs><pattern id="${uid}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">`
+        + `<line x1="0" y1="0" x2="0" y2="6" stroke="#64748B" stroke-width="1.3" opacity="0.35"/></pattern></defs>`);
+    p.push(`<line data-rwy="1" x1="0" y1="${RWY_Y}" x2="${L.XR}" y2="${RWY_Y}" stroke="#64748B" stroke-width="2"${L.known ? '' : ' stroke-dasharray="5 4"'}/>`);
+    p.push(`<rect x="0" y="${RWY_Y + 3}" width="${L.XR}" height="7" fill="url(#${uid})"/>`);
+    p.push(`<line x1="1" y1="${RWY_Y - 5}" x2="1" y2="${RWY_Y + 2}" stroke="#64748B" stroke-width="1.5"/>`);
+    // Fin de piste : jalon SEULEMENT si elle tient dans le cadre (piste très
+    // longue → l'excédent est tronqué au bord droit, la ligne continue).
+    if (L.rwyEndInFrame) p.push(`<line x1="${L.rwyEndX - 1}" y1="${RWY_Y - 5}" x2="${L.rwyEndX - 1}" y2="${RWY_Y + 2}" stroke="#64748B" stroke-width="1.5"/>`);
+
+    // ---- Repère 50 ft au seuil + descente + roulement ----
+    p.push(`<line x1="${L.fiftyX}" y1="${FT50_Y + 8}" x2="${L.fiftyX}" y2="${RWY_Y}" stroke="${muted}" stroke-width="1" stroke-dasharray="2 3" opacity="0.6"/>`);
+    p.push(`<line x1="${L.fiftyX}" y1="${FT50_Y + 7}" x2="${L.touchX}" y2="${RWY_Y - 3}" stroke="${L.col}" stroke-width="2.5" stroke-linecap="round"/>`);
+    p.push(`<line x1="${L.touchX}" y1="${RWY_Y - 2.5}" x2="${L.stopX}" y2="${RWY_Y - 2.5}" stroke="${L.col}" stroke-width="3" stroke-linecap="round"/>`);
+
+    // ---- Marge restante / manque (comme le décollage) ----
+    if (L.known && r.margin != null) {
+        if (r.margin >= 0) {
+            const endX = L.rwyEndInFrame ? L.rwyEndX : L.XR;
+            const mw = endX - L.stopX - 6;
+            if (mw > 4) {
+                p.push(`<rect x="${L.stopX + 3}" y="${RWY_Y - 8}" width="${mw}" height="3.5" rx="1.5" fill="${L.col}" opacity="0.5"/>`);
+                if (mw >= 46) {
+                    p.push(`<text x="${(L.stopX + endX) / 2}" y="${RWY_Y - 12}" text-anchor="middle" font-family="${MONO}" font-size="10" fill="${L.col}">+${ftToM(r.margin)} m</text>`);
+                }
+            }
+        } else {
+            p.push(`<text x="${L.stopX + 2}" y="${FT50_Y + 4}" text-anchor="end" font-family="${MONO}" font-size="10" fill="#EF4444">${isFr ? 'manque' : 'short'} ${ftToM(Math.abs(r.margin))} m</text>`);
+        }
+    }
+
+    // ---- Avions : en approche au 50 ft (angle NÉGATIF = descente),
+    // posé et arrêté en fin de roulement ----
+    const s = L.planeScale;
+    const groundedY = RWY_Y - 1 - (PLANE_DROP + PLANE_LIFT) * s;
+    p.push(planeGrounded(Math.max(L.stopX - 15 * s, L.touchX + 2), groundedY, s));
+    p.push(planeAirborne(L.fiftyX + 10.5 * s, FT50_Y - 2.1 * s, s, L.col, -L.descentAngle));
+
+    // ---- Étiquettes ----
+    // « 50 ft » AVANT le repère (fin du texte au repère) : jamais recouverte
+    // par l'avion en approche, qui entame sa descente à droite du repère.
+    p.push(`<text x="${L.fiftyLblX}" y="${L.fiftyLblY}" text-anchor="${L.fiftyLblAnchor}" font-family="${MONO}" font-size="10" fill="${muted}">50 ft</text>`);
+    const rollMid = (L.touchX + L.stopX) / 2;
+    if (L.stopX - L.touchX > 44) {
+        p.push(`<text x="${rollMid}" y="${RWY_Y + 20}" text-anchor="middle" font-family="${MONO}" font-size="10" fill="${muted}">${ftToM(Math.min(r.rollFt, r.fiftyFt))} m</text>`);
+    }
+    if (L.stopInFrame) {
+        // « arrêt » AU-DESSUS de l'avion posé (retour pilote : masquée par
+        // l'icône à hauteur de piste).
+        p.push(`<text x="${Math.min(L.stopX, L.XR - 4)}" y="${L.stopLblY}" text-anchor="end" font-family="${MONO}" font-size="10" fill="${L.col}">${isFr ? 'arrêt' : 'stop'} · ${ftToM(r.fiftyFt)} m</text>`);
+    }
+    if (!L.known) {
+        p.push(`<text x="${L.XR - 1}" y="${RWY_Y + 20}" text-anchor="end" font-family="'DM Sans',sans-serif" font-size="10" font-style="italic" fill="${muted}">${isFr ? 'longueur piste ?' : 'runway length ?'}</text>`);
+    }
+
+    return `<svg viewBox="0 0 ${L.W} ${H}" role="img" aria-label="${aria}" style="width:100%; height:auto; display:block;">${p.join('')}</svg>`;
+}
+
+/** Monte le schéma d'atterrissage (mesure + re-rendu 1:1, comme le décollage). */
+export function mountLandingProfile(host, r, isFr = true) {
+    if (host._tpRo) host._tpRo.disconnect();
+
+    const render = (width) => { host.innerHTML = landingProfileSvg(r, isFr, width); };
+    render(340);
+
+    const fit = () => {
+        const w = host.clientWidth;
+        if (!w || Math.abs(w - host.querySelector('svg')?.viewBox.baseVal.width) <= 8) return;
+        render(w);
+    };
+    fit();
+
+    if (typeof ResizeObserver !== 'undefined') {
+        host._tpRo = new ResizeObserver(fit);
+        host._tpRo.observe(host);
+    }
 }

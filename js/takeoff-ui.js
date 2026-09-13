@@ -1,29 +1,35 @@
 /* ================================================================
- * TAKEOFF UI — Widget performance décollage
+ * TAKEOFF UI — Widget « Performances piste » (décollage + atterrissage)
  * ================================================================
  *
- * Affiche un panneau compact sous le GO/NO-GO qui présente :
- *   - la distance de décollage corrigée (roulement + franchissement 50ft),
- *   - un champ pour saisir la longueur de piste du terrain (persistée),
- *   - le schéma en coupe de la piste (roulement, montée au 50ft, marge) —
- *     la barre « plan » historique a été supprimée (redondante avec la coupe).
+ * Affiche TOUJOURS les deux sections (arbitrage pilote 13/09) :
+ *   1. DÉCOLLAGE du terrain observé (présentation historique : métriques,
+ *      schéma en coupe, piste en service de la rose des vents, marge) ;
+ *   2. ATTERRISSAGE, même présentation (métriques, schéma en coupe dédié,
+ *      piste, marge) :
+ *      - vol local : le terrain observé (départ = arrivée, même piste) ;
+ *      - navigation : la DESTINATION du plan, calculée SANS consultation à
+ *        partir du METAR de l'arrivée (relais) — piste PRÉVUE d'après son
+ *        vent, mention « prévue ». Le plan de vol n'est jamais modifié.
  *
- * Le widget n'apparaît que si la densité-altitude est calculable
- * (i.e. on a l'élévation + QNH + OAT). La saisie de la longueur de piste
- * est optionnelle mais débloque le verdict de marge.
+ * La section atterrissage exige les références POH de la flotte
+ * (ldgRoll / ldgFifty) — sinon bandeau d'invitation.
  * ================================================================ */
 
 import { state, escapeHtml } from './core.js';
 import { makeCollapsible } from './collapsible.js';
-import { mountTakeoffProfile } from './takeoff-profile.js';
+import { mountTakeoffProfile, mountLandingProfile } from './takeoff-profile.js';
 import {
-    evaluateTakeoffPerformance, getRunwayLength,
-    getAircraftRef, getActiveRunwayNameForIcao,
+    evaluateTakeoffPerformance, evaluateLandingPerformance, evaluateLandingAtDestination,
+    getRunwayLength, getAircraftRef, getActiveRunwayNameForIcao,
 } from './takeoff-performance.js';
-import { getFleet, getActiveAircraftId, setActiveAircraft } from './aircraft-fleet.js';
+import { getFleet, getActiveAircraft, getActiveAircraftId, setActiveAircraft } from './aircraft-fleet.js';
 import { openFleetManager } from './fleet-ui.js';
 import { getDeclinationForIcao } from './magvar.js';
 import { getActiveRunwaySurfaceInfo, surfaceLabel, isSoftSurface } from './runway-surface.js';
+
+// Jeton anti-course des atterrissages de destination asynchrones.
+let _ldgSeq = 0;
 
 /**
  * Affiche/masque le widget takeoff pour le terrain courant.
@@ -39,13 +45,23 @@ export function showTakeoffWidget(icao) {
     }
 
     const result = evaluateTakeoffPerformance(icao);
-    if (!result) {
+    // Consultation de l'ARRIVÉE (message affiché = TAF) : le décollage du
+    // départ n'est plus calculable, mais la section ATTERRISSAGE vit de la
+    // météo de la destination (fetch propre) — le widget reste affiché, la
+    // section décollage remplacée par une invitation (retour au départ).
+    const isNav = document.body.classList.contains('mode-nav');
+    const destInput = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
+    // NB : pas de condition « destination ≠ terrain observé » — en CONSULTATION
+    // de l'arrivée, l'observé EST la destination : le widget reste utile
+    // (atterrissage de la destination, fetch météo propre).
+    const hasNavDest = isNav && /^[A-Z][A-Z0-9]{3}$/.test(destInput);
+    if (!result && !hasNavDest) {
         container.style.display = 'none';
         return;
     }
 
     const isFr = state.lang === 'fr';
-    const body = makeCollapsible(container, isFr ? 'Performance décollage' : 'Takeoff performance', 'plane-takeoff');
+    const body = makeCollapsible(container, isFr ? 'Performances piste' : 'Runway performance', 'plane-takeoff');
 
     // Injecte le bouton « Flotte » dans le header repliable (avant le chevron).
     const header = container.querySelector('.collapsible-header');
@@ -70,6 +86,9 @@ export function showTakeoffWidget(icao) {
 // Facteur de conversion pied → mètre.
 const FT_TO_M = 0.3048;
 
+/** Convertit pieds en mètres, arrondi à l'entier. */
+function ftToM(ft) { return Math.round(ft * FT_TO_M); }
+
 /** État de piste déduit du facteur de majoration (mêmes seuils que
  *  takeoff-performance). Herbe sèche (+15 %) : rien à préciser. Les états
  *  restent courts (« humide », « contaminée ») : la ligne doit tenir entière. */
@@ -82,8 +101,55 @@ function _surfaceState(factor, isFr) {
     return '';
 }
 
-/** Convertit pieds en mètres, arrondi à l'entier. */
-function ftToM(ft) { return Math.round(ft * FT_TO_M); }
+const _lvlColor = (lvl) => lvl === 'danger' ? '#EF4444' : (lvl === 'caution' ? '#F59E0B' : '#10B981');
+
+/** HTML interne de la section ATTERRISSAGE (métriques + hôte du schéma +
+ *  ligne piste + message) — même présentation que la section décollage. */
+function _ldgSectionHTML(landing, icao, isFr, activeRwyFallback) {
+    const hw = landing.headwindKt;
+    const ldgLenM = landing.runwayLength != null ? ftToM(landing.runwayLength) : null;
+    const rwyLbl = landing.forecast
+        ? (isFr ? 'Piste prévue (vent METAR)' : 'Forecast rwy (METAR wind)')
+        : (isFr ? 'Piste en service' : 'Runway in use');
+    const rwyVal = landing.runwayName || activeRwyFallback;
+    return `
+            <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:var(--text-muted); margin-bottom:5px;">
+                <i data-lucide="plane-landing" style="width:13px;height:13px;"></i>
+                ${isFr ? 'Atterrissage' : 'Landing'} · ${escapeHtml(icao)}
+            </div>
+            ${landing.metarFrom ? `
+            <div style="font-size:10px; color:var(--text-muted); margin:-1px 0 6px 0; line-height:1.4;">
+                <i data-lucide="info" style="width:11px;height:11px;vertical-align:middle;"></i>
+                ${isFr
+                    ? `${escapeHtml(icao)} sans METAR propre — météo de <b>${escapeHtml(landing.metarFrom)}</b> (${landing.metarDistNm} NM)`
+                    : `${escapeHtml(icao)} has no METAR — weather from <b>${escapeHtml(landing.metarFrom)}</b> (${landing.metarDistNm} NM)`}
+            </div>` : ''}
+            <div class="to-metrics-grid">
+                <span><span class="lab">${isFr ? 'Roulement' : 'Roll'} :</span> <span class="val">${ftToM(landing.rollFt)} m</span></span>
+                <span><span class="lab">${isFr ? 'Franch. 50ft' : '50 ft obst.'} :</span> <span class="val">${ftToM(landing.fiftyFt)} m</span></span>
+                <span><span class="lab">${isFr ? 'Vent axial' : 'Wind'} :</span> <span class="val">${hw == null ? '—' : `${hw >= 0 ? (isFr ? 'face ' : 'head ') : (isFr ? 'arrière ' : 'tail ')}${Math.abs(hw)} kt`}</span></span>
+                <span><span class="lab">${isFr ? 'Densité-alt.' : 'Density alt.'} :</span> <span class="val">${landing.da} ft</span></span>
+            </div>
+            <div class="to-landing-profile" style="margin-top:10px;"></div>
+            <div style="display:flex; align-items:baseline; gap:6px; margin-top:10px; flex-wrap:wrap; font-size:12px; line-height:1.6;">
+                <span style="color:var(--text-muted);">${rwyLbl} :</span>
+                <span style="font-family:'DM Mono',monospace; color:var(--text-color);">${rwyVal ? 'RWY ' + escapeHtml(rwyVal) : '—'}</span>
+                <span style="color:var(--text-muted);">·</span>
+                <span style="color:var(--text-muted);">${isFr ? 'Longueur de piste' : 'Runway length'} :</span>
+                <span style="font-family:'DM Mono',monospace; color:var(--text-color);">${ldgLenM != null ? ldgLenM + ' m' : '—'}</span>
+                ${landing.margin != null ? `
+                    <span style="margin-left:auto; color:var(--text-muted);">${isFr ? 'Restant' : 'Remaining'} :</span>
+                    <span style="font-family:'DM Mono',monospace; font-weight:500; color:${_lvlColor(landing.level)};">${landing.margin >= 0 ? '+' : ''}${ftToM(landing.margin)} m</span>
+                ` : ''}
+            </div>
+            <div style="font-size:11px; margin-top:5px; line-height:1.5; color:var(--text-color);">${escapeHtml(landing.message)}</div>
+            <div style="font-size:10px; color:var(--text-muted); margin-top:6px; line-height:1.4;">
+                <i data-lucide="info" style="width:11px;height:11px;vertical-align:middle;"></i>
+                ${isFr
+                    ? `Distances d'arrêt corrigées densité-altitude, vent axial et état de piste (réf. POH « Atterr. roulement / 50 ft » de la flotte)${landing.forecast ? ' — piste prévue au vent du METAR de l\u2019arrivée, à confirmer en approche' : ''}.`
+                    : `Stop distances corrected for density altitude, headwind and runway state (fleet POH refs)${landing.forecast ? ' — runway forecast from the arrival METAR wind, confirm on approach' : ''}.`}
+            </div>`;
+}
 
 /**
  * Génère le HTML du widget.
@@ -96,6 +162,7 @@ function render(container, r, icao) {
     const lblDa = isFr ? 'Densité-alt.' : 'Density alt.';
     const lblAcRef = isFr ? 'Réf. avion' : 'A/C ref';
     const ref = getAircraftRef();
+
     // Piste en service = celle de la ROSE DES VENTS (choix automatique selon
     // le vent de la vue courante, ou paire choisie manuellement au clic sur
     // une bulle) — source de vérité unique. Fallback : calcul au vent du
@@ -112,17 +179,28 @@ function render(container, r, icao) {
     // facteur majoré ne s'explique pas par le seul revêtement (herbe sèche).
     const surfInfo = getActiveRunwaySurfaceInfo(icao);
     const surfSoft = surfInfo ? isSoftSurface(surfInfo.code) : false;
-    const surfState = r.surfaceFactor > 1 ? _surfaceState(r.surfaceFactor, isFr) : '';
+    const surfState = r?.surfaceFactor > 1 ? _surfaceState(r.surfaceFactor, isFr) : '';
 
     // Liste des avions pour le sélecteur.
     const fleet = getFleet();
     const activeId = getActiveAircraftId();
-    const lblManage = isFr ? 'Gérer la flotte' : 'Manage fleet';
     const lblAircraft = isFr ? 'Avion' : 'Aircraft';
 
-    const marginColor = r.level === 'danger' ? '#EF4444' : (r.level === 'caution' ? '#F59E0B' : '#10B981');
+    const marginColor = r ? _lvlColor(r.level) : '#94A3B8';
     // Longueur de piste affichée en mètres (conversion depuis le stockage en ft).
-    const rwyLenM = r.runwayLength != null ? ftToM(r.runwayLength) : null;
+    const rwyLenM = r?.runwayLength != null ? ftToM(r.runwayLength) : null;
+
+    // ---- Section atterrissage : destination du plan en navigation (calcul
+    // SANS consultation, METAR de l'arrivée), terrain observé en vol local.
+    const isNav = document.body.classList.contains('mode-nav');
+    const destInput = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
+    // Consultation arrivée comprise : la destination du plan reste la cible
+    // de la section atterrissage (météo par fetch propre, pas par consultation).
+    const hasNavDest = isNav && /^[A-Z][A-Z0-9]{3}$/.test(destInput);
+    const acActive = getActiveAircraft();
+    const hasLdgRefs = !!(acActive?.ldgRoll && acActive?.ldgFifty);
+    const ldgSync = hasLdgRefs && !isNav ? evaluateLandingPerformance(icao) : null;
+    const ldgTarget = isNav ? destInput : icao;
 
     container.innerHTML = `
         <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px; background:var(--input-bg); border:1px solid var(--border-color); border-radius:6px; padding:6px 10px;">
@@ -131,6 +209,7 @@ function render(container, r, icao) {
                 ${fleet.map(ac => `<option value="${ac.id}" ${ac.id === activeId ? 'selected' : ''}>${escapeHtml(ac.name)}${ac.registration ? ' (' + escapeHtml(ac.registration) + ')' : ''}</option>`).join('')}
             </select>
         </div>
+        ${r ? `
         <div class="to-metrics-grid">
             <span><span class="lab">${lblRoll} :</span> <span class="val">${ftToM(r.groundRoll)} m</span></span>
             <span><span class="lab">${lbl50ft} :</span> <span class="val">${ftToM(r.fiftyFt)} m</span></span>
@@ -156,13 +235,83 @@ function render(container, r, icao) {
             ${isFr
                 ? `Distances corrigées selon la densité-altitude (réf. manuel de vol au niveau mer/ISA). « Flotte » pour gérer vos avions.`
                 : `Distances corrected for density altitude (POH ref. at SL/ISA). "Fleet" to manage your aircraft.`}
-        </div>
+        </div>` : `
+        <div style="padding:12px; background:var(--input-bg); border:1px dashed var(--border-color); border-radius:8px; font-size:11.5px; color:var(--text-muted); text-align:center; line-height:1.5;">
+            <i data-lucide="plane-takeoff" style="width:14px;height:14px;vertical-align:-2px;"></i>
+            ${isFr
+                ? ` Décollage — le METAR affiché est celui de l'arrivée (TAF) : revenez au <b>départ</b> (bouton « Départ ») pour recalculer le décollage.`
+                : ` Takeoff — the displayed weather is the arrival (TAF): switch back to <b>departure</b> ("Departure" button) to recompute takeoff.`}
+        </div>`}
+        ${hasLdgRefs ? `
+        <div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--border-color);">
+            <div class="to-ldg-body">
+                ${ldgSync ? _ldgSectionHTML(ldgSync, icao, isFr, activeRwy) : (isNav && hasNavDest ? `
+                    <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:var(--text-muted); margin-bottom:5px;">
+                        <i data-lucide="plane-landing" style="width:13px;height:13px;"></i>
+                        ${isFr ? 'Atterrissage' : 'Landing'} · ${escapeHtml(ldgTarget)}
+                    </div>
+                    <div style="padding:14px 0; text-align:center; color:var(--text-muted); font-size:12px;">
+                        <i data-lucide="loader-2" style="width:15px;height:15px;animation:spin 1s linear infinite;vertical-align:middle;margin-right:6px;"></i>
+                        ${isFr ? `Calcul de l'atterrissage à ${escapeHtml(ldgTarget)} (météo de l'arrivée)…` : `Computing landing at ${escapeHtml(ldgTarget)} (arrival weather)…`}
+                    </div>` : '')}
+            </div>
+        </div>` : (!isNav || hasNavDest ? `
+        <div style="margin-top:10px; padding:10px 12px; background:rgba(245,158,11,0.10); border:1px solid rgba(245,158,11,0.30); border-radius:8px; font-size:11.5px; line-height:1.5; color:var(--text-color);">
+            <i data-lucide="plane-landing" style="width:13px;height:13px;vertical-align:-2px;color:#F59E0B;"></i>
+            ${isFr
+                ? ` Pour calculer l'atterrissage${isNav ? ` à ${escapeHtml(ldgTarget)}` : ''}, renseignez les distances du manuel de vol dans la flotte — champs <b>« Atterr. roulement (ft) »</b> et <b>« Atterr. 50ft (ft) »</b>.`
+                : ` To compute the landing${isNav ? ` at ${escapeHtml(ldgTarget)}` : ''}, enter the POH distances in the fleet — fields <b>"Landing roll (ft)"</b> and <b>"Landing 50ft (ft)"</b>.`}
+            <button id="to-ldg-fleet" style="margin-left:6px; height:24px; padding:0 8px; border:1px solid var(--border-color); border-radius:6px; background:transparent; color:var(--primary); font:600 11px 'DM Sans',sans-serif; cursor:pointer;">${isFr ? 'Ouvrir la flotte' : 'Open fleet'}</button>
+        </div>` : '')}
     `;
 
-    // Schéma en coupe : monté après injection (mesure la largeur
-    // réelle du panneau pour garder les textes à 10 px).
+    // Schémas en coupe : montés après injection (mesure la largeur réelle).
     const profileHost = container.querySelector('.to-profile');
-    if (profileHost) mountTakeoffProfile(profileHost, r, isFr);
+    if (profileHost && r) mountTakeoffProfile(profileHost, r, isFr);
+    if (ldgSync) {
+        const ldgHost0 = container.querySelector('.to-ldg-body .to-landing-profile');
+        if (ldgHost0) mountLandingProfile(ldgHost0, ldgSync, isFr);
+    }
+
+    // Atterrissage de DESTINATION (navigation) : asynchrone — météo de
+    // l'arrivée au relais. Jeton : un calcul plus récent invalide le rendu.
+    if (isNav && hasNavDest && hasLdgRefs) {
+        const token = ++_ldgSeq;
+        evaluateLandingAtDestination(ldgTarget).then(landing => {
+            if (token !== _ldgSeq || !container.isConnected) return;
+            const ldgBody = container.querySelector('.to-ldg-body');
+            if (!ldgBody) return;
+            if (!landing) {
+                ldgBody.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:var(--text-muted); margin-bottom:5px;">
+                        <i data-lucide="plane-landing" style="width:13px;height:13px;"></i>
+                        ${isFr ? 'Atterrissage' : 'Landing'} · ${escapeHtml(ldgTarget)}
+                    </div>
+                    <div style="padding:10px 0; text-align:center; color:var(--text-muted); font-size:12px;">
+                        ${isFr ? `Aucun METAR pour ${escapeHtml(ldgTarget)} ni à proximité — atterrissage non calculé.` : `No METAR for ${escapeHtml(ldgTarget)} or nearby — landing not computed.`}
+                    </div>`;
+            } else {
+                ldgBody.innerHTML = _ldgSectionHTML(landing, ldgTarget, isFr, null);
+                const host = ldgBody.querySelector('.to-landing-profile');
+                if (host) mountLandingProfile(host, landing, isFr);
+            }
+            if (window.lucide) window.lucide.createIcons({ root: ldgBody });
+        });
+    }
+
+    // Invitation flotte (références atterrissage manquantes).
+    const ldgFleetBtn = container.querySelector('#to-ldg-fleet');
+    if (ldgFleetBtn) {
+        ldgFleetBtn.addEventListener('click', () => {
+            openFleetManager(() => {
+                showTakeoffWidget(icao);
+                if (state.refreshCallback) {
+                    state.lastRenderState = null;
+                    state.refreshCallback();
+                }
+            });
+        });
+    }
 
     // Sélecteur d'avion : change l'avion actif et rafraîchit.
     const acSelect = container.querySelector('#to-aircraft-select');

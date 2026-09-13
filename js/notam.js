@@ -289,6 +289,7 @@ export function collectFlatLocal(pib, planRoute = []) {
 }
 
 let _flat = [];   // dernier dossier rendu (annoté)
+let _lastFetchTs = 0;   // B1 : instant du dernier dossier rendu (tuile Dossier de vol)
 
 /** NOTAM cochés pour l'annexe du log de nav PDF — [] si dossier jamais affiché. */
 export function getSelectedNotams() {
@@ -297,6 +298,18 @@ export function getSelectedNotams() {
     const ids = new Set();
     boxes.forEach(b => { if (b.checked) ids.add(b.dataset.nid); });
     return _flat.filter(n => ids.has(String(n.id)));
+}
+
+/** Dossier NOTAM courant (liste plate annotée, y compris non cochés) —
+ *  alimente l'activation des zones par NOTAM (js/azba.js, B2). */
+export function getCurrentNotams() {
+    return _flat;
+}
+
+/** Instant (ms) du dernier dossier NOTAM rendu — fraîcheur de la tuile
+ *  « NOTAM » du Dossier de vol (B1). 0 = jamais. */
+export function getLastNotamFetchTs() {
+    return _lastFetchTs;
 }
 
 const GROUPS_LOCAL = () => (isFr() ? {
@@ -474,6 +487,10 @@ async function _search(body, planRoute) {
         return;
     }
     _flat = local ? collectFlatLocal(pib, route) : collectFlat(pib, route);
+    _lastFetchTs = Date.now();
+    // B2 (AZBA) : le dossier vient d'arriver — les tooltips de zones de la
+    // carte peuvent maintenant afficher les activations NOTAM.
+    document.dispatchEvent(new CustomEvent('notam-dossier-ready'));
     const rendered = _renderPib(pib, route, { local, radiusNm: local ? getRadiusNm() : undefined, excludedDetails });
     const again = document.createElement('button');
     again.className = 'btn-primary';
