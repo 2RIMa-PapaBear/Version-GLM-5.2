@@ -21,7 +21,7 @@ import { makeCollapsible } from './collapsible.js';
 import { mountTakeoffProfile, mountLandingProfile } from './takeoff-profile.js';
 import {
     evaluateTakeoffPerformance, evaluateLandingPerformance, evaluateLandingAtDestination,
-    getRunwayLength, getAircraftRef, getActiveRunwayNameForIcao,
+    getRunwayLength, getAircraftRef, getActiveRunwayNameForIcao, _parseWindForAxial,
 } from './takeoff-performance.js';
 import { getFleet, getActiveAircraft, getActiveAircraftId, setActiveAircraft } from './aircraft-fleet.js';
 import { openFleetManager } from './fleet-ui.js';
@@ -107,6 +107,7 @@ const _lvlColor = (lvl) => lvl === 'danger' ? '#EF4444' : (lvl === 'caution' ? '
  *  ligne piste + message) — même présentation que la section décollage. */
 function _ldgSectionHTML(landing, icao, isFr, activeRwyFallback) {
     const hw = landing.headwindKt;
+    const surfInfo = getActiveRunwaySurfaceInfo(icao);
     const ldgLenM = landing.runwayLength != null ? ftToM(landing.runwayLength) : null;
     const rwyLbl = landing.forecast
         ? (isFr ? 'Piste prévue (vent METAR)' : 'Forecast rwy (METAR wind)')
@@ -125,9 +126,11 @@ function _ldgSectionHTML(landing, icao, isFr, activeRwyFallback) {
                     : `${escapeHtml(icao)} has no METAR — weather from <b>${escapeHtml(landing.metarFrom)}</b> (${landing.metarDistNm} NM)`}
             </div>` : ''}
             <div class="to-metrics-grid">
+                <span title="${isFr ? 'Le premier chiffre (blanc) = performance calculée du jour, le second (ambre) = distance majorée de 20 % pour la comparaison à la LDA.' : 'First figure (white) = calculated performance, second (amber) = distance with 20% margin for LDA comparison.'}"><span class="lab">${isFr ? 'Franch. 50ft' : '50 ft obst.'} :</span> <span class="val">${ftToM(landing.fiftyFt)} m${landing.fiftyMargined ? ` <span style="color:#FBBF24;">→ ${ftToM(landing.fiftyMargined)} m ${isFr ? 'avec marge' : 'w/ margin'}</span>` : ''}</span></span>
                 <span><span class="lab">${isFr ? 'Roulement' : 'Roll'} :</span> <span class="val">${ftToM(landing.rollFt)} m</span></span>
-                <span><span class="lab">${isFr ? 'Franch. 50ft' : '50 ft obst.'} :</span> <span class="val">${ftToM(landing.fiftyFt)} m</span></span>
-                <span><span class="lab">${isFr ? 'Vent axial' : 'Wind'} :</span> <span class="val">${hw == null ? '—' : `${hw >= 0 ? (isFr ? 'face ' : 'head ') : (isFr ? 'arrière ' : 'tail ')}${Math.abs(hw)} kt`}</span></span>
+                <span><span class="lab">${isFr ? 'Vent' : 'Wind'} :</span> <span class="val">${hw == null ? '—' : `${Math.abs(hw)} kt ${hw >= 0 ? (isFr ? 'de face' : 'headwind') : (isFr ? 'arrière' : 'tailwind')}`}${landing.crosswindKt != null ? ` / ${landing.crosswindKt} kt ${landing.crosswindSide === 'D' ? (isFr ? 'de droite' : 'right') : (isFr ? 'de gauche' : 'left')}` : ''}</span></span>
+                <span><span class="lab">${isFr ? 'Revêtement' : 'Surface'} :</span> <span class="val">${surfInfo ? escapeHtml(surfInfo.label) : '—'}${landing.surfaceFactor > 1
+                    ? ` <span style="color:#FBBF24;">+${Math.round((landing.surfaceFactor - 1) * 100)}%</span>` : ''}</span></span>
                 <span><span class="lab">${isFr ? 'Densité-alt.' : 'Density alt.'} :</span> <span class="val">${landing.da} ft</span></span>
             </div>
             <div class="to-landing-profile" style="margin-top:10px;"></div>
@@ -142,12 +145,11 @@ function _ldgSectionHTML(landing, icao, isFr, activeRwyFallback) {
                     <span style="font-family:'DM Mono',monospace; font-weight:500; color:${_lvlColor(landing.level)};">${landing.margin >= 0 ? '+' : ''}${ftToM(landing.margin)} m</span>
                 ` : ''}
             </div>
-            <div style="font-size:11px; margin-top:5px; line-height:1.5; color:var(--text-color);">${escapeHtml(landing.message)}</div>
             <div style="font-size:10px; color:var(--text-muted); margin-top:6px; line-height:1.4;">
                 <i data-lucide="info" style="width:11px;height:11px;vertical-align:middle;"></i>
                 ${isFr
-                    ? `Distances d'arrêt corrigées densité-altitude, vent axial et état de piste (réf. POH « Atterr. roulement / 50 ft » de la flotte)${landing.forecast ? ' — piste prévue au vent du METAR de l\u2019arrivée, à confirmer en approche' : ''}.`
-                    : `Stop distances corrected for density altitude, headwind and runway state (fleet POH refs)${landing.forecast ? ' — runway forecast from the arrival METAR wind, confirm on approach' : ''}.`}
+                    ? `Distances d'arrêt corrigées densité-altitude, vent et état de piste (réf. POH « Atterr. roulement / 50 ft » de la flotte)${landing.forecast ? ' — piste prévue au vent du METAR de l\u2019arrivée, à confirmer en approche' : ''}.`
+                    : `Stop distances corrected for density altitude, wind and runway state (fleet POH refs)${landing.forecast ? ' — runway forecast from the arrival METAR wind, confirm on approach' : ''}.`}
             </div>`;
 }
 
@@ -170,8 +172,7 @@ function render(container, r, icao) {
     let rwyWind = null;
     const ventStr = state.lastParsed?.base?.vent?.[0]?.val;
     if (ventStr) {
-        const m = String(ventStr).match(/(VRB|\d{3})(\d{2,3})/);
-        if (m) rwyWind = { dir: m[1] === 'VRB' ? null : parseInt(m[1], 10), speed: parseInt(m[2], 10) };
+        rwyWind = _parseWindForAxial(ventStr);
     }
     const activeRwy = state.activeRunwayName
         || getActiveRunwayNameForIcao(icao, rwyWind, getDeclinationForIcao(state.requestedIcao || state.lastParsed?.code));

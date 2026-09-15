@@ -1,9 +1,9 @@
-// Tests de la distance d'ATTERRISSAGE corrigée (js/takeoff-performance.js,
-// A5) — fonction pure : densité-altitude, vent longitudinal, revêtement ;
-// et du calcul depuis un METAR BRUT (destination distante).
+// Tests de la méthode RÉFÉRENCE (js/takeoff-performance.js, arbitrage
+// 15/09) — altitude pression + température séparées, facteurs ×, revêtement
+// sur la distance totale, vent axial conservé (atterrissage).
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { correctedLandingDistance, evaluateLandingFromRaw } from '../js/takeoff-performance.js';
+import { correctedTakeoffDistance, correctedLandingDistance } from '../js/takeoff-performance.js';
 
 // Stub localStorage — lu PAR APPEL par la flotte (getFleet), pas au chargement.
 const _ls = new Map();
@@ -13,64 +13,96 @@ globalThis.localStorage = {
     removeItem: (k) => _ls.delete(k),
 };
 
-describe('correctedLandingDistance (A5 : performance atterrissage)', () => {
-    test('références restituées à DA nulle, sans vent, piste dure sèche', () => {
-        const c = correctedLandingDistance(0, 725, 1400, {});
-        assert.equal(c.rollFt, 725);
-        assert.equal(c.fiftyFt, 1400);
-        assert.equal(c.windFactor, 1);
+describe('correctedTakeoffDistance — MÉTHODE RÉFÉRENCE', () => {
+    test('niveau mer ISA (Zp=0, T=ISA) : facteurs ×1,00 partout', () => {
+        const c = correctedTakeoffDistance(0, 15, {});
+        assert.equal(c.paFactor, 1);
+        assert.equal(c.tempFactor, 1);
         assert.equal(c.surfaceFactor, 1);
+        // C172 par défaut : groundRoll 830, fiftyFt 1400
+        assert.equal(c.groundRoll, 830);
+        assert.equal(c.fiftyFt, 1400);
     });
 
-    test('vent DE FACE 10 kt : −10 % (plancher −30 % à 30 kt)', () => {
-        const c10 = correctedLandingDistance(0, 1000, 2000, { headwindKt: 10 });
-        assert.equal(c10.rollFt, 900);
-        const c30 = correctedLandingDistance(0, 1000, 2000, { headwindKt: 30 });
-        assert.equal(c30.rollFt, 700);
-        const c60 = correctedLandingDistance(0, 1000, 2000, { headwindKt: 60 });
-        assert.equal(c60.rollFt, 700, 'plancher −30 % au-delà de 30 kt de face');
+    test('Zp 2000 ft ISA : ×1,15² (facteur référence par 1000 ft Zp)', () => {
+        const c = correctedTakeoffDistance(2000, 15 - 1.98 * 2, {});
+        assert.ok(Math.abs(c.paFactor - 1.3225) < 0.01, `paFactor ${c.paFactor}`);
+        assert.equal(c.tempFactor, 1);   // ISA → pas de correction T°
+        // distance totale ×1,3225 (arrondi pt près par Math.round sur 1.32249…)
+        assert.ok(Math.abs(c.fiftyFt - 1400 * 1.3225) <= 1, `fiftyFt ${c.fiftyFt} ≈ 1851`);
     });
 
-    test('vent ARRIÈRE 10 kt : +20 % (plafond +60 %)', () => {
-        const c = correctedLandingDistance(0, 1000, 2000, { headwindKt: -10 });
-        assert.equal(c.rollFt, 1200);
-        const c40 = correctedLandingDistance(0, 1000, 2000, { headwindKt: -40 });
-        assert.equal(c40.rollFt, 1600, 'plafond +60 % au-delà de 30 kt arrière');
+    test('T° +20 °C au-dessus d\'ISA : ×1,10² (par tranches de 10 °C)', () => {
+        const c = correctedTakeoffDistance(0, 35, {});   // ISA SL = 15, +20 °C
+        assert.ok(Math.abs(c.tempFactor - 1.21) < 0.001, `tempFactor ${c.tempFactor}`);
+        assert.equal(c.paFactor, 1);
     });
 
-    test('densité-altitude 2000 ft : +20 %, se combine au vent', () => {
-        const c = correctedLandingDistance(2000, 1000, 2000, { headwindKt: 0 });
-        assert.equal(c.rollFt, 1200);
-        const cw = correctedLandingDistance(2000, 1000, 2000, { headwindKt: 10 });
-        assert.equal(cw.rollFt, Math.round(1000 * 1.2 * 0.9));
+    test('Zp + T° se MULTIPLIENT (2 000 ft Zp + 20 °C au-dessus ISA)', () => {
+        const isa2000 = 15 - 1.98 * 2;   // ≈ 11 °C
+        const c = correctedTakeoffDistance(2000, isa2000 + 20, {});
+        const attendu = 1.3225 * 1.21;
+        assert.ok(Math.abs(c.factor - attendu) < 0.01, `factor ${c.factor} ≈ ${attendu}`);
+        assert.equal(c.fiftyFt, Math.round(1400 * attendu));
     });
 
-    test('herbe humide : +25 % (mêmes facteurs maison que le décollage)', () => {
-        const c = correctedLandingDistance(0, 1000, 2000, { surfaceCode: 'GRE', wet: true });
-        assert.equal(c.rollFt, 1250);
+    test('REVÊTEMENT référence : herbe sèche ×1,20, mouillée ×1,30', () => {
+        assert.equal(correctedTakeoffDistance(0, 15, { surfaceCode: 'GRE' }).surfaceFactor, 1.20);
+        assert.equal(correctedTakeoffDistance(0, 15, { surfaceCode: 'GRE', wet: true }).surfaceFactor, 1.30);
+        assert.equal(correctedTakeoffDistance(0, 15, { surfaceCode: 'GRE', contaminated: true }).surfaceFactor, 1.25);
     });
 
-    test('références absentes ou invalides → null (section masquée)', () => {
-        assert.equal(correctedLandingDistance(0, null, 1400, {}), null);
-        assert.equal(correctedLandingDistance(0, 725, 0, {}), null);
+    test('REVÊTEMENT référence : piste dure mouillée ×1,00 au décollage', () => {
+        assert.equal(correctedTakeoffDistance(0, 15, { surfaceCode: 'ASP', wet: true }).surfaceFactor, 1.00);
+        assert.equal(correctedTakeoffDistance(0, 15, { surfaceCode: 'ASP', contaminated: true }).surfaceFactor, 1.25);
+        assert.equal(correctedTakeoffDistance(0, 15, { surfaceCode: 'ASP' }).surfaceFactor, 1.00);
+    });
+
+    test('le revêtement s\'applique à la DISTANCE TOTALE (pas au roulement seul)', () => {
+        const sec = correctedTakeoffDistance(0, 15, { surfaceCode: 'GRE' });
+        const mouille = correctedTakeoffDistance(0, 15, { surfaceCode: 'GRE', wet: true });
+        const ratioRoll = mouille.groundRoll / sec.groundRoll;
+        const ratio50 = mouille.fiftyFt / sec.fiftyFt;
+        assert.ok(Math.abs(ratioRoll - 1.30 / 1.20) < 0.01, `ratio roulement ${ratioRoll}`);
+        assert.ok(Math.abs(ratio50 - 1.30 / 1.20) < 0.01, `ratio 50ft ${ratio50}`);
     });
 });
 
-describe('evaluateLandingFromRaw (A5 : atterrissage de la destination, METAR brut)', () => {
-    test('météo complète → distances corrigées, piste marquée PRÉVUE', () => {
-        const l = evaluateLandingFromRaw('LFXX', {
-            raw: 'LFXX 131200Z 31010KT 9999 FEW040 15/08 Q1013 NOSIG',
-            qnh: 1013, oat: 15, elevationFt: 0,
-        });
-        assert.ok(l, 'calculé (C172 par défaut porte les refs POH)');
-        assert.equal(l.forecast, true, 'piste PRÉVUE (destination distante, pas de rose des vents)');
-        assert.ok(Math.abs(l.fiftyFt - 1400) <= 8, `fiftyFt ≈ 1400 à DA≈0, obtenu ${l.fiftyFt}`);
-        assert.equal(l.runwayLength, null, 'longueur inconnue sous Node (base non chargée)');
-        assert.equal(l.level, 'unknown');
+describe('correctedLandingDistance — MÉTHODE RÉFÉRENCE', () => {
+    test('niveau mer ISA : facteurs ×1,00', () => {
+        const l = correctedLandingDistance(0, 15, 725, 1400, {});
+        assert.equal(l.rollFt, 725);
+        assert.equal(l.fiftyFt, 1400);
     });
 
-    test('qnh/oat manquants ou ICAO absent → null', () => {
-        assert.equal(evaluateLandingFromRaw('LFXX', { raw: '', qnh: null, oat: 15, elevationFt: 0 }), null);
-        assert.equal(evaluateLandingFromRaw(null, { raw: 'x', qnh: 1013, oat: 15 }), null);
+    test('Zp 2000 ft ISA : ×1,05² (atterrissage moins sensible que décollage)', () => {
+        const l = correctedLandingDistance(2000, 15 - 1.98 * 2, 725, 1400, {});
+        assert.ok(Math.abs(l.paFactor - 1.1025) < 0.001, `paFactor ${l.paFactor}`);
+    });
+
+    test('T° +20 °C : ×1,05² ', () => {
+        const l = correctedLandingDistance(0, 35, 725, 1400, {});
+        assert.ok(Math.abs(l.tempFactor - 1.1025) < 0.001);
+    });
+
+    test('vent DE FACE 10 kt : −10 % (conservé, spécificité app)', () => {
+        const l = correctedLandingDistance(0, 15, 1000, 2000, { headwindKt: 10 });
+        assert.equal(l.windFactor, 0.90);
+        assert.equal(l.rollFt, 900);
+    });
+
+    test('vent ARRIÈRE 10 kt : +20 %', () => {
+        const l = correctedLandingDistance(0, 15, 1000, 2000, { headwindKt: -10 });
+        assert.equal(l.windFactor, 1.20);
+    });
+
+    test('REVÊTEMENT atterrissage : dure mouillée ×1,15 (référence)', () => {
+        const l = correctedLandingDistance(0, 15, 1000, 2000, { surfaceCode: 'ASP', wet: true });
+        assert.equal(l.surfaceFactor, 1.15);
+    });
+
+    test('références absentes → null', () => {
+        assert.equal(correctedLandingDistance(0, 15, null, 1400, {}), null);
+        assert.equal(correctedLandingDistance(0, 15, 725, 0, {}), null);
     });
 });

@@ -220,6 +220,10 @@ export async function showFlightPlanner(fromIcao, toIcao) {
     // PLAN (total requis) — retour pilote 13/09 : elle ne bougeait pas à
     // la modification du PV.
     showFlightFile();
+
+    // B3+ (14/09) : le plan vient d'être recalculé (altitude comprise) →
+    // la couche Vent de la carte suit (bidirectionnel : carte ↔ plan).
+    try { document.dispatchEvent(new CustomEvent('windlayer:plan-alt')); } catch {   }
 }
 
 // Choix/retrait du terrain de dégagement (panneau Alternates, état

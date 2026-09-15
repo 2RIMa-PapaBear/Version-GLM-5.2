@@ -18,31 +18,67 @@ import { getWindAtAltitude } from './winds-aloft.js';
 import { escapeHtml } from './core.js';
 
 const MIN_ZOOM = 6;          // sous z6 : grille trop dense ou trop large
-const GRID_STEP_DEG = 0.55;  // pas de grille (°) — ~33 NM
-const MAX_POINTS = 48;       // garde-fou : la vue ne peut pas dépasser
+const GRID_CELLS = 9;        // ~9×9 = 81 flèches sur la dimension dominante
+const GRID_MIN_CELLS = 6;    // plancher : la dimension courte garde ≥6 graduations
+const MAX_POINTS = 96;       // garde-fou — une requête de ~96 points reste ~300 ms
 
 // Couleur par force (kt) — cohérente avec l'échelle du widget Vent.
 const _color = (kt) => kt < 10 ? '#94A3B8' : kt < 20 ? '#4ADE80' : kt < 30 ? '#F59E0B' : '#EF4444';
 
-/** Altitude d'affichage : croisière du plan actif, sinon 2000 ft. */
+/** Altitude du calque Vent : partagée avec le plan (BIDIRECTIONNELLE —
+ *  arbitrage pilote 14/09 : modifier le plan change la carte, modifier la
+ *  carte change le plan, toujours identiques). Vol local : défaut 2000 ft
+ *  à chaque session, JAMAIS mémorisé (arbitrage pilote). */
+let _manualAltFt = 2000;
+
 export function windLayerAltFt() {
-    const plan = state._lastNavPlan?.plan;
-    if (plan?.cruiseAltFt > 500) return plan.cruiseAltFt;
-    if (typeof document === 'undefined') return 2000;   // tests Node
+    if (typeof document === 'undefined') return _manualAltFt;   // tests Node
+    // En navigation : le champ altitude du plan est la source — la carte
+    // suit (bidirectionnel : le sélecteur de la carte met à jour le champ).
     const input = document.getElementById('fp-cruise-alt');
-    const v = parseInt(input?.value, 10);
-    return Number.isFinite(v) && v > 500 ? v : 2000;
+    if (input && document.body.classList.contains('mode-nav')) {
+        const v = parseInt(input.value, 10);
+        if (Number.isFinite(v) && v > 0) return v;
+    }
+    return _manualAltFt;
+}
+
+/** Change l'altitude du calque (sélecteur carte) — met à jour le champ du
+ *  plan en navigation (les deux restent identiques), puis re-rend. */
+export function setWindLayerAltFt(altFt, { rerender = null } = {}) {
+    _manualAltFt = Number.isFinite(+altFt) && +altFt > 0 ? +altFt : 2000;
+    if (typeof document !== 'undefined' && document.body.classList.contains('mode-nav')) {
+        const input = document.getElementById('fp-cruise-alt');
+        if (input) {
+            input.value = String(_manualAltFt);
+            input.dispatchEvent(new Event('input', { bubbles: true }));   // recalcule le plan
+        }
+    }
+    rerender?.();
 }
 
 /**
- * Grille de flèches pour une bbox : [{lat, lon, speedKt, dir}] (dir vraie
- * d'ORIGINE — convertie en « vers » au rendu). PUR — testé sous Node.
+ * Grille de flèches pour une bbox : [{lat, lon}] — le pas est ADAPTATIF
+ * (plus grande dimension / GRID_CELLS) : ~36 flèches RÉPARTIES SUR TOUTE
+ * la vue, du zoom serré à la France entière (retour pilote 14/09 : le pas
+ * fixe plafonné à 48 ne couvrait que le coin sud-ouest de la carte).
+ * PUR — testé sous Node.
  */
-export function buildWindGrid(minLat, minLon, maxLat, maxLon, stepDeg = GRID_STEP_DEG, maxPoints = MAX_POINTS) {
+export function buildWindGrid(minLat, minLon, maxLat, maxLon, cells = GRID_CELLS, maxPoints = MAX_POINTS) {
+    const spanLat = Math.max(0.05, maxLat - minLat);
+    const spanLon = Math.max(0.05, maxLon - minLon);
+    const stepDeg = Math.max(spanLat, spanLon) / Math.max(2, cells);
+    // La dimension dominante prend `cells` graduations ; la courte en prend
+    // au moins GRID_MIN_CELLS (retour pilote : « 5 flèches sur la Bretagne,
+    // trop peu ») — la grille reste équilibrée quelle que soit la forme de
+    // la vue (portrait/paysage).
+    const nLat = Math.max(GRID_MIN_CELLS, Math.min(cells + 1, Math.round(spanLat / stepDeg) + 1));
+    const nLon = Math.max(GRID_MIN_CELLS, Math.min(Math.floor(maxPoints / nLat), Math.round(spanLon / stepDeg) + 1));
     const pts = [];
-    for (let lat = minLat; lat <= maxLat + 1e-9; lat += stepDeg) {
-        for (let lon = minLon; lon <= maxLon + 1e-9; lon += stepDeg) {
-            pts.push({ lat: +lat.toFixed(3), lon: +lon.toFixed(3) });
+    for (let i = 0; i < nLat; i++) {
+        const lat = +(minLat + (spanLat * i) / (nLat - 1)).toFixed(3);
+        for (let j = 0; j < nLon; j++) {
+            pts.push({ lat, lon: +(minLon + (spanLon * j) / (nLon - 1)).toFixed(3) });
             if (pts.length >= maxPoints) return pts;
         }
     }
@@ -107,26 +143,36 @@ export function mountWindLayer(map, bar) {
     if (!map || !bar || bar.querySelector('.wind-layer-btn')) return;
     const isFr = state.lang === 'fr';
 
+    const ALTS = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4500];
+
     const group = document.createElement('div');
     group.className = 'precip-control-group';
     group.innerHTML = `
-        <button class="precip-toggle wind-layer-btn" aria-pressed="false" title="${isFr ? 'Vent à l\u2019altitude du plan (flèches)' : 'Wind at plan altitude (arrows)'}">
+        <button class="precip-toggle wind-layer-btn" aria-pressed="false" title="${isFr ? 'Vent — flèches à l\u2019altitude choisie (cliquez le nombre pour changer)' : 'Wind — arrows at chosen altitude (click number to change)'}">
             <i data-lucide="wind" style="width:14px;height:14px;"></i>
             <span class="wind-layer-label">${isFr ? 'Vent' : 'Wind'}</span>
+            <select class="wind-alt-select" title="${isFr ? 'Altitude (ft)' : 'Altitude (ft)'}" aria-label="${isFr ? 'Altitude des flèches' : 'Arrow altitude'}"
+                style="background:transparent; border:none; color:inherit; font:inherit; font-family:'DM Mono',monospace; cursor:pointer; outline:none; padding:0 2px;">
+                ${ALTS.map(a => `<option value="${a}">${a}</option>`).join('')}
+            </select>
         </button>`;
     bar.appendChild(group);
     if (window.lucide) window.lucide.createIcons({ root: group });
 
     const btn = group.querySelector('.wind-layer-btn');
+    const altSelect = group.querySelector('.wind-alt-select');
     let layerGroup = null;
     let epoch = 0;
 
     async function refresh() {
         const myEpoch = ++epoch;
         const altFt = windLayerAltFt();
-        const label = btn.querySelector('.wind-layer-label');
-        if (label) label.textContent = `${isFr ? 'Vent' : 'Wind'} ${altFt}`;
-        btn.title = `${isFr ? 'Vent à' : 'Wind at'} ${altFt} ft ${isFr ? 'AGL (altitude du plan)' : 'AGL (plan altitude)'}`;
+        // Le sélecteur affiche TOUJOURS l'altitude courante (y compris quand
+        // c'est le plan qui l'a changée — bidirectionnel).
+        if (altSelect && String(altSelect.value) !== String(altFt)) {
+            const match = [...altSelect.options].some(o => String(o.value) === String(altFt));
+            altSelect.value = match ? String(altFt) : String(2000);
+        }
 
         layerGroup?.remove();
         layerGroup = L.layerGroup().addTo(map);
@@ -150,12 +196,37 @@ export function mountWindLayer(map, bar) {
                 className: 'wind-arrow-wrap',
                 html: `<div class="wind-arrow" style="transform: rotate(${toward}deg); border-bottom-color:${col};">
                        </div><span class="wind-arrow-kt" style="color:${col};">${r.speedKt}</span>`,
-                iconSize: [26, 26],
-                iconAnchor: [13, 13],
+                iconSize: [32, 32],
+                iconAnchor: [16, 16],
             });
             L.marker([r.lat, r.lon], { icon, interactive: false, keyboard: false }).addTo(layerGroup);
         }
     }
+
+    // Le sélecteur d'altitude ne doit PAS déclencher le toggle du bouton.
+    altSelect?.addEventListener('click', (e) => e.stopPropagation());
+    altSelect?.addEventListener('change', () => {
+        setWindLayerAltFt(parseInt(altSelect.value, 10), { rerender: refresh });
+    });
+
+    // Le plan recalculé avec une nouvelle altitude → la couche suit
+    // (bidirectionnel : carte ↔ plan toujours identiques).
+    if (typeof document !== 'undefined') {
+        document.addEventListener('windlayer:plan-alt', refresh);
+    }
+
+    // Suivi AUTOMATIQUE du déplacement/zoom de la carte (retour pilote
+    // 14/09 : les flèches ne suivaient pas la fenêtre active). Leaflet
+    // déclenche « moveend » (sans namespace) à la fin de chaque pan/zoom —
+    // on débounce 350 ms pour ne pas requêter à chaque frame de drag.
+    let _moveTimer = null;
+    const onMoveEnd = () => {
+        if (btn.getAttribute('aria-pressed') !== 'true') return;
+        clearTimeout(_moveTimer);
+        _moveTimer = setTimeout(refresh, 350);
+    };
+    map.on('moveend', onMoveEnd);
+    map.on('zoomend', onMoveEnd);
 
     btn.addEventListener('click', () => {
         const on = btn.getAttribute('aria-pressed') !== 'true';
@@ -164,12 +235,10 @@ export function mountWindLayer(map, bar) {
         btn.classList.toggle('active', on);
         if (on) {
             refresh();
-            map.on('moveend.zoomwind windlayer:refresh', refresh);
         } else {
             epoch++;
             layerGroup?.remove();
             layerGroup = null;
-            map.off('moveend.zoomwind windlayer:refresh', refresh);
         }
     });
 }

@@ -786,14 +786,11 @@ export function renderWindCompass(containerId, windStr, runways = null, forcedId
                 gustAnchor = "end";
             }
             
-            gustTextSvg = `<text x="${markScreenX + gustOffsetX}" y="${markScreenY + 5}" fill="${color}" font-size="14" font-weight="900" text-anchor="${gustAnchor}" font-family="'DM Mono', monospace" style="filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.8));">G${wind.gust}</text>`;
+            gustTextSvg = `<text x="${markScreenX + gustOffsetX}" y="${markScreenY + 5}" fill="${color}" font-size="14" font-weight="900" text-anchor="${gustAnchor}" font-family="'DM Mono', monospace">G${wind.gust}</text>`;
         }
 
         arrowSvg = `
         <defs>
-            <filter id="${uid}-glow" x="-50%" y="-50%" width="200%" height="200%">
-                <feGaussianBlur in="SourceGraphic" stdDeviation="${glowBlur}" />
-            </filter>
             <linearGradient id="${uid}-grad" x1="0%" y1="0%" x2="0%" y2="100%">
                 <stop offset="0%" style="stop-color:${color};stop-opacity:0.6" />
                 <stop offset="60%" style="stop-color:${color};stop-opacity:1" />
@@ -803,7 +800,7 @@ export function renderWindCompass(containerId, windStr, runways = null, forcedId
         <line x1="${CX}" y1="${CY - R_OUTER}" x2="${CX}" y2="${CY + R_OUTER}" stroke="${color}" stroke-width="1" opacity="0.4" transform="rotate(${wind.dir}, ${CX}, ${CY})"/>
         
         <g class="wind-arrow" style="transform-origin: ${CX}px ${CY}px; transform: rotate(${wind.dir}deg);" data-wind-dir="${wind.dir}" data-cx="${CX}" data-cy="${CY}">
-            <circle cx="${CX}" cy="${yBase}" r="7" fill="none" stroke="${color}" stroke-width="2" opacity="${glowOpacity}" filter="url(#${uid}-glow)"/>
+            <circle cx="${CX}" cy="${yBase}" r="7" fill="none" stroke="${color}" stroke-width="2" opacity="${glowOpacity}" class="wind-arrow-glow"/>
             <circle cx="${CX}" cy="${yBase}" r="3.5" fill="${color}"/>
             <line x1="${CX}" y1="${yBase}" x2="${CX}" y2="${yPointe}" stroke="url(#${uid}-grad)" stroke-width="3" stroke-linecap="round"/>
             <path d="M ${CX - 6},${yPointe - 9} L ${CX},${yPointe} L ${CX + 6},${yPointe - 9} Z" fill="${color}"/>

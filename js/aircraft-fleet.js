@@ -326,6 +326,7 @@ function _sanitizeWb(raw) {
 
     const mtowKg = num(raw.mtowKg);
     const density = num(raw.fuelDensity);
+    const refMass = num(raw.refMassKg);
     return {
         units: {
             mass: WB_MASS_UNITS.includes(raw.units?.mass) ? raw.units.mass : 'kg',
@@ -334,6 +335,9 @@ function _sanitizeWb(raw) {
         emptyMassKg,
         emptyArmMm,
         mtowKg: mtowKg > 0 ? mtowKg : null,
+        // Masse de RÉFÉRENCE POH (celle à laquelle les distances du manuel
+        // sont mesurées) — sert à la correction masse référence (15/09).
+        refMassKg: refMass > 0 ? refMass : null,
         fuelDensity: density > 0.5 && density < 1.2 ? density : 0.72,
         envelope,
         stations,
