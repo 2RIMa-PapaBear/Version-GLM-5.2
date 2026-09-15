@@ -3,24 +3,29 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildWindGrid, windLayerAltFt, fetchWindGrid } from '../js/wind-layer.js';
 
-describe('buildWindGrid (grille flèches de vent)', () => {
-    test('grille régulière sur la bbox, pas ~0,55°', () => {
-        const pts = buildWindGrid(47.0, -3.0, 48.1, -1.9);
-        assert.ok(pts.length >= 8 && pts.length <= 16, `nb raisonnable : ${pts.length}`);
-        // bornes incluses
-        assert.ok(pts.some(p => p.lat === 47 && p.lon === -3), 'premier point = coin SW');
-        // pas régulier
-        const lats = [...new Set(pts.map(p => p.lat))].sort((a, b) => a - b);
-        if (lats.length > 1) assert.ok(Math.abs((lats[1] - lats[0]) - 0.55) < 0.01, `pas ≈ 0,55° : ${lats[1] - lats[0]}`);
+describe('buildWindGrid (grille flèches de vent — pas adaptatif)', () => {
+    test('COUVERTURE TOTALE de la vue : dernier point = coin NE', () => {
+        const pts = buildWindGrid(46.8, -5.5, 48.9, -1.2);   // vue large Bretagne
+        const last = pts[pts.length - 1];
+        assert.ok(Math.abs(last.lat - 48.9) < 0.15, `dernier lat ${last.lat} ≈ 48,9`);
+        assert.ok(Math.abs(last.lon - (-1.2)) < 0.15, `dernier lon ${last.lon} ≈ -1,2`);
+        assert.ok(pts.length >= 40 && pts.length <= 96, `nb : ${pts.length}`);
     });
 
-    test('garde-fou : la grille est plafonnée à maxPoints', () => {
-        const pts = buildWindGrid(40, -6, 52, 11);   // vue européenne
-        assert.ok(pts.length <= 48, `${pts.length} ≤ 48`);
+    test('vue France entière : couvre aussi, ~28-49 flèches', () => {
+        const pts = buildWindGrid(42.5, -5.5, 51.2, 8.5);
+        const last = pts[pts.length - 1];
+        assert.ok(Math.abs(last.lat - 51.2) < 1.5 && Math.abs(last.lon - 8.5) < 1.5, `NE : ${JSON.stringify(last)}`);
+        assert.ok(pts.length <= 96);
     });
 
-    test('bbox vide → vide', () => {
-        assert.equal(buildWindGrid(47, -3, 47, -3).length >= 1, true, 'point unique inclus');
+    test('zoom serré : grille fine', () => {
+        const pts = buildWindGrid(47.5, -3.0, 47.9, -2.4);
+        assert.ok(pts.length >= 40, `${pts.length} flèches en zoom serré`);
+    });
+
+    test('garde-fou : plafonnée à maxPoints', () => {
+        assert.ok(buildWindGrid(40, -10, 55, 15).length <= 96);
     });
 
     test('windLayerAltFt : repli 2000 ft sans plan ni saisie', () => {

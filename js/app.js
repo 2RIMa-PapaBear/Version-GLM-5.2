@@ -717,6 +717,28 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     document.getElementById('tafInput').addEventListener('input', handleInput);
     document.getElementById('tafInput').addEventListener('scroll', handleScroll);
+
+    // AUTO-RESIZE du champ message (15/09) : hauteur minimale par défaut
+    // (une ligne), s'agrandit au fil du message — plus de zone vide de
+    // 120 px pour un METAR court. Le conteneur suit (grid stack).
+    const _tafInput = document.getElementById('tafInput');
+    const _editorContainer = document.querySelector('.editor-container');
+    function _autoResizeEditor() {
+        if (!_tafInput || !_editorContainer) return;
+        _tafInput.style.height = 'auto';
+        const h = Math.max(40, _tafInput.scrollHeight + 4);
+        _tafInput.style.height = h + 'px';
+        _editorContainer.style.height = h + 'px';
+    }
+    _tafInput.addEventListener('input', _autoResizeEditor);
+    // Resize initial + après chaque chargement de message (le champ est
+    // rempli par telechargerMessage, pas seulement par saisie manuelle).
+    const _origTafSet = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
+    Object.defineProperty(_tafInput, 'value', {
+        get: Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').get,
+        set(v) { _origTafSet.call(this, v); _autoResizeEditor(); },
+    });
+    _autoResizeEditor();
     document.getElementById('btn-lang-toggle').addEventListener('click', toggleLanguage);
     // Changement de THÈME (clair/sombre) : les canvas (graphique METAR/TAF,
     // rose des vents) et le profil d'élévation ne lisent pas les variables

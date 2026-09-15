@@ -17,6 +17,26 @@ await page.type('#icaoInput', 'LFRV');
 await page.click('#btn-fetch-metar');
 await new Promise(r => setTimeout(r, 7000));
 
+// ---- Diagnostic vent axial en VOL LOCAL (question pilote 15/09) ----
+const hwLocal = await page.evaluate(async () => {
+    // Instrumenter le module pour voir les variables internes
+    const results = {};
+    try {
+        const um = await import('/js/ui-module.js');
+        results.apt = um.getAirportByICAO('LFRV') ? 'présent (' + um.getAirportByICAO('LFRV').runways?.length + ' pistes)' : 'NULL';
+    } catch (e) { results.apt = 'erreur: ' + e.message; }
+
+    // ce que le module voit
+    const tp = await import('/js/takeoff-performance.js');
+    const r = tp.evaluateLandingPerformance('LFRV');
+    results.headwindKt = r?.headwindKt;
+    results.runwayName = r?.runwayName;
+    results.msg = (r?.message || '').slice(0, 130);
+    results.level = r?.level;
+    return results;
+});
+console.log('Vent axial (LOCAL):', JSON.stringify(hwLocal, null, 1));
+
 // ---- Mode Navigation + destination LFOO ----
 await page.click('#flight-mode-toggle');
 await new Promise(r => setTimeout(r, 800));
@@ -85,6 +105,22 @@ const subst = await page.evaluate(async () => {
     };
 });
 console.log('Substitution LFOO :', JSON.stringify(subst));
+
+// ---- Diagnostic vent axial atterrissage (question pilote 15/09) ----
+const hw = await page.evaluate(async () => {
+    const tp = await import('/js/takeoff-performance.js');
+    const r = tp.evaluateLandingPerformance('LFRV');
+    return {
+        vent_result: r ? {
+            headwindKt: r.headwindKt,
+            runwayName: r.runwayName,
+            level: r.level,
+            message: (r.message || '').slice(0, 120),
+        } : 'null',
+        tafInput: document.getElementById('tafInput')?.value?.slice(0, 60) || '',
+    };
+});
+console.log('Vent axial:', JSON.stringify(hw, null, 1));
 
 // ---- Capture graphique TAF pour le PDF (moteur réel, restauration) ----
 const cap = await page.evaluate(async () => {

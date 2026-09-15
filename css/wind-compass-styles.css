@@ -51,6 +51,11 @@
     will-change: transform;
 }
 
+/* HALO du point de la flèche : UNIQUEMENT en thème sombre (retour pilote
+   14/09 : le flou gaussien brouille le rendu en thème clair). */
+.wind-arrow-glow { display: none; }
+html:not(.theme-light) .wind-arrow-glow { display: inline; }
+
 /* ========== BULLES DES PISTES (RUNWAYS) ========== */
 
 /**
