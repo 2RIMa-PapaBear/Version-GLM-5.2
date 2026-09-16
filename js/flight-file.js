@@ -270,8 +270,8 @@ export async function showFlightFile(forceIcao) {
         <div style="font-size:10px; color:var(--text-muted); margin-top:8px; line-height:1.4;">
             <i data-lucide="info" style="width:11px;height:11px;vertical-align:middle;"></i>
             ${isFr
-                ? 'Vue de préparation — chaque rubrique doit être verte avant le vol. La VAC est attestée à son ouverture ; le dossier NOTAM n\u2019est jamais mis en cache.'
-                : 'Preparation view — every tile should be green before flight. VAC is attested on opening; the NOTAM briefing is never cached.'}
+                ? 'Vue de préparation — chaque rubrique doit être verte avant le vol. La VAC est attestée à son ouverture et jointe au PDF du dossier ; le dossier NOTAM n\u2019est jamais mis en cache.'
+                : 'Preparation view — every tile should be green before flight. VAC is attested on opening and attached to the dossier PDF; the NOTAM briefing is never cached.'}
         </div>
         ${inp.mode === 'nav' && inp.dest ? `
         <button id="ff-print" class="btn-primary" style="margin-top:10px; height:26px; padding:0 12px; font-size:12px;">

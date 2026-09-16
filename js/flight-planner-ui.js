@@ -7,13 +7,15 @@ import { collectFileInputs, computeFileTiles, showFlightFile } from './flight-fi
 import { getVacIndexInfo, getVacConsultedTs } from './vac-viewer.js';
 import { getLastMetarObsMs } from './data-age.js';
 import { getLastNotamFetchTs } from './notam.js';
-import { drawNavLogPdf, drawNotamAnnex, drawFileCover, drawWeatherPage } from './navlog-pdf.js';
+import { drawNavLogPdf, drawNotamAnnex, drawFileCover, drawWeatherPage, drawVacPages } from './navlog-pdf.js';
 import { getSelectedNotams, getCurrentNotams } from './notam.js';
 import { computeWb, resolveLoads, normalizeEnvelope } from './wb-core.js';
 import { makeCollapsible } from './collapsible.js';
 import { computeFlightPlan, computeMultiLegFlightPlan, getDefaultAircraftPerf, greatCircleDistanceNm, RESERVES } from './flight-planner.js';
 import { getActiveRunwaySurfaceInfo, isSoftSurface } from './runway-surface.js';
 import { getEnRouteAlternates } from './alternates.js';
+import { drawFlightMapPage } from './flight-map-pdf.js';
+import { buildFlightMapData } from './flight-map-collect.js';
 import { renderElevationChart, clearElevationChart } from './elevation-chart.js';
 import { fetchAirportByIcao } from './openaip.js';
 import { loadFreqSources, getAirportFreqs } from './freq-sia.js';
@@ -285,6 +287,12 @@ async function _generateNavLogPdfInto(tab, { file = false } = {}) {
     const { plan, tas } = stash;
     if (!window.jspdf?.jsPDF) { console.warn('jsPDF indisponible (vendor/jspdf.umd.min.js)'); return; }
 
+    // Cartes VAC rendues (option ②=B) : déclarées ICI — collectées dans le
+    // bloc garde (avant son dessin, pour une attestation exacte), posées en
+    // pages A5 APRÈS la carte de vol. (TDZ : une déclaration plus bas fait
+    // ReferenceError dans le bloc garde.)
+    let vacPagesData = [];
+
     const isMulti = Array.isArray(plan.legs) && plan.legs.length > 0;
     const legs = isMulti ? plan.legs : [{
         from: plan.from, to: plan.to, distanceNm: plan.distanceNm,
@@ -514,16 +522,20 @@ async function _generateNavLogPdfInto(tab, { file = false } = {}) {
         distanceNm: totalNm ?? '', timeLabel,
         metarRaw, rows, calc, perf, centro,
     });
-    // Annexe NOTAM : les NOTAM cochés du dossier SOFIA (10/09) prolongent le
-    // log de vol sur des pages dédiées. Dossier complet (B1) : aucune case
-    // cochée alors que le dossier est chargé → annexe du dossier ENTIER
-    // (retour pilote 13/09 : « si le dossier NOTAM est OK il doit être
-    // ajouté à la suite du PDF »).
-    try {
-        let selNotams = getSelectedNotams();
-        if (file && !selNotams.length) selNotams = getCurrentNotams();
-        if (selNotams.length) drawNotamAnnex(doc, selNotams, state.lang === 'fr');
-    } catch (e) { console.warn('annexe NOTAM ignorée :', e.message); }
+    // Annexe NOTAM : les NOTAM cochés du dossier SOFIA prolongent le
+    // dossier sur des pages dédiées. ORDRE PILOTE 16/09 : garde / log /
+    // météo / NOTAM — l'annexe est donc générée APRÈS la page météo (elle
+    // suit naturellement, sans remontée). Dossier complet (B1) : aucune
+    // case cochée alors que le dossier est chargé → annexe du dossier
+    // ENTIER (retour pilote 13/09 : « si le dossier NOTAM est OK il doit
+    // être ajouté à la suite du PDF »).
+    const _notamAnnexe = () => {
+        try {
+            let selNotams = getSelectedNotams();
+            if (file && !selNotams.length) selNotams = getCurrentNotams();
+            if (selNotams.length) drawNotamAnnex(doc, selNotams, state.lang === 'fr');
+        } catch (e) { console.warn('annexe NOTAM ignorée :', e.message); }
+    };
 
     // ---- B1 phase 2 : PDF UNIQUE du dossier — page de garde datée (statut
     // des six rubriques + attestation VAC) et page météo capturée, AJOUTÉES
@@ -564,12 +576,33 @@ async function _generateNavLogPdfInto(tab, { file = false } = {}) {
             ];
             const generatedLabel = new Date().toLocaleString([], { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
             const ac = getActiveAircraft() || {};
+            // Cartes VAC INTÉGRÉES (option ②=B, demandée par le pilote le
+            // 16/09) : rendues AVANT la garde pour que son attestation soit
+            // EXACTE (« jointe au dossier » seulement si la carte est là),
+            // posées en pages A5 APRÈS la carte de vol. Départ, arrivée,
+            // dégagement ; chaque terrain dégrade seul.
+            try {
+                const { vacPageImages } = await import('./vac-viewer.js');
+                const vacIcaos = [...new Set([fromIcao, toIcao, state.diversionIcao].filter(Boolean))];
+                for (const icao of vacIcaos) {
+                    // Fenêtre hôte VISIBLE pour pdfjs (piège du rendu suspendu
+                    // en page masquée — cf. vac-viewer.js) : l'onglet popup
+                    // s'il existe, sinon la fenêtre courante.
+                    const r = await vacPageImages(icao, { win: (tab && !tab.closed) ? tab : null });
+                    if (r?.pages?.length) {
+                        const label = icao === fromIcao ? `${isFr3 ? 'Départ' : 'Dep.'} ${icao}`
+                            : icao === toIcao ? `${isFr3 ? 'Arrivée' : 'Arr.'} ${icao}`
+                            : `${isFr3 ? 'Dégagement' : 'Alt.'} ${icao}`;
+                        vacPagesData.push({ icao, label, airac: r.airac, pages: r.pages });
+                    }
+                }
+            } catch (e) { console.warn('cartes VAC ignorées :', e.message); }
             const n0 = doc.getNumberOfPages();
             drawFileCover(doc, {
                 isFr: isFr3, generatedLabel,
                 routeLabel: `${fromIcao} - ${toIcao}${state.diversionIcao ? ` · ${isFr3 ? 'dégagement' : 'alt.'} ${state.diversionIcao}` : ''}`,
                 aircraftLabel: `${ac.name || ''}${ac.registration ? ' (' + ac.registration + ')' : ''}`.trim() || '—',
-                rows, vac: tiles.vac.items.map(v => ({ icao: v.icao, ts: getVacConsultedTs(v.icao) })),
+                rows, vac: tiles.vac.items.map(v => ({ icao: v.icao, ts: getVacConsultedTs(v.icao), jointe: vacPagesData.some(x => x.icao === v.icao) })),
                 vacAirac: vacInfo.airac,
             });
             const displayed = (document.getElementById('tafInput')?.value || '').trim().split('\n')[0] || '';
@@ -609,17 +642,74 @@ async function _generateNavLogPdfInto(tab, { file = false } = {}) {
             }
             await addTafBlock(isFr3 ? 'Arrivée' : 'Destination', toIcao);
             drawWeatherPage(doc, { isFr: isFr3, generatedLabel, dep, terrains });
-            // Remonte garde puis météo en tête (indices 1-based ; la météo
-            // RESTE à n1 après la remontée de la garde — vérifié par
-            // test/_diag-movepage.mjs).
-            const n1 = doc.getNumberOfPages();
-            if (n1 - n0 === 2) {
-                doc.movePage(n0 + 1, 1);
-                doc.movePage(n1, 2);
-            }
+            // ORDRE PILOTE 16/09 : garde / log / météo / NOTAM. La garde et
+            // la météo sont générées à la suite du log — une SEULE remontée
+            // suffit (la garde en page 1, la météo reste juste après le
+            // log) ; l'annexe NOTAM est générée ENSUITE (elle suit donc la
+            // météo naturellement), et la carte de vol clôt le dossier.
+            doc.movePage(n0 + 1, 1);
         } catch (e) {
             console.warn('pages dossier de vol ignorées :', e.message);
         }
+    }
+    _notamAnnexe();
+    // ---- B7 : carte de vol (« carte de secours ») en DERNIÈRE page —
+    // ajoutée APRÈS la remontée garde/météo pour rester en fin de dossier.
+    // Cadrage = la route seule (sémantique « Cadrer plan ») ; alternates et
+    // dégagement portés dessus (rabattus au bord si hors emprise) ; zones
+    // SIA avec la sémantique AZBA du dossier NOTAM courant ; fond relief
+    // OpenTopoMap recomposé (repli vectoriel blanc si hors ligne). Chaque
+    // source dégrade seule — l'impression ne doit jamais échouer pour ça.
+    let carteOmise = '';
+    if (file) {
+        try {
+            const mapRoute = routePts
+                .map((p, i) => ({
+                    lat: p.lat, lon: p.lon,
+                    // ZZxx → NOM RÉEL du repère (RV-E, LOR…) : à l écran ces
+                    // repères affichent leur nom, la carte du PDF aussi
+                    // (retour pilote 16/09 « les repères VFR type RV-E
+                    // apparaissent sous la forme ZZAA »). Les terrains
+                    // gardent leur code OACI (résolveur neutre pour eux).
+                    code: _wpDisplayName(p.icao),
+                    name: getAirportByICAO(p.icao)?.name || '',
+                    role: i === 0 ? 'dep' : (i === routePts.length - 1 ? 'dest' : 'wp'),
+                }))
+                .filter((p) => p.lat != null && p.lon != null);
+            const mapAlts = (altRows || [])
+                .filter((r) => r.lat != null && r.lon != null)
+                .map((r) => ({ lat: r.lat, lon: r.lon, code: r.code, name: r.name }));
+            if (state.diversionIcao && state.diversionIcao !== toIcao && state.diversionIcao !== fromIcao) {
+                const di = mapAlts.findIndex((a) => a.code === state.diversionIcao);
+                const d = di >= 0 ? mapAlts[di] : getAirportByICAO(state.diversionIcao);
+                if (d?.lat != null && d.lon != null) {
+                    if (di >= 0) mapAlts[di] = { ...mapAlts[di], diversion: true };
+                    else mapAlts.push({ lat: d.lat, lon: d.lon, code: state.diversionIcao, name: d.name, diversion: true });
+                }
+            }
+            const mapData = await buildFlightMapData({
+                isFr: isFr3,
+                generatedLabel: new Date().toLocaleString([], { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                routeLabel: `${fromIcao} - ${toIcao}${state.diversionIcao ? ` · ${isFr3 ? 'dégagement' : 'alt.'} ${state.diversionIcao}` : ''}`,
+                route: mapRoute,
+                alternates: mapAlts,
+                notams: getCurrentNotams(),
+            });
+            if (mapData) drawFlightMapPage(doc, mapData);
+        } catch (e) {
+            console.warn('carte de vol ignorée :', e.message);
+            // Diagnostic SANS console (téléphone) : la raison est reportée
+            // dans le titre de l'onglet PDF — « Dossier … — carte omise : … ».
+            carteOmise = ` — carte omise : ${String(e.message || e).slice(0, 60)}`;
+        }
+    }
+
+    // ---- Cartes VAC intégrées (②=B, 16/09) : pages A5 APRÈS la carte de
+    // vol — dernières pages du dossier. Les données ont été rendues avant
+    // la garde (texte d attestation exact).
+    if (file && vacPagesData.length) {
+        try { drawVacPages(doc, vacPagesData, isFr3); }
+        catch (e) { console.warn('cartes VAC ignorées :', e.message); }
     }
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const filename = file
@@ -636,9 +726,10 @@ async function _generateNavLogPdfInto(tab, { file = false } = {}) {
         try {
             const dataUri = doc.output('datauristring');
             const blobUrl = URL.createObjectURL(doc.output('blob'));
-            const title = file
-                ? (isFr3 ? `Dossier de vol ${fromIcao}-${toIcao}` : `Flight file ${fromIcao}-${toIcao}`)
-                : (isFr3 ? `Log de nav ${fromIcao}-${toIcao}` : `Nav log ${fromIcao}-${toIcao}`);
+        const title = (file
+            ? (isFr3 ? `Dossier de vol ${fromIcao}-${toIcao}` : `Flight file ${fromIcao}-${toIcao}`)
+            : (isFr3 ? `Log de nav ${fromIcao}-${toIcao}` : `Nav log ${fromIcao}-${toIcao}`))
+            + (typeof carteOmise === 'string' ? carteOmise : '');
             tab.document.open();
             tab.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
 <style>html,body{margin:0;height:100%;overflow:hidden}iframe{border:0;width:100%;height:100%}

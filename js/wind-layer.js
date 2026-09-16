@@ -173,6 +173,11 @@ export function mountWindLayer(map, bar) {
             const match = [...altSelect.options].some(o => String(o.value) === String(altFt));
             altSelect.value = match ? String(altFt) : String(2000);
         }
+        // Mais on ne DESSINE que si la couche est ACTIVE (retour pilote
+        // 15/09 : au recalcul du plan — événement plan-alt — ou au changement
+        // d'altitude du sélecteur, les flèches apparaissaient sur la carte
+        // sans aucun appui sur le bouton, téléphone en tête).
+        if (btn.getAttribute('aria-pressed') !== 'true') return;
 
         layerGroup?.remove();
         layerGroup = L.layerGroup().addTo(map);

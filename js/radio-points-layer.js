@@ -190,18 +190,38 @@ export function createRadioPointsController(map, deps = {}) {
                     zIndexOffset: kind === 'vrp' ? -200 : 0,
                 });
                 if (withLabels) {
-                    // Encadrés façon carte aéro : ident sur fréquence pour
-                    // les radiophares, nom en italique pour les repères.
-                    const labelHtml = kind === 'vor'
-                        ? `${_esc(it.ident)}<br><span class="rp-freq">${_esc(formatFreq(it.freq, 2))}</span>`
-                        : kind === 'ndb'
-                            ? `${_esc(it.ident)}<br><span class="rp-freq">${_esc(formatFreq(it.freq, 1))}</span>`
-                            : `<i>${_esc(it.name)}</i>`;
+                    // Étiquette sur le MODÈLE DES AÉRODROMES (harmonisation
+                    // pilote 16/09) : <strong>IDENT</strong> — nom, 2e ligne
+                    // colorée par famille (fréquence officielle pour les
+                    // radiophares, « point VFR » pour les repères) — même
+                    // structure que « LFRV — Vannes · VFR » des pastilles.
+                    const l2 = kind === 'vrp'
+                        ? (isFr() ? 'point VFR' : 'VFR point')
+                        : _esc(formatFreq(it.freq, kind === 'ndb' ? 1 : 2));
+                    const nom = kind === 'vrp'
+                        ? (it.desc ? _esc(it.desc.replace(/^VRP-/i, '').slice(0, 24)) : '')
+                        : (it.officialName ? _esc(it.officialName) : '');
+                    const labelHtml = `<strong>${_esc(kind === 'vrp' ? it.name : it.ident)}</strong>`
+                        + (nom ? ' — ' + nom : '')
+                        + `<br><span style="color:${COLORS[kind]};font-weight:700;">${l2}</span>`;
                     m.bindTooltip(labelHtml, { permanent: true, direction: 'right', className: 'rp-label rp-label-' + kind });
                 } else {
                     m.bindTooltip(_esc(kind === 'vrp' ? it.name : it.ident), { direction: 'top' });
                 }
                 m.bindPopup(() => popupHtml(kind, it), { maxWidth: 250 });
+                // Clic droit = raccourci « + Waypoint » (retour pilote 16/09 :
+                // « le clic droit ne fonctionne pas sur les points VFR, ils ne
+                // s ajoutent pas au FP ») — même chemin que le bouton du popup
+                // (repère NOMMÉ avec fréquence/nature), et arrêt de propagation
+                // pour ne pas retomber sur le repère libre ZZxx du contextmenu
+                // carte (même mécanique que les pastilles terrains).
+                m.on('contextmenu', (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    map.closePopup();
+                    const wpName = kind === 'vrp' ? it.name : `${it.ident} (${kind === 'vor' ? 'VOR' : 'NDB'})`;
+                    const freqStr = it.freq != null ? formatFreq(it.freq, kind === 'ndb' ? 1 : 2) : '';
+                    deps.createWaypoint?.(it.lat, it.lon, wpName, freqStr, kind === 'vrp' ? 'VRP' : kind.toUpperCase());
+                });
                 m.addTo(layerGroup);
             }
         }
@@ -294,12 +314,20 @@ export function createRadioPointsController(map, deps = {}) {
 
         menuEl.addEventListener('change', (e) => {
             const kind = e.target?.dataset?.rpKind;
-            if (kind) { setKind(kind, e.target.checked); return; }
-            const group = e.target?.dataset?.rpAirgroup;
-            if (group && deps.airspace) { deps.airspace.setGroup(group, e.target.checked); return; }
-            if (e.target?.dataset?.rpAirspaces != null && deps.airspace) {
-                deps.airspace.toggle(e.target.checked);
+            if (kind) setKind(kind, e.target.checked);
+            else {
+                const group = e.target?.dataset?.rpAirgroup;
+                if (group && deps.airspace) deps.airspace.setGroup(group, e.target.checked);
+                else if (e.target?.dataset?.rpAirspaces != null && deps.airspace) {
+                    deps.airspace.toggle(e.target.checked);
+                }
             }
+            // Referme après CHAQUE case : ouvert, le menu flotte sur la carte
+            // et intercepte les clics des points VFR situés dessous (retour
+            // pilote 16/09 « le clic gauche ne fonctionne pas sur les points
+            // VFR » — le clic tombait sur les libellés du menu, jamais sur
+            // le marqueur). Échap et clic extérieur ferment aussi.
+            close();
         });
     }
 

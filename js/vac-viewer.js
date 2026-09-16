@@ -137,6 +137,64 @@ function _loadPdfjs() {
     return _pdfjsPromise;
 }
 
+// ---- Rendu PDF -> images pour le DOSSIER (option ②=B, pilote 16/09) ----
+
+/** Rend toutes les pages de la VAC d'un terrain en JPEG (dataURL) prêts
+ *  pour une page A5 du dossier de vol. null si VAC indisponible (hors
+ *  ligne sans cache, terrain sans carte). Node (tests) : null.
+ *  @returns {Promise<{airac:string, pages:[{data,w,h}]}|null>} */
+export async function vacPageImages(icao, { pxHeight = 1400, quality = 0.85, win = null } = {}) {
+    if (typeof document === 'undefined') return null;
+    let v = null;
+    try { v = await fetchVac(icao); } catch { return null; }
+    if (!v) return null;
+    try {
+        // PIÈGE pdfjs (découvert 16/09) : page.render() SE SUSPEND
+        // indéfiniment dans une page MASQUÉE (l'onglet PDF du dossier prend
+        // le focus AVANT la génération — drawImage/toDataURL ne suffisent
+        // pas à le réveiller). Le rendu se fait donc dans une FENÊTRE HÔTE
+        // VISIBLE — l'onglet popup lui-même (même origine), repli fenêtre
+        // courante (visible quand le popup est bloqué).
+        const lib = await _loadPdfjsIn(win || window);
+        const data = new Uint8Array(await v.blob.arrayBuffer());
+        const pdf = await lib.getDocument({ data }).promise;
+        const pages = [];
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const vp1 = page.getViewport({ scale: 1 });
+            const scale = pxHeight / vp1.height;   // ~1 400 px de haut ≈ 170 dpi en A5
+            const vp = page.getViewport({ scale });
+            const canvas = (win || window).document.createElement('canvas');
+            canvas.width = Math.ceil(vp.width);
+            canvas.height = Math.ceil(vp.height);
+            await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+            pages.push({ data: canvas.toDataURL('image/jpeg', quality), w: vp.width, h: vp.height });
+        }
+        return { airac: v.airac, pages };
+    } catch { return null; }
+}
+
+/** pdfjs dans une fenêtre donnée : la fenêtre courante via le chargeur
+ *  existant ; une AUTRE fenêtre (l'onglet popup, about:blank même origine)
+ *  par injection de script en URL ABSOLUE (pas de base URL dans about:blank). */
+async function _loadPdfjsIn(win) {
+    if (win === window) return _loadPdfjs();
+    if (win.pdfjsLib) {
+        win.pdfjsLib.GlobalWorkerOptions.workerSrc = `${location.origin}/vendor/pdfjs-worker-3.11.174.min.js`;
+        return win.pdfjsLib;
+    }
+    await new Promise((resolve, reject) => {
+        const s = win.document.createElement('script');
+        s.src = `${location.origin}/vendor/pdfjs-3.11.174.min.js`;
+        s.onload = resolve;
+        s.onerror = () => reject(new Error('pdfjs non chargé dans la fenêtre hôte'));
+        win.document.head.appendChild(s);
+    });
+    const lib = win.pdfjsLib;
+    lib.GlobalWorkerOptions.workerSrc = `${location.origin}/vendor/pdfjs-worker-3.11.174.min.js`;
+    return lib;
+}
+
 // ---- Visionneuse plein cadre -------------------------------------------------
 
 let _ui = null;   // { overlay, canvas, container, pct, badge, icao, lib, pdf, page, scale, renderTask, pageNo, numPages }

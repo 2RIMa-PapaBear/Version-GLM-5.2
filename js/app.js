@@ -692,7 +692,10 @@ document.addEventListener('DOMContentLoaded', async function () {
     // tourne, y compris sur mobile sans console (Brave Android).
     try {
         const src = document.querySelector('script[src*="js/app.js"]')?.src || '';
-        window.APP_VERSION = (src.match(/v=([\d.]+)/) || [])[1] || '?';
+        // Canal test : deploy-test injecte ?v=test.<horodatage> — la regex
+        // doit savoir le lire, sinon le footer affiche « v? » sur /test/ et
+        // le pilote ne peut plus vérifier sa version (retour 16/09).
+        window.APP_VERSION = (src.match(/v=([\d.]+|test\.\d+)/) || [])[1] || '?';
         const build = document.getElementById('app-build');
         if (build) build.textContent = 'v' + window.APP_VERSION;
         console.info('%c✈ météo VFR %cv' + window.APP_VERSION, 'font-weight:700;color:#38BDF8', 'color:#94A3B8');

@@ -28,6 +28,8 @@ Issue de l'audit du 13/09/2026. **Décisions du pilote enregistrées le 13/09/20
 - QA : `npm test` **327/327** (17 tests azba au total).
 - **B1 COMPLET (13/09 nuit, localhost, npm 336/336)** — v1 écran : panneau « Dossier de vol » à 6 tuiles (Météo avec TAF 3 états dont « sans objet », NOTAM fraîcheur, VAC attestation horodatée à l ouverture + bouton Voir, Carburant requis/embarqué/dégagement, Perfs, Centrage verdict points.takeoff + MTOW) + fixes retours pilote (météo ROUGE → âge via getLastMetarObsMs du badge d âge ; centrage AMBRE → points.takeoff.inside ; widget piste masqué en consultation arrivée → bandeau invitation + atterrissage conservé, garde « destination ≠ observé » retiré). v2 PDF UNIQUE : bouton « Imprimer le dossier de vol » (nav) → modale adaptée → doc = garde datée (6 rubriques pastillées + attestation VAC cycle AIRAC + resp. CB) + page Météo (messages affichés + METAR arrivée) + log complet + annexe NOTAM, pages remontées en tête par doc.movePage (piège : la météo RESTE à n1 après le 1er move — micro-test _diag-movepage.mjs). QA : Apercu_Dossier_LFRV-LFOO.pdf (5 pages, p1=garde p2=météo) + widget takeoff diagnostiqué 3 flux par _diag-takeoff.mjs (Brave headless).
 
+- **B7 MAQUETTE (15/09, localhost, npm 362 — 361 + 1 échec PRÉEXISTANT radio-points)** — carte de secours A5 paysage : maquettes réelles prêtes (voir Lot B), intégration au dossier APRÈS feu vert pilote. Pièges résolus : deltas jsPDF `doc.lines` consécutifs (relatifs au point PRÉCÉDENT) ; le screenshot Brave `--headless=new` n'attend PAS `--virtual-time-budget` (capture vierge) → capture CDP clippée au canvas (`test/_pdf2png-cdp.mjs` ; agent juge sans pixels dans cet env → QA géométrique `test/check-flight-map-pdf.mjs`).
+
 Légende effort : **S** = quelques heures · **M** = 1–2 jours · **L** = 3–5 jours · **XL** = 1–2 semaines.
 Workflow inchangé pour tout chantier : maquette/aperçu → feu vert pilote → implémentation → QA réelle.
 Aucune publication sans autorisation explicite (`npm run pub` interdit sans feu vert).
@@ -70,15 +72,28 @@ Aucune publication sans autorisation explicite (`npm run pub` interdit sans feu 
   et dans le dossier. Prolonge A2 — **prioritaire sur B3** (arbitrage ③).
 - [x] **B3 — TEMSI + couche vents sur carte** (L)
   Vignettes TEMSI datées + flèches de vent à l'altitude du plan (Open-Meteo). Après B2.
-- [x] **B4 — Sup AIP** (M)
+- [ ] **B4 — Sup AIP** (M) — à faire
   Crawl des Sup série A du SIA + filtrage par zone d'information.
 - [x] **B5 — Prépa la veille / revalidation le matin** (L)
   Snapshot du dossier en IndexedDB + diff à la réouverture. Extension du watchdog.
-- [x] **B6 — Mode en vol à tuiles** (L)
+- [ ] **B6 — Mode en vol à tuiles** (L) — à faire
   GO/NO-GO revalidé, METAR arrivée, créneau restant, destination ET alternate le plus proche,
   heure d'arrivée recalculée sur la GS réelle GPS → TAF relu à la nouvelle heure.
-- [x] **B7 — Carte de vol imprimable** (M)
+- [x] **B7 — Carte de vol imprimable** (M) — **FAIT 15/09 (canal /test/, en attente d approbation)**
   Export PDF de la carte régionale avec route + espaces tracés (« carte de secours »).
+  → Arbitrages 15/09 : page **A5 paysage en DERNIÈRE page du PDF du dossier** ;
+  cadrage AUTO sur le plan (route seule, comme « Cadrer plan », terrains hors
+  emprise rabattus au bord) ; calques = **zones SIA étiquetées + terrains et
+  alternates** (pas d'étiquettes de tronçons, pas de flèches vent) ; fond
+  relief **OpenTopoMap** recomposé en un JPEG canvas (~300 Ko, budget 20 s,
+  repli vectoriel blanc hors ligne). Modules `js/flight-map-pdf.js` (pur) +
+  `js/flight-map-collect.js` ; tests `flight-map-pdf.test.mjs` (8/8) +
+  `check-flight-map-pdf.mjs` (géométrique TOUT OK) + `qa-flight-map-dossier.mjs`
+  (E2E réel : bouton → modale → onglet PDF, 6 pages, carte en dernière, JPEG
+  canvas, zéro erreur console). **Fix au passage** : `taf-chart-capture.js`
+  gelait à jamais si la page passait en arrière-plan pendant l'impression
+  (l'onglet PDF ouvert AVANT la génération masque l'app → Chrome suspend les
+  rAF) — repli minuteur 250 ms.
 
 ## Vérifications de fiabilité (à faire tôt, indépendamment du reste)
 
@@ -101,11 +116,14 @@ Badge « recommandé » sur l'alternate le plus praticable à l'heure estimée (
 NOTAM + distance), sélection confirmée par le pilote. La sélection automatique pure (B, météo
 seule) a été écartée : météo ≠ praticable.
 
-### ② Dossier PDF unique → **A : ~1 Mo sans VAC intégrées**
-Page de garde datée (heure de consultation par rubrique) + log + NOTAM cochés + perfs +
-centrage + météo capturée + attestation « VAC consultées (cycle, heure) ». Option B (pages VAC
-intégrées, +5–9 Mo, rasterisation ou pdf-lib) conservée pour une évolution ultérieure, en case
-optionnelle par terrain.
+### ② Dossier PDF unique → A (14/09) puis **B (16/09, demande pilote)**
+Option A d'abord (~1 Mo, attestation « VAC consultées »). Le 16/09, le pilote a demandé
+l'option B : **cartes VAC INTÉGRÉES** (départ, arrivée, dégagement) en pages A5 APRÈS la
+carte de vol — rendu pdfjs par page (JPEG ~170 dpi), bande titre terrain + AIRAC + i/n,
+attestation de la garde corrigée (« jointe au dossier » quand la carte est là).
+Pièges découverts : **pdfjs page.render() se SUSPEND indéfiniment dans une page masquée**
+(l'onglet PDF prend le focus avant la génération) → rendu dans l'onglet popup hôte (même
+origine, script en URL absolue) ; variable de collecte à déclarer AVANT le bloc garde (TDZ).
 
 ### ③ AZBA vs TEMSI → **recommandation acceptée : AZBA d'abord**
 Deux pas : A2 (statuts `hor`, quasi gratuit) puis B2 (plages d'activation NOTAM). TEMSI (B3)
