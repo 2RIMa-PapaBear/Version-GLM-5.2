@@ -2753,3 +2753,56 @@ html.theme-light .data-age-badge.age-old   { color: #B91C1C; background: rgba(23
                  0 1px 0 rgba(0,0,0,0.8), 0 -1px 0 rgba(0,0,0,0.8);
     pointer-events: none;
 }
+
+/* ================================================================
+ * TEMSI (B3 v2) — panneau de vignettes datées + visionneuse.
+ * ================================================================ */
+.temsi-panel {
+    position: absolute; top: 52px; right: 10px; z-index: 1150;
+    width: min(560px, calc(100% - 20px)); max-height: calc(100% - 70px);
+    display: flex; flex-direction: column;
+    padding: 10px 12px; overflow: hidden;
+}
+.temsi-panel[hidden] { display: none; }
+.temsi-head { display: flex; align-items: center; justify-content: space-between; }
+.temsi-head h3 { margin: 0; font-size: 13px; }
+.temsi-close { background: none; border: none; cursor: pointer; color: var(--text-muted, #94A3B8); padding: 4px; }
+.temsi-note { font-size: 10.5px; color: var(--text-muted, #94A3B8); margin: 4px 0 8px; }
+.temsi-body { overflow-y: auto; min-height: 0; -webkit-overflow-scrolling: touch; }
+.temsi-wait { font-size: 12px; color: var(--text-muted, #94A3B8); padding: 10px 0; }
+.temsi-layer-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin: 8px 0 6px; }
+.temsi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.temsi-thumb {
+    position: relative; padding: 0; border: 1px solid var(--border-color, #334155);
+    border-radius: 8px; background: var(--inner-bg, #0F172A); cursor: pointer; overflow: hidden;
+    display: flex; flex-direction: column; min-height: 120px;
+}
+.temsi-thumb.near { border-color: #38BDF8; box-shadow: 0 0 0 1px #38BDF866; }
+.temsi-thumb .temsi-when {
+    display: flex; align-items: baseline; gap: 6px; padding: 4px 6px 2px;
+    font-size: 10.5px;
+}
+.temsi-thumb .temsi-when b { font-size: 11px; }
+.temsi-thumb .temsi-when span { color: var(--text-muted, #94A3B8); }
+.temsi-thumb .temsi-when em {
+    margin-left: auto; font-style: normal; font-size: 9.5px; color: #38BDF8; font-weight: 700;
+}
+.temsi-thumb img { width: 100%; aspect-ratio: 4/3; object-fit: contain; background: #fff; }
+.temsi-thumb .temsi-load {
+    position: absolute; inset: 26px 0 0; display: flex; align-items: center; justify-content: center;
+    font-size: 10.5px; color: var(--text-muted, #94A3B8);
+}
+.temsi-viewer {
+    position: fixed; inset: 0; z-index: 12000; background: rgba(2, 6, 23, .92);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.temsi-viewer-bar {
+    position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center;
+    justify-content: space-between; padding: 10px 14px; color: #F8FAFC; font-size: 13px; font-weight: 700;
+}
+.temsi-viewer-bar button { background: rgba(30,41,59,.8); border: 1px solid var(--border-color,#334155); border-radius: 8px; cursor: pointer; color: #F8FAFC; padding: 6px 9px; }
+.temsi-viewer img { max-width: 94vw; max-height: 88vh; object-fit: contain; background: #fff; border-radius: 6px; }
+@media (max-width: 640px) {
+    .temsi-panel { top: 46px; right: 5px; left: 5px; width: auto; padding: 8px; }
+    .temsi-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+}

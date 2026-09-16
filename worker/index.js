@@ -53,6 +53,10 @@ export default {
                 return reponse(502, JSON.stringify({ error: String(e.message || e).slice(0, 200) }), 'application/json');
             }
         }
+        // B3 v2 (16/09) — TEMSI/WinTEM France (AEROWEB, compte du pilote).
+        if (request.method === 'GET' && url.pathname === '/temsi') {
+            return await temsiFrance(request, env, ctx);
+        }
         // C1 (14/09) : SIGMET/GAMET/AIRMET France via le compte AEROWEB du
         // pilote (secrets AEROWEB_USER/AEROWEB_PASS — jamais dans le repo).
         if (request.method === 'GET' && url.pathname === '/sigmet') {
@@ -106,6 +110,104 @@ async function aerowebLogin(env) {
     const cookies = [baseCookie, ...extra].join('; ');
     _aeroSession = { cookie: cookies, ts: Date.now() };
     return cookies;
+}
+
+// ---------------------------------------------------------------------------
+// B3 v2 — TEMSI / WinTEM France (cartes du temps significatif, AEROWEB).
+//   GET /temsi
+//     → JSON { generatedAt, domain:'FRANCE',
+//              layers:[{ key:'temsi'|'wintem', label, type, echeances:[{utc,label}] }] }
+//     liste des échéances du jour (cache périphérique 10 min — 4 émissions/j).
+//   GET /temsi?img=<type>&date=<YYYYMMDDHHMMSS>
+//     → l'IMAGE de la carte (affiche_image.php?mode=img, ~280 Ko, immuable
+//       par date — cache périphérique 30 min).
+// Sources (recon 16/09, session authentifiée) :
+//   get_domaine_layers_echeances.php?domaine=19 (FRANCE) → couches + échéances
+//   affiche_image.php?type=sigwx/fr/france&date=…&mode=img → image TEMSI
+//   affiche_image.php?type=wintemp/fr/france/fl020&date=…&mode=img → WinTEM
+// ---------------------------------------------------------------------------
+const TEMSI_TYPE_OK = /^(sigwx|wintemp)\/fr\/france(\/fl\d{2,3})?$/;
+
+/** Parse la page des couches France → [{key,label,type,echeances}] (pur, testé). */
+export function parseTemsiLayers(html) {
+    const layers = [];
+    const reBlock = /<span>([^<]+)<\/span>([\s\S]*?)(?=<span>|$)/g;
+    let m;
+    while ((m = reBlock.exec(html))) {
+        const label = m[1].replace(/\s+/g, ' ').trim();
+        const body = m[2];
+        const type = (body.match(/type=([a-z0-9/_]+)&date=/i) || [])[1];
+        const utc = [...body.matchAll(/goCartesAnim\(\d+,'(\d{14})',19,/g)].map(e => e[1]);
+        const echeances = [...new Set(utc)];
+        if (!type || !echeances.length) continue;
+        layers.push({
+            key: /wintemp/i.test(type) ? 'wintem' : 'temsi',
+            label,
+            type,
+            echeances: echeances.map(u => ({ utc: u, label: u.slice(8, 10) + 'h UTC' })),
+        });
+    }
+    return layers;
+}
+
+async function temsiFrance(request, env, ctx) {
+    if (!env.AEROWEB_USER || !env.AEROWEB_PASS) {
+        return reponse(503, JSON.stringify({ error: 'secrets AEROWEB absents (wrangler secret put AEROWEB_USER / AEROWEB_PASS)' }), 'application/json');
+    }
+    const params = new URL(request.url).searchParams;
+    const cache = caches.default;
+
+    // ---- Image d'une échéance (immuable par date → cache 30 min) ----
+    const imgType = params.get('img');
+    if (imgType) {
+        if (!TEMSI_TYPE_OK.test(imgType)) return reponse(400, JSON.stringify({ error: 'type TEMSI invalide' }), 'application/json');
+        const date = (params.get('date') || '').replace(/\D/g, '');
+        if (!/^\d{14}$/.test(date)) return reponse(400, JSON.stringify({ error: 'date invalide (YYYYMMDDHHMMSS)' }), 'application/json');
+        const urlImg = AEROWEB + '/affiche_image.php?type=' + imgType + '&date=' + date + '&mode=img';
+        const cle = new Request(urlImg);
+        const hit = await cache.match(cle);
+        if (hit) {
+            const out = reponse(200, hit.body, hit.headers.get('content-type') || 'image/png');
+            out.headers.set('X-Cache', 'HIT');
+            return out;
+        }
+        const cookie = await aerowebLogin(env);
+        const r = await fetch(urlImg, { headers: { cookie } });
+        if (!r.ok) return reponse(502, JSON.stringify({ error: 'image TEMSI indisponible (HTTP ' + r.status + ')' }), 'application/json');
+        const ct = r.headers.get('content-type') || 'image/png';
+        const bytes = await r.arrayBuffer();
+        ctx.waitUntil(cache.put(cle, new Response(bytes, { headers: { 'content-type': ct, 'cache-control': 'public, max-age=1800' } })));
+        const out = reponse(200, bytes, ct);
+        out.headers.set('Cache-Control', 'public, max-age=1800');
+        return out;
+    }
+
+    // ---- Liste des couches/échéances (cache 10 min) ----
+    const cleListe = new Request(AEROWEB + '/temsi/liste/france');
+    const hitListe = await cache.match(cleListe);
+    if (hitListe) {
+        const out = reponse(200, hitListe.body, 'application/json');
+        out.headers.set('X-Cache', 'HIT');
+        return out;
+    }
+    const urlListe = AEROWEB + '/get_domaine_layers_echeances.php?domaine=19';
+    let html = '';
+    for (let essai = 1; essai <= 2; essai++) {
+        const cookie = await aerowebLogin(env);
+        const r = await fetch(urlListe, { headers: { cookie } });
+        html = await r.text();
+        if (/goCartesAnim/.test(html)) break;
+        _aeroSession = { cookie: null, ts: 0 };   // session expirée → re-login
+    }
+    const layers = parseTemsiLayers(html);
+    if (!layers.length) {
+        return reponse(502, JSON.stringify({ error: 'réponse AEROWEB inattendue (pas de couches TEMSI)' }), 'application/json');
+    }
+    const json = JSON.stringify({ generatedAt: new Date().toISOString(), domain: 'FRANCE', layers });
+    ctx.waitUntil(cache.put(cleListe, new Response(json, { headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=600' } })));
+    const out = reponse(200, json, 'application/json');
+    out.headers.set('Cache-Control', 'public, max-age=600');
+    return out;
 }
 
 // MD5 — implémentation EXACTE du site AEROWEB (php.js, md5 + utf8_encode

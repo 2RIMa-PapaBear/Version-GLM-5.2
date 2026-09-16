@@ -70,8 +70,14 @@ Aucune publication sans autorisation explicite (`npm run pub` interdit sans feu 
 - [x] **B2 — AZBA : activations de zones** (L)
   Plages horaires NOTAM × polygones SIA (« R 71 : active aujourd'hui 14h00–17h00 ») sur la carte
   et dans le dossier. Prolonge A2 — **prioritaire sur B3** (arbitrage ③).
-- [x] **B3 — TEMSI + couche vents sur carte** (L)
-  Vignettes TEMSI datées + flèches de vent à l'altitude du plan (Open-Meteo). Après B2.
+- [x] **B3 — TEMSI + couche vents sur carte** (L) — v1 vent FAIT 15/09 (prod) ; **v2 TEMSI FAIT 16/09 (canal /test/, attente validation)**
+  Vignettes TEMSI datées + flèches de vent à l'altitude du plan (Open-Meteo).
+  → v2 : Worker GET /temsi (session AEROWEB du pilote, recon 16/09 :
+  get_domaine_layers_echeances.php?domaine=19 → TEMSI SFC-FL150 (sigwx/fr/france)
+  + WINTEM FL020-100 ; images affiche_image.php?mode=img, cache edge 30 min) ;
+  bouton « TEMSI » dans la barre de la carte → panneau de vignettes datées
+  UTC **et locale**, mise en avant de l'échéance ≈ heure d'arrivée prévue,
+  visionneuse plein cadre, cache IDB 12 h ; qa-temsi.mjs + temsi.test.mjs.
 - [ ] **B4 — Sup AIP** (M) — à faire
   Crawl des Sup série A du SIA + filtrage par zone d'information.
 - [x] **B5 — Prépa la veille / revalidation le matin** (L)
