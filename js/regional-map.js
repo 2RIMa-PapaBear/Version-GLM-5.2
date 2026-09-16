@@ -11,6 +11,7 @@ import { getRunwayThresholds } from './runways-geo.js';
 import { hasVac, openVac } from './vac-viewer.js';
 import { registerMap } from './map-registry.js';
 import { mountWindLayer } from './wind-layer.js';
+import { mountTemsiButton, closeTemsiViewer } from './temsi.js';
 
 let _map = null;
 let _precip = null;
@@ -365,6 +366,7 @@ function _initLayerControls() {
     // B3 (14/09) : couche « Vent » — flèches à l'altitude du plan (OFF au
     // départ, comme le radar ; re-rendu au déplacement/zoom de la carte).
     try { mountWindLayer(_map, bar); } catch (e) { console.error('wind layer failed:', e.message); }
+    try { mountTemsiButton(bar); } catch (e) { console.error('temsi button failed:', e.message); }
 
     _mountZoomAirfieldButton(bar);
     _wireFreeWaypointShortcuts();
