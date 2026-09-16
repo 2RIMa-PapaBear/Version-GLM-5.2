@@ -23,7 +23,7 @@ const MIN_ZOOM = 4;
 // continentales) — une vue France z6 en fait ~70, ce cap ne la touche pas.
 const MAX_VIEW_CELLS = 300;
 
-const MAX_BASE_FT = 5000;
+export const MAX_BASE_FT = 5000;
 
 // Numérotation openAIP BRUTE (cellules data/airspaces/cells/) — vérifiée
 // sur le corpus servi : RMZ CHERBOURG=6, TMZ SEINE=5, ZARAGOZA ATZ=13,
@@ -99,7 +99,7 @@ const ICAO_CLASS_MAP = {
     8: 'NA',
 };
 
-const AIRSPACE_STYLE = {
+export const AIRSPACE_STYLE = {
     CTR:    { color: '#3B82F6', fill: 'rgba(59,130,246,0.10)', weight: 2, label: 'CTR' },
     // STRICT SIA (décision pilote 09/09) : espaces contrôlés en BLEU
     // (les TMA/CTA étaient orange, confondues avec les zones D ambre).
@@ -581,7 +581,7 @@ function _decodeIcaoClass(as) {
 // Limites verticales openAIP : lowerLimit/upperLimit { value, unit,
 // referenceDatum } — unit 6 = FL, unit 1 = ft, unit 0 = m ; referenceDatum
 // 1 = AGL. (L'ancien format `lower`/`upper` en mètres est encore accepté.)
-function _limitFt(lim) {
+export function _limitFt(lim) {
     if (!lim || !isFinite(lim.value)) return null;
     if (lim.unit === 6) return lim.value * 100;                      // FL → ft
     if (lim.unit === 0) return Math.round(lim.value * 3.28084);      // m → ft
@@ -591,7 +591,7 @@ function _limitFt(lim) {
 /** Texte d'une borne : « SFC », « FL065 », « 2500 ft AMSL »… (les limites
  *  verticales des zones sont publiées AMSL ; le referenceDatum openAIP
  *  « AGL » est erroné sur les CTR/TMA — retour utilisateur 2026-08-26). */
-function _limitTxt(lim) {
+export function _limitTxt(lim) {
     const ft = _limitFt(lim);
     if (ft == null) return null;
     if (ft <= 0) return 'SFC';
@@ -646,7 +646,7 @@ function _activationLine(as, isFr) {
     } catch { return ''; }
 }
 
-function _geometryToLatLngs(geometry, radiusKm = 5) {
+export function _geometryToLatLngs(geometry, radiusKm = 5) {
     if (!geometry || !geometry.coordinates) return [];
     const type = geometry.type;
     const rings = [];

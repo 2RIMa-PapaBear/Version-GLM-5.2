@@ -324,7 +324,12 @@ export function dessinerGraphique(data, hppValue, activeTzOffset) {
 
     // Support HiDPI (Retina)
     const dpr = window.devicePixelRatio || 1;
-    const availableWidth = Math.max(container.clientWidth, 300);
+    // Largeur de rendu : celle de l'écran, SAUF override posé par la
+    // capture d'impression (taf-chart-capture) — le PDF dossier exige un
+    // graphique au format page A5 IDENTIQUE quel que soit l'appareil
+    // (téléphone, tablette, ordinateur) ; l'override contourne le DOM
+    // (flex/media queries pouvaient écraser un style.width forcé).
+    const availableWidth = state.chartRenderWidthOverride || Math.max(container.clientWidth, 300);
     const PADDING_LEFT = 95, PADDING_RIGHT = 65, PADDING_TOP = 80, PADDING_BOTTOM = 35, OFFSET_STEP = 30;
     const pxPerH = (availableWidth - PADDING_LEFT - PADDING_RIGHT) / Math.max(data.endH - data.startH, 0.1);
 

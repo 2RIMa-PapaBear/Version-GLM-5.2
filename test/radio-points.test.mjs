@@ -80,6 +80,19 @@ test('radio-points.json : navaids SIA France (VOR/VOR-DME/NDB + RadioNav)', asyn
     ok(ldv.every(n => Math.abs(n[2] - 48.53) < 0.01), 'LDV inchangé (garde de proximité)');
 });
 
+test('radio-points.json : VRP SIA France (base officielle, openAIP écarté)', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const json = JSON.parse(await readFile(new URL('../data/radio-points.json', import.meta.url), 'utf8'));
+    // Règle pilote 16/09 : la base est SIA — l'incident du 14/09 (robot
+    // openAIP seul) avait laissé 0 VRP avec description, invisible aux tests.
+    ok(json.counts?.vrpsSia >= 900, `≥900 VRP officiels SIA (${json.counts?.vrpsSia})`);
+    const fr = json.vrps.filter(v => v[3] === 'FR');
+    equal(fr.length, json.counts.vrpsSia, 'les VRP FR sont EXACTEMENT les officiels SIA (openAIP FR écarté)');
+    const avecDesc = fr.filter(v => v[4]).length;
+    ok(avecDesc >= fr.length * 0.9, `${avecDesc}/${fr.length} VRP avec description officielle`);
+    ok(!!json.siaAirac && !!json.siaVrpAirac, `AIRAC SIA présent (${json.siaAirac} / ${json.siaVrpAirac})`);
+});
+
 test('filterBbox : cadre simple et antiméridien (est < ouest)', () => {
     const pts = [
         { lat: 0, lon: 0 }, { lat: 0, lon: 10 },

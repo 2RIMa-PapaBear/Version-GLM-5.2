@@ -1719,7 +1719,13 @@ export function drawNotamAnnex(doc, items, isFr = true) {
     const SZ_T = 11, SZ_G = 8.5, SZ_B = 7.5;
     let y = 0;
 
-    const newPage = () => { doc.addPage(); y = M; };
+    // Couleur de texte FORCÉE : l'annexe peut être générée après la page
+    // Météo, qui se termine en BLANC (bandeaux) — sans ce reset, tout le
+    // contenu de l'annexe s'écrivait blanc sur blanc (retour pilote 16/09
+    // « les NOTAM n'apparaissent pas, pages blanches »).
+    const _inkAnnex = () => doc.setTextColor(...INK);
+
+    const newPage = () => { doc.addPage(); y = M; _inkAnnex(); };
     const need = (h) => { if (y + h > H - M) newPage(); };
 
     // En-tête de l'annexe
@@ -1737,15 +1743,24 @@ export function drawNotamAnnex(doc, items, isFr = true) {
             lastGrp = grp;
             need(18);
             doc.setFont('helvetica', 'bold'); doc.setFontSize(SZ_G);
+            _inkAnnex();
             doc.text(grp.toUpperCase(), M, y);
             y += 12;
         }
-        // Ligne titre : P 3953/25 · OBST — validités
-        need(24);
+        // Ligne titre : P 3953/25 · OBST — validités (+ item D). Retour
+        // pilote 16/09 : les item D longs (plages « 16 17 19 27 1530-1830,
+        // … ») faisaient déborder le titre hors page — il est désormais
+        // REPLIÉ sur la largeur utile, ligne par ligne. La flèche → est
+        // remplacée par un tiret (absente de la police PDF, elle sortait en
+        // glyphe cassé — même remède que les bandeaux de la page Météo).
         doc.setFont('helvetica', 'bold'); doc.setFontSize(SZ_B);
-        const title = notamTitleLocal(n) + '  —  ' + notamPeriodLocal(n, isFr);
-        doc.text(title, M, y);
-        y += 9;
+        const title = (notamTitleLocal(n) + '  —  ' + notamPeriodLocal(n, isFr)).replace(/→/g, '-');
+        const titleLines = doc.splitTextToSize(title, W - 2 * M) || [title];
+        need(9 * titleLines.length + 12);
+        for (const tl of titleLines) {
+            doc.text(tl, M, y);
+            y += 9;
+        }
         // Corps (traduction FR prioritaire), replié à la largeur, multiligne
         doc.setFont('helvetica', 'normal');
         const body = notamBodyLocal(n);
@@ -1785,6 +1800,43 @@ function notamBodyLocal(n) {
  * par le générateur (doc.movePage). Arbitrage ②=A : SANS VAC intégrées
  * — la garde ATTESTE leur consultation (heure + cycle AIRAC).
  * ================================================================ */
+
+/** Cartes VAC INTÉGRÉES (option ②=B, demandée par le pilote le 16/09) :
+ *  une page A5 par page de VAC, APRÈS la carte de vol. Bande titre fine
+ *  (terrain + AIRAC + i/n), image ajustée en dessous — la carte SIA est
+ *  au format A5, le remplissage est donc quasi total. vacs :
+ *  [{label, airac, pages:[{data, fmt, w, h}]}] — chaque source dégrade
+ *  seule (terrain sans VAC simplement absent). */
+export function drawVacPages(doc, vacs, isFr = true) {
+    for (const v of vacs || []) {
+        const pages = v.pages || [];
+        pages.forEach((p, i) => {
+            doc.addPage([PAGE.w, PAGE.h], 'portrait');
+            const M = 16, B = 20;
+            doc.setFillColor(...DARK);
+            doc.rect(M, M, PAGE.w - 2 * M, 14, 'F');
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+            doc.setTextColor(255, 255, 255);
+            doc.text(`VAC · ${v.label}`, M + 6, M + 10);
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+            doc.text(`${v.airac || ''} · ${isFr ? 'page' : 'p.'} ${i + 1}/${pages.length}`,
+                PAGE.w - M - 6, M + 10, { align: 'right' });
+            const area = { x: M, y: M + B + 4, w: PAGE.w - 2 * M, h: PAGE.h - (M + B + 4) - M - 10 };
+            const w = p.w && p.h ? p.w : area.w;
+            const h = p.w && p.h ? p.h : area.h;
+            const sc = Math.min(area.w / w, area.h / h);
+            try {
+                doc.addImage(p.data, p.fmt || 'JPEG',
+                    area.x + (area.w - w * sc) / 2, area.y + (area.h - h * sc) / 2, w * sc, h * sc);
+            } catch (e) { console.warn('page VAC non insérée :', e.message); }
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(5.5);
+            doc.setTextColor(100, 116, 139);
+            doc.text('Source : SIA — carte d’atterrissage à vue. Document d’aide à la préparation.',
+                PAGE.w / 2, PAGE.h - 4, { align: 'center' });
+            doc.setTextColor(...INK);
+        });
+    }
+}
 
 /** Page de garde : statut daté des six rubriques + Cartes VAC.
  *  d = { isFr, generatedLabel, routeLabel, aircraftLabel,
@@ -1841,8 +1893,9 @@ export function drawFileCover(doc, d) {
     }
     y += 6;
 
-    // Cartes VAC (arbitrage ②=A : NON intégrées — consultation attestée
-    // horodatée ; une carte non consultée est dite en ambre).
+    // Cartes VAC — option ②=B (pilote 16/09) : cartes JOINTES au dossier
+    // (pages A5 après la carte de vol) quand v.jointe ; la consultation
+    // reste attestée horodatée, une carte non consultée reste en ambre.
     if ((d.vac || []).length) {
         const h = 18 + d.vac.length * 11 + 14;
         doc.setDrawColor(...LINE); doc.setLineWidth(0.5);
@@ -1860,8 +1913,12 @@ export function drawFileCover(doc, d) {
             if (seen) _setInk(doc, GREEN_INK);
             else doc.setTextColor(...AMBER);
             doc.text(seen
-                ? (d.isFr ? `consultée le ${seen} (hors ligne disponible)` : `viewed on ${seen} (offline available)`)
-                : (d.isFr ? 'NON CONSULTÉE — à visualiser avant le vol' : 'NOT VIEWED — open before flight'),
+                ? (v.jointe
+                    ? (d.isFr ? `consultée le ${seen} — jointe au dossier` : `viewed on ${seen} — attached`)
+                    : (d.isFr ? `consultée le ${seen} (hors ligne disponible)` : `viewed on ${seen} (offline available)`))
+                : (v.jointe
+                    ? (d.isFr ? 'NON CONSULTÉE — jointe, à visualiser avant le vol' : 'NOT VIEWED — attached, open before flight')
+                    : (d.isFr ? 'NON CONSULTÉE — à visualiser avant le vol' : 'NOT VIEWED — open before flight')),
                 M + 40, vy);
             _setInk(doc, INK);
             vy += 11;
@@ -1918,25 +1975,10 @@ export function drawWeatherPage(doc, d) {
     const INNER = W - 2 * M;
     doc.addPage();
 
-    // ---- Pré-calcul : la page doit TOUT contenir, graphiques PLEINE
-    // LARGEUR par défaut — réduction SYMÉTRIQUE seulement si débordement.
-    let fixed = 26;   // titre de page + note
-    if (d.dep) {
-        const l = doc.splitTextToSize(String(d.dep.raw || ''), INNER - 8);
-        const dec = d.dep.decode ? doc.splitTextToSize(_metarSummary(d.dep.raw, d.isFr), INNER - 8) : [];
-        fixed += 17 + l.length * 8.5 + (dec.length ? dec.length * 8 + 3 : 0) + 9;
-    }
-    let sumRatios = 0, nCharts = 0;
-    for (const t of d.terrains || []) {
-        fixed += 17 + 9 + 12;
-        if (t.chart) { sumRatios += (t.chartRatio || 0.4); nCharts++; }
-    }
-    const dispo = PAGE.h - 2 * M - 10 - fixed;
-    let chartW = INNER;   // pleine largeur souhaitée
-    if (sumRatios > 0 && chartW * sumRatios > dispo) {
-        chartW = Math.max(INNER * 0.62, dispo / sumRatios);   // shrink symétrique borné
-    }
-
+    // ---- Exigence pilote 16/09 : les graphiques TAF sont TOUJOURS posés
+    // à la LARGEUR DE PAGE A5, quel que soit l'appareil qui a généré le
+    // PDF — plus AUCUNE réduction symétrique : s'il n'y a pas la place,
+    // la page Météo CONTINUE sur une page suivante.
     let y = 30;
 
     // ---- Titre de page ----
@@ -1952,7 +1994,9 @@ export function drawWeatherPage(doc, d) {
         doc.rect(M, y, INNER, 11, 'F');
         doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(255, 255, 255);
         doc.text(String(txt).replace(/→/g, '-'), M + 5, y + 7.6);
-        y += 17;
+        // Aération (retour pilote 16/09, même correction que le centrogramme
+        // 4a4ef249) : le texte sous la bande collait à son bord inférieur.
+        y += 21;
     };
 
     // ---- 1. Départ : METAR brut + décodé ----
@@ -1961,28 +2005,37 @@ export function drawWeatherPage(doc, d) {
         const l = doc.splitTextToSize(String(d.dep.raw || ''), INNER - 8);
         doc.setFont('helvetica', 'normal'); doc.setFontSize(8); _setInk(doc, INK);
         doc.text(l, M + 2, y);
-        y += l.length * 8.5 + 3;
+        y += l.length * 9.2 + 6;
         const dec = d.dep.decode ? doc.splitTextToSize(_metarSummary(d.dep.raw, d.isFr), INNER - 8) : [];
         if (dec.length) {
             doc.setFont('helvetica', 'italic'); doc.setFontSize(7);
             doc.setTextColor(71, 85, 105);
             doc.text(dec, M + 2, y);
-            y += dec.length * 8 + 3;
-        }
-        y += 9;
-    }
-
-    // ---- 2 & 3. Déroutement puis arrivée : GRAPHIQUE TAF seul ----
-    for (const t of d.terrains || []) {
-        bande(`${t.label} · TAF${t.note ? ` (${t.note})` : ''}`);
-        if (t.chart) {
-            const ratio = t.chartRatio || 0.4;
-            const w = chartW, h = w * ratio;   // pleine largeur (ou shrink symétrique)
-            try {
-                doc.addImage(t.chart, t.chartFmt || 'PNG', M, y, w, h);
-            } catch (e) { console.warn('graphique TAF non inséré :', e.message); }
-            y += h + 9;
+            y += dec.length * 8.8 + 6;
         }
         y += 12;
     }
+
+    // ---- 2 & 3. Déroutement puis arrivée : GRAPHIQUE TAF seul, PLEINE
+    // LARGEUR — la page continue si la place manque (exigence pilote 16/09).
+    for (const t of d.terrains || []) {
+        const ratio = Math.min(t.chartRatio || 0.4, 1.3);   // garde-fou hauteur page
+        const h = INNER * ratio;
+        if (t.chart && y + h + 14 > PAGE.h - M) {
+            doc.addPage();
+            y = 30;
+        }
+        bande(`${t.label} · TAF${t.note ? ` (${t.note})` : ''}`);
+        if (t.chart) {
+            try {
+                doc.addImage(t.chart, t.chartFmt || 'PNG', M, y, INNER, h);
+            } catch (e) { console.warn('graphique TAF non inséré :', e.message); }
+            y += h + 12;
+        }
+        y += 14;
+    }
+    // La page se termine souvent sur un bandeau (texte BLANC) : rendre
+    // l'encre pour ne pas hériter du blanc sur ce qui suit (l'annexe
+    // NOTAM, qui force aussi sa propre couleur depuis le retour 16/09).
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); _setInk(doc, INK);
 }

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><style>html,body{margin:0;background:#333}canvas{display:block}</style></head>
+<body>
+<canvas id="c"></canvas>
+<script src="../vendor/pdfjs-3.11.174.min.js"></script>
+<script>
+// Rendu PDF (page ?page=N, défaut 1) -> canvas pour capture Brave headless.
+// Usage : _pdf2png.html?file=../Apercu_X.pdf&scale=2&page=6
+const q = new URLSearchParams(location.search);
+const file = q.get('file');
+const scale = Number(q.get('scale') || 2);
+const pageNo = Number(q.get('page') || 1);
+pdfjsLib.GlobalWorkerOptions.workerSrc = '../vendor/pdfjs-worker-3.11.174.min.js';
+(async () => {
+    const raw = await (await fetch(file)).arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: raw }).promise;
+    const page = await pdf.getPage(Math.min(pageNo, pdf.numPages));
+    const vp = page.getViewport({ scale });
+    const c = document.getElementById('c');
+    c.width = Math.ceil(vp.width);
+    c.height = Math.ceil(vp.height);
+    await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+    document.title = 'RENDER_DONE';
+})().catch((e) => { document.title = 'RENDER_ERR_' + e.message; });
+</script>
+</body>
+</html>

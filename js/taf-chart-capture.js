@@ -44,6 +44,7 @@ export async function captureTafChartPng(rawTaf) {
     const wasLight = html.classList.contains('theme-light');
     const savedDpr = window.devicePixelRatio;
     const savedVal = input.value;
+    const savedW = state.chartRenderWidthOverride ?? null;
     const saved = {
         lastRenderState: state.lastRenderState,
         lastCacheKey: state.lastCacheKey,
@@ -57,6 +58,16 @@ export async function captureTafChartPng(rawTaf) {
     try {
         html.classList.add('theme-light');          // impression : thème clair
         window.devicePixelRatio = 2;                // ~327 dpi en A5 : net à l'impression
+        // Capture au FORMAT D'IMPRESSION (retour pilote 16/09 : « graphiques
+        // TAF adaptés à la largeur de la page, quel que soit l'appareil ») :
+        // le moteur dimensionne le canvas sur la LARGEUR ÉCRAN du conteneur
+        // — sur téléphone le graphe est étroit (ratio ~1.1) et la page Météo
+        // du dossier le réduisait à ~60 % de la largeur utile. La 1re
+        // tentative (style.width forcé sur le conteneur) a été écrasée par
+        // le CSS mobile sur le téléphone du pilote : l'override passe
+        // DIRECTEMENT par le moteur (state.chartRenderWidthOverride, lu par
+        // dessinerGraphique) — indépendant du DOM.
+        state.chartRenderWidthOverride = 760;
         input.value = String(rawTaf);
         state.lastRenderState = null;
         state.lastCacheKey = null;
@@ -73,7 +84,17 @@ export async function captureTafChartPng(rawTaf) {
         // updateFinalUI (ui-module) : attendre DEUX frames pour que le
         // canvas contienne le graphe DEMANDÉ avant de le figer — sans
         // cela, on photographiait le graphe précédent (le METAR affiché).
-        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        // Repli minuteur 250 ms : l'onglet PDF du dossier s'ouvre AVANT la
+        // génération, la page passe en arrière-plan et Chrome SUSPEND les
+        // rAF des pages masquées — sans repli, la génération gelait pour
+        // toujours (reproduit en QA headless, valable aussi si le pilote
+        // change d'onglet pendant l'impression).
+        await new Promise((r) => {
+            let done = false;
+            const fin = () => { if (!done) { done = true; clearTimeout(timer); r(); } };
+            const timer = setTimeout(fin, 250);
+            requestAnimationFrame(() => requestAnimationFrame(fin));
+        });
 
         // JPEG fin : un graphe TAF riche en PNG pèse ~600 Ko (dégradés du
         // soleil),JPEG 0.92 le ramène ~200 Ko pour un dossier ~1 Mo.
@@ -90,6 +111,7 @@ export async function captureTafChartPng(rawTaf) {
             window.devicePixelRatio = savedDpr;
             if (!wasLight) html.classList.remove('theme-light');
             input.value = savedVal;
+            state.chartRenderWidthOverride = savedW;   // AVANT le re-rendu : largeur écran
             Object.assign(state, saved);
             state.lastRenderState = null;           // force le re-rendu d'origine
             mod.genererGraphique();

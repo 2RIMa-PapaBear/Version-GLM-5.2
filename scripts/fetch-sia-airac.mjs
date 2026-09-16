@@ -18,7 +18,7 @@
 // ============================================================================
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = Object.fromEntries(process.argv.slice(2).map(a => a.replace(/^--/, '').split('=').map(decodeURIComponent)));
@@ -203,61 +203,38 @@ fs.writeFileSync(path.join(ROOT, 'data', 'freq-services-sia.json'), JSON.stringi
 console.log(`fréquences organismes : ${services.size} services → data/freq-services-sia.json`);
 
 // ---------------------------------------------------------------------------
-// 3. RADIOphares France (VOR, VOR-DME, NDB) — fusion dans radio-points.json.
-//    Fréquences OFFICIELLES des entités <RadioNav> (Frequence + NomPhraseo) ;
-//    coordonnées SIA officielles. Le rapprochement openAIP se fait par
-//    ident ET proximité (<0,35°/0,5°) — l'ident seul collisionne à l'échelle
-//    mondiale (mesuré : LDV Brest ↔ openAIP même ident en Champagne !) ;
-//    les navaids SIA absents d'openAIP sont AJOUTÉS (ex. VOR-DME BT, TOU,
-//    CAV, MEN, ROA, CNM, LSE). TACAN (azimut militaire UHF, non recevable
-//    sur VOR classique) et DME seul (distance sans azimut) restent hors
-//    périmètre.
+// 3. RADIOphares + POINTS VFR officiels France — via le module PARTAGÉ
+//    scripts/lib/sia-navaids.mjs (RÈGLE PILOTE 16/09 : la base, ce sont les
+//    fichiers SIA ; openAIP ne complète que le reste du monde). L'instantané
+//    data/sia-radio-layer.json (navaids + VRP) est écrit ICI à chaque cycle
+//    AIRAC : c'est la BASE OBLIGATOIRE que le robot fetch-radio-points.mjs
+//    ré-applique à chaque crawl (il refuse de tourner sans elle).
 // ---------------------------------------------------------------------------
-const NAV_KIND = { VOR: 'vor', 'VOR-DME': 'vor', VORTAC: 'vor', NDB: 'ndb' };
-const navFreq = new Map();   // "TYPE IDENT" → { f, u, n (nom phraséologique), r (portée NM) }
-each('RadioNav', (attrs, body) => {
-    const m = (attr(attrs, 'lk') || '').match(/^\[LF\]\[([A-Z-]+) ([^\]]+)\]$/);
-    if (!m) return;
-    const f = parseFloat(String(txt(body, 'Frequence') || '').replace(',', '.'));
-    if (!Number.isFinite(f)) return;
-    const portee = parseInt(String(txt(body, 'Portee') || ''), 10);
-    navFreq.set(`${m[1]} ${m[2]}`, {
-        f, u: m[1] === 'NDB' ? 1 : 2,
-        n: (txt(body, 'NomPhraseo') || '').trim() || null,
-        r: Number.isFinite(portee) && portee > 0 ? portee : null,
-    });
-});
-const navaids = [];
-each('NavFix', (attrs, body) => {
-    if (!/^\[LF\]/.test(attr(attrs, 'lk'))) return;
-    const t = txt(body, 'NavType');
-    if (!NAV_KIND[t]) return;
-    const lat = parseFloat(txt(body, 'Latitude')), lon = parseFloat(txt(body, 'Longitude'));
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-    const ident = txt(body, 'Ident') || '';
-    const fq = navFreq.get(`${t} ${ident}`);
-    navaids.push({ k: NAV_KIND[t], ident, lat: Math.round(lat * 1e5) / 1e5, lon: Math.round(lon * 1e5) / 1e5, f: fq?.f ?? null, u: fq?.u ?? null, n: fq?.n ?? null, r: fq?.r ?? null, used: false });
-});
+const { parseSiaNavaids, parseSiaVrps, mergeIntoRadioPoints, applySiaVrps, verifySiaLayer }
+    = await import(pathToFileURL(path.join(ROOT, 'scripts', 'lib', 'sia-navaids.mjs')).href);
+const siaNav = parseSiaNavaids(xml);
+const siaVrps = parseSiaVrps(xml);
+const siaLayerSnapshot = {
+    generatedAt: new Date().toISOString(),
+    airac: siaNav.effDate,
+    navaids: siaNav.navaids,
+    vrps: siaVrps,
+};
+fs.writeFileSync(path.join(ROOT, 'data', 'sia-radio-layer.json'), JSON.stringify(siaLayerSnapshot));
 const rpPath = path.join(ROOT, 'data', 'radio-points.json');
 const rp = JSON.parse(fs.readFileSync(rpPath, 'utf8'));
-// 7ᵉ élément (optionnel) : méta officielles RadioNav [nom phraséologique,
-// portée NM] — ex. ['BORDEAUX', 100] pour BMC.
-const metaOf = (s) => (s.n || s.r) ? [s.n, s.r] : null;
-const merged = rp.navaids.map(o => {
-    const s = navaids.find(n => !n.used && n.ident === o[1]
-        && Math.abs(n.lat - o[2]) < 0.35 && Math.abs(n.lon - o[3]) < 0.5);
-    if (!s) return o;
-    s.used = true;
-    return [s.k, s.ident, s.lat, s.lon, s.f ?? o[4] ?? null, s.u ?? o[5] ?? null, metaOf(s)];
-});
-for (const s of navaids) if (!s.used) merged.push([s.k, s.ident, s.lat, s.lon, s.f, s.u, metaOf(s)]);
-rp.navaids = merged;
-rp.counts = rp.counts || {};
-rp.counts.navaidsSia = navaids.length;
-rp.siaAirac = effDate;
+const st = mergeIntoRadioPoints(rp, siaNav, { effDate: siaNav.effDate });
+applySiaVrps(rp, siaVrps, { effDate: siaNav.effDate });
+const integrite = verifySiaLayer(rp, siaLayerSnapshot);
+if (integrite) {
+    console.error('INTÉGRITÉ SIA REFUSÉE : ' + integrite + ' — radio-points.json NON modifié.');
+    process.exit(1);
+}
 fs.writeFileSync(rpPath, JSON.stringify(rp));
-const navFreqCount = navaids.filter(n => n.f != null).length;
-console.log(`radio-points.json : ${rp.navaids.length} navaids (dont ${navaids.length} officiels SIA, ${navFreqCount} avec fréquence officielle RadioNav)`);
+const navFreqCount = siaNav.navaids.filter(n => n.f != null).length;
+console.log(`radio-points.json : ${rp.navaids.length} navaids (dont ${st.total} officiels SIA, `
+    + `${navFreqCount} avec fréquence officielle RadioNav ; ${st.matched} rapprochés, ${st.added} ajoutés) `
+    + `+ ${siaVrps.length} VRP officiels — base data/sia-radio-layer.json (AIRAC ${siaNav.effDate})`);
 
 // ---------------------------------------------------------------------------
 // 4. TERRAINS officiels France (+ élévation et déclinaison magnétique
@@ -375,26 +352,7 @@ fs.writeFileSync(path.join(ROOT, 'data', 'sia-runways.json'), JSON.stringify({
 }));
 console.log(`pistes officielles : ${Object.values(runways).reduce((a, v) => a + v.length, 0)} pistes / ${Object.keys(runways).length} terrains → data/sia-runways.json`);
 
-// ---------------------------------------------------------------------------
-// 4ter. POINTS VFR officiels France (NavFix type VFR) — remplacent les
-// points openAIP en France : 1098 points AVEC description officielle
-// (« VRP-Cavaillon (Pont TGV sur la Durance) ») contre 675 sans.
-// ---------------------------------------------------------------------------
-const vrpsSia = [];
-each('NavFix', (attrs, body) => {
-    if (!/^\[LF\]/.test(attr(attrs, 'lk'))) return;
-    if (txt(body, 'NavType') !== 'VFR') return;
-    const lat = parseFloat(txt(body, 'Latitude')), lon = parseFloat(txt(body, 'Longitude'));
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-    const desc = (txt(body, 'Description') || '').replace(/\s+/g, ' ').trim();
-    vrpsSia.push([txt(body, 'Ident') || '', Math.round(lat * 1e5) / 1e5, Math.round(lon * 1e5) / 1e5, 'FR', desc || null]);
-});
-{
-    // Priorité SIA : les points VFR openAIP de France sont écartés.
-    rp.vrps = rp.vrps.filter(v => v[3] !== 'FR').concat(vrpsSia);
-    rp.counts = rp.counts || {};
-    rp.counts.vrpsSia = vrpsSia.length;
-    rp.siaVrpAirac = effDate;
-    fs.writeFileSync(rpPath, JSON.stringify(rp));
-}
-console.log(`points VFR officiels : ${vrpsSia.length} (openAIP FR écartés) → data/radio-points.json`);
+// (Les POINTS VFR officiels France — NavFix type VFR, description officielle
+//  « VRP-Cavaillon (Pont TGV sur la Durance) », priorité SIA sur openAIP FR —
+//  sont désormais appliqués en section 3 par scripts/lib/sia-navaids.mjs,
+//  avec les navaids, depuis la base data/sia-radio-layer.json.)
