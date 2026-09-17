@@ -923,6 +923,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     initPlanIo();
     initDataAge();   // badge d'âge des données (06/09… piloté par dataAgeUpdate)
+    { const { initSupPanel } = await import('./sup-sia.js'); initSupPanel().catch(() => {}); }   // Sup AIP SIA (B4)
     initAutocomplete('icaoInput', (icao) => { document.getElementById('icaoInput').value = icao; telechargerMessage('metar'); });
     renderSearchHistory('search-history-list', _selectAndFetch);
     updateFavoritesUI(_selectAndFetch);

@@ -53,6 +53,10 @@ jobs:
           OPENAIP_API_KEY: ${{ secrets.OPENAIP_API_KEY }}
         run: node scripts/fetch-radio-points.mjs
 
+      # B4 (16/09) : Suppléments AIP série A France (page publique SIA).
+      - name: Sup AIP série A (SIA)
+        run: node scripts/fetch-sup-sia.mjs
+
       # Obstacles : base OFFICIELLE SIA (export AIXM OM) — mise à jour à chaque
       # cycle AIRAC avec le reste de la base SIA (téléchargement manuel puis
       # node scripts/fetch-obstacles.mjs), PAS dans ce cron openAIP.
@@ -61,7 +65,7 @@ jobs:
         run: |
           git config user.name "radio-points-bot"
           git config user.email "radio-points-bot@users.noreply.github.com"
-          git add data/radio-points.json data/airspaces/ data/freq-sia.json
+          git add data/radio-points.json data/sup-sia.json data/airspaces/ data/freq-sia.json
           if git diff --cached --quiet; then
             echo "Aucun changement openAIP aujourd'hui."
           else

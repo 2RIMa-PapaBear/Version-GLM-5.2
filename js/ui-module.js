@@ -104,7 +104,7 @@ export function _selectAndFetch(icao) {
 
 export function updateFinalUI(res, raw, forcedId) {
     if (state.rafId) cancelAnimationFrame(state.rafId);
-    state.rafId = requestAnimationFrame(() => {
+    const _uiUpdate = () => {
 
         const aptCode = state.requestedIcao || res.code;
         const apt = getAirportByICAO(aptCode); const runways = apt ? apt.runways : null;
@@ -186,7 +186,15 @@ export function updateFinalUI(res, raw, forcedId) {
         let targetHGraph = state.manualTargetHour === null ? (new Date().getUTCHours() + new Date().getUTCMinutes()/60) : state.manualTargetHour;
         dessinerGraphique(res, targetHGraph, tz);
         state.rafId = null;
-    });
+    };
+    // Page MASQUÉE (l'onglet PDF du dossier s'ouvre AVANT la génération) :
+    // Chrome suspend les requestAnimationFrame → le dessin n'avait JAMAIS
+    // lieu et la capture du dossier embarquait l'ANCIEN graphique (le METAR
+    // affiché à l'écran, au lieu des TAF déroutement/arrivée — retour pilote
+    // 17/09). En page masquée, mettre à jour IMMÉDIATEMENT : rAF n'apporte
+    // de la fluidité qu'à l'écran visible.
+    if (typeof document !== 'undefined' && document.hidden) _uiUpdate();
+    else state.rafId = requestAnimationFrame(_uiUpdate);
 }
 
 function demarrerHorlogeLocale(icao) {

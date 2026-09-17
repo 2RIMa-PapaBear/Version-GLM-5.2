@@ -571,7 +571,12 @@ function _mount() {
     const planner = document.getElementById('flight-planner-panel');
     let host, title;
     if (planner && planner.parentElement) {
-        host = planner.nextSibling;
+        // Sup AIP entre le Calcul de navigation et le NOTAM (retour pilote
+        // 16/09) : si le panneau Sup est déjà monté, s'insérer APRÈS lui.
+        const sup = document.getElementById('sup-panel');
+        host = (sup && sup.parentElement === planner.parentElement && sup.previousElementSibling === planner)
+            ? sup.nextSibling
+            : planner.nextSibling;
         title = 'NOTAM (SOFIA)';
     } else {
         // MODE VOL LOCAL (retour pilote 10/09) : panneau sous le tableau de

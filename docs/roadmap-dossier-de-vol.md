@@ -70,7 +70,7 @@ Aucune publication sans autorisation explicite (`npm run pub` interdit sans feu 
 - [x] **B2 — AZBA : activations de zones** (L)
   Plages horaires NOTAM × polygones SIA (« R 71 : active aujourd'hui 14h00–17h00 ») sur la carte
   et dans le dossier. Prolonge A2 — **prioritaire sur B3** (arbitrage ③).
-- [x] **B3 — TEMSI + couche vents sur carte** (L) — v1 vent FAIT 15/09 (prod) ; **v2 TEMSI FAIT 16/09 (canal /test/, attente validation)**
+- [x] **B3 — TEMSI + couche vents sur carte** (L) — v1 vent FAIT 15/09 (prod) ; **v2 TEMSI PUBLIÉ 16/09 PROD v1.281 (feu vert pilote, canal /test/ purgé)**
   Vignettes TEMSI datées + flèches de vent à l'altitude du plan (Open-Meteo).
   → v2 : Worker GET /temsi (session AEROWEB du pilote, recon 16/09 :
   get_domaine_layers_echeances.php?domaine=19 → TEMSI SFC-FL150 (sigwx/fr/france)
@@ -78,8 +78,15 @@ Aucune publication sans autorisation explicite (`npm run pub` interdit sans feu 
   bouton « TEMSI » dans la barre de la carte → panneau de vignettes datées
   UTC **et locale**, mise en avant de l'échéance ≈ heure d'arrivée prévue,
   visionneuse plein cadre, cache IDB 12 h ; qa-temsi.mjs + temsi.test.mjs.
-- [ ] **B4 — Sup AIP** (M) — à faire
+- [x] **B4 — Sup AIP** (M) — **FAIT 16/09 (canal /test/, attente validation)**
   Crawl des Sup série A du SIA + filtrage par zone d'information.
+  → `scripts/fetch-sup-sia.mjs` (page publique SUP AIP MÉTROPOLE, 121 Sup :
+  numéro/objet/validité/tags/PDF publics — base `data/sup-sia.json`, refus
+  < 20 lignes ; robot hebdo += étape) · panneau « Sup AIP (SIA) » sous le
+  tableau de bord (modes local ET nav) : filtres VFR + en vigueur
+  aujourd'hui + recherche, mise en avant « votre vol » des Sup citant un
+  ICAO du plan, PDF officiel dans un onglet · tests parse/filtres +
+  qa-sup.mjs E2E.
 - [x] **B5 — Prépa la veille / revalidation le matin** (L)
   Snapshot du dossier en IndexedDB + diff à la réouverture. Extension du watchdog.
 - [ ] **B6 — Mode en vol à tuiles** (L) — à faire
