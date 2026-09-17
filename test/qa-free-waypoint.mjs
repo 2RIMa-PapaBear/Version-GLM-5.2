@@ -69,6 +69,7 @@ const creation = await page.evaluate(() => {
         err: null,
         wp: document.getElementById('fp-waypoints')?.value || '',
         label: [...document.querySelectorAll('.free-wp-label')].map(e => e.textContent).join('|'),
+        x: !!document.querySelector('.free-wp-label .wp-del-x[data-code]'),
     }), 1500));
 });
 if (creation.err) ko(creation.err);
@@ -76,10 +77,12 @@ else {
     console.log('waypoints :', JSON.stringify(creation.wp), '· repères :', JSON.stringify(creation.label));
     (/ZZ[A-Z]{2}/.test(creation.wp) ? ok : ko)('Valider : repère ZZ** AJOUTÉ au champ Waypoints');
     (/QA PT LIBRE/.test(creation.label) ? ok : ko)('marqueur ambre + étiquette posés sur la carte');
+    (creation.x ? ok : ko)('étiquette du repère : bouton « × » de suppression (data-code)');
 }
 
-// ③ Clic sur le marqueur ambre (le path SVG du circleMarker — l'étiquette
-// n'est pas interactive) : popup d'édition (Renommer / + Plan / Supprimer).
+// ③ Clic sur le marqueur ambre (le path SVG du circleMarker) : popup
+// d'édition (Renommer / + Plan — depuis le 17/09, la suppression vit dans
+// le « × » de l'étiquette, couvert par qa-map-wp-delete.mjs).
 // Clic SOURIS PHYSIQUE aux coordonnées du cercle : Leaflet résout ses
 // couches interactives depuis les événements réels du conteneur.
 const cible = await page.evaluate(() => {
@@ -122,7 +125,7 @@ else {
         console.log('popup repère :', JSON.stringify(popup.boutons));
         (popup.ouvert ? ok : ko)('clic sur le repère : popup ouvert');
         (popup.boutons.some(b => /Renommer|Rename/i.test(b)) ? ok : ko)('popup : bouton Renommer');
-        (popup.boutons.some(b => /Supprimer|Delete/i.test(b)) ? ok : ko)('popup : bouton Supprimer');
+        (popup.boutons.some(b => /Supprimer|Delete/i.test(b)) ? ko : ok)('popup : PLUS de bouton Supprimer (le « × » de l\'étiquette le remplace)');
         // « + Plan » n'apparaît QUE si le repère n'est pas déjà au plan —
         // ici il VIENT d'y être ajouté : le bouton doit être absent.
         (popup.boutons.some(b => /\+\s*Plan/i.test(b)) ? ko : ok)('popup : pas de « + Plan » (repère déjà dans le plan)');

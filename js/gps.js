@@ -144,9 +144,11 @@ const CSS = `
 .gps-vol-btn.active { background: #4C1D95; border-color: #A78BFA; color: #EDE9FE; }
 .gps-vols-count { color: #FBBF24; font-weight: 600; margin-left: 2px; }
 .gps-vols-count:empty { display: none; }
-/* ---- Barre d'origine : une seule ligne (défilement horizontal), sans les boutons GPS ---- */
-.map-layers-bar { flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none; }
-.map-layers-bar::-webkit-scrollbar { display: none; }
+/* ---- Barre d'origine : deux rangées (style.css .map-layers-row), sans les
+   boutons GPS — sécurité très petit écran : chaque rangée défile sans barre
+   visible si elle ne tient pas, plutôt que de déborder. ---- */
+.map-layers-bar .map-layers-row { overflow-x: auto; scrollbar-width: none; }
+.map-layers-row::-webkit-scrollbar { display: none; }
 .map-layers-bar .precip-control-group { flex: 0 0 auto; }
 /* ---- Paquet d'icônes GPS flottant SUR la carte (demande pilote 08/09) ---- */
 .gps-map-cluster {
@@ -581,13 +583,15 @@ function mount() {
     (host || bar).appendChild(cluster);
 
     // « Vols » reste dans la barre (fonction d'archive, pas un réflexe de vol)
+    // — 2e rangée (fond & cadrage) de la barre deux-lignes 17/09.
     const groupVols = document.createElement('div');
     groupVols.className = 'precip-control-group';
     groupVols.innerHTML = `
         <button class="precip-toggle" id="gps-vols-btn" title="${t.volsTitle}">
             <i data-lucide="download" style="width:14px;height:14px;"></i><span>${t.vols}</span><span class="gps-vols-count"></span>
         </button>`;
-    bar.appendChild(groupVols);
+    const rowBottom = bar.querySelector('.map-layers-row-bottom');
+    (rowBottom || bar).appendChild(groupVols);
 
     btn = cluster.querySelector('#gps-toggle-btn');
     recBtn = cluster.querySelector('#gps-recenter-btn');

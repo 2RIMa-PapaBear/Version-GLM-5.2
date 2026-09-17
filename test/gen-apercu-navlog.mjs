@@ -46,7 +46,7 @@ for (const [fixture, outName] of VARIANTS) {
         isFr: true,
         generatedLabel: 'sam. 13/09/2026 21:45',
         routeLabel: 'LFRV - LFOO · dégagement LFRD',
-        aircraftLabel: 'Dynamic WT9 Club (F-HVXJ)',
+        aircraftLabel: 'Dynamic WT9 Club',
         rows: [
             { status: 'ok', label: 'Météo', detail: 'METAR 12 min · TAF OK · arrivée OK', ref: '21:33' },
             { status: 'ok', label: 'NOTAM', detail: '53 NOTAM · générés il y a 6 min', ref: '21:39' },

@@ -736,9 +736,6 @@ body.mode-local #alternates-container { display: none !important; }
     border: 1px solid var(--border-color);
     background: #0F172A;
 }
-/* Correction Leaflet : le filtre sombre ne s'applique qu'au fond "dark".
-   Sur satellite/aéro, on garde les couleurs intactes pour distinguer les pistes. */
-.regional-map[data-base-layer="dark"] .leaflet-tile { filter: brightness(0.9); }
 .regional-map .leaflet-control-attribution { background: rgba(15,23,42,0.8) !important; color: #94A3B8 !important; }
 .regional-map .leaflet-control-attribution a { color: #38BDF8 !important; }
 .regional-map .leaflet-bar a { background: #1E293B !important; color: #F8FAFC !important; border-color: var(--border-color) !important; }
@@ -777,9 +774,11 @@ body.mode-local #alternates-container { display: none !important; }
 }
 .mp-inner .mp-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .mp-inner .mp-btns .mp-load-btn, .mp-inner .mp-btns .mp-dest-btn { flex: 1 1 130px; }
+/* Boutons des popups carte (17/09) : gabarit compact padding 4×8 / police
+   10.5px — compense le « × » ajouté aux étiquettes sans prise de place. */
 .mp-inner .mp-load-btn {
-    width: 100%; padding: 6px 10px; border-radius: 6px; cursor: pointer;
-    background: rgba(56,189,248,0.15); color: #38BDF8; font-weight: 700; font-size: 11px;
+    width: 100%; padding: 4px 8px; border-radius: 6px; cursor: pointer;
+    background: rgba(56,189,248,0.15); color: #38BDF8; font-weight: 700; font-size: 10.5px;
     border: 1px solid rgba(56,189,248,0.4); transition: background 0.15s;
     white-space: nowrap;
 }
@@ -793,16 +792,16 @@ body.mode-local #alternates-container { display: none !important; }
 .mp-inner .mp-load-btn.mp-dep-btn:hover { background: rgba(74,222,128,0.28); }
 /* « Définir comme destination » : rouge du point d'arrivée sur la carte. */
 .mp-inner .mp-dest-btn {
-    width: 100%; padding: 6px 10px; border-radius: 6px; cursor: pointer;
-    background: rgba(239,68,68,0.15); color: #F87171; font-weight: 700; font-size: 11px;
+    width: 100%; padding: 4px 8px; border-radius: 6px; cursor: pointer;
+    background: rgba(239,68,68,0.15); color: #F87171; font-weight: 700; font-size: 10.5px;
     border: 1px solid rgba(239,68,68,0.4); transition: background 0.15s;
     white-space: nowrap;
 }
 .mp-inner .mp-dest-btn:hover { background: rgba(239,68,68,0.3); }
 /* « + Waypoint » : ambre comme les marqueurs d'étapes sur la carte. */
 .mp-inner .mp-waypoint-btn {
-    width: 100%; padding: 6px 10px; border-radius: 6px; cursor: pointer;
-    background: rgba(251,191,36,0.15); color: #FBBF24; font-weight: 700; font-size: 11px;
+    width: 100%; padding: 4px 8px; border-radius: 6px; cursor: pointer;
+    background: rgba(251,191,36,0.15); color: #FBBF24; font-weight: 700; font-size: 10.5px;
     border: 1px solid rgba(251,191,36,0.4); transition: background 0.15s;
     white-space: nowrap;
 }
@@ -810,8 +809,8 @@ body.mode-local #alternates-container { display: none !important; }
 /* « Carte VAC » : même gabarit que les autres, bleu ciel comme le bouton
  * Carte VAC de la fiche terrain. */
 .mp-inner .mp-vac-btn {
-    width: 100%; padding: 6px 10px; border-radius: 6px; cursor: pointer;
-    background: rgba(56,189,248,0.15); color: #38BDF8; font-weight: 700; font-size: 11px;
+    width: 100%; padding: 4px 8px; border-radius: 6px; cursor: pointer;
+    background: rgba(56,189,248,0.15); color: #38BDF8; font-weight: 700; font-size: 10.5px;
     border: 1px solid rgba(56,189,248,0.4); transition: background 0.15s;
     white-space: nowrap;
 }
@@ -826,13 +825,31 @@ body.mode-local #alternates-container { display: none !important; }
     font-size: 11px; font-weight: 700; pointer-events: none;
     box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
-/* Étiquette permanente du repère (tooltip Leaflet custom). */
+/* Étiquette permanente du repère (tooltip Leaflet custom) : rangée flex
+   texte + « × » de suppression. pointer-events:auto indispensable — Leaflet
+   coupe les pointer-events de ses tooltips, sans ça le « × » serait mort. */
 .leaflet-tooltip.free-wp-label {
     background: rgba(15,23,42,0.92); border: 1px solid rgba(251,191,36,0.55);
     color: #FBBF24; font-size: 11px; font-weight: 600;
     padding: 2px 7px; border-radius: 5px; box-shadow: none;
+    display: flex; align-items: center; gap: 4px; pointer-events: auto;
 }
 .leaflet-tooltip.free-wp-label::before { display: none; }
+.leaflet-tooltip.free-wp-label .wp-lbl-txt { cursor: default; }
+/* « × » intégré à l'étiquette : retire l'étape du plan (waypoint de route)
+   ou supprime le repère (repère libre). Discret au repos, rouge au survol. */
+.wp-del-x {
+    appearance: none; -webkit-appearance: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; padding: 0; margin: 0 -1px 0 0;
+    background: transparent; border: 1px solid transparent; border-radius: 4px;
+    color: inherit; font-family: inherit; font-size: 13px; line-height: 1;
+    font-weight: 700; cursor: pointer;
+}
+.wp-del-x:hover, .wp-del-x:focus-visible {
+    border-color: rgba(248,113,113,0.8); background: rgba(248,113,113,0.18);
+    color: #F87171; outline: none;
+}
 /* Étiquettes des couches radio — MÊME MODÈLE que les étiquettes
    d'aérodromes (harmonisation pilote 16/09) : fond/bordure/texte du
    tooltip standard (.regional-map .leaflet-tooltip), police de l'app,
@@ -871,34 +888,23 @@ body.mode-local #alternates-container { display: none !important; }
 }
 .fw-inner .fw-name-input:focus { border-color: #FBBF24; }
 .fw-inner .fw-ok-btn {
-    flex: 1; padding: 6px 10px; border-radius: 6px; cursor: pointer;
-    background: rgba(251,191,36,0.15); color: #FBBF24; font-weight: 700; font-size: 11px;
+    flex: 1; padding: 4px 8px; border-radius: 6px; cursor: pointer;
+    background: rgba(251,191,36,0.15); color: #FBBF24; font-weight: 700; font-size: 10.5px;
     border: 1px solid rgba(251,191,36,0.4); transition: background 0.15s; white-space: nowrap;
 }
 .fw-inner .fw-ok-btn:hover { background: rgba(251,191,36,0.3); }
 .fw-inner .fw-add-btn {
-    flex: 1; padding: 6px 10px; border-radius: 6px; cursor: pointer;
-    background: rgba(56,189,248,0.15); color: #38BDF8; font-weight: 700; font-size: 11px;
+    flex: 1; padding: 4px 8px; border-radius: 6px; cursor: pointer;
+    background: rgba(56,189,248,0.15); color: #38BDF8; font-weight: 700; font-size: 10.5px;
     border: 1px solid rgba(56,189,248,0.4); transition: background 0.15s; white-space: nowrap;
 }
 .fw-inner .fw-add-btn:hover { background: rgba(56,189,248,0.3); }
-.fw-inner .fw-del-btn {
-    width: 100%; padding: 6px 10px; border-radius: 6px; cursor: pointer;
-    background: rgba(239,68,68,0.12); color: #F87171; font-weight: 700; font-size: 11px;
-    border: 1px solid rgba(239,68,68,0.35); transition: background 0.15s; white-space: nowrap;
-}
-.fw-inner .fw-del-btn:hover { background: rgba(239,68,68,0.25); }
 
-/* Popup d'un waypoint de route (étape du plan vue sur la carte). */
-.mp-inner .mp-rmwp-btn {
-    flex: 1; padding: 6px 10px; border-radius: 6px; cursor: pointer;
-    background: rgba(239,68,68,0.12); color: #F87171; font-weight: 700; font-size: 11px;
-    border: 1px solid rgba(239,68,68,0.35); transition: background 0.15s; white-space: nowrap;
-}
-.mp-inner .mp-rmwp-btn:hover { background: rgba(239,68,68,0.25); }
+/* Popup d'un waypoint de route (étape du plan vue sur la carte) : plus que
+   « Renommer » — la suppression vit dans le « × » de l'étiquette. */
 .mp-inner .mp-renamewp-btn {
-    flex: 1; padding: 6px 10px; border-radius: 6px; cursor: pointer;
-    background: rgba(251,191,36,0.15); color: #FBBF24; font-weight: 700; font-size: 11px;
+    flex: 1; padding: 4px 8px; border-radius: 6px; cursor: pointer;
+    background: rgba(251,191,36,0.15); color: #FBBF24; font-weight: 700; font-size: 10.5px;
     border: 1px solid rgba(251,191,36,0.4); transition: background 0.15s; white-space: nowrap;
 }
 .mp-inner .mp-renamewp-btn:hover { background: rgba(251,191,36,0.3); }
@@ -1832,20 +1838,26 @@ body.map-overlay-open { overflow: hidden; }
  * MAP LAYERS BAR — Contrôles calques (radar / espaces)
  * ================================================================ */
 .map-layers-bar {
+    /* DEUX rangées (retour pilote 17/09 : 8 contrôles ne tiennent plus en
+       une ligne) — couches (Radar/Espaces/Vent/TEMSI) puis fond & cadrage
+       (Satellite/Terrain/Cadrer plan/Plein cadre). */
     display: flex;
-    align-items: center;
-    /* UNE ligne en desktop : l'horloge radar est le tampon élastique qui
-       absorbe les variations de largeur de la fenêtre (nowrap > 600 px). */
+    flex-direction: column;
     gap: 6px;
-    flex-wrap: wrap;
     padding: 6px 8px;
     background: var(--inner-bg);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     margin-bottom: 8px;
 }
-@media (min-width: 601px) {
-    .map-layers-bar { flex-wrap: nowrap; }
+.map-layers-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    /* Petit écran : passe à la ligne plutôt que déborder (l'horloge radar
+       reste le tampon élastique qui absorbe les variations de largeur). */
+    flex-wrap: wrap;
+    min-width: 0;
 }
 
 .precip-control-group {
@@ -1998,13 +2010,12 @@ body.map-overlay-open { overflow: hidden; }
  */
 
 /* ---- Responsive : barre de calques compacte sur petits écrans ----
-   (seuil 700 px : en dessous, le nowrap couperait le dernier bouton —
-   on repasse en icônes seules avec l'horloge en seconde ligne). */
+   (seuil 700 px : en dessous, on repasse en icônes seules avec l'horloge
+   en seconde ligne de sa rangée). */
 @media (max-width: 700px) {
     .map-layers-bar {
         gap: 6px;
         padding: 6px;
-        flex-wrap: wrap;
     }
     .precip-slider-group {
         order: 3;

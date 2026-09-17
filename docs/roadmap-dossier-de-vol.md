@@ -78,7 +78,7 @@ Aucune publication sans autorisation explicite (`npm run pub` interdit sans feu 
   bouton « TEMSI » dans la barre de la carte → panneau de vignettes datées
   UTC **et locale**, mise en avant de l'échéance ≈ heure d'arrivée prévue,
   visionneuse plein cadre, cache IDB 12 h ; qa-temsi.mjs + temsi.test.mjs.
-- [x] **B4 — Sup AIP** (M) — **FAIT 16/09 (canal /test/, attente validation)**
+- [x] **B4 — Sup AIP** (M) — **PUBLIÉ 17/09 PROD v1.282 (feu vert pilote, /test/ purgé)** + fix majeur du 17/09 : graphiques TAF déroutement/arrivée (rAF suspendus en page masquée = ancien METAR capturé — dessin immédiat quand document.hidden)
   Crawl des Sup série A du SIA + filtrage par zone d'information.
   → `scripts/fetch-sup-sia.mjs` (page publique SUP AIP MÉTROPOLE, 121 Sup :
   numéro/objet/validité/tags/PDF publics — base `data/sup-sia.json`, refus

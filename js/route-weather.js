@@ -17,6 +17,30 @@ let _routeLabelsCtl = null;
 let _lastMap = null;
 let _lastRoutePoints = [];
 
+// Étiquette d'un point de passage : texte + bouton « × » de suppression
+// intégré (retour pilote 17/09 : suppression directement depuis la carte).
+// data-icao = waypoint de route (→ event remove-waypoint) ;
+// data-code = repère libre ZZxx (→ _deleteFreeWaypoint, regional-map).
+export function waypointLabelHtml(text, delAttrs, title) {
+    const attrs = Object.entries(delAttrs || {})
+        .map(([k, v]) => `${k}="${escapeHtml(String(v))}"`).join(' ');
+    return `<span class="wp-lbl-txt">${escapeHtml(text)}</span>` +
+        `<button type="button" class="wp-del-x" ${attrs} title="${escapeHtml(title || '')}" aria-label="${escapeHtml(title || '')}">×</button>`;
+}
+
+// Clic sur le « × » d'une étiquette de waypoint DE ROUTE : même chaîne que
+// l'ancien bouton « Retirer du plan » du popup (app.js filtre le champ
+// Waypoints puis relance le calcul → redraw carte). Délégation au niveau
+// document : les tooltips sont recréés à chaque redraw.
+if (typeof document !== 'undefined') {
+    document.addEventListener('click', (e) => {
+        const btn = e.target?.closest?.('.wp-del-x[data-icao]');
+        if (!btn) return;
+        e.stopPropagation();
+        document.dispatchEvent(new CustomEvent('remove-waypoint', { detail: { icao: btn.dataset.icao } }));
+    });
+}
+
 export async function showRouteWeather(map, fromIcao, toIcao, opts = {}) {
     if (!map || !fromIcao || !toIcao || fromIcao === toIcao) {
         _clearRoute(map);
@@ -73,9 +97,10 @@ export async function showRouteWeather(map, fromIcao, toIcao, opts = {}) {
     _addRouteEndpoint(map, toLat, toLon, toIcao, false);
     // Marqueurs intermédiaires pour les waypoints (cercles ambre) — ajoutés directement
     // à la map (pas à la polyline, qui n'accepte pas addTo).
-    // Étiquette permanente du CODE OACI pour les aérodromes ; les repères
-    // libres (ZZxx) portent déjà leur nom via leur marqueur dédié (pas de
-    // doublon d'étiquette).
+    // Étiquette permanente du CODE OACI + « × » de suppression pour les
+    // aérodromes ; les repères libres (ZZxx) portent déjà leur nom (et leur
+    // « × ») via leur marqueur dédié (pas de doublon d'étiquette). La
+    // suppression vit dans l'étiquette : le popup ne garde que Renommer.
     const isFr = state.lang === 'fr';
     _waypointMarkers = routePoints.slice(1, -1).map(p => {
         const isFreeWp = /^ZZ[A-Z]{2}$/.test(p[2]);
@@ -86,14 +111,15 @@ export async function showRouteWeather(map, fromIcao, toIcao, opts = {}) {
         }).addTo(map).bindPopup(`
             <div class="mp-inner">
                 <div class="mp-title"><strong>${escapeHtml(name || p[2])}</strong>${name && name !== p[2] ? ` · <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted,#94A3B8);">${escapeHtml(p[2])}</span>` : ''}</div>
-                <div class="mp-btns">
-                    ${isFreeWp ? `<button class="mp-renamewp-btn" data-icao="${escapeHtml(p[2])}">${isFr ? 'Renommer' : 'Rename'}</button>` : ''}
-                    <button class="mp-rmwp-btn" data-icao="${escapeHtml(p[2])}" title="${isFr ? 'Retire cette étape du plan de vol' : 'Remove this leg from the flight plan'}">${isFr ? 'Retirer du plan' : 'Remove from plan'}</button>
-                </div>
+                ${isFreeWp ? `<div class="mp-btns">
+                    <button class="mp-renamewp-btn" data-icao="${escapeHtml(p[2])}">${isFr ? 'Renommer' : 'Rename'}</button>
+                </div>` : ''}
             </div>
         `, { maxWidth: 250, keepInView: true });
         if (!isFreeWp) {
-            marker.bindTooltip(escapeHtml(p[2]), { permanent: true, direction: 'right', className: 'free-wp-label' });
+            marker.bindTooltip(
+                waypointLabelHtml(p[2], { 'data-icao': p[2] }, isFr ? 'Retirer du plan' : 'Remove from plan'),
+                { permanent: true, direction: 'right', className: 'free-wp-label', interactive: true });
         }
         return marker;
     });
@@ -201,23 +227,14 @@ async function _loadCorridorMetars(map, fromLat, fromLon, toLat, toLon, fromIcao
     }
 }
 
-// Actions des popups des waypoints de route : « Retirer du plan » (app.js
-// retire le code du champ Waypoints et relance le calcul) et « Renommer »
-// pour les repères libres (regional-map rouvre son éditeur au point).
+// Actions des popups des waypoints de route : « Renommer » pour les repères
+// libres (regional-map rouvre son éditeur au point). La suppression se fait
+// désormais par le « × » de l'étiquette (délégation document ci-dessus).
 function _mountWaypointPopupActions(map) {
     if (_wpActionsBound || !map) return;
     _wpActionsBound = true;
     map.on('popupopen', (e) => {
         const el = e.popup?.getElement();
-        const rmBtn = el?.querySelector('.mp-rmwp-btn');
-        if (rmBtn) {
-            rmBtn.addEventListener('click', () => {
-                const icao = rmBtn.dataset.icao;
-                if (!icao) return;
-                map.closePopup();
-                document.dispatchEvent(new CustomEvent('remove-waypoint', { detail: { icao } }));
-            });
-        }
         const rnBtn = el?.querySelector('.mp-renamewp-btn');
         if (rnBtn) {
             rnBtn.addEventListener('click', () => {
