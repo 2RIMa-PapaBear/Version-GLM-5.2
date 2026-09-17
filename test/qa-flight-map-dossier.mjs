@@ -93,8 +93,14 @@ try {
         document.querySelectorAll('.docs-check').forEach((c) => { c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true })); });
     });
     await page.waitForFunction(() => !document.querySelector('[data-ok]')?.disabled, { timeout: 8000 });
+    // Dégagement LFRD : le dossier embarque le graphique TAF du
+    // DÉROUTEMENT en plus de l'arrivée (vérif. différentielle 17/09).
+    await page.evaluate(async () => {
+        const { state } = await import('./js/core.js');
+        state.diversionIcao = 'LFRD';
+    });
     await page.click('[data-ok]');
-    ok('modale documents cochée, impression lancée');
+    ok('modale documents cochée, impression lancée (dégagement LFRD)');
 
     // 3. L'onglet PDF arrive avec l'iframe data: (génération complète,
     //    tuiles + zones + captures TAF comprises).
@@ -236,6 +242,19 @@ try {
         const full = places.filter((p) => Math.abs(p.w - 363.53) < 2);
         full.length ? ok(`graphique(s) TAF pleine largeur (${full.length} × ${full[0].w.toFixed(0)} pt)`)
             : ko(`aucun graphique à 363.5 pt (placements : ${places.map((p) => p.w.toFixed(0)).join(', ')})`);
+        // Différentielle (bug 17/09) : avec un dégagement, les graphiques
+        // DÉROUTEMENT et ARRIVÉE doivent être DEUX images distinctes — le
+        // bug capturait deux fois l'ANCIEN METAR = flux binaires identiques.
+        // Les deux TAF ont les MÊMES dimensions : on compare les FLUX.
+        if (full.length >= 2) {
+            const streams = [...raw.matchAll(/\/Subtype \/Image[\s\S]{0,400}?\/Width (\d+)[\s\S]{0,80}?\/Height (\d+)[\s\S]{0,2000}?stream[\s\S]{0,3}?([\s\S]*?)endstream/g)]
+                .map((m) => ({ w: +m[1], h: +m[2], sig: m[3].length + ':' + m[3].slice(0, 400) + '|' + m[3].slice(-200) }))
+                .filter((o) => o.w >= 1200 && o.w / o.h > 1.2);   // les graphiques TAF (~1520x1130)
+            const distinct = new Set(streams.map((o) => o.sig));
+            distinct.size >= 2
+                ? ok(`graphiques déroutement/arrivée DISTINCTS (${streams.length} flux, ${distinct.size} signatures)`)
+                : ko(`flux identiques ou uniques (${streams.length} flux, ${distinct.size} signatures) — bug METAR en place ?`);
+        }
     }
 
     // 5. Aucune erreur bloquante côté page (les warnings de dégradation
