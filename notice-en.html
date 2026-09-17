@@ -430,7 +430,7 @@
 <p>You rarely fly a single type of aircraft. <strong>Fleet management</strong> lets you register your aircraft, each with its own reference distances from the Pilot Operating Handbook (POH):</p>
 <ul>
 <li><strong>Adding an aircraft</strong>: click the "My fleet" button (plane icon, in the takeoff widget). Enter the name, registration, type and ground roll / 50 ft obstacle distances.</li>
-<li><strong>Autocomplete</strong>: as you type the name/model, the tool automatically suggests the most common aircraft (Cessna, Piper, Robin, Diamond, Cirrus…) with their reference distances pre-filled. <em>Always verify against your aircraft's POH.</em></li>
+<li><strong>Autocomplete</strong>: as you type the name/model, the tool automatically suggests the most common aircraft (Cessna, Piper, Robin, Diamond, Cirrus…) with their reference distances pre-filled — and, for complete sheets (e.g. Dynamic WT9 LSA), also landing distances, cruise performance, limits and the full weight & balance. <em>Always verify against your aircraft's POH.</em></li>
 <li><strong>Active aircraft</strong>: one aircraft is selected as active for performance calculations. Switch with a single click.</li>
 <li><strong>Safety margin</strong>: each aircraft has its own margin (%) applied to the calculated distances.</li>
 <li><strong>Persistence</strong>: your fleet is stored in your browser.</li>
@@ -509,7 +509,7 @@
 <table>
 <thead><tr><th>Layer</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><span class="demo-select">Satellite ▾</span></td><td><strong>Basemap</strong>: satellite, map, dark or terrain — "Satellite" selector in the toolbar</td></tr>
+<tr><td><span class="demo-select">Satellite ▾</span></td><td><strong>Basemap</strong>: satellite, map or terrain — "Satellite" selector in the toolbar</td></tr>
 <tr><td><span class="demo-btn"><i data-lucide="cloud-rain"></i> Radar</span></td><td>Real-time precipitation — <strong>off by default</strong>; play/pause button and time slider once enabled</td></tr>
 <tr><td><span class="pin" style="background:#FBBF24; width:15px; height:15px;"></span> <span class="rwy" style="background:#4ADE80"></span><span class="rwy" style="background:#94A3B8"></span><span class="rwy" style="background:#D6A24A"></span></td><td><strong>Current airfield</strong>: amber pin at the centre; runways drawn by surface (green = grass, grey = paved, ochre = dirt)</td></tr>
 <tr><td><span class="pin" style="background:#4ADE80"></span> <span class="pin" style="background:#38BDF8"></span> <span class="pin" style="background:#F87171"></span> <span class="pin" style="background:#94A3B8"></span></td><td><strong>Nearby airfields</strong>: every airfield in the visible area (up to France-wide scale, kept as you pan); coloured pins VFR / MVFR / IFR / LIFR (green, blue, red, violet) for airfields that report a METAR, <strong>grey pins</strong> for the others — clicking those opens the METAR of the nearest reporting station</td></tr>
@@ -585,17 +585,16 @@
 </ul>
 
 <h3>Waypoints and Markers</h3>
-<p>Five ways to add a leg:</p>
+<p>Four ways to add a leg:</p>
 <ul>
 <li><strong>Airfield popup</strong> on the map: "+ Waypoint" button;</li>
-<li>the <strong>"+ Waypoint" button</strong> in the map toolbar, then click where you want it;</li>
 <li><strong>right-click</strong> anywhere on the map;</li>
 <li>the plan's <strong>"Waypoints" field</strong>: ICAO codes or <strong>waypoint names</strong>, space-separated — VOR, NDB and VFR reporting points added to the plan appear under their real name (e.g. BNE, LOR, E2), technical codes stay hidden;</li>
 <li>clicking a previously dropped marker → "+ Plan".</li>
 </ul>
 <p>Every addition is <strong>inserted at the best position</strong>: the tool tests all slots and keeps the shortest total route — an intermediate stop automatically slips in <em>before</em> a farther leg. The order of already-entered waypoints is always preserved.</p>
 <p><strong>Free markers</strong>: a point dropped away from any known airfield defaults to <strong>its coordinates</strong> (e.g. 4851N 00221W). Name it at creation, or later via the <strong>pencil</strong> in the leg list or by clicking the marker (Rename). A point dropped near a known airfield simply becomes that leg, named after the airfield.</p>
-<p><strong>Managing legs</strong>: the plan's leg list shows number, code and name, with a <strong>pencil</strong> (rename markers) and a <strong>cross</strong> to remove a leg. On the map, clicking a leg point also offers "Remove from plan" — and "Rename" for markers. Departure, arrival and legs carry their <strong>ICAO code as a label</strong> (green / red / amber); markers carry their name.</p>
+<p><strong>Managing legs</strong>: the plan's leg list shows number, code and name, with a <strong>pencil</strong> (rename markers) and a <strong>cross</strong> to remove a leg. On the map, every leg and marker label carries a <strong>"×"</strong>: one click removes the leg from the plan — for a free marker, it also deletes its point from the map. Clicking a leg point offers "Rename" for markers. Departure and arrival carry their <strong>ICAO code as a label</strong> (green / red), legs their code (amber) and markers their name.</p>
 
 <h3>Saving and Importing a Plan</h3>
 <p>The folder button in the "Departure → Destination" bar offers <strong>Save (JSON)</strong> — a 100% faithful native format (named markers, altitude, TAS, fuel burn, night flight) — plus <strong>GPX export</strong> (universal GPS: SkyDemon, Garmin…) and <strong>KML</strong> (Google Earth), then <strong>Import a plan</strong> (.json, .gpx, .kml). The save folder is chosen on first use and remembered. On import, any point carrying a known ICAO code becomes that airfield; others become named free markers, and the file's order is preserved.</p>

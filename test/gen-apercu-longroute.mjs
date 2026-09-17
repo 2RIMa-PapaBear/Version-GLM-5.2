@@ -140,7 +140,8 @@ for (let i = 0; i < ROUTE.length - 1; i++) {
 const totalMin = Math.round(legs.reduce((s, l) => s + l.ete, 0));
 const fmtH = (min) => { const h = Math.floor(min / 60), m = Math.round(min % 60); return h > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${m} min`; };
 const tripL = Math.round(totalMin / 60 * 30);
-const fuel = { tripL, reserveL: Math.round((30 / 60) * 30 * 10) / 10, totalL: tripL + 15, reserveMin: 30 };
+const groundL = Math.round((15 / 60) * 30 * 10) / 10;   // forfaits roulage ×2 + intégration
+const fuel = { tripL, groundMin: 15, groundL, reserveL: Math.round((30 / 60) * 30 * 10) / 10, totalL: tripL + groundL + 15, reserveMin: 30 };
 
 // METAR réel du départ
 let metarRaw = '';

@@ -2232,10 +2232,86 @@ body.map-overlay-open { overflow: hidden; }
     grid-template-columns: 1fr 1fr 1fr 1fr;
     gap: 6px 10px;
 }
+/* Devis carburant 5 cellules : trajet / dégagement / roulage+intégration /
+   réserve / total (sans dégagement → fp-grid-4). */
+.fp-grid-5 {
+    grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+    gap: 6px 8px;
+}
+
+/* Projet « deux étapes sans plein » : saisie + verdict sous le devis. */
+.fp-leg2-inputs {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+}
+.fp-leg2-inputs label { flex: 1; }
+.fp-leg2-line {
+    font-size: 12px;
+    margin-top: 7px;
+    color: var(--text-color);
+}
+.fp-leg2-verdict {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 7px;
+    padding: 6px 9px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.fp-leg2-verdict.ok {
+    background: rgba(74, 222, 128, 0.12);
+    border: 1px solid rgba(74, 222, 128, 0.35);
+    color: #4ADE80;
+}
+.fp-leg2-verdict.warn {
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    color: #FBBF24;
+}
+.fp-leg2-note {
+    margin-top: 6px;
+    font-size: 10.5px;
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+
+/* Minima VFR réglementaires par terrain du plan (informatif). */
+.fp-minima-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 7px;
+    font-size: 12px;
+}
+.fp-minima-dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    margin-top: 4px; flex-shrink: 0;
+    background: var(--text-muted);
+}
+.fp-minima-dot.ok { background: #4ADE80; }
+.fp-minima-dot.warn { background: #FBBF24; }
+.fp-minima-dot.bad { background: #F87171; }
+.fp-minima-dot.dim { background: var(--text-muted); opacity: 0.55; }
+.fp-minima-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fp-minima-meta { font-size: 10.5px; color: var(--text-muted); }
+.fp-minima-verdict { font-weight: 600; }
+.fp-minima-verdict.lvl-ok { color: #4ADE80; }
+.fp-minima-verdict.lvl-caution { color: #FBBF24; }
+.fp-minima-verdict.lvl-danger { color: #F87171; }
+.fp-minima-verdict.lvl-unknown { color: var(--text-muted); font-weight: 400; }
+.fp-minima-note {
+    margin-top: 8px;
+    font-size: 10.5px;
+    color: var(--text-muted);
+    line-height: 1.45;
+}
 
 @media (max-width: 600px) {
     .fp-inputs { grid-template-columns: 1fr 1fr; }
-    .fp-grid, .fp-grid-3, .fp-grid-4 { grid-template-columns: 1fr 1fr; }
+    .fp-grid, .fp-grid-3, .fp-grid-4, .fp-grid-5 { grid-template-columns: 1fr 1fr; }
 }
 
 /* === Log de navigation (tableau waypoints) === */
@@ -2816,6 +2892,60 @@ html.theme-light .data-age-badge.age-old   { color: #B91C1C; background: rgba(23
 @media (max-width: 640px) {
     .temsi-panel { top: 46px; right: 5px; left: 5px; width: auto; padding: 8px; }
     .temsi-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+}
+
+/* ================================================================
+ * CARTES DES FRONTS (⑤) — panneau de vignettes + visionneuse
+ * (clone TEMSI ; les cartes fronts sont plus larges que hautes).
+ * ================================================================ */
+.fronts-panel {
+    position: absolute; top: 52px; right: 10px; z-index: 1150;
+    width: min(560px, calc(100% - 20px)); max-height: calc(100% - 70px);
+    display: flex; flex-direction: column;
+    padding: 10px 12px; overflow: hidden;
+}
+.fronts-panel[hidden] { display: none; }
+.fronts-head { display: flex; align-items: center; justify-content: space-between; }
+.fronts-head h3 { margin: 0; font-size: 13px; }
+.fronts-close { background: none; border: none; cursor: pointer; color: var(--text-muted, #94A3B8); padding: 4px; }
+.fronts-note { font-size: 10.5px; color: var(--text-muted, #94A3B8); margin: 4px 0 8px; }
+.fronts-body { overflow-y: auto; min-height: 0; -webkit-overflow-scrolling: touch; }
+.fronts-wait { font-size: 12px; color: var(--text-muted, #94A3B8); padding: 10px 0; }
+.fronts-layer-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin: 8px 0 6px; }
+.fronts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.fronts-thumb {
+    position: relative; padding: 0; border: 1px solid var(--border-color, #334155);
+    border-radius: 8px; background: var(--inner-bg, #0F172A); cursor: pointer; overflow: hidden;
+    display: flex; flex-direction: column; min-height: 120px;
+}
+.fronts-thumb.near { border-color: #38BDF8; box-shadow: 0 0 0 1px #38BDF866; }
+.fronts-thumb .fronts-when {
+    display: flex; align-items: baseline; gap: 6px; padding: 4px 6px 2px;
+    font-size: 10.5px;
+}
+.fronts-thumb .fronts-when b { font-size: 11px; }
+.fronts-thumb .fronts-when span { color: var(--text-muted, #94A3B8); }
+.fronts-thumb .fronts-when em {
+    margin-left: auto; font-style: normal; font-size: 9.5px; color: #38BDF8; font-weight: 700;
+}
+.fronts-thumb img { width: 100%; aspect-ratio: 10/9; object-fit: contain; background: #fff; }
+.fronts-thumb .fronts-load {
+    position: absolute; inset: 26px 0 0; display: flex; align-items: center; justify-content: center;
+    font-size: 10.5px; color: var(--text-muted, #94A3B8);
+}
+.fronts-viewer {
+    position: fixed; inset: 0; z-index: 12000; background: rgba(2, 6, 23, .92);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.fronts-viewer-bar {
+    position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center;
+    justify-content: space-between; padding: 10px 14px; color: #F8FAFC; font-size: 13px; font-weight: 700;
+}
+.fronts-viewer-bar button { background: rgba(30,41,59,.8); border: 1px solid var(--border-color,#334155); border-radius: 8px; cursor: pointer; color: #F8FAFC; padding: 6px 9px; }
+.fronts-viewer img { max-width: 94vw; max-height: 88vh; object-fit: contain; background: #fff; border-radius: 6px; }
+@media (max-width: 640px) {
+    .fronts-panel { top: 46px; right: 5px; left: 5px; width: auto; padding: 8px; }
+    .fronts-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
 }
 
 /* ================================================================

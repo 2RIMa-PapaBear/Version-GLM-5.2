@@ -234,6 +234,14 @@ describe('flotte — limites par avion (A3)', () => {
         assert.equal(fleet.addAircraft({ name: 'C', groundRoll: 1, fiftyFt: 2, reserveExtraMin: 90 }).reserveExtraMin, 60);
     });
 
+    // Carburant UTILISABLE (L, manuel de vol) : plafonne l'emport du centrage.
+    test('carburant utilisable : enregistré si valide, null sinon (capacité du poste sinon)', () => {
+        assert.equal(fleet.addAircraft({ name: 'WT9', groundRoll: 500, fiftyFt: 1100, usableFuelL: 113 }).usableFuelL, 113);
+        assert.equal(fleet.addAircraft({ name: 'X', groundRoll: 1, fiftyFt: 2 }).usableFuelL, null);
+        assert.equal(fleet.addAircraft({ name: 'Y', groundRoll: 1, fiftyFt: 2, usableFuelL: 0 }).usableFuelL, null);
+        assert.equal(fleet.addAircraft({ name: 'Z', groundRoll: 1, fiftyFt: 2, usableFuelL: 5000 }).usableFuelL, null);
+    });
+
     test('références atterrissage optionnelles ; C172 par défaut les porte (POH)', () => {
         const def = fleet.getActiveAircraft();   // flotte neuve → C172 par défaut
         assert.equal(def.ldgRoll, 725);
@@ -261,6 +269,7 @@ describe('base avions — Dynamic WT9 LSA (fiche complète)', () => {
         assert.equal(wt9.safetyMargin, 15);
         assert.equal(wt9.cruiseSpeedKt, 100);
         assert.equal(wt9.fuelBurnLph, 18);
+        assert.equal(wt9.usableFuelL, 113, '119 L de capacité − 6 L inutilisables (pilote)');
         assert.equal(wt9.xwindLimitKt, 25);
         assert.equal(wt9.reserveExtraMin, 5);
     });

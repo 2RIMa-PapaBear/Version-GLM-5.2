@@ -150,13 +150,21 @@ export async function collectFileInputs() {
     const loads = resolveLoads(ac.id);
     const fuelOnBoard = loads.fuelL > 0 ? loads.fuelL : null;
     let fuelRequired = null;
+    let fuelParts = null;
     if (mode === 'nav') {
-        fuelRequired = state._lastNavPlan?.plan?.fuel?.totalL ?? null;
+        const f = state._lastNavPlan?.plan?.fuel;
+        fuelRequired = f?.totalL ?? null;
+        if (f) fuelParts = {
+            trip: f.tripFuelL, ground: f.groundL ?? 0,
+            reserve: f.reserveL, diversion: f.diversionL || 0,
+        };
     } else {
         const min = parseInt(document.getElementById('wb-local-min')?.value, 10);
         if (Number.isFinite(min) && min > 0) {
             const burn = ac.fuelBurnLph ?? 35;
-            const reserveMin = 30 + (ac.reserveExtraMin || 0);
+            // Réserve finale vol local de jour en vue du terrain : 10 min
+            // (30 en navigation de jour, 45 de nuit — cf. planificateur).
+            const reserveMin = 10 + (ac.reserveExtraMin || 0);
             fuelRequired = Math.round(((min + reserveMin) / 60 * burn) * 10) / 10;
         }
     }
@@ -181,7 +189,7 @@ export async function collectFileInputs() {
         mode, icao, dest: hasDest ? destInput : null,
         metarAgeMin, tafState, arrWeather,
         notamCount, notamAgeMin, vac,
-        fuelRequired, fuelOnBoard,
+        fuelRequired, fuelOnBoard, fuelParts,
         diversion: mode === 'nav' ? !!state.diversionIcao : null,
         takeoffLevel, landingLevel, wbLevel,
     };
@@ -256,7 +264,10 @@ export async function showFlightFile(forceIcao) {
                 t.vac.items.length ? vacRows : (isFr ? 'Aucune VAC publiée sur ce vol' : 'No VAC charts on this flight'))}
             ${_tile('fuel', isFr ? 'Carburant' : 'Fuel', t.fuel.status,
                 inp.fuelRequired != null
-                    ? `${isFr ? 'Requis' : 'Req.'} ${inp.fuelRequired} L · ${isFr ? 'embarqué' : 'on board'} ${inp.fuelOnBoard ?? '—'} L`
+                    ? `${isFr ? 'Requis' : 'Req.'} ${inp.fuelRequired} L` + (inp.fuelParts
+                        ? ` (${isFr ? 'trajet' : 'trip'} ${inp.fuelParts.trip} + ${isFr ? 'roulage' : 'taxi'} ${inp.fuelParts.ground} + ${isFr ? 'rés.' : 'res.'} ${inp.fuelParts.reserve}${inp.fuelParts.diversion ? ` + ${isFr ? 'dégag.' : 'alt.'} ${inp.fuelParts.diversion}` : ''})`
+                        : '')
+                      + ` · ${isFr ? 'embarqué' : 'on board'} ${inp.fuelOnBoard ?? '—'} L`
                       + (inp.mode === 'nav' ? ` · ${isFr ? 'dégagement' : 'alternate'} ${inp.diversion ? '✓' : '—'}` : '')
                     : (isFr ? 'Devis non renseigné (durée ou plan)' : 'No fuel plan yet (duration or route)'))}
             ${_tile('gauge', isFr ? 'Perfs piste' : 'Rwy perf', t.perf.status,

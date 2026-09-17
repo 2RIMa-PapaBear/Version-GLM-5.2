@@ -41,6 +41,14 @@ async function loadRouteAirspaces(elevProfile, cruiseAltFt) {
 const RESERVE_MIN_DAY = 30;
 const RESERVE_MIN_NIGHT = 45;
 
+// Forfaits AU SOL du devis carburant : roulage départ et arrivée (5 min mini
+// chacun) + intégration à destination. La branche dégagement ajoute aussi
+// son intégration (remise de gaz → navigation → intégration → atterrissage).
+export const TAXI_MIN_DEP = 5;
+export const TAXI_MIN_ARR = 5;
+export const INTEGRATION_MIN = 5;
+const GROUND_MIN = TAXI_MIN_DEP + TAXI_MIN_ARR + INTEGRATION_MIN;
+
 // Couloir de prise en compte des obstacles SIA autour de la polyligne (A6) —
 // 0,5 NM couvre largement la bande réglementaire de 600 m autour de la route.
 const OBSTACLE_CORRIDOR_NM = 0.5;
@@ -191,22 +199,26 @@ export function trueToMagneticHdg(trueHdg, declination) {
     return Math.round((((trueHdg - declination) % 360) + 360) % 360);
 }
 
-export function computeFuel(legTimeMin, fuelBurnLph, reserveMin) {
+export function computeFuel(legTimeMin, fuelBurnLph, reserveMin, groundMin = 0) {
     const tripFuelL = (legTimeMin / 60) * fuelBurnLph;
     const reserveL = (reserveMin / 60) * fuelBurnLph;
+    const groundL = (groundMin / 60) * fuelBurnLph;
     return {
         tripFuelL: Math.round(tripFuelL * 10) / 10,
         reserveL: Math.round(reserveL * 10) / 10,
-        totalL: Math.round((tripFuelL + reserveL) * 10) / 10,
+        groundMin: Math.round(groundMin),
+        groundL: Math.round(groundL * 10) / 10,
+        totalL: Math.round((tripFuelL + reserveL + groundL) * 10) / 10,
     };
 }
 
 /**
  * Branche DÉGAGEMENT du devis carburant (arrêté du 24/07/1991 : carburant
  * pour rejoindre la destination, PUIS le terrain de dégagement, PLUS la
- * réserve 30/45 min). Distance et temps depuis la DESTINATION vers le
- * dégagement, à la vitesse sol de référence du plan (vent du plan pris en
- * compte) ; sans GS de référence exploitable, seul le distance est rendu.
+ * réserve 30/45 min). Distance depuis la DESTINATION vers le dégagement, à
+ * la vitesse sol de référence du plan (vent du plan pris en compte) ; le
+ * temps inclut l'INTÉGRATION à l'arrivée au dégagement. Sans GS de
+ * référence explotable, seule la distance est rendue.
  * Fonction pure — testée sous Node.
  * @returns {{distNm:number, timeMin:number|null, fuelL:number|null}|null}
  */
@@ -216,7 +228,7 @@ export function computeDiversionLeg(destLat, destLon, divLat, divLon, fuelBurnLp
     const distNm = greatCircleDistanceNm(destLat, destLon, divLat, divLon);
     const out = { distNm: Math.round(distNm * 10) / 10, timeMin: null, fuelL: null };
     if (!(refGsKt > 0) || !(fuelBurnLph > 0)) return out;
-    const timeMin = distNm / refGsKt * 60;
+    const timeMin = distNm / refGsKt * 60 + INTEGRATION_MIN;
     out.timeMin = Math.round(timeMin);
     out.fuelL = Math.round(timeMin / 60 * fuelBurnLph * 10) / 10;
     return out;
@@ -245,6 +257,36 @@ function _withDiversion(fuel, diversion) {
         diversion,
         diversionL: diversion.fuelL,
         totalL: Math.round((fuel.totalL + diversion.fuelL) * 10) / 10,
+    };
+}
+
+/**
+ * Projet « DEUX ÉTAPES SANS PLEIN » : minimum réglementaire de la 2ᵉ étape —
+ * roulage ×2 + intégration (forfaits au sol) + navigation + réserve finale.
+ * Navigation SANS VENT au TAS du plan (le pilote majore via sa réserve
+ * perso) ; étape 2 LOCALE (durée saisie) → l'appelant passe la réserve
+ * locale 10 min. Pas de dégagement propre à l'étape 2 (v1, affiché).
+ * Fonction pure — testée sous Node.
+ * @returns {{isLocal:boolean, navTimeMin:number, navL:number, groundMin:number,
+ *   groundL:number, reserveMin:number, reserveL:number, totalL:number}|null}
+ */
+export function computeLeg2Fuel({ distNm = null, localMin = null, tasKt, fuelBurnLph, reserveMin }) {
+    if (!(tasKt > 0) || !(fuelBurnLph > 0)) return null;
+    const isLocal = !(distNm > 0);
+    const navTimeMin = isLocal ? localMin : distNm / tasKt * 60;
+    if (!(navTimeMin > 0)) return null;
+    const navL = navTimeMin / 60 * fuelBurnLph;
+    const groundL = GROUND_MIN / 60 * fuelBurnLph;
+    const reserveL = reserveMin / 60 * fuelBurnLph;
+    return {
+        isLocal,
+        navTimeMin: Math.round(navTimeMin),
+        navL: Math.round(navL * 10) / 10,
+        groundMin: GROUND_MIN,
+        groundL: Math.round(groundL * 10) / 10,
+        reserveMin,
+        reserveL: Math.round(reserveL * 10) / 10,
+        totalL: Math.round((navL + groundL + reserveL) * 10) / 10,
     };
 }
 
@@ -288,7 +330,7 @@ export async function computeFlightPlan(fromIcao, toIcao, params) {
     const reserveMin = (params.isNight ? RESERVE_MIN_NIGHT : RESERVE_MIN_DAY)
         + (Number.isFinite(params.reserveExtraMin) ? Math.max(0, Math.min(60, params.reserveExtraMin)) : 0);
     const fuel = _withDiversion(
-        { ...computeFuel(legTimeMin, params.fuelBurnLph, reserveMin), reserveMin },
+        { ...computeFuel(legTimeMin, params.fuelBurnLph, reserveMin, GROUND_MIN), reserveMin },
         _diversionFor(toLat, toLon, params.diversionIcao, params.fuelBurnLph, gsKt));
 
     const elevProfile = await fetchRouteElevation(fromLat, fromLon, toLat, toLon, null,
@@ -416,6 +458,9 @@ export async function computeMultiLegFlightPlan(route, params) {
     const routeAirspaces = await loadRouteAirspaces(elevProfile, params.cruiseAltFt);
 
     const totalReserveL = (reserveMin / 60) * params.fuelBurnLph;
+    // Forfaits au sol (roulage ×2 + intégration) : une seule fois pour toute
+    // la navigation, pas par tronçon.
+    const groundL = (GROUND_MIN / 60) * params.fuelBurnLph;
     // Branche dégagement : depuis la DESTINATION (dernier waypoint), à la GS
     // moyenne réelle du plan (totalDistance / temps total — vent intégré).
     const dest = waypoints[waypoints.length - 1];
@@ -424,7 +469,9 @@ export async function computeMultiLegFlightPlan(route, params) {
     const fuel = _withDiversion({
         tripFuelL: Math.round(totalTripFuelL * 10) / 10,
         reserveL: Math.round(totalReserveL * 10) / 10,
-        totalL: Math.round((totalTripFuelL + totalReserveL) * 10) / 10,
+        groundMin: GROUND_MIN,
+        groundL: Math.round(groundL * 10) / 10,
+        totalL: Math.round((totalTripFuelL + totalReserveL + groundL) * 10) / 10,
         reserveMin,
     }, diversion);
     return {

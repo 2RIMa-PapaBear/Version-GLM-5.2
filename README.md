@@ -54,7 +54,8 @@ dans une PWA installable qui fonctionne aussi hors ligne.
   checks en bas de page) ; le tableau des calculs remplit la page avant
   d'appeler « Détail des waypoints (suite) ».
 - **Carte régionale** (Leaflet) : route, étiquettes de tronçons
-  (cap / distance / temps), espaces aériens — **base officielle SIA (XML
+  (cap / distance / temps), étiquettes de points de passage supprimables
+  d'un clic (« × »), espaces aériens — **base officielle SIA (XML
   AIRAC) en priorité**, complétée par openAIP (ATZ, reste du monde), radar.
 - **Suivi GPS** (mobile, HTTPS) : position de l'avion sur la carte
   régionale avec cercle de précision et **trace du trajet**, orientation
@@ -112,8 +113,10 @@ dans une PWA installable qui fonctionne aussi hors ligne.
   IndexedDB).
 
 ### Performances & masse
-- **Performance décollage** : flotte d'avions personnalisable (Cessna, Piper,
-  Robin, DR400…), correction densité-altitude, revêtement de piste (herbe,
+- **Performance décollage** : flotte d'avions personnalisable — la base
+  intégrée (Cessna, Piper, Robin, DR400… jusqu'au Dynamic WT9 LSA complet :
+  distances, perf croisière et centrage) **pré-remplit toute la fiche** —,
+  correction densité-altitude, revêtement de piste (herbe,
   dur sec/humide/contaminé), piste en service pilotée par la rose des vents,
   schéma en coupe (roulement → rotation → franchissement 50 ft) avec marge
   restante ou manque.
@@ -271,7 +274,7 @@ npm run deploy:test -- --mirror      # supprime aussi les fichiers distants disp
 - **2026-09-05** — FICHE TERRAIN v3 — feu vert pilote après aperçu PDF (Apercu_fiche_terrain.pdf, 3 terrains LFRN/LFRV/LFPF) : section Terrain en LIGNES LIBELL…
 - **2026-09-05** — FICHE TERRAIN v2 (retours pilote : ordre + lisibilité) : ① FRÉQUENCES en tête (sans sous-titre redondant) ② PISTES (seuils officiels affiché…
 - **2026-09-05** — FICHE TERRAIN COMPLÈTE dans l onglet « Fréquences & info terrain » (demande pilote, 4 arbitrages validés) : ① IDENTITÉ en chips — élévation,…
-<!-- docs:lastSha=acb39aa6b2b31e7a73da0a0a8746d3f2f9feb685 -->
+<!-- docs:lastSha=1652d29d396a7a9ba194a2b0a0396e55509e9336 -->
 
 
 
