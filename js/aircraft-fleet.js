@@ -361,6 +361,7 @@ function _sanitize(data) {
     const rem = parseInt(data.reserveExtraMin, 10);
     const lr = parseInt(data.ldgRoll, 10);
     const lf = parseInt(data.ldgFifty, 10);
+    const uf = parseInt(data.usableFuelL, 10);
     const out = {
         name: String(data.name || 'Avion').slice(0, 40),
         registration: String(data.registration || '').slice(0, 12).toUpperCase(),
@@ -370,6 +371,10 @@ function _sanitize(data) {
         safetyMargin: isNaN(sm) ? 20 : Math.max(0, Math.min(50, sm)),
         cruiseSpeedKt: isNaN(cs) || cs <= 0 ? null : cs,
         fuelBurnLph: isNaN(fb) || fb <= 0 ? null : fb,
+        // Carburant UTILISABLE (L, manuel de vol — une partie du plein est
+        // inutilisable) : optionnel ; sans valeur, la capacité du poste
+        // carburant du centrage sert de plafond d'emport.
+        usableFuelL: isNaN(uf) || uf <= 0 || uf > 999 ? null : uf,
         // Limite vent traversier (kt, manuel de vol/école) : OPTIONNELLE —
         // le GO/NO-GO garde ses seuils génériques 12/15 kt sans elle.
         xwindLimitKt: isNaN(xw) || xw <= 0 || xw > 40 ? null : xw,

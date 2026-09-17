@@ -1,4 +1,4 @@
-import { state, escapeHtml, fetchAvecRelais } from './core.js';
+import { state, escapeHtml, fetchAvecRelais, memoGet } from './core.js';
 import { getAirportByICAO, enrichAirport } from './ui-module.js';
 import { getActiveAircraftId, getActiveAircraft, getFleet, updateAircraft } from './aircraft-fleet.js';
 import { getActiveRunwayNameForIcao, evaluateTakeoffFromRaw, evaluateLandingAtDestination, fetchTafWithFallback, getAircraftRef } from './takeoff-performance.js';
@@ -11,7 +11,8 @@ import { drawNavLogPdf, drawNotamAnnex, drawFileCover, drawWeatherPage, drawVacP
 import { getSelectedNotams, getCurrentNotams } from './notam.js';
 import { computeWb, resolveLoads, normalizeEnvelope } from './wb-core.js';
 import { makeCollapsible } from './collapsible.js';
-import { computeFlightPlan, computeMultiLegFlightPlan, getDefaultAircraftPerf, greatCircleDistanceNm, RESERVES } from './flight-planner.js';
+import { computeFlightPlan, computeMultiLegFlightPlan, getDefaultAircraftPerf, greatCircleDistanceNm, computeLeg2Fuel, RESERVES } from './flight-planner.js';
+import { evaluateVfrMinima, collectVfrMinima } from './vfr-minima.js';
 import { getActiveRunwaySurfaceInfo, isSoftSurface } from './runway-surface.js';
 import { getEnRouteAlternates } from './alternates.js';
 import { drawFlightMapPage } from './flight-map-pdf.js';
@@ -398,6 +399,7 @@ async function _generateNavLogPdfInto(tab, { file = false } = {}) {
         fuel: {
             tripL: fuel.tripFuelL, reserveL: fuel.reserveL, totalL: fuel.totalL,
             reserveMin: fuel.reserveMin ?? (stash.isNight ? RESERVES.NIGHT_MIN : RESERVES.DAY_MIN),
+            groundMin: fuel.groundMin ?? 0, groundL: fuel.groundL ?? 0,
             diversionL: fuel.diversionL || 0,
             divIcao: fuel.diversion?.icao || null,
             divDistNm: fuel.diversion?.distNm ?? null,
@@ -747,6 +749,213 @@ async function _generateNavLogPdfInto(tab, { file = false } = {}) {
     doc.save(filename);
 }
 
+// ----------------------------------------------------------------
+// PROJET « DEUX ÉTAPES SANS PLEIN » : minimum réglementaire de la 2ᵉ
+// étape (roulage ×2 + intégration + navigation sans vent + réserve)
+// ajouté au requis complet de l'étape 1, comparé au carburant UTILISABLE
+// réellement à bord. Saisie : code OACI de la 2ᵉ destination (prime) ou
+// durée d'une étape locale. Persistance localStorage fp-leg2.
+// ----------------------------------------------------------------
+const LS_LEG2 = 'fp-leg2';
+function _readLeg2() { try { return JSON.parse(localStorage.getItem(LS_LEG2)) || {}; } catch { return {}; } }
+function _writeLeg2(v) { try { localStorage.setItem(LS_LEG2, JSON.stringify(v)); } catch { /* localStorage indisponible */ } }
+
+/** Calcul complet du bloc étape 2 (pure vis-à-vis du DOM). */
+function _leg2Compute(plan, isNight, tas, burn) {
+    const saved = _readLeg2();
+    const icao = String(saved.icao || '').toUpperCase();
+    const localMin = Math.max(0, Math.min(600, Math.round(parseFloat(saved.min)) || 0));
+    const dest1 = (Array.isArray(plan.waypoints) && plan.waypoints.length)
+        ? plan.waypoints[plan.waypoints.length - 1] : plan.to;
+    let info = null;
+    if (/^[A-Z][A-Z0-9]{3}$/.test(icao)) {
+        const apt = getAirportByICAO(icao);
+        const memo = memoGet(icao);
+        const lat = memo?.lat ?? apt?.lat ?? null, lon = memo?.lon ?? apt?.lon ?? null;
+        if (lat != null && lon != null && dest1?.lat != null && dest1?.lon != null) {
+            info = { icao, name: apt?.name && apt.name !== icao ? apt.name : null,
+                     distNm: greatCircleDistanceNm(dest1.lat, dest1.lon, lat, lon) };
+        }
+    }
+    const ac = getActiveAircraft();
+    const perso = Number.isFinite(ac?.reserveExtraMin) ? Math.max(0, Math.min(60, ac.reserveExtraMin)) : 0;
+    const leg2 = (info || localMin > 0) ? computeLeg2Fuel({
+        distNm: info ? info.distNm : null,
+        localMin: info ? null : localMin,
+        tasKt: tas, fuelBurnLph: burn,
+        reserveMin: (info ? (isNight ? RESERVES.NIGHT_MIN : RESERVES.DAY_MIN) : 10) + perso,
+    }) : null;
+    // Embarqué (widget Centrage) plafonné au carburant UTILISABLE.
+    const loads = resolveLoads(getActiveAircraftId());
+    const onBoardRaw = loads.fuelL > 0 ? loads.fuelL : null;
+    const usable = ac?.usableFuelL > 0 ? ac.usableFuelL : null;
+    const onBoard = (onBoardRaw != null && usable != null) ? Math.min(onBoardRaw, usable) : onBoardRaw;
+    const req2legs = leg2 ? Math.round((plan.fuel.totalL + leg2.totalL) * 10) / 10 : null;
+    const manque = (req2legs != null && onBoard != null) ? Math.round((req2legs - onBoard) * 10) / 10 : null;
+    return { saved, icao: info ? info.icao : (/^[A-Z][A-Z0-9]{3}$/.test(icao) ? icao : ''),
+             icaoInconnu: !info && /^[A-Z][A-Z0-9]{3}$/.test(icao),
+             info, localMin, leg2, onBoard, onBoardRaw, usable, req2legs, manque };
+}
+
+function _leg2InnerHtml(plan, isFr, isNight, tas, burn) {
+    const c = _leg2Compute(plan, isNight, tas, burn);
+    const t = (fr, en) => (isFr ? fr : en);
+    let res = '';
+    if (c.leg2) {
+        const l = c.leg2;
+        res += `<div class="fp-leg2-line">${t('Étape 2', 'Leg 2')} : <b>${c.info ? `${escapeHtml(c.info.icao)}${c.info.name ? ' · ' + escapeHtml(c.info.name) : ''}` : t('vol local', 'local flight')}</b>`
+            + ` — ${l.navTimeMin} min ${t('sans vent', 'no wind')} · ${l.navL} L + ${t('roulage', 'taxi')} ${l.groundL} L + ${t('réserve', 'reserve')} ${l.reserveL} L (${l.reserveMin} min)`
+            + ` → <b>${l.totalL} L</b></div>`
+            + `<div class="fp-leg2-line">${t('Requis 2 étapes', 'Required for both legs')} : <b style="color:var(--primary);">${c.req2legs} L</b>`
+            + ` · ${t('à bord (utilisable)', 'on board (usable)')} : ${c.onBoard != null ? c.onBoard + ' L' : '—'}</div>`;
+        if (c.manque != null && c.manque > 0) {
+            res += `<div class="fp-leg2-verdict warn"><i data-lucide="fuel" style="width:13px;height:13px;"></i> ${t(`Manque ${c.manque} L — <b>avitaillement à prévoir</b> (pompe, moyen de paiement).`,
+                `Short by ${c.manque} L — <b>refuelling stop required</b> (pump, payment).`)}</div>`;
+        } else if (c.onBoard != null) {
+            res += `<div class="fp-leg2-verdict ok"><i data-lucide="check" style="width:13px;height:13px;"></i> ${t('Les deux étapes sont possibles sans complément de plein.', 'Both legs are achievable without refuelling.')}</div>`;
+        } else {
+            res += `<div class="fp-leg2-verdict" >${t('Renseignez le carburant embarqué dans le widget Centrage pour le verdict.', 'Fill the fuel on board in the Balance widget to get the verdict.')}</div>`;
+        }
+    } else if (c.icaoInconnu) {
+        res += `<div class="fp-leg2-line" style="color:var(--danger);">${t('Terrain inconnu — chargez sa météo ou vérifiez le code.', 'Unknown airfield — load its weather or check the code.')}</div>`;
+    }
+    if (c.leg2) {
+        res += `<div class="fp-leg2-note">${t('Vérification à refaire au sol avant le départ de la 2ᵉ étape (responsabilité du commandant de bord). Étape 2 sans dégagement propre.',
+            'Re-check on the ground before departing on the 2nd leg (pilot-in-command responsibility). Leg 2 has no alternate of its own.')}</div>`;
+    }
+    return `
+        <div class="fp-section" style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--border-color);">
+            <div class="fp-section-title">${t('Deuxième étape (sans plein)', 'Second leg (no refuel)')}</div>
+            <div class="fp-leg2-inputs">
+                <label class="fp-input-label" title="${t('Code OACI de la 2ᵉ destination, au départ de l’arrivée de l’étape 1 — prime sur la durée', 'ICAO of the 2nd destination, departing from leg 1 arrival — takes precedence over duration')}">
+                    <span>${t('2ᵉ étape (OACI)', '2nd leg (ICAO)')}</span>
+                    <input type="text" id="fp-leg2-icao" value="${escapeHtml(c.saved.icao || '')}" placeholder="LFRD" class="fp-input" style="font-family:'DM Mono',monospace; text-transform:uppercase;" maxlength="8">
+                </label>
+                <label class="fp-input-label" title="${t('Étape 2 LOCALE : durée estimée en minutes (réserve 10 min)', 'LOCAL 2nd leg: estimated duration in minutes (10 min reserve)')}">
+                    <span>${t('ou durée locale (min)', 'or local duration (min)')}</span>
+                    <input type="number" id="fp-leg2-min" value="${c.saved.min != null && c.saved.min !== '' ? escapeHtml(String(c.saved.min)) : ''}" placeholder="30" min="0" max="600" step="5" class="fp-input">
+                </label>
+            </div>
+            ${res}
+        </div>`;
+}
+
+/** Câblage des deux saisies : persiste puis re-rend SEULEMENT le sous-bloc. */
+function _wireLeg2(container, ctx) {
+    const block = container.querySelector('#fp-leg2-block');
+    if (!block) return;
+    const rerender = () => {
+        block.innerHTML = _leg2InnerHtml(ctx.plan, ctx.isFr, ctx.isNight, ctx.tas, ctx.burn);
+        if (window.lucide) window.lucide.createIcons({ root: block });
+        _wireLeg2(container, ctx);
+    };
+    const persist = () => {
+        const s = _readLeg2();
+        const icaoEl = block.querySelector('#fp-leg2-icao');
+        const minEl = block.querySelector('#fp-leg2-min');
+        s.icao = (icaoEl?.value || '').trim().toUpperCase();
+        s.min = minEl?.value ?? '';
+        _writeLeg2(s);
+        rerender();
+    };
+    block.querySelector('#fp-leg2-icao')?.addEventListener('change', persist);
+    block.querySelector('#fp-leg2-min')?.addEventListener('change', persist);
+
+    // L'embarqué se saisit dans le widget Centrage (rendu indépendant) : on
+    // suit sa saisie pour rafraîchir le verdict, avec un léger debounce.
+    if (!container.dataset.leg2FuelWire) {
+        container.dataset.leg2FuelWire = '1';
+        let t = null;
+        document.addEventListener('input', (e) => {
+            if (e.target?.id !== 'wb-fuel-l') return;
+            const b = container.querySelector('#fp-leg2-block');
+            if (!b) return;
+            clearTimeout(t);
+            t = setTimeout(() => {
+                b.innerHTML = _leg2InnerHtml(ctx.plan, ctx.isFr, ctx.isNight, ctx.tas, ctx.burn);
+                if (window.lucide) window.lucide.createIcons({ root: b });
+            }, 400);
+        });
+    }
+}
+
+// ----------------------------------------------------------------
+// MINIMA VFR RÉGLEMENTAIRES par terrain du plan (départ / destination /
+// dégagement). Indicateur informatif : collecte asynchrone (espaces au
+// sol + METAR/TAF à l'ETA), rendu re-dessiné à l'arrivée des données.
+// ----------------------------------------------------------------
+const _MINIMA_MSG = {
+    ctrl_ok:    { fr: 'Conditions VFR OK (zone contrôlée)', en: 'VFR conditions OK (controlled airspace)',
+                  tipFr: 'Visi ≥ 5 km et plafond ≥ 1500 ft (espace contrôlé sous FL100)', tipEn: 'Vis ≥ 5 km and ceiling ≥ 1500 ft (controlled below FL100)' },
+    sp_needed:  { fr: 'Météo insuffisante pour le VFR — clairance VFR spécial requise', en: 'Below VFR minima — special VFR clearance required',
+                  tipFr: 'Sous 5 km ou 1500 ft, mais ≥ 1500 m et ≥ 600 ft : possible sur clairance du contrôleur', tipEn: 'Below 5 km or 1500 ft, but ≥ 1500 m and ≥ 600 ft: possible on controller clearance' },
+    sp_night:   { fr: 'Conditions VFR spécial mais NUIT — interdit', en: 'Special-VFR conditions but NIGHT — not allowed',
+                  tipFr: 'Le VFR spécial est interdit de nuit', tipEn: 'Special VFR is not allowed at night' },
+    ctrl_below: { fr: 'Sous tous les minima VFR', en: 'Below all VFR minima',
+                  tipFr: 'Même le VFR spécial exige ≥ 1500 m et ≥ 600 ft', tipEn: 'Even special VFR needs ≥ 1500 m and ≥ 600 ft' },
+    unctrl_ok:  { fr: 'Conditions VFR OK (hors zone contrôlée)', en: 'VFR conditions OK (uncontrolled airspace)',
+                  tipFr: 'Visi ≥ 1500 m et plafond > 500 ft (espace non contrôlé, Vi ≤ 140 kt)', tipEn: 'Vis ≥ 1500 m and ceiling > 500 ft (uncontrolled, Vi ≤ 140 kt)' },
+    unctrl_below: { fr: 'Sous tous les minima VFR', en: 'Below all VFR minima',
+                  tipFr: 'Exige visi ≥ 1500 m et plafond > 500 ft', tipEn: 'Needs vis ≥ 1500 m and ceiling > 500 ft' },
+    unknown:    { fr: 'météo indisponible', en: 'weather unavailable' },
+};
+const _MINIMA_DOT = { ok: 'ok', caution: 'warn', danger: 'bad', unknown: 'dim' };
+
+function _minimaRowHtml(r, isFr) {
+    const t = (fr, en) => (isFr ? fr : en);
+    const role = r.role === 'dep' ? t('Départ', 'Departure') : r.role === 'div' ? t('Dégagement', 'Alternate') : t('Arrivée', 'Arrival');
+    const espace = r.zone
+        ? `${escapeHtml(r.zone)}${r.classe ? ' · ' + escapeHtml(r.classe) : ''} — ${r.controlled ? t('contrôlé', 'controlled') : t('non contrôlé', 'uncontrolled')}`
+        : t('non contrôlé (aucune zone au sol)', 'uncontrolled (no ground airspace)');
+    const meteo = (r.visiM != null)
+        ? `${r.source} : ${r.visiM >= 10000 ? '≥ 10 km' : Math.round(r.visiM) + ' m'} · ${t('plafond', 'ceiling')} ${r.ceilingFt >= 99999 ? '—' : r.ceilingFt + ' ft'}`
+        : '';
+    const msg = _MINIMA_MSG[r.verdict.key] || _MINIMA_MSG.unknown;
+    const tip = msg.tipFr ? (isFr ? msg.tipFr : msg.tipEn) : '';
+    return `
+        <div class="fp-minima-row">
+            <span class="fp-minima-dot ${_MINIMA_DOT[r.verdict.level] || 'dim'}"></span>
+            <span class="fp-minima-main">
+                <b>${role}</b> ${escapeHtml(r.icao || '')}${r.name ? ' · ' + escapeHtml(r.name) : ''}
+                <span class="fp-minima-meta">${espace} · ${meteo}${r.isNight ? ' · ' + t('nuit', 'night') : ''}</span>
+                <span class="fp-minima-verdict lvl-${r.verdict.level}"${tip ? ` title="${escapeHtml(tip)}"` : ''}>${msg[isFr ? 'fr' : 'en']}</span>
+            </span>
+        </div>`;
+}
+
+function _minimaSectionInner(plan, isFr) {
+    const t = (fr, en) => (isFr ? fr : en);
+    const rows = state._vfrMinima;
+    const body = Array.isArray(rows) && rows.length
+        ? rows.map(r => _minimaRowHtml(r, isFr)).join('')
+        : `<div class="fp-minima-row"><span class="fp-minima-dot dim"></span><span class="fp-minima-main">${t('Collecte des minima (espaces au sol, METAR/TAF)…', 'Collecting minima (ground airspaces, METAR/TAF)…')}</span></div>`;
+    return `
+        <div class="fp-section" style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--border-color);">
+            <div class="fp-section-title">${t('Minima VFR', 'VFR minima')}</div>
+            ${body}
+            <div class="fp-minima-note">${t('Vi ≤ 140 kt supposée. Indicateur informatif — la clairance VFR spécial reste à la discrétion du contrôleur ; le règlement et le manuel de vol priment.',
+                'Vi ≤ 140 kt assumed. Informational only — special-VFR clearance remains at the controller\u2019s discretion; regulations and the POH prevail.')}</div>
+        </div>`;
+}
+
+/** Lance la collecte et re-dessine la section quand elle arrive (jeton
+ *  anti-course : un nouveau rendu du plan invalide la collecte en vol). */
+function _attachMinima(container, plan, isFr) {
+    const block = container.querySelector('#fp-minima-block');
+    if (!block) return;
+    const token = Symbol('minima');
+    block._minimaToken = token;
+    collectVfrMinima(plan).then(rows => {
+        if (block._minimaToken !== token || !block.isConnected) return;
+        state._vfrMinima = rows;
+        block.innerHTML = _minimaSectionInner(plan, isFr);
+    }).catch(() => {
+        if (block._minimaToken !== token || !block.isConnected) return;
+        state._vfrMinima = null;
+        block.innerHTML = _minimaSectionInner(plan, isFr);
+    });
+}
+
 function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
     // Gère les deux formats de plan :
     //   - single-leg : { from, to, distanceNm, trueCourse, magHeading, windCorrection, legTimeMin, ... }
@@ -852,16 +1061,20 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
 
         <div class="fp-section" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color);">
             <div class="fp-section-title">${isFr ? 'Carburant' : 'Fuel'}</div>
-            <div class="fp-grid ${fuel.diversion ? 'fp-grid-4' : 'fp-grid-3'}" style="margin-top:6px;">
+            <div class="fp-grid ${fuel.diversion ? 'fp-grid-5' : 'fp-grid-4'}" style="margin-top:6px;">
                 <div class="fp-cell">
                     <div class="fp-label">${isFr ? 'Trajet' : 'Trip'}</div>
                     <div class="fp-value">${fuel.tripFuelL} L</div>
                 </div>
                 ${fuel.diversion ? `
-                <div class="fp-cell" title="${isFr ? 'Rejoindre le terrain de dégagement depuis l\u2019arrivée' : 'Reach the alternate field from destination'} : ${fuel.diversion.distNm} NM · ${fuel.diversion.timeMin ?? '—'} min">
+                <div class="fp-cell" title="${isFr ? 'Rejoindre le terrain de dégagement depuis l\u2019arrivée (navigation + intégration)' : 'Reach the alternate field from destination (navigation + integration)'} : ${fuel.diversion.distNm} NM · ${fuel.diversion.timeMin ?? '—'} min">
                     <div class="fp-label">${isFr ? 'Dégagement' : 'Alternate'} ${fuel.diversion.icao}</div>
                     <div class="fp-value">${fuel.diversion.fuelL != null ? fuel.diversion.fuelL : '—'} L</div>
                 </div>` : ''}
+                <div class="fp-cell" title="${isFr ? 'Roulage départ + intégration + roulage arrivée (forfaits mini)' : 'Taxi-out + integration + taxi-in (minimum allowances)'}">
+                    <div class="fp-label">${isFr ? 'Roulage + intégr.' : 'Taxi + integ.'} (${fuel.groundMin ?? 0}min)</div>
+                    <div class="fp-value">${fuel.groundL ?? 0} L</div>
+                </div>
                 <div class="fp-cell">
                     <div class="fp-label">${isFr ? 'Réserve' : 'Reserve'} (${fuel.reserveMin ?? (isNight ? RESERVES.NIGHT_MIN : RESERVES.DAY_MIN)}min)</div>
                     <div class="fp-value">${fuel.reserveL} L</div>
@@ -872,6 +1085,10 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
                 </div>
             </div>
         </div>
+
+        <div id="fp-leg2-block">${_leg2InnerHtml(plan, isFr, isNight, tas, burn)}</div>
+
+        <div id="fp-minima-block">${_minimaSectionInner(plan, isFr)}</div>
 
         ${cl ? `
             <div class="fp-section" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color);">
@@ -964,6 +1181,8 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
         if (await _confirmNavLogPdf(isFr)) _generateNavLogPdf();
     });
     _wireInputs(container, from, to);
+    _wireLeg2(container, { plan, isFr, isNight, tas, burn });
+    _attachMinima(container, plan, isFr);
 }
 
 // Fenêtre de confirmation avant génération du log de nav PDF (ou du DOSSIER

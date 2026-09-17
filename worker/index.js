@@ -57,6 +57,11 @@ export default {
         if (request.method === 'GET' && url.pathname === '/temsi') {
             return await temsiFrance(request, env, ctx);
         }
+        // ⑤ (17/09) — CARTES DES FRONTS (situation générale du briefing,
+        // AEROWEB compte du pilote) : analyse + prévisions toutes les 6 h.
+        if (request.method === 'GET' && url.pathname === '/fronts') {
+            return await frontsFrance(request, env, ctx);
+        }
         // C1 (14/09) : SIGMET/GAMET/AIRMET France via le compte AEROWEB du
         // pilote (secrets AEROWEB_USER/AEROWEB_PASS — jamais dans le repo).
         if (request.method === 'GET' && url.pathname === '/sigmet') {
@@ -204,6 +209,99 @@ async function temsiFrance(request, env, ctx) {
         return reponse(502, JSON.stringify({ error: 'réponse AEROWEB inattendue (pas de couches TEMSI)' }), 'application/json');
     }
     const json = JSON.stringify({ generatedAt: new Date().toISOString(), domain: 'FRANCE', layers });
+    ctx.waitUntil(cache.put(cleListe, new Response(json, { headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=600' } })));
+    const out = reponse(200, json, 'application/json');
+    out.headers.set('Cache-Control', 'public, max-age=600');
+    return out;
+}
+
+// ----------------------------------------------------------------
+// CARTES DES FRONTS (⑤, 17/09) — situation générale du briefing.
+// Page d'animation AEROWEB : anim_carte_front.php?layer=front/europeouest
+// (analyse + prévisions toutes les 6 h, jusqu'à J+3). La page embarque
+// directement les URLs affiche_image.php?type=front/…&date=…&mode=img —
+// chaque échéance y figure DEUX fois (aller puis retour de l'animation).
+// ----------------------------------------------------------------
+const FRONTS_TYPE_OK = /^front\/[a-z]+$/;
+
+/** Parse la page d'animation des fronts → [{key,label,type,echeances}]
+ *  (pur, testé) — dédoublonnage des dates + tri croissant. */
+export function parseFrontsLayers(html) {
+    const pairs = [...String(html).matchAll(/affiche_image\.php\?[^"']*?type=([a-z0-9/_]+)&date=(\d{14})[^"']*?mode=img/gi)];
+    const byType = new Map();
+    for (const m of pairs) {
+        if (!FRONTS_TYPE_OK.test(m[1])) continue;
+        if (!byType.has(m[1])) byType.set(m[1], new Set());
+        byType.get(m[1]).add(m[2]);
+    }
+    const layers = [];
+    for (const [type, set] of byType) {
+        const echeances = [...set].sort();
+        if (!echeances.length) continue;
+        layers.push({
+            key: 'fronts',
+            label: /europe/.test(type) ? 'Europe ouest' : type,
+            type,
+            echeances: echeances.map(u => ({ utc: u, label: u.slice(8, 10) + 'h UTC' })),
+        });
+    }
+    return layers;
+}
+
+async function frontsFrance(request, env, ctx) {
+    if (!env.AEROWEB_USER || !env.AEROWEB_PASS) {
+        return reponse(503, JSON.stringify({ error: 'secrets AEROWEB absents (wrangler secret put AEROWEB_USER / AEROWEB_PASS)' }), 'application/json');
+    }
+    const params = new URL(request.url).searchParams;
+    const cache = caches.default;
+
+    // ---- Image d'une échéance (immuable par date → cache 30 min) ----
+    const imgType = params.get('img');
+    if (imgType) {
+        if (!FRONTS_TYPE_OK.test(imgType)) return reponse(400, JSON.stringify({ error: 'type fronts invalide' }), 'application/json');
+        const date = (params.get('date') || '').replace(/\D/g, '');
+        if (!/^\d{14}$/.test(date)) return reponse(400, JSON.stringify({ error: 'date invalide (YYYYMMDDHHMMSS)' }), 'application/json');
+        const urlImg = AEROWEB + '/affiche_image.php?type=' + imgType + '&date=' + date + '&mode=img';
+        const cle = new Request(urlImg);
+        const hit = await cache.match(cle);
+        if (hit) {
+            const out = reponse(200, hit.body, hit.headers.get('content-type') || 'image/png');
+            out.headers.set('X-Cache', 'HIT');
+            return out;
+        }
+        const cookie = await aerowebLogin(env);
+        const r = await fetch(urlImg, { headers: { cookie } });
+        if (!r.ok) return reponse(502, JSON.stringify({ error: 'image fronts indisponible (HTTP ' + r.status + ')' }), 'application/json');
+        const ct = r.headers.get('content-type') || 'image/png';
+        const bytes = await r.arrayBuffer();
+        ctx.waitUntil(cache.put(cle, new Response(bytes, { headers: { 'content-type': ct, 'cache-control': 'public, max-age=1800' } })));
+        const out = reponse(200, bytes, ct);
+        out.headers.set('Cache-Control', 'public, max-age=1800');
+        return out;
+    }
+
+    // ---- Liste des échéances (cache 10 min) ----
+    const cleListe = new Request(AEROWEB + '/fronts/liste/europeouest');
+    const hitListe = await cache.match(cleListe);
+    if (hitListe) {
+        const out = reponse(200, hitListe.body, 'application/json');
+        out.headers.set('X-Cache', 'HIT');
+        return out;
+    }
+    const urlListe = AEROWEB + '/anim_carte_front.php?tt=xxx&width=600&height=539&layer=front/europeouest&prof_avant=-18';
+    let html = '';
+    for (let essai = 1; essai <= 2; essai++) {
+        const cookie = await aerowebLogin(env);
+        const r = await fetch(urlListe, { headers: { cookie } });
+        html = await r.text();
+        if (/affiche_image\.php/.test(html)) break;
+        _aeroSession = { cookie: null, ts: 0 };   // session expirée → re-login
+    }
+    const layers = parseFrontsLayers(html);
+    if (!layers.length) {
+        return reponse(502, JSON.stringify({ error: 'réponse AEROWEB inattendue (pas de cartes fronts)' }), 'application/json');
+    }
+    const json = JSON.stringify({ generatedAt: new Date().toISOString(), domain: 'EUROPE OUEST', layers });
     ctx.waitUntil(cache.put(cleListe, new Response(json, { headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=600' } })));
     const out = reponse(200, json, 'application/json');
     out.headers.set('Cache-Control', 'public, max-age=600');

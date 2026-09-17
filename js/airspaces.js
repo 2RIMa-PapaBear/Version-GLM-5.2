@@ -572,7 +572,7 @@ export function _decodeType(as) {
     return 'OTHER';
 }
 
-function _decodeIcaoClass(as) {
+export function _decodeIcaoClass(as) {
     if (typeof as.icaoClass === 'number') return ICAO_CLASS_MAP[as.icaoClass] || '';
     const c = String(as.icaoClass || '').toUpperCase();
     return /^[A-G]$/.test(c) ? c : '';

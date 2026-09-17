@@ -139,6 +139,7 @@ export const AIRCRAFT_DB = [
         name: 'Dynamic WT9 LSA', type: 'WT9-LSA',
         groundRoll: 540, fiftyFt: 1148,
         safetyMargin: 15, cruiseSpeedKt: 100, fuelBurnLph: 18,
+        usableFuelL: 113,   // capacité 119 L − 6 L inutilisables (pilote 17/09)
         xwindLimitKt: 25, reserveExtraMin: 5,
         ldgRoll: 246, ldgFifty: 863,
         wb: {

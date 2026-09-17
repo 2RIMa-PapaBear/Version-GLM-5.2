@@ -579,22 +579,26 @@ function _drawCalcPage(doc, c) {
          c.timeLabel || '—', { color: TEAL, size: 11 });
     y += 33;
 
-    // ---- Ligne carburant : Trajet / [Dégagement] / Réserve / Total requis ----
+    // ---- Ligne carburant : Trajet / [Dégagement] / Roulage+intégration /
+    // Réserve / Total requis ----
     y = section(null, y);
     if (c.fuel?.divIcao) {
-        const fw = (W - 3 * 12) / 4;
+        const fw = (W - 4 * 12) / 5;
         cell(L, y, fw, 29, fr ? 'Trajet' : 'Trip', `${c.fuel?.tripL ?? '—'} L`, { size: 9.5 });
         cell(L + fw + 12, y, fw, 29, `${fr ? 'Dégagement' : 'Alternate'} ${c.fuel.divIcao}`,
             `${c.fuel?.diversionL ?? '—'} L`, { size: 9.5 });
-        cell(L + 2 * (fw + 12), y, fw, 29, `${fr ? 'Réserve' : 'Reserve'} (${c.fuel?.reserveMin ?? ''} min)`,
+        cell(L + 2 * (fw + 12), y, fw, 29, `${fr ? 'Roulage + intégr.' : 'Taxi + integ.'} (${c.fuel?.groundMin ?? 0} min)`,
+            `${c.fuel?.groundL ?? 0} L`, { size: 9.5 });
+        cell(L + 3 * (fw + 12), y, fw, 29, `${fr ? 'Réserve' : 'Reserve'} (${c.fuel?.reserveMin ?? ''} min)`,
             `${c.fuel?.reserveL ?? '—'} L`, { size: 9.5 });
-        cell(L + 3 * (fw + 12), y, fw, 29, fr ? 'Total requis' : 'Total req.',
+        cell(L + 4 * (fw + 12), y, fw, 29, fr ? 'Total requis' : 'Total req.',
             `${c.fuel?.totalL ?? '—'} L`, { color: BLUE, size: 12 });
     } else {
-        const fw = (W - 2 * 12) / 3;
+        const fw = (W - 3 * 12) / 4;
         cell(L, y, fw, 29, fr ? 'Trajet' : 'Trip', `${c.fuel?.tripL ?? '—'} L`);
-        cell(L + fw + 12, y, fw, 29, `${fr ? 'Réserve' : 'Reserve'} (${c.fuel?.reserveMin ?? ''} min)`, `${c.fuel?.reserveL ?? '—'} L`);
-        cell(L + 2 * (fw + 12), y, fw, 29, fr ? 'Total requis' : 'Total req.', `${c.fuel?.totalL ?? '—'} L`, { color: BLUE, size: 12 });
+        cell(L + fw + 12, y, fw, 29, `${fr ? 'Roulage + intégr.' : 'Taxi + integ.'} (${c.fuel?.groundMin ?? 0} min)`, `${c.fuel?.groundL ?? 0} L`);
+        cell(L + 2 * (fw + 12), y, fw, 29, `${fr ? 'Réserve' : 'Reserve'} (${c.fuel?.reserveMin ?? ''} min)`, `${c.fuel?.reserveL ?? '—'} L`);
+        cell(L + 3 * (fw + 12), y, fw, 29, fr ? 'Total requis' : 'Total req.', `${c.fuel?.totalL ?? '—'} L`, { color: BLUE, size: 12 });
     }
     y += 33;
 

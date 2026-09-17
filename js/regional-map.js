@@ -12,6 +12,7 @@ import { hasVac, openVac } from './vac-viewer.js';
 import { registerMap } from './map-registry.js';
 import { mountWindLayer } from './wind-layer.js';
 import { mountTemsiButton, closeTemsiViewer } from './temsi.js';
+import { mountFrontsButton, closeFrontsViewer } from './fronts.js';
 
 let _map = null;
 let _precip = null;
@@ -361,6 +362,7 @@ function _initLayerControls() {
     // aussi « Vols » en rangée 2.)
     try { mountWindLayer(_map, row1); } catch (e) { console.error('wind layer failed:', e.message); }
     try { mountTemsiButton(row1); } catch (e) { console.error('temsi button failed:', e.message); }
+    try { mountFrontsButton(row1); } catch (e) { console.error('fronts button failed:', e.message); }
 
     try { _mountBasemapSwitcher(row2); } catch (e) { console.error('basemap switcher failed:', e.message); }
     _mountZoomAirfieldButton(row2);

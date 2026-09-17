@@ -60,8 +60,10 @@
     "fuel": {
       "tripL": 21.4,
       "reserveL": 8,
-      "totalL": 29.4,
-      "reserveMin": 30
+      "totalL": 33.9,
+      "reserveMin": 30,
+      "groundMin": 15,
+      "groundL": 4.5
     },
     "clearance": {
       "maxFt": 660,

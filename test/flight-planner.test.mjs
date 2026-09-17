@@ -23,14 +23,16 @@ import {
     computeDiversionLeg,
     cheapestWaypointInsertion,
     RESERVES,
+    TAXI_MIN_DEP, TAXI_MIN_ARR, INTEGRATION_MIN,
+    computeLeg2Fuel,
 } from '../js/flight-planner.js';
 
 describe('computeDiversionLeg (branche dégagement du devis carburant)', () => {
     test('distance / temps / carburant depuis la destination (0,5° lat ≈ 30 NM)', () => {
         const d = computeDiversionLeg(47.0, -3.0, 47.5, -3.0, 30, 100);
         assert.equal(d.distNm, 30);   // 0,5° × 60 NM
-        assert.equal(d.timeMin, 18);  // 30 NM / 100 kt × 60
-        assert.equal(d.fuelL, 9);     // 18 min / 60 × 30 L/h
+        assert.equal(d.timeMin, 23);  // 30 NM / 100 kt × 60 + 5 min d'intégration
+        assert.equal(d.fuelL, 11.5);  // 23 min / 60 × 30 L/h
     });
 
     test('sans GS ni conso → distance seule ; coordonnées invalides → null', () => {
@@ -229,5 +231,55 @@ describe('computeFuel', () => {
         const f = computeFuel(15, 35, 30);
         // Trip : 15/60 * 35 = 8.75 → 8.8
         assert.equal(f.tripFuelL, 8.8);
+    });
+
+    // Forfaits au sol (roulage ×2 + intégration) — chantier devis détaillé 17/09.
+    test('forfaits au sol : groundMin/groundL ajoutés au total', () => {
+        const f = computeFuel(60, 18, 30, TAXI_MIN_DEP + TAXI_MIN_ARR + INTEGRATION_MIN);
+        assert.equal(f.groundMin, 15);
+        assert.equal(f.groundL, 4.5);        // 15/60 × 18
+        assert.equal(f.tripFuelL, 18);
+        assert.equal(f.reserveL, 9);
+        assert.equal(f.totalL, 31.5);        // 18 + 4.5 + 9
+    });
+
+    test('sans forfaits (jambes du plan) : groundL nul, total inchangé', () => {
+        const f = computeFuel(60, 35, 30);
+        assert.equal(f.groundMin, 0);
+        assert.equal(f.groundL, 0);
+        assert.equal(f.totalL, 52.5);
+    });
+
+    test('constantes forfaits : 5 + 5 + 5 minutes', () => {
+        assert.equal(TAXI_MIN_DEP, 5);
+        assert.equal(TAXI_MIN_ARR, 5);
+        assert.equal(INTEGRATION_MIN, 5);
+    });
+});
+
+describe('computeLeg2Fuel (projet deux étapes sans plein)', () => {
+    test('étape 2 navigation : nav sans vent au TAS + forfaits + réserve', () => {
+        const l = computeLeg2Fuel({ distNm: 50, tasKt: 100, fuelBurnLph: 18, reserveMin: 35 });
+        assert.equal(l.isLocal, false);
+        assert.equal(l.navTimeMin, 30);      // 50 NM / 100 kt
+        assert.equal(l.navL, 9);             // 30/60 × 18
+        assert.equal(l.groundMin, 15);
+        assert.equal(l.groundL, 4.5);
+        assert.equal(l.reserveL, 10.5);      // 35/60 × 18
+        assert.equal(l.totalL, 24);          // 9 + 4.5 + 10.5
+    });
+
+    test('étape 2 LOCALE : durée saisie + réserve 10 min', () => {
+        const l = computeLeg2Fuel({ localMin: 30, tasKt: 100, fuelBurnLph: 18, reserveMin: 10 });
+        assert.equal(l.isLocal, true);
+        assert.equal(l.navTimeMin, 30);
+        assert.equal(l.reserveL, 3);
+        assert.equal(l.totalL, 16.5);        // 9 + 4.5 + 3
+    });
+
+    test('paramètres inutilisables → null', () => {
+        assert.equal(computeLeg2Fuel({ distNm: 50, tasKt: 0, fuelBurnLph: 18, reserveMin: 30 }), null);
+        assert.equal(computeLeg2Fuel({ tasKt: 100, fuelBurnLph: 18, reserveMin: 30 }), null);   // ni distance ni durée
+        assert.equal(computeLeg2Fuel({ distNm: 0, localMin: 0, tasKt: 100, fuelBurnLph: 18, reserveMin: 30 }), null);
     });
 });

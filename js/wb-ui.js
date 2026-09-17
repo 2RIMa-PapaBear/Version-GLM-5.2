@@ -26,13 +26,17 @@ import {
 } from './wb-core.js';
 
 let _chartDispose = null;
+// Réserve finale d'un vol LOCAL de jour en vue du terrain : 10 min
+// (30 min en navigation de jour, 45 de nuit — cf. devis du planificateur).
+const LOCAL_RESERVE_MIN = 10;
 // Pop-up « carburant insuffisant » déjà affiché pour l'épisode courant
 // (reset dès que l'embarqué atteint le requis, re-alerte ensuite si rechute).
 let _fuelWarnActive = false;
 
 /** Carburant requis. En navigation : plan actif {totalL, tripFuelL, reserveL}.
- *  En vol local (A4) : durée estimée saisie dans le widget + ROZ 30 min
- *  (majorée de la réserve perso de l'avion) — null sans durée saisie. */
+ *  En vol local (A4) : durée estimée saisie dans le widget + réserve finale
+ *  10 min (vol local de jour en vue du terrain), majorée de la réserve perso
+ *  de l'avion — null sans durée saisie. */
 function _requiredFuel() {
     if (getFlightMode() === 'nav') {
         const f = state._lastNavPlan?.plan?.fuel;
@@ -42,12 +46,12 @@ function _requiredFuel() {
     if (!Number.isFinite(min) || min <= 0) return null;
     const ac = getActiveAircraft();
     const burn = ac?.fuelBurnLph ?? 35;
-    const reserveMin = 30 + (ac?.reserveExtraMin || 0);
+    const reserveMin = LOCAL_RESERVE_MIN + (ac?.reserveExtraMin || 0);
     const tripL = Math.round(min / 60 * burn * 10) / 10;
     const reserveL = Math.round(reserveMin / 60 * burn * 10) / 10;
     return {
         local: true, tripMin: min, tripFuelL: tripL, reserveL, reserveMin,
-        reserveBaseMin: 30, reserveExtraMin: ac?.reserveExtraMin || 0,
+        reserveBaseMin: LOCAL_RESERVE_MIN, reserveExtraMin: ac?.reserveExtraMin || 0,
         totalL: Math.round((tripL + reserveL) * 10) / 10,
     };
 }
@@ -128,6 +132,10 @@ function _render(body, ac, isFr) {
             <input type="number" step="any" min="0" name="wb-load" aria-label="Masse embarquée au poste" class="wb-load-in" data-key="st:${escapeHtml(s.name)}" data-max="${s.maxKg || ''}" value="${loads.masses[s.name] ?? ''}" placeholder="0">
             <input type="range" name="wb-load-range" aria-label="Réglage de la masse" class="wb-load-range" data-key="st:${escapeHtml(s.name)}" min="0" max="${s.maxKg ? Math.max(1, Math.round(massFromKg(s.maxKg, u.mass))) : 150}" step="1" value="${Math.round(massFromKg(loads.masses[s.name] || 0, u.mass))}">
         </label>`;
+    // Plafond d'emport : carburant UTILISABLE du manuel de vol si défini,
+    // sinon capacité du poste carburant du centrage.
+    const usableL = (ac.usableFuelL > 0) ? ac.usableFuelL : null;
+    const fuelMaxL = usableL ?? (fuelSt?.maxKg > 0 ? fuelSt.maxKg : null);
     const fuelCell = fuelSt ? `
         <label class="wb-load wb-load-fuel" title="${isFr
             ? (isNav
@@ -135,10 +143,12 @@ function _render(body, ac, isFr) {
                 : 'Quantité totale embarquée au décollage — saisie libre, mémorisée pour cet avion.')
             : (isNav
                 ? 'Total fuel at takeoff — pre-filled from the nav plan (trip + reserve), editable.'
-                : 'Total fuel at takeoff — free entry, saved for this aircraft.')}">
-            <span class="wb-load-lab"><span class="lab">${isFr ? 'Carburant embarqué (L)' : 'Fuel on board (L)'}</span>${fuelSt.maxKg ? ` <span class="val">Max ${fuelSt.maxKg}</span>` : ''}</span>
-            <input type="number" step="any" min="0" id="wb-fuel-l" data-key="fuel" data-max="${fuelSt.maxKg || ''}" value="${loads.fuelL || ''}" placeholder="0">
-            <input type="range" name="wb-load-range" aria-label="Réglage de la masse" class="wb-load-range" data-key="fuel" min="0" max="${fuelSt.maxKg ? Math.max(1, Math.round(fuelSt.maxKg)) : 200}" step="1" value="${Math.round(loads.fuelL || 0)}">
+                : 'Total fuel at takeoff — free entry, saved for this aircraft.')}${usableL && fuelSt?.maxKg && usableL < fuelSt.maxKg ? (isFr
+                ? ` Carburant utilisable du manuel de vol (${usableL} L sur ${fuelSt.maxKg} L de capacité).`
+                : ` Usable fuel from the POH (${usableL} L out of ${fuelSt.maxKg} L capacity).`) : ''}">
+            <span class="wb-load-lab"><span class="lab">${isFr ? 'Carburant embarqué (L)' : 'Fuel on board (L)'}</span>${fuelMaxL ? ` <span class="val">Max ${fuelMaxL}</span>` : ''}</span>
+            <input type="number" step="any" min="0" id="wb-fuel-l" data-key="fuel" data-max="${fuelMaxL || ''}" value="${loads.fuelL || ''}" placeholder="0">
+            <input type="range" name="wb-load-range" aria-label="Réglage de la masse" class="wb-load-range" data-key="fuel" min="0" max="${fuelMaxL ? Math.max(1, Math.round(fuelMaxL)) : 200}" step="1" value="${Math.round(loads.fuelL || 0)}">
         </label>` : '';
     const burnCell = (fuelSt && isNav) ? `
         <label class="wb-load wb-load-fuel" title="${isFr ? 'Essence consommée jusqu\u2019à destination, issue du plan de vol (trajet, sans la réserve) — non modifiable. Le point Arrivée est calculé avec le carburant restant (embarqué − consommée).' : 'Fuel burned to destination, from the flight plan (trip, no reserve) — read-only. The landing point uses the remaining fuel (on board − burned).'}">
@@ -218,7 +228,7 @@ function _render(body, ac, isFr) {
         const under = !(isFinite(fl2) && fl2 + 0.05 >= req.totalL);
         if (under && !_fuelWarnActive) {
             _fuelWarnActive = true;
-            const plan = state._lastNavPlan.plan;
+            const plan = state._lastNavPlan?.plan;
             const route = (plan?.from?.icao && plan?.to?.icao) ? ` (${plan.from.icao} → ${plan.to.icao})` : '';
             // Détail du requis : vol estimé (local) / trajet + dégagement
             // éventuel (navigation), puis réserve.
@@ -229,10 +239,10 @@ function _render(body, ac, isFr) {
                 partsEn.push(`alternate ${req.diversionL} L`);
             }
             partsFr.push(`réserve ${req.reserveL} L${req.local
-                ? (req.reserveExtraMin > 0 ? ` (30 + ${req.reserveExtraMin} perso)` : ' (30 min)')
+                ? (req.reserveExtraMin > 0 ? ` (${req.reserveBaseMin} + ${req.reserveExtraMin} perso)` : ` (${req.reserveBaseMin} min)`)
                 : (req.reserveMin ? ` (${req.reserveMin} min)` : '')}`);
             partsEn.push(`reserve ${req.reserveL} L${req.local
-                ? (req.reserveExtraMin > 0 ? ` (30 + ${req.reserveExtraMin} personal)` : ' (30 min)')
+                ? (req.reserveExtraMin > 0 ? ` (${req.reserveBaseMin} + ${req.reserveExtraMin} personal)` : ` (${req.reserveBaseMin} min)`)
                 : (req.reserveMin ? ` (${req.reserveMin} min)` : '')}`);
             window.alert(isFr
                 ? `⚠ CARBURANT INSUFFISANT${route}\n\nEmbarqué : ${isFinite(fl2) ? fl2 : 0} L\nRequis : ${req.totalL} L (${partsFr.join(' + ')})\n\nLe champ « Carburant embarqué » restera rouge jusqu'à ce que la quantité embarquée atteigne le total requis.`
@@ -277,14 +287,18 @@ function _recalc(body, ac, isFr) {
         fuelIn.classList.toggle('wb-under', under);
         if (!under) _fuelWarnActive = false;
         // Vol local (A4) : requis détaillé à côté de la durée — la formule
-        // est explicite, réserve perso comprise : « durée + 30 min + 15 perso ».
+        // est explicite, réserve perso comprise : « durée + 10 min + 15 perso »
+        // (réserve finale vol local de jour en vue du terrain).
         const reqEl = body.querySelector('#wb-local-req');
         if (reqEl) {
             if (req && req.local) {
                 const extra = req.reserveExtraMin > 0
                     ? ` + ${req.reserveExtraMin} ${isFr ? 'perso' : 'personal'}` : '';
-                reqEl.textContent = `→ ${req.totalL} L (${isFr ? 'durée' : 'duration'} + 30 min${extra})`;
-            } else reqEl.textContent = '';
+                reqEl.textContent = `→ ${req.totalL} L (${isFr ? 'durée' : 'duration'} + ${req.reserveBaseMin} min${extra})`;
+                reqEl.title = isFr
+                    ? 'Réserve finale vol local de jour en vue du terrain'
+                    : 'Final reserve for a day local flight in sight of the airfield';
+            } else { reqEl.textContent = ''; reqEl.title = ''; }
         }
     }
     writeWbLoads(ac.id, loads);
