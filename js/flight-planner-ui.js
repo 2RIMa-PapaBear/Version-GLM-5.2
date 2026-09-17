@@ -754,15 +754,28 @@ async function _generateNavLogPdfInto(tab, { file = false } = {}) {
 // étape (roulage ×2 + intégration + navigation sans vent + réserve)
 // ajouté au requis complet de l'étape 1, comparé au carburant UTILISABLE
 // réellement à bord. Saisie : code OACI de la 2ᵉ destination (prime) ou
-// durée d'une étape locale. Persistance localStorage fp-leg2.
+// durée d'une étape locale. État EN MÉMOIRE uniquement, remis à vide à
+// chaque changement de route (retour pilote 17/09 : le champ ne doit
+// pas survivre d'un vol à l'autre) — plus aucun localStorage.
 // ----------------------------------------------------------------
-const LS_LEG2 = 'fp-leg2';
-function _readLeg2() { try { return JSON.parse(localStorage.getItem(LS_LEG2)) || {}; } catch { return {}; } }
-function _writeLeg2(v) { try { localStorage.setItem(LS_LEG2, JSON.stringify(v)); } catch { /* localStorage indisponible */ } }
+let _leg2Mem = { planKey: null, icao: '', min: '' };
+try { localStorage.removeItem('fp-leg2'); } catch { /* best effort */ }
+
+function _leg2PlanKey(plan) {
+    const wps = Array.isArray(plan.waypoints) && plan.waypoints.length ? plan.waypoints : null;
+    const dep = wps ? wps[0].icao : plan.from?.icao;
+    const arr = wps ? wps[wps.length - 1].icao : plan.to?.icao;
+    return `${dep || ''}>${arr || ''}`;
+}
+function _readLeg2(plan) {
+    const key = _leg2PlanKey(plan);
+    if (_leg2Mem.planKey !== key) _leg2Mem = { planKey: key, icao: '', min: '' };
+    return _leg2Mem;
+}
 
 /** Calcul complet du bloc étape 2 (pure vis-à-vis du DOM). */
 function _leg2Compute(plan, isNight, tas, burn) {
-    const saved = _readLeg2();
+    const saved = _readLeg2(plan);
     const icao = String(saved.icao || '').toUpperCase();
     const localMin = Math.max(0, Math.min(600, Math.round(parseFloat(saved.min)) || 0));
     const dest1 = (Array.isArray(plan.waypoints) && plan.waypoints.length)
@@ -850,12 +863,12 @@ function _wireLeg2(container, ctx) {
         _wireLeg2(container, ctx);
     };
     const persist = () => {
-        const s = _readLeg2();
+        const s = _readLeg2(ctx.plan);
         const icaoEl = block.querySelector('#fp-leg2-icao');
         const minEl = block.querySelector('#fp-leg2-min');
         s.icao = (icaoEl?.value || '').trim().toUpperCase();
         s.min = minEl?.value ?? '';
-        _writeLeg2(s);
+        _leg2Mem = s;
         rerender();
     };
     block.querySelector('#fp-leg2-icao')?.addEventListener('change', persist);

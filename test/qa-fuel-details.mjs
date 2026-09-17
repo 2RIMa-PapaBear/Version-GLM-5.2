@@ -112,7 +112,8 @@ const leg2b = await page.evaluate(() => ({
 }));
 console.log('étape 2 (40 L) :', JSON.stringify(leg2b.block));
 (/avitaillement à prévoir/.test(leg2b.block) && !/possibles sans complément/.test(leg2b.block) ? ok : ko)('étape 2 : verdict bascule sur « avitaillement à prévoir » à 40 L');
-// Persistance au rechargement.
+// Retour pilote 17/09 : le champ 2ᵉ étape NE DOIT PAS survivre — vide au
+// rechargement, vide aussi quand la route change.
 await page.reload({ waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => document.getElementById('fp-leg2-block') && /Deuxième|Second/.test(document.getElementById('fp-leg2-block')?.textContent || ''), { timeout: 30000 }).catch(() => {});
 const leg2c = await page.evaluate(() => ({
@@ -120,7 +121,25 @@ const leg2c = await page.evaluate(() => ({
     block: document.getElementById('fp-leg2-block')?.textContent.replace(/\s+/g, ' ').trim().slice(0, 120) || '',
 }));
 console.log('après rechargement :', JSON.stringify(leg2c));
-(leg2c.icao === 'LFRD' && /Étape 2 : LFRD|Requis 2 étapes/.test(leg2c.block) ? ok : ko)('étape 2 : saisie LFRD persistée au rechargement');
+(leg2c.icao === '' && !/Étape 2 :/.test(leg2c.block) ? ok : ko)('2ᵉ étape VIDE au rechargement (plus de persistance d un vol à l autre)');
+// Changement de route → remise à vide.
+await page.evaluate(() => {
+    const i = document.getElementById('fp-leg2-icao');
+    i.value = 'LFRD';
+    i.dispatchEvent(new Event('change', { bubbles: true }));
+});
+await wait(800);
+await page.evaluate(() => {
+    const to = document.getElementById('route-to-input');
+    to.value = 'LFRN';
+    to.dispatchEvent(new Event('input', { bubbles: true }));   // câblé sur 'input' (frappe clavier)
+});
+await wait(4500);
+const leg2d = await page.evaluate(() => ({
+    icao: document.getElementById('fp-leg2-icao')?.value ?? 'ABSENT',
+}));
+console.log('après changement de destination :', JSON.stringify(leg2d));
+(leg2d.icao === '' ? ok : ko)('2ᵉ étape remise à vide quand la route change');
 
 // ② LOCAL : réserve 10 min + plafond Max 113 (utilisable).
 await page.goto('http://127.0.0.1:8662/index.html?icao=LFRV', { waitUntil: 'domcontentloaded', timeout: 30000 });
