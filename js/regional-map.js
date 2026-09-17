@@ -2,7 +2,7 @@ import { state, I18N, fetchAvecRelais, memoGet, memoSet, surfaceLabel } from './
 import { getAirportByICAO, getAirportsInBbox, enrichAirport } from './ui-module.js';
 import { parseWaypointsField, formatWaypointsField, registerFreeWpResolver, _wpDisplayName } from './flight-planner-ui.js';
 import { parseVisiToMeters, getCeiling } from './core.js';
-import { showRouteWeather, resetRouteFit } from './route-weather.js';
+import { showRouteWeather, resetRouteFit, waypointLabelHtml } from './route-weather.js';
 import { greatCircleDistanceNm } from './flight-planner.js';
 import { createPrecipController } from './radar-layer.js';
 import { createAirspaceController } from './airspaces.js';
@@ -145,9 +145,8 @@ const BASEMAPS = {
     osm: () => L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors', maxZoom: 19,
     }),
-    dark: () => L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
-        attribution: '© CARTO © OpenStreetMap contributors', maxZoom: 19, subdomains: 'abcd',
-    }),
+    // « Sombre » retiré (pilote 17/09 : aucun intérêt) — l'option avait en
+    // plus cassé quand CARTO s'est mis à exiger une clé API.
     terrain: () => L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenTopoMap (CC-BY-SA)', maxZoom: 17, subdomains: 'abc',
     }),
@@ -286,16 +285,6 @@ async function _initOrRefresh() {
                     document.dispatchEvent(new CustomEvent('add-waypoint', { detail: { icao: code } }));
                 });
             }
-            // « Supprimer » : retire le repère de la carte et du plan.
-            const fwDel = el?.querySelector('.fw-del-btn');
-            if (fwDel) {
-                fwDel.addEventListener('click', () => {
-                    const code = fwDel.dataset.code;
-                    if (!code) return;
-                    _map.closePopup();
-                    _deleteFreeWaypoint(code);
-                });
-            }
         });
 
         // Déplacement/zoom sur la carte : charge les aérodromes de la nouvelle zone
@@ -340,12 +329,18 @@ function _initLayerControls() {
         const mapEl = document.getElementById('regional-map');
         mapEl?.parentNode?.insertBefore(bar, mapEl);
     }
+    // DEUX rangées (retour pilote 17/09 : 8 contrôles ne tiennent plus en
+    // une ligne) — rangée 1 couches d'information, rangée 2 fond & cadrage.
+    let row1 = bar.querySelector('.map-layers-row-top');
+    let row2 = bar.querySelector('.map-layers-row-bottom');
+    if (!row1) { row1 = document.createElement('div'); row1.className = 'map-layers-row map-layers-row-top'; bar.appendChild(row1); }
+    if (!row2) { row2 = document.createElement('div'); row2.className = 'map-layers-row map-layers-row-bottom'; bar.appendChild(row2); }
 
     _precip = createPrecipController(_map);
-    _precip.mountControls(bar);
+    _precip.mountControls(row1);
 
     _airspaces = createAirspaceController(_map);
-    _airspaces.mountControls(bar);
+    _airspaces.mountControls(row1);
 
     // Radiophares (VOR/NDB) + points VFR : couches ouvertes via le menu
     // déroulant du bouton « Espaces » (monté APRÈS le bouton qu'il promeut).
@@ -356,22 +351,22 @@ function _initLayerControls() {
             airspace: _airspaces,
             createWaypoint: (lat, lon, name, freq, kind) => _createFreeWaypoint(lat, lon, name, freq, kind),
         });
-        _radioPoints.mountControls(bar);
+        _radioPoints.mountControls(row1);
     } catch (e) { console.error('radio points layer failed:', e.message); }
 
-    // Ordre de la barre (une ligne) : Radar+lecture+horloge — Espaces —
-    // Satellite (fond de carte) — Terrain — Cadrer plan — Plein cadre.
-    try { _mountBasemapSwitcher(bar); } catch (e) { console.error('basemap switcher failed:', e.message); }
+    // Ordre — rangée 1 (couches) : Radar+lecture+horloge — Espaces — Vent
+    // — TEMSI. Rangée 2 (fond & cadrage) : Satellite — Terrain — Cadrer
+    // plan — Plein cadre. (Cadrer plan et Plein cadre sont ENSUITE promus
+    // dans le paquet d'icônes flottant sur la carte par gps.js, qui y ajoute
+    // aussi « Vols » en rangée 2.)
+    try { mountWindLayer(_map, row1); } catch (e) { console.error('wind layer failed:', e.message); }
+    try { mountTemsiButton(row1); } catch (e) { console.error('temsi button failed:', e.message); }
 
-    // B3 (14/09) : couche « Vent » — flèches à l'altitude du plan (OFF au
-    // départ, comme le radar ; re-rendu au déplacement/zoom de la carte).
-    try { mountWindLayer(_map, bar); } catch (e) { console.error('wind layer failed:', e.message); }
-    try { mountTemsiButton(bar); } catch (e) { console.error('temsi button failed:', e.message); }
-
-    _mountZoomAirfieldButton(bar);
+    try { _mountBasemapSwitcher(row2); } catch (e) { console.error('basemap switcher failed:', e.message); }
+    _mountZoomAirfieldButton(row2);
     _wireFreeWaypointShortcuts();
-    _mountFitPlanButton(bar);
-    _mountFullscreenButton(bar);
+    _mountFitPlanButton(row2);
+    _mountFullscreenButton(row2);
 
     // Radar n'est PAS activé d'office : le pilote l'allume d'un clic
     // (état initial OFF dans son contrôleur).
@@ -421,7 +416,6 @@ function _mountBasemapSwitcher(bar) {
     const options = [
         ['satellite', 'Satellite'],
         ['osm',       isFr ? 'Plan'   : 'Map'],
-        ['dark',      isFr ? 'Sombre' : 'Dark'],
         ['terrain',   isFr ? 'Relief' : 'Terrain'],
     ];
     group.innerHTML = `
@@ -538,12 +532,11 @@ function _freeWpPopupHtml(code) {
         <div class="fw-inner">
             <div class="fw-title"><strong>${escapeHtml(wp.name)}</strong> <span class="fw-code">${escapeHtml(code)}</span></div>
             <input type="text" name="wp-name" aria-label="Nom du waypoint" class="fw-name-input" maxlength="24" value="${escapeHtml(wp.name)}" placeholder="${isFr ? 'Nom du waypoint' : 'Waypoint name'}">
-            <div class="mp-btns">
-                <button class="fw-ok-btn" data-code="${escapeHtml(code)}">${isFr ? 'Renommer' : 'Rename'}</button>
-                ${!inPlan ? `<button class="fw-add-btn" data-code="${escapeHtml(code)}">+ ${isFr ? 'Plan' : 'Plan'}</button>` : ''}
-            </div>
-            <div class="mp-btns"><button class="fw-del-btn" data-code="${escapeHtml(code)}">${isFr ? 'Supprimer' : 'Delete'}</button></div>
-        </div>`;
+                <div class="mp-btns">
+                    <button class="fw-ok-btn" data-code="${escapeHtml(code)}">${isFr ? 'Renommer' : 'Rename'}</button>
+                    ${!inPlan ? `<button class="fw-add-btn" data-code="${escapeHtml(code)}">+ ${isFr ? 'Plan' : 'Plan'}</button>` : ''}
+                </div>
+            </div>`;
 }
 
 // Popup de création d'un nouveau repère au point cliqué (hors zone connue) :
@@ -595,11 +588,15 @@ function _createFreeWaypoint(lat, lon, name, freq, kind) {
         radius: 7, fillColor: '#FBBF24', color: '#fff',
         weight: 2, opacity: 1, fillOpacity: 0.9,
     }).addTo(_map);
-    marker.bindTooltip(escapeHtml(name), { permanent: true, direction: 'right', className: 'free-wp-label' });
+    // Étiquette permanente du nom + « × » de suppression (retour pilote
+    // 17/09 : on supprime le repère directement depuis son étiquette).
+    marker.bindTooltip(
+        waypointLabelHtml(name, { 'data-code': code }, state.lang === 'fr' ? 'Supprimer le repère' : 'Delete waypoint'),
+        { permanent: true, direction: 'right', className: 'free-wp-label', interactive: true });
     // Marqueur DOM superposé au cercle SVG — même remède que les pastilles
     // (da0feda1) : le clic sur un path SVG recouvert par les couches et le
     // point d'étape de la route n'est pas fiable, c'est le HIT qui porte le
-    // popup d'édition (Renommer / + Plan / Supprimer).
+    // popup d'édition (Renommer / + Plan).
     const hit = L.marker([lat, lon], {
         interactive: true,
         keyboard: false,
@@ -631,7 +628,7 @@ function _renameFreeWaypoint(code, name) {
     wp.name = name;
     enrichAirport(code, { name });
     memoSet(code, { name, lat: wp.lat, lon: wp.lon });
-    wp.marker.setTooltipContent(escapeHtml(name));
+    wp.marker.setTooltipContent(waypointLabelHtml(name, { 'data-code': code }, state.lang === 'fr' ? 'Supprimer le repère' : 'Delete waypoint'));
     // (le popup est bindé avec une fonction : il se re-rendra à la prochaine ouverture)
     if (wpInput && codes) {
         wpInput.value = formatWaypointsField(codes);
@@ -671,6 +668,16 @@ if (typeof document !== 'undefined') {
         const icao = e.detail?.icao;
         const name = (e.detail?.name || '').trim().slice(0, 24);
         if (icao && name) _renameFreeWaypoint(icao.toUpperCase(), name);
+    });
+
+    // « × » d'une étiquette de repère libre : suppression du repère ET de son
+    // étape du plan — même chaîne que l'ancien bouton « Supprimer » du popup.
+    // Délégation document : les tooltips sont recréés à chaque renommage.
+    document.addEventListener('click', (e) => {
+        const btn = e.target?.closest?.('.wp-del-x[data-code]');
+        if (!btn) return;
+        e.stopPropagation();
+        _deleteFreeWaypoint(btn.dataset.code);
     });
 
     // « Renommer » depuis le popup d'un repère libre EN ROUTE (son marqueur

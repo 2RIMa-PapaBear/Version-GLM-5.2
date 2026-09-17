@@ -128,6 +128,36 @@ export const AIRCRAFT_DB = [
     // --- Aeroprakt / ULM 3 axes ---
     { name: 'Aeroprakt A-22 Foxbat', type: 'A22', groundRoll: 250, fiftyFt: 520 },
     { name: 'Aeroprakt A-32 Vixxen', type: 'A32', groundRoll: 280, fiftyFt: 560 },
+    // Fiche COMPLÈTE (config club du pilote, 17/09) — version LSA 600 kg
+    // (l'ULM 525 kg sera ajoutée quand ses données réelles seront fournies ;
+    // pas d'enveloppe déduite par interpolation). En plus des distances de
+    // décollage, les champs étendus (atterrissage, croisière, limites) et le
+    // bloc wb (centrage kg/mm interne, MTOW 600) pré-remplissent TOUT le
+    // formulaire flotte via l'autocomplétion du nom — sans immatriculation.
+    // VR 50 kt (pilote).
+    {
+        name: 'Dynamic WT9 LSA', type: 'WT9-LSA',
+        groundRoll: 540, fiftyFt: 1148,
+        safetyMargin: 15, cruiseSpeedKt: 100, fuelBurnLph: 18,
+        xwindLimitKt: 25, reserveExtraMin: 5,
+        ldgRoll: 246, ldgFifty: 863,
+        wb: {
+            units: { mass: 'kg', arm: 'm' },
+            emptyMassKg: 354, emptyArmMm: 2641,
+            mtowKg: 600, refMassKg: null,
+            fuelDensity: 0.72,
+            envelope: [
+                [405, 2704], [405, 2704], [542.5, 2704], [600, 2748],
+                [600, 2824], [465.3, 2824], [445, 2810], [405, 2713],
+            ],
+            stations: [
+                { name: 'Pilote', armMm: 3130, maxKg: 130, fuel: false },
+                { name: 'Passager 1', armMm: 3130, maxKg: 130, fuel: false },
+                { name: 'Bagages', armMm: 3795, maxKg: 40, fuel: false },
+                { name: 'Carburant', armMm: 2580, maxKg: 119, fuel: true },
+            ],
+        },
+    },
     { name: "Dyn'Aéro MCR01 ULM", type: 'MCR01', groundRoll: 200, fiftyFt: 450 },
     { name: "Dyn'Aéro MCR-4S", type: 'MCR4S', groundRoll: 380, fiftyFt: 750 },
     { name: 'TL-Ultralight TL-3000 Sirius', type: 'TL3000', groundRoll: 300, fiftyFt: 600 },
@@ -236,11 +266,11 @@ export const VR_KT = {
     '7AC': 45, '11AC': 45, L8A: 50, BC12D: 45, '7GCBC': 50, '8KCAB': 55,
     '8GCBC': 58, M7: 50, M9: 55,
     P92: 50, P2002: 55, P2010: 60, P2006T: 68, A22: 52, A32: 60,
-    MCR01: 60, MCR4S: 65, TL3000: 55, EV97: 50, VirusSW: 60, Sinus: 55,
+    WT9: 50, 'WT9-LSA': 50, MCR01: 60, MCR4S: 65, TL3000: 55, EV97: 50, VirusSW: 60, Sinus: 55,
     CAP20: 65, EA200: 60, S10VT: 60,
     Yak18T: 60, AERC: 55, AUSTER: 45, D112: 50, DR1050: 50, DR1051: 50,
     SF260: 70, L90: 60, KOLIBER: 50, Yak52: 65, Z42: 60, Z43: 60, Z142: 65,
-    Z242L: 65, G115: 70, G120A: 70, T67: 60, BULLOG: 60, 'B-121': 60, HEMA352: 55,
+    Z242L: 65, G115: 70, G120A: 70, T67: 60, BULLDOG: 60, 'B-121': 60, HEMA352: 55,
 };
 
 /** VR d'un type de la base ; type inconnu → 55 kt (monomoteur club). */

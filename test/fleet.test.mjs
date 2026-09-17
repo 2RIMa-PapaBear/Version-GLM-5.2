@@ -12,6 +12,7 @@ globalThis.localStorage = {
 };
 
 const fleet = await import('../js/aircraft-fleet.js');
+const acdb = await import('../js/aircraft-database.js');
 
 beforeEach(() => { _store.clear(); });
 
@@ -240,5 +241,62 @@ describe('flotte — limites par avion (A3)', () => {
         const sans = fleet.addAircraft({ name: 'DR400', groundRoll: 500, fiftyFt: 1100 });
         assert.equal(sans.ldgRoll, null);
         assert.equal(sans.ldgFifty, null);
+    });
+});
+
+// ---- Base avions (js/aircraft-database.js) : fiche complète Dynamic WT9 ----
+// Intégrée le 17/09 depuis la config flotte du pilote (export JSON, version
+// LSA 600 kg), sans l'immatriculation. La fiche étendue pré-remplit TOUT le
+// formulaire via l'autocomplétion du nom (fleet-ui.js _applySuggestion).
+describe('base avions — Dynamic WT9 LSA (fiche complète)', () => {
+    test('recherche « wt9 » : la fiche complète est trouvée et intègre tous les champs', () => {
+        const res = acdb.searchAircraft('wt9');
+        const wt9 = res.find(a => a.type === 'WT9-LSA');
+        assert.ok(wt9, 'WT9 LSA trouvé');
+        assert.equal(wt9.name, 'Dynamic WT9 LSA');
+        assert.equal(wt9.groundRoll, 540);
+        assert.equal(wt9.fiftyFt, 1148);
+        assert.equal(wt9.ldgRoll, 246);
+        assert.equal(wt9.ldgFifty, 863);
+        assert.equal(wt9.safetyMargin, 15);
+        assert.equal(wt9.cruiseSpeedKt, 100);
+        assert.equal(wt9.fuelBurnLph, 18);
+        assert.equal(wt9.xwindLimitKt, 25);
+        assert.equal(wt9.reserveExtraMin, 5);
+    });
+
+    test('bloc centrage embarqué : masse/CG à vide, MTOW 600, enveloppe, 4 postes dont carburant', () => {
+        const wt9 = acdb.AIRCRAFT_DB.find(a => a.type === 'WT9-LSA');
+        assert.ok(wt9.wb);
+        assert.equal(wt9.wb.emptyMassKg, 354);
+        assert.equal(wt9.wb.emptyArmMm, 2641);
+        assert.equal(wt9.wb.mtowKg, 600, 'MTOW LSA enregistré (verdict dépassement)');
+        assert.equal(wt9.wb.fuelDensity, 0.72);
+        assert.ok(wt9.wb.envelope.length >= 3, 'au moins 3 points d\'enveloppe');
+        assert.equal(wt9.wb.stations.length, 4);
+        assert.ok(wt9.wb.stations.some(s => s.fuel), 'poste carburant présent');
+        // La fiche doit passer telle quelle le sanitize flotte (ajout réel).
+        const ac = fleet.addAircraft({ ...wt9 });
+        assert.equal(ac.wb.emptyMassKg, 354);
+        assert.equal(ac.wb.mtowKg, 600);
+        assert.equal(ac.wb.stations.length, 4);
+        assert.equal(ac.ldgRoll, 246);
+    });
+
+    test('la base ne contient JAMAIS d\'immatriculation ni d\'id (données personnelles)', () => {
+        for (const ac of acdb.AIRCRAFT_DB) {
+            assert.equal('registration' in ac, false, `${ac.name} sans immatriculation`);
+            assert.equal(ac.id, undefined, `${ac.name} sans id`);
+        }
+        assert.ok(!JSON.stringify(acdb.AIRCRAFT_DB).includes('F-H'), 'aucun préfixe F-H');
+    });
+
+    test('VR_KT couvre tous les types de la base (chrono GPS)', () => {
+        for (const ac of acdb.AIRCRAFT_DB) {
+            assert.ok(acdb.VR_KT[ac.type] != null, `VR manquante pour ${ac.type}`);
+        }
+        assert.equal(acdb.VR_KT['WT9-LSA'], 50, 'VR WT9 LSA (pilote)');
+        assert.equal(acdb.vrForType('WT9'), 50, 'rétro-compat : flotte existante type WT9');
+        assert.equal(acdb.VR_KT.BULLDOG, 60, 'régression BULLOG/BULLDOG corrigée');
     });
 });

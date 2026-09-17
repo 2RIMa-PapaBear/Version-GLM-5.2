@@ -142,7 +142,10 @@ const before = await routeInfo();
 (before.poly && before.poly.length === 3) ? ok(`plan initial 3 étapes tracées (polyline ${before.poly.length} points)`) : ko(`polyline initiale inattendue (${before.poly?.length} points)`);
 before.depLabel === 'LFRV' ? ok('étiquette verte initiale = LFRV (départ)') : ko(`étiquette verte initiale = ${before.depLabel}`);
 before.arrLabel === 'LFRC' ? ok('étiquette rouge = LFRC (destination)') : ko(`étiquette rouge = ${before.arrLabel}`);
-before.permLabels.includes('LFRQ') ? ok('waypoint LFRQ étiqueté sur la route') : ko('waypoint LFRQ absent des étiquettes');
+// Les étiquettes de waypoints portent un « × » de suppression depuis le 17/09
+// (« LFRQ× ») : on compare SANS le bouton.
+const sansX = arr => arr.map(c => c.replace(/×$/, '').trim());
+sansX(before.permLabels).includes('LFRQ') ? ok('waypoint LFRQ étiqueté sur la route') : ko('waypoint LFRQ absent des étiquettes');
 const oldDepPos = before.poly[0];
 const wpBefore = await page.evaluate(() => document.getElementById('fp-waypoints')?.value || '');
 wpBefore.toUpperCase() === 'LFRQ' ? ok(`champ Waypoints = « ${wpBefore} »`) : ko(`champ Waypoints = « ${wpBefore} »`);
@@ -196,7 +199,7 @@ const after = await routeInfo();
 (after.poly && pinLL && distDeg(after.poly[0], pinLL) < 0.35) ? ok('la polyline part bien du NOUVEAU départ LFRD') : ko(`1er sommet ${JSON.stringify(after.poly?.[0])} ≠ pastille LFRD ${JSON.stringify(pinLL)}`);
 after.depLabel === 'LFRD' ? ok('étiquette verte = LFRD (nouveau départ)') : ko(`étiquette verte = ${after.depLabel}`);
 after.arrLabel === 'LFRC' ? ok('destination conservée : étiquette rouge = LFRC') : ko(`étiquette rouge = ${after.arrLabel}`);
-!after.permLabels.includes('LFRQ') ? ok('ancien waypoint LFRQ supprimé de la carte') : ko('waypoint LFRQ encore tracé sur la carte');
+!sansX(after.permLabels).includes('LFRQ') ? ok('ancien waypoint LFRQ supprimé de la carte') : ko('waypoint LFRQ encore tracé sur la carte');
 !after.permLabels.includes('LFRV') ? ok('ancien départ LFRV n\u2019est plus étiqueté sur la route') : ko('ancien départ LFRV encore étiqueté (route)');
 const nearOld = (after.poly || []).filter(p => distDeg(p, oldDepPos) < 0.3).length;
 nearOld === 0 ? ok('ancien départ LFRV n\u2019est plus un sommet du tracé') : ko(`${nearOld} sommet(s) de la polyline encore sur l\u2019ancien départ LFRV`);

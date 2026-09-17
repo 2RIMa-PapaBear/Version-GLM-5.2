@@ -340,7 +340,10 @@ function _render() {
 
 /* ----------------------------------------------------------------
  * Autocomplétion du champ nom : propose les avions de la base
- * (aircraft-database.js) et pré-remplit type / roulement / 50ft.
+ * (aircraft-database.js) et pré-remplit le formulaire — type,
+ * roulement et 50ft, ET quand la fiche de la base les embarque
+ * (ex. Dynamic WT9) : distances d'atterrissage, perf croisière,
+ * limites et centrage complet.
  * ---------------------------------------------------------------- */
 let _suggestDebounce = null;
 
@@ -413,6 +416,37 @@ function _applySuggestion(ac) {
     if (rollEl && !rollEl.value.trim()) rollEl.value = ac.groundRoll;
     const ftEl = document.getElementById('fleet-50ft');
     if (ftEl && !ftEl.value.trim()) ftEl.value = ac.fiftyFt;
+
+    // Champs étendus (uniquement sur les fiches complètes de la base) :
+    // mêmes règles — champs vides seulement.
+    const ext = [
+        ['fleet-ldg-roll', ac.ldgRoll],
+        ['fleet-ldg-50ft', ac.ldgFifty],
+        ['fleet-cruise', ac.cruiseSpeedKt],
+        ['fleet-burn', ac.fuelBurnLph],
+        ['fleet-xwind', ac.xwindLimitKt],
+        ['fleet-reserve-extra', ac.reserveExtraMin],
+    ];
+    for (const [id, val] of ext) {
+        const el = document.getElementById(id);
+        if (el && val != null && !String(el.value).trim()) el.value = val;
+    }
+    // La marge est pré-remplie à 20 par le formulaire : remplacée seulement
+    // si le pilote ne l'a pas touchée.
+    const marginEl = document.getElementById('fleet-margin');
+    if (marginEl && ac.safetyMargin != null && String(marginEl.value).trim() === '20') {
+        marginEl.value = ac.safetyMargin;
+    }
+
+    // Centrage : repris tel quel si la section n'a pas été touchée et si
+    // l'avion édité n'en a pas déjà un (en ajout, edit-id est vide).
+    const editId = document.getElementById('fleet-edit-id')?.value;
+    const editedHasWb = !!editId && !!getFleet().find(a => a.id === editId)?.wb;
+    if (ac.wb && !_wbTouched && !editedHasWb) {
+        _wbDraft = _wbDraftFrom(ac);
+        _wbTouched = true;
+        _renderWbSection();
+    }
     _hideSuggest();
     nameEl?.focus();
 }
