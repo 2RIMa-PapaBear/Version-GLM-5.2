@@ -488,15 +488,17 @@ async function _search(body, planRoute) {
     }
     _flat = local ? collectFlatLocal(pib, route) : collectFlat(pib, route);
     _lastFetchTs = Date.now();
-    // B2 (AZBA) : le dossier vient d'arriver — les tooltips de zones de la
-    // carte peuvent maintenant afficher les activations NOTAM.
-    document.dispatchEvent(new CustomEvent('notam-dossier-ready'));
     const rendered = _renderPib(pib, route, { local, radiusNm: local ? getRadiusNm() : undefined, excludedDetails });
     const again = document.createElement('button');
     again.className = 'btn-primary';
     again.style.cssText = 'margin:8px 0;padding:6px 12px;font-size:12px;';
     again.textContent = tr ? 'Actualiser' : 'Refresh';
     body.innerHTML = rendered;
+    // B2 (AZBA) + tuile NOTAM du dossier de vol : le dossier vient d'arriver
+    // — on prévient APRÈS le rendu des cases (le compte de la tuile lit la
+    // SÉLECTION ; dispatch avant innerHTML = course perdue = « Aucun dossier
+    // chargé », retour pilote 18/09).
+    document.dispatchEvent(new CustomEvent('notam-dossier-ready'));
     const counter = document.createElement('p');
     counter.id = 'notam-pdf-counter';
     counter.style.cssText = 'font-size:11px;color:var(--text-muted);margin:6px 0 0;';
@@ -524,6 +526,9 @@ async function _search(body, planRoute) {
             if (cat) syncCat(cat);
         } else return;
         majCounter();
+        // Tuile NOTAM du dossier de vol (retour pilote 18/09) : le nombre
+        // affiché suit la sélection IMMÉDIATEMENT.
+        document.dispatchEvent(new CustomEvent('notam-selection-changed'));
     });
     body.addEventListener('click', (e) => {
         // Case catégorie DANS le <summary> : la spec HTML n'active pas le

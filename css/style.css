@@ -1728,6 +1728,45 @@ body.map-overlay-open { overflow: hidden; }
 @media (max-width: 700px) {
     .wb-load-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+/* Devis carburant vol local (18/09) : 4 cellules type olives du planificateur. */
+.wb-fuel-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px 8px;
+    margin-top: 8px;
+}
+@media (max-width: 700px) {
+    .wb-fuel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.wb-fuel-grid:empty { display: none; }
+.wb-fuel-cell {
+    background: var(--inner-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 5px 7px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.wb-fuel-cell span {
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-size: 8.5px;
+    letter-spacing: 0.8px;
+    line-height: 1.35;
+}
+.wb-fuel-cell b {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--text-color);
+}
+.wb-fuel-cell.wb-fuel-total b {
+    color: var(--primary);
+    font-size: 13px;
+}
+.wb-fuel-cell.wb-fuel-total {
+    border-color: var(--primary);
+}
 /* Sécurité libellés : jamais de retour à la ligne, ellipse si trop long. */
 .wb-load-grid .wb-load-lab .lab {
     display: block;
