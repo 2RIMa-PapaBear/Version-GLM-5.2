@@ -134,7 +134,29 @@ function _cell(doc, x, yc, w, h, label, value, opt = {}) {
     doc.setFillColor(...CELL_BG); doc.setDrawColor(...LINE); doc.setLineWidth(0.5);
     doc.roundedRect(x, yc, w, h, 2.5, 2.5, 'FD');
     doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); _setInk(doc, MUTED);
-    doc.text(String(label).toUpperCase(), x + 7, yc + 9, { charSpace: 0.5 });
+    // Libellé : tenir sur UNE ligne en réduisant la police si besoin
+    // (jusqu'à 5 pt), sinon RETOUR À LA LIGNE dans la largeur de l'olive —
+    // AUCUN texte ne doit déborder (retour pilote 18/09 : ligne carburant
+    // 5 cellules « Dégagement », « Roulage + intégr. », « Réserve (35 min) »).
+    const lab = String(label).toUpperCase();
+    const usable = w - 12;
+    let uneLigne = null;
+    for (let size = 6.5; size >= 5 && !uneLigne; size -= 0.5) {
+        doc.setFontSize(size);
+        if (doc.getTextWidth(lab) + lab.length * 0.5 <= usable) uneLigne = { size };
+    }
+    if (uneLigne) {
+        doc.text(lab, x + 7, yc + 9, { charSpace: 0.5 });
+    } else {
+        let size = 6, lines;
+        do {
+            doc.setFontSize(size);
+            lines = doc.splitTextToSize(lab, usable);
+            size -= 0.5;
+        } while (lines.length > 2 && size >= 4.5);
+        doc.text(lines, x + 7, yc + 7.5, { lineHeightFactor: 1.2 });
+    }
+    doc.setFontSize(6.5);
     doc.setFont('courier', 'bold'); doc.setFontSize(opt.size || 10.5);
     _setInk(doc, opt.color || INK);
     doc.text(_trunc(doc, value ?? '—', w - 14), x + 7, yc + h - 7);
@@ -583,15 +605,20 @@ function _drawCalcPage(doc, c) {
     // Réserve / Total requis ----
     y = section(null, y);
     if (c.fuel?.divIcao) {
-        const fw = (W - 4 * 12) / 5;
-        cell(L, y, fw, 29, fr ? 'Trajet' : 'Trip', `${c.fuel?.tripL ?? '—'} L`, { size: 9.5 });
-        cell(L + fw + 12, y, fw, 29, `${fr ? 'Dégagement' : 'Alternate'} ${c.fuel.divIcao}`,
+        // Trajet légèrement rétréci au profit de Dégagement, dont le
+        // libellé porte le code du terrain (retour pilote 18/09).
+        const total = W - 4 * 12;
+        const wts = [0.8, 1.2, 1, 1, 1];
+        const ws = wts.map(t => total * t / 5);
+        const xAt = (i) => L + ws.slice(0, i).reduce((a, b) => a + b, 0) + i * 12;
+        cell(xAt(0), y, ws[0], 29, fr ? 'Trajet' : 'Trip', `${c.fuel?.tripL ?? '—'} L`, { size: 9.5 });
+        cell(xAt(1), y, ws[1], 29, `${fr ? 'Dégagement' : 'Alternate'} ${c.fuel.divIcao}`,
             `${c.fuel?.diversionL ?? '—'} L`, { size: 9.5 });
-        cell(L + 2 * (fw + 12), y, fw, 29, `${fr ? 'Roulage + intégr.' : 'Taxi + integ.'} (${c.fuel?.groundMin ?? 0} min)`,
+        cell(xAt(2), y, ws[2], 29, `${fr ? 'Roulage + intégr.' : 'Taxi + integ.'} (${c.fuel?.groundMin ?? 0} min)`,
             `${c.fuel?.groundL ?? 0} L`, { size: 9.5 });
-        cell(L + 3 * (fw + 12), y, fw, 29, `${fr ? 'Réserve' : 'Reserve'} (${c.fuel?.reserveMin ?? ''} min)`,
+        cell(xAt(3), y, ws[3], 29, `${fr ? 'Réserve' : 'Reserve'} (${c.fuel?.reserveMin ?? ''} min)`,
             `${c.fuel?.reserveL ?? '—'} L`, { size: 9.5 });
-        cell(L + 4 * (fw + 12), y, fw, 29, fr ? 'Total requis' : 'Total req.',
+        cell(xAt(4), y, ws[4], 29, fr ? 'Total requis' : 'Total req.',
             `${c.fuel?.totalL ?? '—'} L`, { color: BLUE, size: 12 });
     } else {
         const fw = (W - 3 * 12) / 4;
