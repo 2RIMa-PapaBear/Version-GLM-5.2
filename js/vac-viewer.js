@@ -235,6 +235,8 @@ export async function openVac(icao) {
     _ui.pdf = pdf;
     await _showPage(1);
     _traceVacConsult(code);   // B1 : atteste la consultation (tuile Dossier de vol)
+    // Tuile VAC du dossier (retour pilote 18/09) : mise à jour IMMÉDIATE.
+    document.dispatchEvent(new CustomEvent('vac-consulted', { detail: { icao: code } }));
     return true;
 }
 

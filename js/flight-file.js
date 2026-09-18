@@ -25,7 +25,7 @@ import { makeCollapsible } from './collapsible.js';
 import { getActiveAircraft } from './aircraft-fleet.js';
 import { computeWb, resolveLoads } from './wb-core.js';
 import { evaluateTakeoffPerformance, evaluateLandingPerformance, evaluateLandingAtDestination } from './takeoff-performance.js';
-import { getCurrentNotams, getLastNotamFetchTs } from './notam.js';
+import { getCurrentNotams, getLastNotamFetchTs, getSelectedNotams } from './notam.js';
 import { hasVac, openVac, getVacConsultedTs } from './vac-viewer.js';
 import { getLastMetarObsMs } from './data-age.js';
 
@@ -133,8 +133,10 @@ export async function collectFileInputs() {
         landingLevel = ldg?.level ?? null;
     }
 
-    // NOTAM.
-    const notamCount = getCurrentNotams().length;
+    // NOTAM — le COMPTE suit la SÉLECTION (cases du panneau SOFIA, retour
+    // pilote 18/09) : cochés/total. Sans panneau rendu, tout est à zéro.
+    const notamTotal = getCurrentNotams().length;
+    const notamCount = notamTotal ? getSelectedNotams().length : 0;
     const ts = getLastNotamFetchTs();
     const notamAgeMin = ts ? Math.round((Date.now() - ts) / 60000) : null;
 
@@ -162,10 +164,11 @@ export async function collectFileInputs() {
         const min = parseInt(document.getElementById('wb-local-min')?.value, 10);
         if (Number.isFinite(min) && min > 0) {
             const burn = ac.fuelBurnLph ?? 35;
-            // Réserve finale vol local de jour en vue du terrain : 10 min
-            // (30 en navigation de jour, 45 de nuit — cf. planificateur).
+            // Vol local : durée + roulage 10 min (départ+arrivée) + réserve
+            // finale 10 min (jour, vue du terrain) — même formule que le
+            // devis du widget Centrage (18/09).
             const reserveMin = 10 + (ac.reserveExtraMin || 0);
-            fuelRequired = Math.round(((min + reserveMin) / 60 * burn) * 10) / 10;
+            fuelRequired = Math.round(((min + 10 + reserveMin) / 60 * burn) * 10) / 10;
         }
     }
 
@@ -188,7 +191,7 @@ export async function collectFileInputs() {
     return {
         mode, icao, dest: hasDest ? destInput : null,
         metarAgeMin, tafState, arrWeather,
-        notamCount, notamAgeMin, vac,
+        notamCount, notamTotal, notamAgeMin, vac,
         fuelRequired, fuelOnBoard, fuelParts,
         diversion: mode === 'nav' ? !!state.diversionIcao : null,
         takeoffLevel, landingLevel, wbLevel,
@@ -258,7 +261,7 @@ export async function showFlightFile(forceIcao) {
                     : ` · TAF ${isFr ? 'à charger' : 'missing'}`))}
             ${_tile('file-text', 'NOTAM', t.notam.status,
                 inp.notamCount
-                    ? `${inp.notamCount} ${isFr ? 'NOTAM · il y a' : 'NOTAM ·'} ${_min(inp.notamAgeMin, isFr)}`
+                    ? `${inp.notamCount}/${inp.notamTotal} ${isFr ? 'NOTAM · il y a' : 'NOTAM ·'} ${_min(inp.notamAgeMin, isFr)}`
                     : (isFr ? 'Aucun dossier chargé' : 'No briefing loaded'))}
             ${_tile('map', 'VAC', t.vac.status,
                 t.vac.items.length ? vacRows : (isFr ? 'Aucune VAC publiée sur ce vol' : 'No VAC charts on this flight'))}
@@ -316,14 +319,113 @@ export async function showFlightFile(forceIcao) {
 // Le dossier vit avec les décisions du pilote : choix de dégagement,
 // arrivée du dossier NOTAM et SAISIE du carburant (widget Centrage) —
 // retour pilote 13/09 : la tuile Carburant ne suivait pas l'embarqué.
+// navplan-changed (retour pilote 18/09 « la tuile Carburant reste en
+// ambre ») : la tuile lit le requis DANS le plan — elle doit se rafraîchir
+// quand un plan vient d'être (re)calculé, pas seulement à la saisie.
+// Retour pilote 18/09 (suite) : la couleur doit changer IMMÉDIATEMENT à
+// la saisie de l'embarqué — la tuile seule est recalculée (synchrone),
+// sans attendre le re-rendu complet du dossier.
 if (typeof document !== 'undefined') {
     document.addEventListener('diversion-changed', () => showFlightFile());
     document.addEventListener('notam-dossier-ready', () => showFlightFile());
-    let _fuelDeb = null;
+    window.addEventListener('navplan-changed', () => showFlightFile());
     document.addEventListener('input', (e) => {
         const id = e.target?.id;
         if (id !== 'wb-fuel-l' && id !== 'wb-local-min') return;
-        clearTimeout(_fuelDeb);
-        _fuelDeb = setTimeout(() => showFlightFile(), 400);
+        _refreshFuelTileNow();
     });
+    // Cases du panneau NOTAM (SOFIA) — retour pilote 18/09 : le nombre de
+    // la tuile doit suivre la sélection IMMÉDIATEMENT.
+    document.addEventListener('notam-selection-changed', _refreshNotamTileNow);
+    // Consultation d'une carte VAC (visionneuse) — retour pilote 18/09 :
+    // la tuile VAC passe à « consultée » IMMÉDIATEMENT.
+    document.addEventListener('vac-consulted', (e) => _refreshVacTileNow(e.detail?.icao));
+}
+
+/** Mise à jour IMMÉDIATE de la seule tuile Carburant (synchrone) :
+ *  requis (plan actif ou formule locale) vs embarqué du widget Centrage. */
+function _refreshFuelTileNow() {
+    if (typeof document === 'undefined') return;
+    const tiles = [...document.querySelectorAll('.ff-tile')];
+    const tile = tiles.find(t => /Carburant|Fuel/.test(t.querySelector('.ff-tile-head')?.textContent || ''));
+    if (!tile) return;
+    const isFr = state.lang === 'fr';
+    const ac = getActiveAircraft();
+    const destInput = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
+    const isNav = _isNav();
+    // Embarqué lu DIRECTEMENT dans le champ vivant (toujours à jour à
+    // l'instant de l'événement, indépendamment du stockage).
+    const flRaw = parseFloat(String(document.getElementById('wb-fuel-l')?.value ?? '').replace(',', '.'));
+    const onBoard = (Number.isFinite(flRaw) && flRaw > 0) ? flRaw : null;
+    let req = null, detail = null;
+    if (isNav) {
+        const f = state._lastNavPlan?.plan?.fuel;
+        req = f?.totalL ?? null;
+        if (req != null) detail = `${isFr ? 'Requis' : 'Req.'} ${req} L · ${isFr ? 'embarqué' : 'on board'} ${onBoard ?? '—'} L`
+            + ` · ${isFr ? 'dégagement' : 'alternate'} ${state.diversionIcao ? '✓' : '—'}`;
+    } else {
+        const min = parseInt(document.getElementById('wb-local-min')?.value, 10);
+        if (Number.isFinite(min) && min > 0) {
+            const burn = ac.fuelBurnLph ?? 35;
+            req = Math.round(((min + 10 + 10 + (ac.reserveExtraMin || 0)) / 60 * burn) * 10) / 10;
+            detail = `${isFr ? 'Requis' : 'Req.'} ${req} L · ${isFr ? 'embarqué' : 'on board'} ${onBoard ?? '—'} L`;
+        }
+    }
+    if (req == null) {
+        detail = isFr ? 'Devis non renseigné (durée ou plan)' : 'No fuel plan yet (duration or route)';
+    }
+    const status = req == null ? 'warn' : (onBoard == null || onBoard + 0.05 < req) ? 'danger' : 'ok';
+    tile.style.borderLeftColor = LVL[status];
+    tile.querySelector('.ff-tile-head svg')?.style.setProperty('color', LVL[status], 'important');
+    const d = tile.querySelector('.ff-tile-detail');
+    if (d && detail) d.textContent = detail;
+}
+
+/** Mise à jour IMMÉDIATE de la seule tuile NOTAM (synchrone) :
+ *  cochés/total du panneau SOFIA + fraîcheur. */
+function _refreshNotamTileNow() {    if (typeof document === 'undefined') return;
+    const tiles = [...document.querySelectorAll('.ff-tile')];
+    const tile = tiles.find(t => /^NOTAM/i.test(t.querySelector('.ff-tile-head')?.textContent?.trim() || ''));
+    if (!tile) return;
+    const isFr = state.lang === 'fr';
+    const total = getCurrentNotams().length;
+    const sel = total ? getSelectedNotams().length : 0;
+    const ts = getLastNotamFetchTs();
+    const ageMin = ts ? Math.round((Date.now() - ts) / 60000) : null;
+    const status = !sel ? 'danger' : (ageMin == null || ageMin > 30) ? 'warn' : 'ok';
+    tile.style.borderLeftColor = LVL[status];
+    tile.querySelector('.ff-tile-head svg')?.style.setProperty('color', LVL[status], 'important');
+    const d = tile.querySelector('.ff-tile-detail');
+    if (d) {
+        d.textContent = sel
+            ? `${sel}/${total} ${isFr ? 'NOTAM · il y a' : 'NOTAM ·'} ${_min(ageMin, isFr)}`
+            : (isFr ? 'Aucun dossier chargé' : 'No briefing loaded');
+    }
+}
+
+/** Mise à jour IMMÉDIATE de la seule tuile VAC (synchrone) : la ligne du
+ *  terrain consulté passe à « consultée HH:MM » (vert) et la pastille de
+ *  la tuile suit si toutes les VAC du vol sont consultées. */
+function _refreshVacTileNow(icaoConsulte) {
+    if (typeof document === 'undefined') return;
+    const tiles = [...document.querySelectorAll('.ff-tile')];
+    const tile = tiles.find(t => /^VAC/i.test(t.querySelector('.ff-tile-head')?.textContent?.trim() || ''));
+    if (!tile) return;
+    const isFr = state.lang === 'fr';
+    let restent = 0;
+    for (const row of [...tile.querySelectorAll('.ff-tile-detail > div')]) {
+        const spans = row.querySelectorAll('span');
+        const code = spans[0]?.textContent?.trim();
+        if (!code) continue;
+        const seen = getVacConsultedTs(code);
+        if (seen && spans[1]) {
+            spans[1].textContent = (isFr ? 'consultée ' : 'viewed ')
+                + new Date(seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            spans[1].style.color = LVL.ok;
+        } else if (!seen) restent++;
+    }
+    if (!restent) {
+        tile.style.borderLeftColor = LVL.ok;
+        tile.querySelector('.ff-tile-head svg')?.style.setProperty('color', LVL.ok, 'important');
+    }
 }

@@ -151,12 +151,16 @@ await page.evaluate(() => {
 });
 await wait(800);
 const local = await page.evaluate(() => ({
-    req: document.getElementById('wb-local-req')?.textContent || '',
+    cells: [...document.querySelectorAll('#wb-local-devis .wb-fuel-cell')].map(c => c.textContent.replace(/\s+/g, ' ').trim()),
     fuelMax: document.getElementById('wb-fuel-l')?.dataset.max || '',
     label: document.querySelector('#wb-fuel-l')?.closest('label')?.textContent.replace(/\s+/g, ' ').trim() || '',
 }));
-console.log('local requis :', JSON.stringify(local.req), '· max embarqué :', local.fuelMax);
-(/10 min/.test(local.req) && !/30 min/.test(local.req) ? ok : ko)('vol local : réserve finale 10 min (jour, vue du terrain)');
+console.log('devis local :', JSON.stringify(local.cells), '· max embarqué :', local.fuelMax);
+(local.cells.length === 4 ? ok : ko)('devis local : 4 cellules (Durée / Roulage / Réserve / Total)');
+(/9 L/.test(local.cells[0] || '') ? ok : ko)('cellule Durée = 9 L (30 min à 18 L/h)');
+(/Roulage.*10 min.*3 L/.test(local.cells[1] || '') ? ok : ko)('cellule Roulage = 3 L (10 min)');
+(/Réserve.*15 min.*4[.,]5 L/.test(local.cells[2] || '') ? ok : ko)('cellule Réserve = 4,5 L (10 + 5 perso)');
+(/16[.,]5 L/.test(local.cells[3] || '') ? ok : ko)('Total requis = 16,5 L (9 + 3 + 4,5)');
 (local.fuelMax === '113' ? ok : ko)(`plafond embarqué = utilisable 113 L (capacité poste 119)`);
 (pageErrors.length === 0 ? ok : ko)('zéro erreur JS' + (pageErrors.length ? ' — ' + pageErrors[0] : ''));
 server.close(); await browser.close();
