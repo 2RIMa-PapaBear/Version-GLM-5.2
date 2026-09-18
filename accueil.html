@@ -8,51 +8,128 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=1.288">
-<script src="vendor/lucide.min.js?v=1.288" defer></script>
+<link rel="stylesheet" href="css/style.css?v=1.289">
+<script src="vendor/lucide.min.js?v=1.289" defer></script>
 <style>
     /* Page d'accueil — présentation de l'application. Réutilise le thème
-       (variables, cartes) de css/style.css ; classes préfixées .acc-*. */
-    .acc-page { max-width: 1060px; margin: 0 auto; padding: 34px 20px 46px; }
-    .acc-hero { text-align: center; padding: 26px 10px 8px; }
+       (variables, cartes) de css/style.css ; classes préfixées .acc-. */
+    .acc-page { max-width: 1080px; margin: 0 auto; padding: 0 20px 50px; }
+
+    /* ---- Hero ---- */
+    .acc-hero {
+        position: relative; text-align: center; padding: 54px 10px 30px; overflow: hidden;
+    }
+    .acc-hero::before {
+        content: ''; position: absolute; inset: -40% -20% auto; height: 130%;
+        background:
+            radial-gradient(42% 55% at 38% 42%, rgba(56, 189, 248, .14), transparent 70%),
+            radial-gradient(35% 45% at 68% 55%, rgba(45, 212, 191, .10), transparent 70%);
+        pointer-events: none;
+    }
+    .acc-hero > * { position: relative; }
     .acc-hero .acc-logo {
-        width: 58px; height: 58px; margin: 0 auto 14px; border-radius: 14px;
+        width: 64px; height: 64px; margin: 0 auto 16px; border-radius: 16px;
         background: var(--inner-bg, #0F172A); border: 1px solid var(--border-color, #334155);
         display: flex; align-items: center; justify-content: center; color: var(--primary, #38BDF8);
+        box-shadow: 0 0 34px rgba(56, 189, 248, .22);
     }
-    .acc-hero h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: .3px; }
-    .acc-hero p { margin: 0 auto; max-width: 640px; color: var(--text-muted, #94A3B8); font-size: 15px; line-height: 1.6; }
-    .acc-cta { margin: 24px 0 6px; }
+    .acc-badge {
+        display: inline-flex; align-items: center; gap: 7px; margin-bottom: 16px;
+        padding: 5px 13px; border-radius: 999px; font-size: 11.5px; font-weight: 600;
+        color: var(--primary, #38BDF8); background: rgba(56, 189, 248, .10);
+        border: 1px solid rgba(56, 189, 248, .30);
+    }
+    .acc-hero h1 { margin: 0 0 10px; font-size: 34px; letter-spacing: .2px; }
+    .acc-hero .acc-sub { margin: 0 auto 6px; max-width: 660px; color: var(--text-color, #F8FAFC); font-size: 16.5px; font-weight: 500; }
+    .acc-hero p { margin: 0 auto; max-width: 640px; color: var(--text-muted, #94A3B8); font-size: 14px; line-height: 1.65; }
+    .acc-cta { margin: 26px 0 4px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
     .acc-cta a {
         display: inline-flex; align-items: center; gap: 10px;
-        padding: 12px 26px; border-radius: 10px; cursor: pointer; text-decoration: none;
-        background: rgba(56, 189, 248, 0.15); color: var(--primary, #38BDF8); font-weight: 700;
-        border: 1px solid var(--primary, #38BDF8); font-size: 15px; transition: background .15s;
+        padding: 13px 28px; border-radius: 11px; cursor: pointer; text-decoration: none;
+        font-weight: 700; font-size: 15px; transition: background .15s, transform .15s;
     }
-    .acc-cta a:hover { background: rgba(56, 189, 248, 0.28); }
+    .acc-cta .acc-go {
+        background: rgba(56, 189, 248, .16); color: var(--primary, #38BDF8);
+        border: 1px solid var(--primary, #38BDF8);
+    }
+    .acc-cta .acc-go:hover { background: rgba(56, 189, 248, .30); transform: translateY(-1px); }
+    .acc-cta .acc-ghost {
+        background: transparent; color: var(--text-muted, #94A3B8);
+        border: 1px solid var(--border-color, #334155);
+    }
+    .acc-cta .acc-ghost:hover { color: var(--text-color, #F8FAFC); border-color: var(--text-muted, #94A3B8); }
     .acc-stats {
-        display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 34px;
-        margin: 22px auto 0; padding: 12px 18px; max-width: 720px;
+        display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 34px;
+        margin: 26px auto 0; padding: 13px 20px; max-width: 760px;
         background: var(--inner-bg, #0F172A); border: 1px solid var(--border-color, #334155);
-        border-radius: 10px; font-size: 12.5px; color: var(--text-muted, #94A3B8);
+        border-radius: 12px; font-size: 12.5px; color: var(--text-muted, #94A3B8);
     }
     .acc-stats b { color: var(--text-color, #F8FAFC); font-family: 'DM Mono', monospace; font-size: 14px; }
-    .acc-grid {
-        display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 14px; margin-top: 28px;
+
+    /* ---- Captures réelles ---- */
+    .acc-shots { display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; margin-top: 34px; align-items: start; }
+    .acc-shot { position: relative; border-radius: 12px; overflow: hidden;
+        border: 1px solid var(--border-color, #334155); background: var(--inner-bg, #0F172A); }
+    .acc-shot img { display: block; width: 100%; height: auto; }
+    .acc-shot .acc-shot-bar {
+        display: flex; align-items: center; gap: 6px; padding: 8px 12px;
+        border-bottom: 1px solid var(--border-color, #334155); background: rgba(15, 23, 42, .9);
     }
+    .acc-shot .acc-shot-bar i { width: 9px; height: 9px; border-radius: 50%; background: #334155; }
+    .acc-shot .acc-shot-bar span { margin-left: 6px; font-size: 11px; color: var(--text-muted, #94A3B8); font-family: 'DM Mono', monospace; }
+    .acc-shot figcaption {
+        position: absolute; right: 10px; top: 40px; padding: 5px 11px; border-radius: 8px;
+        background: rgba(2, 6, 23, .82); border: 1px solid var(--border-color, #334155);
+        font-size: 11.5px; font-weight: 600; color: var(--text-color, #F8FAFC);
+    }
+    .acc-shots .acc-col { display: flex; flex-direction: column; gap: 14px; }
+
+    /* ---- Grille de fonctions ---- */
+    .acc-h2 { margin: 44px 0 4px; font-size: 20px; text-align: center; }
+    .acc-h2sub { margin: 0 0 20px; text-align: center; color: var(--text-muted, #94A3B8); font-size: 13px; }
+    .acc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 14px; }
     .acc-card {
         background: var(--inner-bg, #0F172A); border: 1px solid var(--border-color, #334155);
-        border-radius: 12px; padding: 18px 18px 14px;
+        border-radius: 13px; padding: 19px 18px 15px; transition: border-color .15s, transform .15s;
     }
-    .acc-card h2 { display: flex; align-items: center; gap: 9px; margin: 0 0 8px; font-size: 14.5px; }
-    .acc-card h2 svg { color: var(--primary, #38BDF8); flex-shrink: 0; }
-    .acc-card p { margin: 0; color: var(--text-muted, #94A3B8); font-size: 12.5px; line-height: 1.65; }
-    .acc-foot { margin-top: 30px; text-align: center; font-size: 11px; color: var(--text-muted, #94A3B8); line-height: 1.7; }
+    .acc-card:hover { border-color: rgba(56, 189, 248, .45); transform: translateY(-2px); }
+    .acc-card h2 { display: flex; align-items: center; gap: 10px; margin: 0 0 9px; font-size: 14.5px; }
+    .acc-ic {
+        width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(56, 189, 248, .12); color: var(--primary, #38BDF8);
+        border: 1px solid rgba(56, 189, 248, .28);
+    }
+    .acc-card p { margin: 0; color: var(--text-muted, #94A3B8); font-size: 12.5px; line-height: 1.68; }
+
+    /* ---- 3 étapes ---- */
+    .acc-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 16px; }
+    .acc-step {
+        display: flex; gap: 12px; align-items: flex-start; padding: 15px 16px;
+        background: var(--inner-bg, #0F172A); border: 1px solid var(--border-color, #334155); border-radius: 12px;
+    }
+    .acc-step b { display: flex; align-items: center; justify-content: center; width: 30px; height: 30px;
+        border-radius: 50%; flex-shrink: 0; font-family: 'DM Mono', monospace; font-size: 13px;
+        color: var(--primary, #38BDF8); border: 1px solid rgba(56, 189, 248, .4); }
+    .acc-step div span { display: block; font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+    .acc-step div p { margin: 0; font-size: 12px; color: var(--text-muted, #94A3B8); line-height: 1.6; }
+
+    /* ---- CTA final + pied ---- */
+    .acc-final {
+        margin-top: 46px; text-align: center; padding: 30px 20px; border-radius: 14px;
+        background: radial-gradient(60% 120% at 50% 0%, rgba(56, 189, 248, .12), transparent 75%), var(--inner-bg, #0F172A);
+        border: 1px solid var(--border-color, #334155);
+    }
+    .acc-final h2 { margin: 0 0 6px; font-size: 19px; }
+    .acc-final p { margin: 0 0 18px; color: var(--text-muted, #94A3B8); font-size: 13px; }
+    .acc-foot { margin-top: 28px; text-align: center; font-size: 11px; color: var(--text-muted, #94A3B8); line-height: 1.7; }
     .acc-foot .warning { color: #FBBF24; }
-    @media (max-width: 640px) {
-        .acc-hero h1 { font-size: 24px; }
-        .acc-page { padding: 20px 14px 34px; }
+
+    @media (max-width: 760px) {
+        .acc-shots { grid-template-columns: 1fr; }
+        .acc-hero h1 { font-size: 26px; }
+        .acc-hero { padding-top: 36px; }
+        .acc-page { padding: 0 14px 40px; }
     }
 </style>
 </head>
@@ -60,62 +137,101 @@
 <div class="acc-page">
 
     <div class="acc-hero">
-        <div class="acc-logo"><i data-lucide="plane" style="width:30px;height:30px;"></i></div>
+        <div class="acc-logo"><i data-lucide="plane" style="width:32px;height:32px;"></i></div>
+        <div class="acc-badge"><i data-lucide="shield-check" style="width:13px;height:13px;"></i> Données officielles — SIA · Météo-France · NOAA</div>
         <h1>Visualiseur METAR/TAF</h1>
-        <p>Le briefing VFR complet, du METAR du matin au dossier de vol imprimé :
-           météo décryptée, carte régionale, planification, carburant et suivi GPS —
-           dans une seule page, sur PC comme sur téléphone.</p>
+        <div class="acc-sub">Le briefing VFR complet, du METAR du matin au dossier de vol imprimé.</div>
+        <p>Météo décryptée à la minute, carte régionale aux couleurs du jour, planification et carburant,
+           dossier imprimable — dans une seule page, sur PC comme sur téléphone.</p>
         <div class="acc-cta">
-            <a href="index.html"><i data-lucide="arrow-right-circle" style="width:19px;height:19px;"></i> Ouvrir l'application</a>
+            <a class="acc-go" href="index.html"><i data-lucide="arrow-right-circle" style="width:19px;height:19px;"></i> Ouvrir l'application</a>
+            <a class="acc-ghost" href="#fonctions"><i data-lucide="list" style="width:17px;height:17px;"></i> Tout découvrir</a>
         </div>
         <div class="acc-stats">
             <span><b>17 000+</b> terrains</span>
-            <span><b>1 500+</b> zones aériennes SIA officielles</span>
+            <span><b>1 500+</b> zones aériennes SIA</span>
             <span><b>950+</b> points VFR &amp; radiophares</span>
-            <span><b>8</b> cartes du temps Météo-France</span>
+            <span><b>8</b> cartes du temps</span>
         </div>
     </div>
 
+    <div class="acc-shots">
+        <figure class="acc-shot" style="margin:0;">
+            <div class="acc-shot-bar"><i></i><i></i><i></i><span>carte régionale · LFRV → LFOO</span></div>
+            <img src="assets/accueil/carte.jpg" alt="Carte régionale : route, pastilles VFR et espaces aériens">
+            <figcaption>Route, pastilles VFR, espaces SIA, radar</figcaption>
+        </figure>
+        <div class="acc-col">
+            <figure class="acc-shot" style="margin:0;">
+                <div class="acc-shot-bar"><i></i><i></i><i></i><span>calcul de navigation</span></div>
+                <img src="assets/accueil/plan.jpg" alt="Calcul de navigation : devis carburant et minima VFR">
+                <figcaption>Devis carburant · minima VFR</figcaption>
+            </figure>
+            <figure class="acc-shot" style="margin:0;">
+                <div class="acc-shot-bar"><i></i><i></i><i></i><span>dossier de vol</span></div>
+                <img src="assets/accueil/dossier.jpg" alt="Dossier de vol : tuiles météo, NOTAM, VAC, carburant">
+                <figcaption>Tuiles du dossier de vol</figcaption>
+            </figure>
+        </div>
+    </div>
+
+    <h2 class="acc-h2" id="fonctions">Tout ce qu'il faut pour préparer — et vivre — un vol VFR</h2>
+    <p class="acc-h2sub">Chaque information vient d'une source officielle ; rien ne remplace votre jugement de commandant de bord.</p>
     <div class="acc-grid">
         <div class="acc-card">
-            <h2><i data-lucide="cloud-sun" style="width:17px;height:17px;"></i> Météo décryptée, temps réel</h2>
+            <h2><span class="acc-ic"><i data-lucide="cloud-sun" style="width:17px;height:17px;"></i></span> Météo décryptée, temps réel</h2>
             <p>METAR et TAF en clair à la minute près : vent, visibilité, plafond, phénomènes.
                Catégorie de vol par terrain, alertes de tendance, fenêtre de vol jour VFR,
                givrage carburateur et verdict GO/NO-GO argumenté.</p>
         </div>
         <div class="acc-card">
-            <h2><i data-lucide="map" style="width:17px;height:17px;"></i> Carte régionale</h2>
+            <h2><span class="acc-ic"><i data-lucide="map" style="width:17px;height:17px;"></i></span> Carte régionale</h2>
             <p>Pastilles VFR des terrains voisins, espaces aériens SIA (CTR, TMA, zones R·P·D),
                radar de précipitations animé, relief et obstacles sur la route,
                étiquettes de tronçons cap / distance / temps.</p>
         </div>
         <div class="acc-card">
-            <h2><i data-lucide="cloud-lightning" style="width:17px;height:17px;"></i> Cartes Météo-France</h2>
+            <h2><span class="acc-ic"><i data-lucide="cloud-lightning" style="width:17px;height:17px;"></i></span> Cartes Météo-France</h2>
             <p>TEMSI et vents en altitude, cartes des fronts et isobares — vignettes datées
                en UTC et heure locale, échéance la plus proche de l'arrivée mise en avant,
                consultables hors ligne après le premier chargement.</p>
         </div>
         <div class="acc-card">
-            <h2><i data-lucide="navigation" style="width:17px;height:17px;"></i> Planification &amp; carburant</h2>
+            <h2><span class="acc-ic"><i data-lucide="navigation" style="width:17px;height:17px;"></i></span> Planification &amp; carburant</h2>
             <p>Plan multi-étapes avec insertion au plus court, log de nav A5 imprimable,
                devis carburant complet (roulage, intégration, dégagement, réserve, deux
                étapes sans plein) et minima VFR réglementaires par terrain.</p>
         </div>
         <div class="acc-card">
-            <h2><i data-lucide="folder-check" style="width:17px;height:17px;"></i> Dossier de vol</h2>
+            <h2><span class="acc-ic"><i data-lucide="folder-check" style="width:17px;height:17px;"></i></span> Dossier de vol</h2>
             <p>NOTAM (SOFIA) sur la route, Suppléments AIP, cartes VAC intégrées et carte
                de vol imprimable — assemblés en un PDF prêt à emporter, avec page de garde
                et vérifications à compléter à la main.</p>
         </div>
         <div class="acc-card">
-            <h2><i data-lucide="plane-takeoff" style="width:17px;height:17px;"></i> Flotte, perfs &amp; centrage</h2>
+            <h2><span class="acc-ic"><i data-lucide="plane-takeoff" style="width:17px;height:17px;"></i></span> Flotte, perfs &amp; centrage</h2>
             <p>Distances de décollage et d'atterrissage corrigées (densité-altitude, vent,
-               revêtement, masse, pente), schémas en coupe, centrogramme par avion et
-               vérification du MTOW — la base propose les avions courants jusqu'au Dynamic WT9 LSA complet.</p>
+               revêtement, masse, pente) avec verdict à quatre niveaux dont « piste
+               limitative », schémas en coupe et centrogramme par avion.</p>
         </div>
     </div>
 
+    <h2 class="acc-h2">Trois étapes, un dossier prêt</h2>
+    <p class="acc-h2sub">De l'idée du vol au PDF dans la poche.</p>
+    <div class="acc-steps">
+        <div class="acc-step"><b>1</b><div><span>Choisissez un terrain</span><p>Saisissez son code OACI ou son nom — la météo du jour s'affiche, décryptée.</p></div></div>
+        <div class="acc-step"><b>2</b><div><span>Tracez la navigation</span><p>Départ, étapes, destination : route, carburant, NOTAM et minima suivent.</p></div></div>
+        <div class="acc-step"><b>3</b><div><span>Imprimez le dossier</span><p>Log de nav A5, météo, cartes VAC et carte de vol — un PDF complet à emporter.</p></div></div>
+    </div>
+
+    <div class="acc-final">
+        <h2>Prêt pour le prochain vol ?</h2>
+        <p>Aucune inscription, aucune installation — ça tourne dans le navigateur.</p>
+        <a class="acc-go" style="display:inline-flex;align-items:center;gap:10px;padding:13px 28px;border-radius:11px;text-decoration:none;font-weight:700;font-size:15px;background:rgba(56,189,248,.16);color:var(--primary,#38BDF8);border:1px solid var(--primary,#38BDF8);" href="index.html"><i data-lucide="arrow-right-circle" style="width:19px;height:19px;"></i> Ouvrir l'application</a>
+    </div>
+
     <div class="acc-foot">
+        <div style="font-weight:600;color:var(--text-color,#F8FAFC);">© 2026 PapaBear — Visualiseur METAR/TAF · Web version 3.0</div>
         <div>Sources : AviationWeather.gov · Service de l'Information Aéronautique (SIA) · Météo-France (AEROWEB) · OpenStreetMap / OpenTopoMap</div>
         <div class="warning">Avertissement : cet outil est fourni à titre purement indicatif et ne remplace
              ni le briefing officiel, ni le manuel de vol de l'avion, ni les cartes réglementaires.</div>

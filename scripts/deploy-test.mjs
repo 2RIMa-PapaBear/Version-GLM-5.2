@@ -45,9 +45,9 @@ const warn = (m) => console.log('  ⚠ ' + m);
 
 // ---- Périmètre : mêmes chemins « app » que la prod, moins les exclusions ----
 const ALLOWED = [
-    'index.html', 'sw.js', 'manifest.webmanifest', 'favicon.ico', 'icon.svg',
+    'index.html', 'accueil.html', 'sw.js', 'manifest.webmanifest', 'favicon.ico', 'icon.svg',
     'notice-fr.html', 'notice-en.html',
-    'js/', 'css/', 'vendor/', 'data/',
+    'js/', 'css/', 'vendor/', 'data/', 'assets/accueil/',
 ];
 const DENIED = [
     /^data\/airspaces\/cells\//,   // 257 Mo — lus depuis la racine (data-base.js)

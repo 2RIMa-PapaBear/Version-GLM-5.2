@@ -32,9 +32,9 @@ const STATE_PATH = path.join(ROOT, 'deploy.state.json');
 // Seuls ces chemins partent en prod (le reste du dépôt = dev : test/,
 // apps-script/, scripts/, package.json…).
 const ALLOWED = [
-    'index.html', 'sw.js', 'manifest.webmanifest', 'favicon.ico', 'icon.svg',
+    'index.html', 'accueil.html', 'sw.js', 'manifest.webmanifest', 'favicon.ico', 'icon.svg',
     'notice-fr.html', 'notice-en.html',
-    'js/', 'css/', 'vendor/', 'data/',
+    'js/', 'css/', 'vendor/', 'data/', 'assets/accueil/',
 ];
 // … sauf les CELLULES openAIP (voir ci-dessous). vendor/pdfjs a rejoint la
 // prod le 06/09 (la visionneuse VAC le charge à la demande — son exclusion
