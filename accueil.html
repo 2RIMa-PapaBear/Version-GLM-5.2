@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visualiseur METAR/TAF — Le briefing VFR complet</title>
+<link rel="icon" href="favicon.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css?v=1.288">
+<script src="vendor/lucide.min.js?v=1.288" defer></script>
+<style>
+    /* Page d'accueil — présentation de l'application. Réutilise le thème
+       (variables, cartes) de css/style.css ; classes préfixées .acc-*. */
+    .acc-page { max-width: 1060px; margin: 0 auto; padding: 34px 20px 46px; }
+    .acc-hero { text-align: center; padding: 26px 10px 8px; }
+    .acc-hero .acc-logo {
+        width: 58px; height: 58px; margin: 0 auto 14px; border-radius: 14px;
+        background: var(--inner-bg, #0F172A); border: 1px solid var(--border-color, #334155);
+        display: flex; align-items: center; justify-content: center; color: var(--primary, #38BDF8);
+    }
+    .acc-hero h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: .3px; }
+    .acc-hero p { margin: 0 auto; max-width: 640px; color: var(--text-muted, #94A3B8); font-size: 15px; line-height: 1.6; }
+    .acc-cta { margin: 24px 0 6px; }
+    .acc-cta a {
+        display: inline-flex; align-items: center; gap: 10px;
+        padding: 12px 26px; border-radius: 10px; cursor: pointer; text-decoration: none;
+        background: rgba(56, 189, 248, 0.15); color: var(--primary, #38BDF8); font-weight: 700;
+        border: 1px solid var(--primary, #38BDF8); font-size: 15px; transition: background .15s;
+    }
+    .acc-cta a:hover { background: rgba(56, 189, 248, 0.28); }
+    .acc-stats {
+        display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 34px;
+        margin: 22px auto 0; padding: 12px 18px; max-width: 720px;
+        background: var(--inner-bg, #0F172A); border: 1px solid var(--border-color, #334155);
+        border-radius: 10px; font-size: 12.5px; color: var(--text-muted, #94A3B8);
+    }
+    .acc-stats b { color: var(--text-color, #F8FAFC); font-family: 'DM Mono', monospace; font-size: 14px; }
+    .acc-grid {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 14px; margin-top: 28px;
+    }
+    .acc-card {
+        background: var(--inner-bg, #0F172A); border: 1px solid var(--border-color, #334155);
+        border-radius: 12px; padding: 18px 18px 14px;
+    }
+    .acc-card h2 { display: flex; align-items: center; gap: 9px; margin: 0 0 8px; font-size: 14.5px; }
+    .acc-card h2 svg { color: var(--primary, #38BDF8); flex-shrink: 0; }
+    .acc-card p { margin: 0; color: var(--text-muted, #94A3B8); font-size: 12.5px; line-height: 1.65; }
+    .acc-foot { margin-top: 30px; text-align: center; font-size: 11px; color: var(--text-muted, #94A3B8); line-height: 1.7; }
+    .acc-foot .warning { color: #FBBF24; }
+    @media (max-width: 640px) {
+        .acc-hero h1 { font-size: 24px; }
+        .acc-page { padding: 20px 14px 34px; }
+    }
+</style>
+</head>
+<body>
+<div class="acc-page">
+
+    <div class="acc-hero">
+        <div class="acc-logo"><i data-lucide="plane" style="width:30px;height:30px;"></i></div>
+        <h1>Visualiseur METAR/TAF</h1>
+        <p>Le briefing VFR complet, du METAR du matin au dossier de vol imprimé :
+           météo décryptée, carte régionale, planification, carburant et suivi GPS —
+           dans une seule page, sur PC comme sur téléphone.</p>
+        <div class="acc-cta">
+            <a href="index.html"><i data-lucide="arrow-right-circle" style="width:19px;height:19px;"></i> Ouvrir l'application</a>
+        </div>
+        <div class="acc-stats">
+            <span><b>17 000+</b> terrains</span>
+            <span><b>1 500+</b> zones aériennes SIA officielles</span>
+            <span><b>950+</b> points VFR &amp; radiophares</span>
+            <span><b>8</b> cartes du temps Météo-France</span>
+        </div>
+    </div>
+
+    <div class="acc-grid">
+        <div class="acc-card">
+            <h2><i data-lucide="cloud-sun" style="width:17px;height:17px;"></i> Météo décryptée, temps réel</h2>
+            <p>METAR et TAF en clair à la minute près : vent, visibilité, plafond, phénomènes.
+               Catégorie de vol par terrain, alertes de tendance, fenêtre de vol jour VFR,
+               givrage carburateur et verdict GO/NO-GO argumenté.</p>
+        </div>
+        <div class="acc-card">
+            <h2><i data-lucide="map" style="width:17px;height:17px;"></i> Carte régionale</h2>
+            <p>Pastilles VFR des terrains voisins, espaces aériens SIA (CTR, TMA, zones R·P·D),
+               radar de précipitations animé, relief et obstacles sur la route,
+               étiquettes de tronçons cap / distance / temps.</p>
+        </div>
+        <div class="acc-card">
+            <h2><i data-lucide="cloud-lightning" style="width:17px;height:17px;"></i> Cartes Météo-France</h2>
+            <p>TEMSI et vents en altitude, cartes des fronts et isobares — vignettes datées
+               en UTC et heure locale, échéance la plus proche de l'arrivée mise en avant,
+               consultables hors ligne après le premier chargement.</p>
+        </div>
+        <div class="acc-card">
+            <h2><i data-lucide="navigation" style="width:17px;height:17px;"></i> Planification &amp; carburant</h2>
+            <p>Plan multi-étapes avec insertion au plus court, log de nav A5 imprimable,
+               devis carburant complet (roulage, intégration, dégagement, réserve, deux
+               étapes sans plein) et minima VFR réglementaires par terrain.</p>
+        </div>
+        <div class="acc-card">
+            <h2><i data-lucide="folder-check" style="width:17px;height:17px;"></i> Dossier de vol</h2>
+            <p>NOTAM (SOFIA) sur la route, Suppléments AIP, cartes VAC intégrées et carte
+               de vol imprimable — assemblés en un PDF prêt à emporter, avec page de garde
+               et vérifications à compléter à la main.</p>
+        </div>
+        <div class="acc-card">
+            <h2><i data-lucide="plane-takeoff" style="width:17px;height:17px;"></i> Flotte, perfs &amp; centrage</h2>
+            <p>Distances de décollage et d'atterrissage corrigées (densité-altitude, vent,
+               revêtement, masse, pente), schémas en coupe, centrogramme par avion et
+               vérification du MTOW — la base propose les avions courants jusqu'au Dynamic WT9 LSA complet.</p>
+        </div>
+    </div>
+
+    <div class="acc-foot">
+        <div>Sources : AviationWeather.gov · Service de l'Information Aéronautique (SIA) · Météo-France (AEROWEB) · OpenStreetMap / OpenTopoMap</div>
+        <div class="warning">Avertissement : cet outil est fourni à titre purement indicatif et ne remplace
+             ni le briefing officiel, ni le manuel de vol de l'avion, ni les cartes réglementaires.</div>
+    </div>
+
+</div>
+<script>
+    if (window.lucide) window.lucide.createIcons();
+    else document.addEventListener('DOMContentLoaded', () => window.lucide && window.lucide.createIcons());
+</script>
+</body>
+</html>

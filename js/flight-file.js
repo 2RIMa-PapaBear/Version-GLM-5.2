@@ -41,7 +41,7 @@ const LVL = { ok: '#10B981', warn: '#F59E0B', danger: '#EF4444' };
  *   metarAgeMin (min|null), tafLoaded (bool), arrWeather (bool|null),
  *   notamCount, notamAgeMin (min|null),
  *   vac [{icao, hasVac, consulted}], fuelRequired (L|null), fuelOnBoard (L|null),
- *   diversion (bool), takeoffLevel ('ok'|'caution'|'danger'|null),
+ *   diversion (bool), takeoffLevel ('ok'|'caution'|'limitative'|'danger'|null),
  *   landingLevel (…|null), wbLevel ('ok'|'out'|null)
  * @returns {{weather, notam, vac, fuel, perf, wb}} tuiles {status, …}.
  */
@@ -85,7 +85,7 @@ export function computeFileTiles(i) {
     t.perf = {
         status: i.takeoffLevel == null ? 'warn'
             : levels.includes('danger') ? 'danger'
-            : levels.includes('caution') ? 'warn' : 'ok',
+            : levels.some(l => l === 'caution' || l === 'limitative') ? 'warn' : 'ok',
     };
 
     // ---- CENTRAGE : dans l'enveloppe / hors limites / non configuré.

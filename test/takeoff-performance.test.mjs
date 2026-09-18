@@ -3,7 +3,7 @@
 // sur la distance totale, vent axial conservé (atterrissage).
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { correctedTakeoffDistance, correctedLandingDistance } from '../js/takeoff-performance.js';
+import { correctedTakeoffDistance, correctedLandingDistance , runwayLevel } from '../js/takeoff-performance.js';
 
 // Stub localStorage — lu PAR APPEL par la flotte (getFleet), pas au chargement.
 const _ls = new Map();
@@ -104,5 +104,31 @@ describe('correctedLandingDistance — MÉTHODE RÉFÉRENCE', () => {
     test('références absentes → null', () => {
         assert.equal(correctedLandingDistance(0, 15, null, 1400, {}), null);
         assert.equal(correctedLandingDistance(0, 15, 725, 0, {}), null);
+    });
+});
+
+// ① (18/09) — VERDICT « PISTE LIMITATIVE » : brut tient dans la piste,
+// marge +20 % non (niveau intermédiaire entre marge faible et interdit).
+describe('runwayLevel (niveaux du verdict piste)', () => {
+    test('brut > piste → danger (même sans marge)', () => {
+        assert.equal(runwayLevel(1100, 1320, 1000), 'danger');
+        assert.equal(runwayLevel(1001, 1201, 1000), 'danger');
+    });
+    test('brut tient, margined dépasse → limitative', () => {
+        assert.equal(runwayLevel(900, 1080, 1000), 'limitative');
+        assert.equal(runwayLevel(1000, 1200, 1000), 'limitative', 'brut exactement égal à la piste');
+    });
+    test('margined tient mais marge < seuil → caution', () => {
+        assert.equal(runwayLevel(850, 1020, 1050, 20), 'caution');   // marge 2,9 %
+        assert.equal(runwayLevel(840, 1008, 1200, 20), 'caution');   // marge 16 %
+    });
+    test('marge ≥ seuil → ok', () => {
+        assert.equal(runwayLevel(700, 840, 1200, 20), 'ok');         // marge 30 %
+    });
+    test('les 4 niveaux forment un ordre croissant de sévérité', () => {
+        // même avion (brut 900), pistes décroissantes → sévérité croissante.
+        assert.deepEqual(
+            [1500, 1100, 950, 850].map(r => runwayLevel(900, 1080, r)),
+            ['ok', 'caution', 'limitative', 'danger']);
     });
 });

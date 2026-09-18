@@ -101,7 +101,7 @@ function _surfaceState(factor, isFr) {
     return '';
 }
 
-const _lvlColor = (lvl) => lvl === 'danger' ? '#EF4444' : (lvl === 'caution' ? '#F59E0B' : '#10B981');
+const _lvlColor = (lvl) => lvl === 'danger' ? '#EF4444' : (lvl === 'caution' || lvl === 'limitative' ? '#F59E0B' : '#10B981');
 
 /** HTML interne de la section ATTERRISSAGE (métriques + hôte du schéma +
  *  ligne piste + message) — même présentation que la section décollage. */

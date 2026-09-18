@@ -854,7 +854,7 @@ function _drawPerfPage(doc, p) {
     y = section(fr ? `Performances de décollage — ${p.fromIcao}${rwyTxt}` : `Takeoff performance — ${p.fromIcao}${rwyTxt}`, y);
     const t = p.takeoff;
     if (t) {
-        const lvl = t.level === 'danger' ? 'danger' : (t.level === 'caution' ? 'caution' : 'ok');
+        const lvl = t.level === 'danger' ? 'danger' : ((t.level === 'caution' || t.level === 'limitative') ? 'caution' : 'ok');
         const lvlColor = lvl === 'danger' ? REDTX : (lvl === 'caution' ? AMBER : GREEN);
 
         const cw4 = (W - 3 * 7) / 4;
@@ -1036,7 +1036,7 @@ function _planeIcon(doc, cx, cy, scale, rotDeg) {
 }
 
 function _drawTakeoffProfile(doc, t, L, R, yTop, fr) {
-    const lvl = t.level === 'danger' ? 'danger' : (t.level === 'caution' ? 'caution' : 'ok');
+    const lvl = t.level === 'danger' ? 'danger' : ((t.level === 'caution' || t.level === 'limitative') ? 'caution' : 'ok');
     const lvlColor = lvl === 'danger' ? REDTX : (lvl === 'caution' ? AMBER : GREEN);
     const W = R - L;
     const yBase = yTop + 44;                    // ligne de piste
