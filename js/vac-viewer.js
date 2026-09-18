@@ -148,30 +148,50 @@ export async function vacPageImages(icao, { pxHeight = 1400, quality = 0.85, win
     let v = null;
     try { v = await fetchVac(icao); } catch { return null; }
     if (!v) return null;
-    try {
-        // PIÈGE pdfjs (découvert 16/09) : page.render() SE SUSPEND
-        // indéfiniment dans une page MASQUÉE (l'onglet PDF du dossier prend
-        // le focus AVANT la génération — drawImage/toDataURL ne suffisent
-        // pas à le réveiller). Le rendu se fait donc dans une FENÊTRE HÔTE
-        // VISIBLE — l'onglet popup lui-même (même origine), repli fenêtre
-        // courante (visible quand le popup est bloqué).
-        const lib = await _loadPdfjsIn(win || window);
-        const data = new Uint8Array(await v.blob.arrayBuffer());
-        const pdf = await lib.getDocument({ data }).promise;
-        const pages = [];
-        for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const vp1 = page.getViewport({ scale: 1 });
-            const scale = pxHeight / vp1.height;   // ~1 400 px de haut ≈ 170 dpi en A5
-            const vp = page.getViewport({ scale });
-            const canvas = (win || window).document.createElement('canvas');
-            canvas.width = Math.ceil(vp.width);
-            canvas.height = Math.ceil(vp.height);
-            await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
-            pages.push({ data: canvas.toDataURL('image/jpeg', quality), w: vp.width, h: vp.height });
+    // PIÈGE pdfjs (16/09) : page.render() SE SUSPEND ou REJETTE dans une
+    // page MASQUÉE. Fenêtre hôte : celle qui est RÉELLEMENT VISIBLE au
+    // moment du rendu — l'onglet popup s'il est au premier plan, SINON la
+    // fenêtre courante (retour pilote 17/09 : en revenant sur l'app pendant
+    // la génération, le popup passe masqué et les VAC des premiers terrains
+    // disparaissaient du dossier). 2 essais, en basculant d'hôte.
+    let host = (win && !win.closed && !win.document.hidden) ? win : window;
+    for (let essai = 1; essai <= 2; essai++) {
+        try {
+            const lib = await _loadPdfjsIn(host);
+            const data = new Uint8Array(await v.blob.arrayBuffer());
+            const pdf = await lib.getDocument({ data }).promise;
+            const pages = [];
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const vp1 = page.getViewport({ scale: 1 });
+                const scale = pxHeight / vp1.height;   // ~1 400 px de haut ≈ 170 dpi en A5
+                const vp = page.getViewport({ scale });
+                const canvas = host.document.createElement('canvas');
+                canvas.width = Math.ceil(vp.width);
+                canvas.height = Math.ceil(vp.height);
+                await _renderAvecGarde(page, canvas, vp);
+                pages.push({ data: canvas.toDataURL('image/jpeg', quality), w: vp.width, h: vp.height });
+            }
+            return { airac: v.airac, pages };
+        } catch (e) {
+            console.warn(`VAC ${icao} : rendu échoué (essai ${essai}, hôte ${host === window ? 'fenêtre' : 'popup'}) :`, String(e?.message || e).slice(0, 80));
+            if (essai === 2) return null;
+            host = (host === window && win && !win.closed) ? win : window;
+            await new Promise(r => setTimeout(r, 400));
         }
-        return { airac: v.airac, pages };
-    } catch { return null; }
+    }
+    return null;
+}
+
+/** page.render() avec garde-fou temps : une page masquée peut suspendre le
+ *  rendu pdfjs indéfiniment — on rejette plutôt que de geler le dossier. */
+function _renderAvecGarde(page, canvas, vp, timeoutMs = 20000) {
+    return new Promise((resolve, reject) => {
+        const t = setTimeout(() => reject(new Error('rendu pdfjs expiré (page masquée ?)')), timeoutMs);
+        page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise
+            .then(() => { clearTimeout(t); resolve(); },
+                  (e) => { clearTimeout(t); reject(e); });
+    });
 }
 
 /** pdfjs dans une fenêtre donnée : la fenêtre courante via le chargeur

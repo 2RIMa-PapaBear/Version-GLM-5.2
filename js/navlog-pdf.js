@@ -1965,12 +1965,17 @@ function _metarSummary(raw, isFr) {
     return out.join(' \u00B7 ');
 }
 
-/** Page « Météo au dossier » v5 — spécification pilote 13/09 (définitive) :
+/** Page « Météo au dossier » v7 — spécification pilote 13/09, amendée
+ *  17/09 nuit : « conserve la mise en page d'avant, réduis juste un peu
+ *  les deux messages TAF en hauteur afin que TOUT tienne sur la page
+ *  météo » :
  *   1. DÉPART : METAR brut + décodé en clair ;
- *   2. DÉROUTEMENT TAF : GRAPHIQUE seul (pleine largeur) ;
- *   3. ARRIVÉE TAF : GRAPHIQUE seul (pleine largeur).
+ *   2. DÉROUTEMENT TAF puis ARRIVÉE TAF : GRAPHIQUES seuls, empilés
+ *      l'un SOUS l'autre, PLEINE LARGEUR — hauteur de chacun plafonnée
+ *      pour que la page reste UNIQUE (un graphique seul garde son ratio
+ *      naturel) ; garde-fou : continuation si ça ne tient vraiment pas.
  *  Plus de texte brut TAF (retour pilote : « on ne garde que les
- *  graphiques »). Une page : réduction symétrique si besoin.
+ *  graphiques »).
  *  d = { isFr, generatedLabel, dep: {title, raw, decode?} | null,
  *        terrains: [{label, note?, chart?, chartRatio?, chartFmt?}] }
  *  (ordre des terrains = affichage : déroutement puis arrivée.) */
@@ -1979,10 +1984,6 @@ export function drawWeatherPage(doc, d) {
     const INNER = W - 2 * M;
     doc.addPage();
 
-    // ---- Exigence pilote 16/09 : les graphiques TAF sont TOUJOURS posés
-    // à la LARGEUR DE PAGE A5, quel que soit l'appareil qui a généré le
-    // PDF — plus AUCUNE réduction symétrique : s'il n'y a pas la place,
-    // la page Météo CONTINUE sur une page suivante.
     let y = 30;
 
     // ---- Titre de page ----
@@ -2020,10 +2021,16 @@ export function drawWeatherPage(doc, d) {
         y += 12;
     }
 
-    // ---- 2 & 3. Déroutement puis arrivée : GRAPHIQUE TAF seul, PLEINE
-    // LARGEUR — la page continue si la place manque (exigence pilote 16/09).
+    // ---- 2 & 3. Déroutement puis arrivée : graphiques TAF empilés SOUS le
+    // METAR sur la MÊME page — hauteur de chacun plafonnée à la place
+    // restante pour que TOUT tienne sur la page météo (retour pilote 17/09
+    // nuit). Un graphique seul garde son ratio naturel.
+    const nCharts = (d.terrains || []).filter(t => t.chart).length;
+    const availImg = (PAGE.h - M) - y - nCharts * (21 + 12 + 14);
+    const hFit = nCharts >= 2 ? Math.max(availImg / nCharts, 120) : Infinity;
     for (const t of d.terrains || []) {
-        const ratio = Math.min(t.chartRatio || 0.4, 1.3);   // garde-fou hauteur page
+        let ratio = Math.min(t.chartRatio || 0.4, 1.3);   // garde-fou hauteur page
+        if (nCharts >= 2) ratio = Math.min(ratio, hFit / INNER);
         const h = INNER * ratio;
         if (t.chart && y + h + 14 > PAGE.h - M) {
             doc.addPage();

@@ -1,79 +1,77 @@
-// Page Météo du dossier (drawWeatherPage) — exigence pilote 16/09 : les
-// graphiques TAF sont TOUJOURS posés à la LARGEUR DE PAGE A5 (INNER
-// = 419.53 − 2×28 = 363.53 pt), jamais réduits ; la page se CONTINUE
-// s'il n'y a pas la place. Vérifié sur les placements `cm … Do` du flux
-// jsPDF (non compressé).
-import test from 'node:test';
-import { ok, equal } from 'node:assert/strict';
+// Page « Météo au dossier » v7 — REMPLACE la règle v5 du 16/09 (« graphiques
+// pleine hauteur, jamais réduits, page continuée ») : retour pilote 17/09
+// nuit — mise en page d'avant CONSERVÉE (METAR puis les graphiques à la
+// suite), les 2 graphiques TAF empilés l'un SOUS l'autre sur la MÊME page
+// météo, PLEINE LARGEUR A5 conservée (363,5 pt), hauteur réduite pour que
+// TOUT tienne sur la page ; un graphique seul garde sa hauteur naturelle.
+// Vérification géométrique par traçage des appels text/addImage. `npm test`.
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-globalThis.self = globalThis;
-globalThis.window = globalThis;
+globalThis.self = globalThis; globalThis.window = globalThis;
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = (0, eval)('typeof require === "function" ? require : null');
 const _m = { exports: {} };
-new Function('module', 'exports', 'require',
-    fs.readFileSync(path.join(root, 'vendor', 'jspdf.umd.min.js'), 'utf8')
-)(_m, _m.exports, require);
+new Function('module', 'exports', 'require', fs.readFileSync(path.join(root, 'vendor', 'jspdf.umd.min.js'), 'utf8'))(_m, _m.exports, require);
 const { jsPDF } = _m.exports;
 const { drawWeatherPage } = await import('../js/navlog-pdf.js');
 
-const JPEG1 = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAQAAAAAAAAAAAAAAAAAAAAv/2gAMAwEAAhEDEQA/AKgA/9k=';
+const PX = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 
-// Placements d'images dans le flux : "w 0 0 h x y cm /Name Do".
-function imagePlacements(raw) {
-    return [...raw.matchAll(/([\d.]+) 0 0 ([\d.]+) ([\d.]+) ([\d.]+) cm\s*\/\w+ Do/g)]
-        .map((m) => ({ w: +m[1], h: +m[2], x: +m[3], y: +m[4] }));
+/** Instrumente le doc : chaque texte et image avec son numéro de page. */
+function tracer(doc) {
+    const evts = [];
+    const page = () => doc.internal.getCurrentPageInfo().pageNumber;
+    const dText = doc.text.bind(doc);
+    doc.text = (t, x, y, o) => { evts.push({ page: page(), type: 'text', t: String(t) }); return dText(t, x, y, o); };
+    const dImg = doc.addImage.bind(doc);
+    doc.addImage = (data, fmt, x, y, w, h) => { evts.push({ page: page(), type: 'img', w, h }); return dImg(data, fmt, x, y, w, h); };
+    const dPage = doc.addPage.bind(doc);
+    doc.addPage = (...a) => { const r = dPage(...a); evts.push({ page: page(), type: 'addPage' }); return r; };
+    return evts;
 }
 
-test('graphiques TAF : PLEINE LARGEUR A5, jamais réduits', () => {
+describe('page Météo v6 (2 TAF sur la même page)', () => {
+test('déroutement et arrivée : MÊME page, pleine largeur, hauteur réduite', () => {
     const doc = new jsPDF({ unit: 'pt', format: 'a5' });
-    const n0 = doc.getNumberOfPages();
+    const evts = tracer(doc);
     drawWeatherPage(doc, {
-        isFr: true, generatedLabel: 'test',
-        dep: { title: 'Départ LFRV - METAR', raw: 'LFRV 160900Z 32008KT 9999 FEW030 Q1018', decode: true },
+        isFr: true, generatedLabel: 'test 17/09',
+        dep: { title: 'DÉPART · LFRV', raw: 'LFRV 171900Z AUTO 33008KT 9999NDZ SCT043 17/08 Q1019=', decode: true },
         terrains: [
-            { label: 'Déroutement LFRD', tafRaw: 'x', chart: JPEG1, chartRatio: 0.43, chartFmt: 'JPEG' },
-            { label: 'Arrivée LFOO', tafRaw: 'x', chart: JPEG1, chartRatio: 0.5, chartFmt: 'JPEG' },
+            { label: 'DÉROUTEMENT · LFRD', chart: PX, chartRatio: 1.42, chartFmt: 'PNG' },
+            { label: 'ARRIVÉE · LFOO', chart: PX, chartRatio: 1.42, chartFmt: 'PNG' },
         ],
     });
-    const raw = Buffer.from(doc.output('arraybuffer')).toString('latin1');
-    const places = imagePlacements(raw);
-    ok(places.length >= 2, `${places.length} graphiques posés`);
-    for (const p of places) {
-        ok(Math.abs(p.w - 363.53) < 1.5, `largeur ${p.w.toFixed(1)} pt = pleine page (363.5)`);
-    }
+    const pg = e => e.page;
+    const metar = evts.find(e => e.type === 'text' && /LFRV 171900Z/.test(e.t));
+    const bandeDer = evts.find(e => e.type === 'text' && /D.ROUTEMENT/.test(e.t));
+    const bandeArr = evts.find(e => e.type === 'text' && /ARRIV/.test(e.t) && /TAF/.test(e.t));
+    const imgs = evts.filter(e => e.type === 'img');
+    const nPages = doc.internal.getNumberOfPages();
+    console.log(`2 graphiques : ${nPages} pages · METAR p${metar?.page} · déroutement p${bandeDer?.page} · arrivée p${bandeArr?.page} · images ${imgs.map(i => `${Math.round(i.w)}×${Math.round(i.h)} p${i.page}`).join(' + ')}`);
+    assert.ok(metar && bandeDer && bandeArr, 'éléments tracés');
+    assert.equal(nPages, 2, 'page météo UNIQUE (2 = page blanche initiale du doc de test + 1)');
+    assert.equal(bandeDer?.page, bandeArr?.page, 'les 2 bandeaux TAF sur la même page');
+    assert.equal(metar?.page, bandeDer?.page, 'METAR sur la même page que les TAF');
+    assert.equal(imgs.length, 2);
+    assert.equal(imgs[0].page, imgs[1].page, 'les 2 graphiques sur la même page');
+    imgs.forEach(i => assert.equal(Math.round(i.w), 364, 'largeur pleine page (364 pt)'));
+    imgs.forEach(i => assert.ok(i.h > 100 && i.h < 250, `hauteur réduite pour que tout tienne (${Math.round(i.h)})`));
 });
 
-test('place insuffisante → la page Météo CONTINUE (pas de réduction)', () => {
+test('graphique TAF seul : hauteur naturelle conservée', () => {
     const doc = new jsPDF({ unit: 'pt', format: 'a5' });
-    const n0 = doc.getNumberOfPages();
-    // METAR long (multi-lignes) + 2 graphiques hauts : impossible en une page.
-    const longRaw = 'LFRV 160900Z 32008KT 9999 FEW030 SCT120 BKN200 1234/5678 8000 -RA BR ' + 'NOSIG '.repeat(12);
+    const evts = tracer(doc);
     drawWeatherPage(doc, {
         isFr: true, generatedLabel: 'test',
-        dep: { title: 'Départ LFRV - METAR', raw: longRaw, decode: true },
-        terrains: [
-            { label: 'Arrivée LFOO', tafRaw: 'x', chart: JPEG1, chartRatio: 0.62, chartFmt: 'JPEG' },
-            { label: 'Déroutement LFRD', tafRaw: 'x', chart: JPEG1, chartRatio: 0.62, chartFmt: 'JPEG' },
-        ],
+        dep: { title: 'DÉPART · LFRV', raw: 'LFRV 171900Z 9999NDZ SCT043=', decode: false },
+        terrains: [{ label: 'ARRIVÉE · LFOO', chart: PX, chartRatio: 1.42, chartFmt: 'PNG' }],
     });
-    const pages = doc.getNumberOfPages() - n0;
-    ok(pages >= 2, `${pages} page(s) météo (continuation au lieu de réduire)`);
-    const raw = Buffer.from(doc.output('arraybuffer')).toString('latin1');
-    for (const p of imagePlacements(raw)) {
-        ok(Math.abs(p.w - 363.53) < 1.5, `largeur ${p.w.toFixed(1)} pt maintenue en continuation`);
-    }
+    const img = evts.find(e => e.type === 'img');
+    assert.ok((img?.h || 0) > 460, `hauteur naturelle conservée (${Math.round(img?.h || 0)} pt)`);
+    assert.equal(Math.round(img?.w || 0), 364);
 });
-
-test('sans graphique : une seule page, texte brut seul', () => {
-    const doc = new jsPDF({ unit: 'pt', format: 'a5' });
-    const n0 = doc.getNumberOfPages();
-    drawWeatherPage(doc, {
-        isFr: true, generatedLabel: 'test',
-        dep: { title: 'Départ LFRV - METAR', raw: 'LFRV 160900Z 32008KT 9999 Q1018', decode: false },
-        terrains: [{ label: 'Arrivée LFOO', tafRaw: 'TAF…' }],
-    });
-    equal(doc.getNumberOfPages() - n0, 1);
 });
