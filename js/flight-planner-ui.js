@@ -549,7 +549,7 @@ async function _generateNavLogPdfInto(tab, { file = false } = {}) {
             const tiles = computeFileTiles(finp);
             const vacInfo = await getVacIndexInfo();
             const hhmm = (ts) => ts ? new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-            const lvlTxt = (l) => l === 'ok' ? 'OK' : (l === 'caution' ? '!' : '!!');
+            const lvlTxt = (l) => l === 'ok' ? 'OK' : (l === 'caution' || l === 'limitative' ? '!' : '!!');
             const rows = [
                 { status: tiles.weather.status, label: isFr3 ? 'Météo' : 'Weather',
                     detail: `METAR ${finp.metarAgeMin != null ? finp.metarAgeMin + ' min' : '—'} · TAF `

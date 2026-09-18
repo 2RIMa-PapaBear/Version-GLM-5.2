@@ -126,7 +126,7 @@ export function evaluateGoNoGo() {
         if (toResult.level === 'danger') {
             if (verdict !== 'NO-GO') verdict = 'NO-GO';
             reasons.push({ level: 'danger', icon: 'plane-takeoff', text: toResult.message });
-        } else if (toResult.level === 'caution') {
+        } else if (toResult.level === 'caution' || toResult.level === 'limitative') {
             if (verdict === 'GO') verdict = 'CAUTION';
             reasons.push({ level: 'caution', icon: 'plane-takeoff', text: toResult.message });
         }

@@ -330,6 +330,16 @@ function _surfaceNote(corr, surfaceCode, isFr) {
 // Verdict commun : compare la distance corrigée à la longueur de piste et
 // construit le message (FR/EN). Partagé par evaluateTakeoffPerformance (état
 // courant de l'app) et evaluateTakeoffFromRaw (METAR brut, ex. log de nav).
+// Niveau « PISTE LIMITATIVE » (①, feu vert pilote 18/09) : distance BRUTE
+// qui tient dans la piste mais PAS avec la marge +20 % — réglementairement
+// utilisable en respectant exactement les vitesses du manuel.
+export function runwayLevel(rawFt, marginedFt, rwyLenFt, cautionPct = 20) {
+    if (rawFt > rwyLenFt) return 'danger';        // même sans marge : non
+    if (marginedFt > rwyLenFt) return 'limitative'; // brut tient, marge non
+    const margin = rwyLenFt - marginedFt;
+    return (margin / rwyLenFt) * 100 < cautionPct ? 'caution' : 'ok';
+}
+
 function _takeoffVerdict(icao, daResult, corr, surfaceCode) {
     const acRef = getAircraftRef();
     const rwyLen = getRunwayLength(icao);
@@ -362,17 +372,8 @@ function _takeoffVerdict(icao, daResult, corr, surfaceCode) {
 
     // Marge : piste − distance 50 ft × 1,20 (méthode de référence).
     const margin = rwyLen - fiftyMargined;
-    const marginPct = (margin / rwyLen) * 100;
     const cautionThreshold = acRef.safetyMargin ?? 20;
-
-    let level;
-    if (margin < 0) {
-        level = 'danger';
-    } else if (marginPct < cautionThreshold) {
-        level = 'caution';
-    } else {
-        level = 'ok';
-    }
+    const level = runwayLevel(corr.fiftyFt, fiftyMargined, rwyLen, cautionThreshold);
 
     const messages = {
         ok: isFr
@@ -381,9 +382,12 @@ function _takeoffVerdict(icao, daResult, corr, surfaceCode) {
         caution: isFr
             ? `Marge faible — ${acRef.name}: 50 ft ${ftToM(fiftyMargined)} m (+20 %), piste ${ftToM(rwyLen)} m${surfaceNote}`
             : `Tight margin — ${acRef.name}: 50 ft ${ftToM(fiftyMargined)} m (+20%), rwy ${ftToM(rwyLen)} m${surfaceNote}`,
+        limitative: isFr
+            ? `PISTE LIMITATIVE (décollage) — brut ${ftToM(corr.fiftyFt)} m tient dans ${ftToM(rwyLen)} m, mais +20 % (${ftToM(fiftyMargined)} m) dépasse${surfaceNote} : utilisable en respectant exactement les vitesses du manuel — pleins gaz sur freins, rotation au bon moment`
+            : `LIMITING RUNWAY (takeoff) — raw ${ftToM(corr.fiftyFt)} m fits in ${ftToM(rwyLen)} m but +20% (${ftToM(fiftyMargined)} m) does not${surfaceNote}: fly the book speeds — full power before brake release, rotate on speed`,
         danger: isFr
-            ? `DÉCOLLAGE CRITIQUE — ${acRef.name}: ${ftToM(fiftyMargined)} m nécessaires (50 ft +20 %), piste ${ftToM(rwyLen)} m (manque ${ftToM(Math.abs(margin))} m)${surfaceNote}`
-            : `CRITICAL TAKEOFF — ${acRef.name}: ${ftToM(fiftyMargined)} m needed (50 ft +20%), rwy ${ftToM(rwyLen)} m (short by ${ftToM(Math.abs(margin))} m)${surfaceNote}`,
+            ? `DÉCOLLAGE IMPOSSIBLE — ${acRef.name}: même sans marge, brut ${ftToM(corr.fiftyFt)} m > piste ${ftToM(rwyLen)} m (manque ${ftToM(corr.fiftyFt - rwyLen)} m)${surfaceNote}`
+            : `TAKEOFF NOT POSSIBLE — ${acRef.name}: even raw ${ftToM(corr.fiftyFt)} m > rwy ${ftToM(rwyLen)} m (short by ${ftToM(corr.fiftyFt - rwyLen)} m)${surfaceNote}`,
     };
 
     return {
@@ -556,9 +560,8 @@ function _landingVerdict(icao, daResult, corr, headwindKt, activeName, isForecas
     const MARGIN_FACTOR = 1.20;
     const fiftyMargined = Math.round(corr.fiftyFt * MARGIN_FACTOR);
     const margin = rwyLen - fiftyMargined;
-    const marginPct = (margin / rwyLen) * 100;
     const cautionThreshold = ac.safetyMargin ?? 20;
-    const level = margin < 0 ? 'danger' : (marginPct < cautionThreshold ? 'caution' : 'ok');
+    const level = runwayLevel(corr.fiftyFt, fiftyMargined, rwyLen, cautionThreshold);
     const hwTxt = headwindKt == null ? '' : (isFr
         ? ` · vent ${headwindKt >= 0 ? 'de face' : 'arrière'} ${Math.abs(headwindKt)} kt`
         : ` · ${headwindKt >= 0 ? 'headwind' : 'tailwind'} ${Math.abs(headwindKt)} kt`);
@@ -569,9 +572,12 @@ function _landingVerdict(icao, daResult, corr, headwindKt, activeName, isForecas
         caution: isFr
             ? `Marge faible — 50 ft ${ftToM(fiftyMargined)} m (+20 %), piste ${ftToM(rwyLen)} m${hwTxt}`
             : `Tight margin — 50 ft ${ftToM(fiftyMargined)} m (+20%), rwy ${ftToM(rwyLen)} m${hwTxt}`,
+        limitative: isFr
+            ? `PISTE LIMITATIVE (atterrissage) — brut ${ftToM(corr.fiftyFt)} m tient dans ${ftToM(rwyLen)} m, mais +20 % (${ftToM(fiftyMargined)} m) dépasse${hwTxt} : posé court au seuil, visée de la zone d'aboutissement, remise de gaz sinon`
+            : `LIMITING RUNWAY (landing) — raw ${ftToM(corr.fiftyFt)} m fits in ${ftToM(rwyLen)} m but +20% (${ftToM(fiftyMargined)} m) does not${hwTxt}: aim for the touchdown zone, go around if not stable`,
         danger: isFr
-            ? `ATTERRISSAGE CRITIQUE — ${ftToM(fiftyMargined)} m nécessaires (50 ft +20 %), piste ${ftToM(rwyLen)} m (manque ${ftToM(Math.abs(margin))} m)${hwTxt}`
-            : `CRITICAL LANDING — ${ftToM(fiftyMargined)} m needed (50 ft +20%), rwy ${ftToM(rwyLen)} m (short by ${ftToM(Math.abs(margin))} m)${hwTxt}`,
+            ? `ATTERRISSAGE IMPOSSIBLE — même sans marge, brut ${ftToM(corr.fiftyFt)} m > piste ${ftToM(rwyLen)} m (manque ${ftToM(corr.fiftyFt - rwyLen)} m)${hwTxt}`
+            : `LANDING NOT POSSIBLE — even raw ${ftToM(corr.fiftyFt)} m > rwy ${ftToM(rwyLen)} m (short by ${ftToM(corr.fiftyFt - rwyLen)} m)${hwTxt}`,
     };
     return { ...base, fiftyMargined, runwayLength: rwyLen, margin: Math.round(margin), level, message: messages[level] };
 }
