@@ -1122,12 +1122,14 @@ document.addEventListener('DOMContentLoaded', async function () {
             }
         }
     } else {
-        // ---- Pas de permalien : priorité au favori de démarrage, sinon dernier terrain ----
+        // ---- Pas de permalien : priorité au favori de démarrage, sinon dernier terrain,
+        // sinon LFRV (base de vol du pilote — retour 18/09 : l'app ne doit
+        // jamais s'ouvrir vide) ----
         const startupIcao = getStartupFavorite();
         const lastIcao = (() => { try { return localStorage.getItem('last-icao'); } catch { return null; } })();
         const icaoToLoad = (startupIcao && /^[A-Z][A-Z0-9]{3}$/.test(startupIcao))
             ? startupIcao
-            : (lastIcao && /^[A-Z][A-Z0-9]{3}$/.test(lastIcao) ? lastIcao : null);
+            : (lastIcao && /^[A-Z][A-Z0-9]{3}$/.test(lastIcao) ? lastIcao : 'LFRV');
         if (icaoToLoad) {
             const input = document.getElementById('icaoInput');
             if (input) input.value = icaoToLoad;
