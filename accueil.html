@@ -19,14 +19,22 @@
     .acc-hero {
         position: relative; text-align: center; padding: 54px 10px 30px; overflow: hidden;
     }
+    .acc-hero > * { position: relative; z-index: 2; }
+    .acc-hero > img.acc-hero-bg {
+        position: absolute; inset: 0; z-index: 0;
+        width: 100%; height: 100%; object-fit: cover; object-position: center 30%;
+    }
     .acc-hero::before {
-        content: ''; position: absolute; inset: -40% -20% auto; height: 130%;
+        content: ''; position: absolute; inset: -40% -20% auto; height: 130%; z-index: 1;
         background:
             radial-gradient(42% 55% at 38% 42%, rgba(56, 189, 248, .14), transparent 70%),
             radial-gradient(35% 45% at 68% 55%, rgba(45, 212, 191, .10), transparent 70%);
         pointer-events: none;
     }
-    .acc-hero > * { position: relative; }
+    .acc-hero::after {
+        content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+        background: linear-gradient(180deg, rgba(7, 12, 24, .58) 0%, rgba(7, 12, 24, .74) 55%, rgba(7, 12, 24, .95) 100%);
+    }
     .acc-hero .acc-logo {
         width: 64px; height: 64px; margin: 0 auto 16px; border-radius: 16px;
         background: var(--inner-bg, #0F172A); border: 1px solid var(--border-color, #334155);
@@ -91,6 +99,10 @@
     }
     .acc-card p { margin: 0; color: var(--text-muted, #94A3B8); font-size: 12.5px; line-height: 1.68; }
 
+    /* ---- Photo d'ambiance ---- */
+    .acc-band { position: relative; margin: 30px 0 0; border-radius: 13px; overflow: hidden; border: 1px solid var(--border-color, #334155); }
+    .acc-band img { display: block; width: 100%; height: 350px; object-fit: cover; }
+
     /* ---- 3 étapes ---- */
     .acc-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 16px; }
     .acc-step {
@@ -119,6 +131,7 @@
         .acc-hero h1 { font-size: 26px; }
         .acc-hero { padding-top: 36px; }
         .acc-page { padding: 0 14px 40px; }
+        .acc-band img { height: 210px; }
     }
 </style>
 </head>
@@ -126,6 +139,7 @@
 <div class="acc-page">
 
     <div class="acc-hero">
+        <img class="acc-hero-bg" src="assets/accueil/hero.jpg" alt="" decoding="async" fetchpriority="high">
         <div class="acc-logo"><i data-lucide="plane" style="width:32px;height:32px;"></i></div>
         <h1>Visualiseur METAR/TAF</h1>
         <div class="acc-sub">Le briefing VFR complet, du METAR au dossier de vol imprimé.</div>
@@ -201,6 +215,10 @@
         </div>
     </div>
 
+    <figure class="acc-band">
+        <img src="assets/accueil/golfe.jpg" alt="Vue aérienne du Golfe du Morbihan" loading="lazy" decoding="async">
+    </figure>
+
     <h2 class="acc-h2">Trois étapes, un dossier prêt</h2>
     <p class="acc-h2sub">De l'idée du vol au PDF dans la poche.</p>
     <div class="acc-steps">
@@ -218,6 +236,7 @@
     <div class="acc-foot">
         <div style="font-weight:600;color:var(--text-color,#F8FAFC);">© 2026 PapaBear — Visualiseur METAR/TAF · Web version 3.0</div>
         <div>Sources : AviationWeather.gov · Service de l'Information Aéronautique (SIA) · Météo-France (AEROWEB) · openAIP · OpenStreetMap / OpenTopoMap</div>
+        <div>Photos d'illustration : <a href="https://commons.wikimedia.org/wiki/File:Sunset202001251701.jpg" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a> — Xonqnopp, Lieven Smits (CC BY-SA 4.0)</div>
         <div class="warning">Avertissement : cet outil est fourni à titre purement indicatif et ne remplace
              ni le briefing officiel, ni le manuel de vol de l'avion, ni les cartes réglementaires.</div>
     </div>

@@ -914,25 +914,6 @@ body.mode-local #alternates-container { display: none !important; }
 }
 .mp-inner .mp-renamewp-btn:hover { background: rgba(251,191,36,0.3); }
 
-/* Bouton « Imprimer le log de nav » : action finale de la préparation —
-   il doit sauter aux yeux dans le panneau Calcul de navigation. */
-.fp-print-btn {
-    display: inline-flex; align-items: center; gap: 7px;
-    padding: 9px 16px; border-radius: 8px; cursor: pointer;
-    background: linear-gradient(180deg, #38BDF8 0%, #0EA5E9 100%);
-    color: #04131F; font-weight: 800; font-size: 12.5px;
-    border: 1px solid rgba(125, 211, 252, 0.8);
-    box-shadow: 0 2px 12px rgba(14, 165, 233, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
-    transition: transform 0.12s, box-shadow 0.12s;
-    white-space: nowrap;
-}
-.fp-print-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 16px rgba(14, 165, 233, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.35);
-}
-.fp-print-btn:active { transform: translateY(0); }
-.fp-print-btn svg { width: 15px; height: 15px; }
-
 /* Liste des étapes intermédiaires du plan (code + nom, renommage des repères). */
 .fp-waypoint-list { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
 .fp-wp-row { display: flex; align-items: center; gap: 7px; font-size: 11px; min-width: 0; }
