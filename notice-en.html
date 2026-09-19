@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Manual - METAR/TAF Visualizer</title>
+    <title>User Manual — Prévol</title>
     <style>
         :root {
             --primary: #0288D1;
@@ -345,8 +345,8 @@
 <body>
     <div class="container">
         <a href="index.html" class="btn-back"><i data-lucide="arrow-left"></i> Back to app</a>
-        <h1><i data-lucide="book-open"></i> USER MANUAL — METAR/TAF Visualizer</h1>
-<h2>Complete Guide for VFR and IFR Pilots</h2>
+        <h1><i data-lucide="book-open"></i> USER MANUAL</h1>
+<h2>Complete Guide for VFR Pilots</h2>
 <hr />
 <h2 id="toc"><i data-lucide="list"></i> TABLE OF CONTENTS</h2>
 <ol>
@@ -354,7 +354,7 @@
 <li><a href="#interface">Interface and Features</a></li>
 <li><a href="#decision">Decision Support</a></li>
 <li><a href="#situational">Situational Awareness</a></li>
-<li><a href="#navigation">Cross-Country Navigation</a></li>
+<li><a href="#navigation">Navigation</a></li>
 <li><a href="#frequencies">Frequencies &amp; Airfield Info</a></li>
 <li><a href="#comfort">Comfort &amp; Customization</a></li>
 <li><a href="#metar-decoding">METAR Decoding</a></li>
@@ -417,7 +417,7 @@
 <thead><tr><th>Button</th><th>Action</th></tr></thead>
 <tbody>
 <tr><td><span class="demo-lang"><span class="demo-flag-fr"></span><span class="demo-flag-en"></span><span class="demo-flag-line"></span></span> <small>FR/ENG</small></td><td>Toggle French / English language</td></tr>
-<tr><td><span class="demo-seg"><span class="on">Local</span><span>Navigation</span></span></td><td>Toggle between local flight and cross-country navigation</td></tr>
+<tr><td><span class="demo-seg"><span class="on">Local</span><span>Navigation</span></span></td><td>Toggle between local flight and navigation</td></tr>
 <tr><td><span class="demo-btn"><i data-lucide="maximize-2"></i></span></td><td>Express briefing: cockpit view (verdict, wind, window in large format)</td></tr>
 <tr><td><span class="demo-btn"><i data-lucide="share-2"></i></span></td><td>Share: generates a briefing link / QR code</td></tr>
 <tr><td><span class="demo-btn"><i data-lucide="bell"></i></span></td><td>Watchdog: automatic favorite monitoring with notifications</td></tr>
@@ -554,7 +554,7 @@
 <p>Evaluates the <strong>freezing level</strong> (0°C isotherm) and the icing risk if clouds extend above it.</p>
 
 <!-- ====================== NAVIGATION ====================== -->
-<h2 id="navigation"><i data-lucide="plane"></i> CROSS-COUNTRY NAVIGATION</h2>
+<h2 id="navigation"><i data-lucide="plane"></i> NAVIGATION</h2>
 
 <h3>Local / Navigation Mode</h3>
 <p>The toggle button <strong><span class="demo-seg"><span class="on">Local</span><span>Navigation</span></span></strong> adapts the display:</p>
@@ -765,33 +765,10 @@
 <p><strong>Day 07 04h → Day 07 12h</strong> : These conditions maintained<br />
 → <i data-lucide="x" class="li-ic"></i> <strong>IFR</strong></p>
 <hr />
-<h2><i data-lucide="gauge"></i> VFR MINIMA (VMC)</h2>
-<h3>VMC conditions in controlled airspace</h3>
+<h2 id="vfr-minima"><i data-lucide="gauge"></i> VFR MINIMA (VMC)</h2>
 <p><strong>VMC</strong> = Visual Meteorological Conditions (weather conditions for visual flight)</p>
-<h4>Classes A, B, C, D, E (≥ FL100 / 3000m AMSL)</h4>
-<table>
-<thead>
-<tr>
-<th>Parameter</th>
-<th>Minimum</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Visibility</strong></td>
-<td>≥ 8 km</td>
-</tr>
-<tr>
-<td><strong>Cloud distance (horizontal)</strong></td>
-<td>≥ 1500 m</td>
-</tr>
-<tr>
-<td><strong>Cloud distance (vertical)</strong></td>
-<td>≥ 300 m (1000 ft)</td>
-</tr>
-</tbody>
-</table>
-<h4>Classes A, B, C, D, E (&lt; FL100 / 3000m AMSL)</h4>
+<h3>Controlled airspace (classes A to E)</h3>
+<p>Below FL100 — speed limited to <strong>250 kt</strong>:</p>
 <table>
 <thead>
 <tr>
@@ -812,9 +789,18 @@
 <td><strong>Cloud distance (vertical)</strong></td>
 <td>≥ 300 m (1000 ft)</td>
 </tr>
+<tr>
+<td><strong>Minimum height above ground</strong></td>
+<td>500 ft</td>
+</tr>
 </tbody>
 </table>
-<h4>Class G (&lt; 900m / 3000ft AMSL)</h4>
+<div class="success">
+<p><strong>Remember</strong>: 500 ft minimum height + 1000 ft vertical separation from cloud = <strong>deduced minimum ceiling of 1500 ft</strong>. Below FL100: <strong>visibility ≥ 5 km and ceiling ≥ 1500 ft</strong>.</p>
+</div>
+<p>Above FL100 (no speed limit): <strong>visibility ≥ 8 km</strong>, same cloud separations.</p>
+<h3>Uncontrolled airspace (classes F and G)</h3>
+<p>Below the <strong>"S" surface</strong> — the higher of the two levels: <strong>3000 ft AMSL (QNH)</strong> or <strong>1000 ft above the ground</strong> — at <strong>IAS ≤ 140 kt</strong>:</p>
 <table>
 <thead>
 <tr>
@@ -825,52 +811,32 @@
 <tbody>
 <tr>
 <td><strong>Visibility</strong></td>
-<td>≥ 5 km</td>
+<td>≥ 1500 m (otherwise ≥ 5000 m above 140 kt)</td>
 </tr>
 <tr>
 <td><strong>Cloud distance</strong></td>
 <td>Clear of clouds and in sight of the ground</td>
 </tr>
 <tr>
-<td><strong>Ceiling</strong></td>
-<td>No regulatory minimum*</td>
+<td><strong>Minimum height above ground</strong></td>
+<td>500 ft</td>
 </tr>
 </tbody>
 </table>
-<p>*But use common sense: stay high enough to glide in case of engine failure!</p>
-<h4>Class G (&gt; 900m / 3000ft AMSL)</h4>
-<table>
-<thead>
-<tr>
-<th>Parameter</th>
-<th>Minimum</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Visibility</strong></td>
-<td>≥ 5 km</td>
-</tr>
-<tr>
-<td><strong>Cloud distance (horizontal)</strong></td>
-<td>≥ 1500 m</td>
-</tr>
-<tr>
-<td><strong>Cloud distance (vertical)</strong></td>
-<td>≥ 300 m (1000 ft)</td>
-</tr>
-</tbody>
-</table>
+<div class="success">
+<p><strong>Remember</strong>: near the ground, the 500 ft minimum height implies a <strong>deduced minimum ceiling &gt; 500 ft</strong>. Below the "S" surface at IAS ≤ 140 kt: <strong>visibility ≥ 1500 m and ceiling &gt; 500 ft</strong>.</p>
+</div>
+<p>Above the "S" surface and below FL100: <strong>visibility ≥ 5 km</strong>, clouds at 1500 m horizontally and 300 m (1000 ft) vertically, speed limited to 250 kt.</p>
 <h3>Special VFR (SVFR)</h3>
-<p><strong>Conditions</strong> :
-- ATC clearance mandatory
-- In control zone (CTR) only
-- Visibility ≥ 1500 m (sometimes 800 m at night if qualified)
-- Clear of clouds
-- In sight of the ground</p>
-<p><strong>Typical use</strong> :
-- Departure/arrival at an aerodrome in degraded weather conditions
-- Transit through a CTR with weather below VMC</p>
+<p>Special VFR lets you take off, land or transit through controlled airspace by <strong>momentarily lowering its weather minima</strong>: conditions can make a flight legal in uncontrolled airspace yet forbidden in controlled airspace (e.g. 10 km / 1000 ft) — the special VFR clearance bridges the two.</p>
+<p><strong>Pilot side</strong> (SERA.5010b):
+- ATC clearance mandatory — the controller is not required to issue it (traffic density, aerodrome weather, mandatory reporting points)
+- Forbidden at night for aeroplanes (SERA.5010a)
+- In-flight visibility ≥ 1500 m along the intended route (IAS ≤ 140 kt), clear of clouds and in sight of the ground</p>
+<p><strong>Controller side</strong> (SERA.5010c): the clearance may only be issued for take-off, landing or entry into the manoeuvring or circuit area if the weather reported on the aerodrome is <strong>visibility ≥ 1500 m and ceiling ≥ 600 ft</strong> (transit is not concerned). Special instructions may apply (see the VAC chart).</p>
+<div class="warning">
+<p><strong>Safety — CFIT</strong>: flying with reduced weather minima is a contributing factor to controlled flight into terrain.</p>
+</div>
 <h3>Recommended VFR minimums</h3>
 <p>Beyond the regulatory minimums, here are the <strong>practical thresholds</strong> :</p>
 <table>

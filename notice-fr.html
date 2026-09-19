@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notice d'utilisation - METAR/TAF Visualizer</title>
+    <title>Notice d'utilisation — Prévol</title>
     <style>
         :root {
             --primary: #0288D1;
@@ -377,8 +377,8 @@
 <body>
     <div class="container">
         <a href="index.html" class="btn-back"><i data-lucide="arrow-left"></i> Retour à l'application</a>
-        <h1><i data-lucide="book-open"></i> NOTICE D'UTILISATION — METAR/TAF Visualizer</h1>
-<h2>Guide complet pour pilotes VFR et IFR</h2>
+        <h1><i data-lucide="book-open"></i> NOTICE D'UTILISATION</h1>
+<h2>Guide complet pour pilote VFR</h2>
 <hr />
 <h2 id="toc"><i data-lucide="list"></i> TABLE DES MATIÈRES</h2>
 <ol>
@@ -386,7 +386,7 @@
 <li><a href="#interface">Interface et fonctionnalités</a></li>
 <li><a href="#decision">Aide à la décision</a></li>
 <li><a href="#situation">Conscience situationnelle</a></li>
-<li><a href="#navigation">Navigation cross-country</a></li>
+<li><a href="#navigation">Navigation</a></li>
 <li><a href="#frequences">Fréquences et info terrain</a></li>
 <li><a href="#confort">Confort &amp; Personnalisation</a></li>
 <li><a href="#decryptage-metar">Décryptage METAR</a></li>
@@ -449,7 +449,7 @@
 <thead><tr><th>Bouton</th><th>Action</th></tr></thead>
 <tbody>
 <tr><td><span class="demo-lang"><span class="demo-flag-fr"></span><span class="demo-flag-en"></span><span class="demo-flag-line"></span></span> <small>FR/ANG</small></td><td>Bascule langue français / anglais</td></tr>
-<tr><td><span class="demo-seg"><span class="on">Local</span><span>Navigation</span></span></td><td>Bascule entre vol local et navigation cross-country</td></tr>
+<tr><td><span class="demo-seg"><span class="on">Local</span><span>Navigation</span></span></td><td>Bascule entre vol local et navigation</td></tr>
 <tr><td><span class="demo-btn"><i data-lucide="maximize-2"></i></span></td><td>Briefing express : vue cockpit épurée (verdict, vent, créneau en grand)</td></tr>
 <tr><td><span class="demo-btn"><i data-lucide="share-2"></i></span></td><td>Partager : génère un lien / QR code du briefing</td></tr>
 <tr><td><span class="demo-btn"><i data-lucide="bell"></i></span></td><td>Surveillance : surveillance automatique des favoris avec notifications</td></tr>
@@ -596,7 +596,7 @@
 <p>Évalue le <strong>niveau de congélation</strong> (isotherme 0°C) et le risque de givrage si les nuages s'étendent au-dessus.</p>
 
 <!-- ====================== NAVIGATION ====================== -->
-<h2 id="navigation"><i data-lucide="plane"></i> NAVIGATION CROSS-COUNTRY</h2>
+<h2 id="navigation"><i data-lucide="plane"></i> NAVIGATION</h2>
 
 <h3>Mode Vol local / Navigation</h3>
 <p>Le bouton toggle <strong><span class="demo-seg"><span class="on">Local</span><span>Navigation</span></span></strong> adapte l'affichage :</p>
@@ -807,33 +807,10 @@
 <p><strong>07j 04h → 07j 12h</strong> : Maintien de ces conditions<br />
 → <i data-lucide="x" class="li-ic"></i> <strong>IFR</strong></p>
 <hr />
-<h2><i data-lucide="gauge"></i> MINIMA VFR (VMC)</h2>
-<h3>Conditions VMC en espace aérien contrôlé</h3>
+<h2 id="minima-vfr"><i data-lucide="gauge"></i> MINIMA VFR (VMC)</h2>
 <p><strong>VMC</strong> = Visual Meteorological Conditions (conditions météo de vol à vue)</p>
-<h4>Classes A, B, C, D, E (≥ FL100 / 3000m AMSL)</h4>
-<table>
-<thead>
-<tr>
-<th>Paramètre</th>
-<th>Minimum</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Visibilité</strong></td>
-<td>≥ 8 km</td>
-</tr>
-<tr>
-<td><strong>Distance des nuages (horizontale)</strong></td>
-<td>≥ 1500 m</td>
-</tr>
-<tr>
-<td><strong>Distance des nuages (verticale)</strong></td>
-<td>≥ 300 m (1000 ft)</td>
-</tr>
-</tbody>
-</table>
-<h4>Classes A, B, C, D, E (&lt; FL100 / 3000m AMSL)</h4>
+<h3>Espace aérien contrôlé (classes A à E)</h3>
+<p>Sous FL100 — vitesse limitée à <strong>250 kt</strong> :</p>
 <table>
 <thead>
 <tr>
@@ -854,9 +831,18 @@
 <td><strong>Distance des nuages (verticale)</strong></td>
 <td>≥ 300 m (1000 ft)</td>
 </tr>
+<tr>
+<td><strong>Hauteur minimale au-dessus du sol</strong></td>
+<td>500 ft</td>
+</tr>
 </tbody>
 </table>
-<h4>Classe G (&lt; 900m / 3000ft AMSL)</h4>
+<div class="success">
+<p><strong>À retenir</strong> : hauteur minimale de 500 ft + espacement vertical de 1000 ft avec les nuages = <strong>plafond minimum déduit de 1500 ft</strong>. Sous FL100 : <strong>visibilité ≥ 5 km et plafond ≥ 1500 ft</strong>.</p>
+</div>
+<p>Au-dessus de FL100 (vitesse libre) : <strong>visibilité ≥ 8 km</strong>, mêmes espacements avec les nuages.</p>
+<h3>Espace aérien non contrôlé (classes F et G)</h3>
+<p>Sous la <strong>surface « S »</strong> — le plus haut des deux niveaux : <strong>3000 ft AMSL (QNH)</strong> ou <strong>1000 ft au-dessus du sol</strong> — à <strong>Vi ≤ 140 kt</strong> :</p>
 <table>
 <thead>
 <tr>
@@ -867,52 +853,32 @@
 <tbody>
 <tr>
 <td><strong>Visibilité</strong></td>
-<td>≥ 5 km</td>
+<td>≥ 1500 m (sinon ≥ 5000 m au-dessus de 140 kt)</td>
 </tr>
 <tr>
 <td><strong>Distance des nuages</strong></td>
 <td>Hors des nuages et en vue du sol</td>
 </tr>
 <tr>
-<td><strong>Plafond</strong></td>
-<td>Aucun minimum réglementaire*</td>
+<td><strong>Hauteur minimale au-dessus du sol</strong></td>
+<td>500 ft</td>
 </tr>
 </tbody>
 </table>
-<p>*Mais bon sens : rester suffisamment haut pour planer en cas de panne moteur !</p>
-<h4>Classe G (&gt; 900m / 3000ft AMSL)</h4>
-<table>
-<thead>
-<tr>
-<th>Paramètre</th>
-<th>Minimum</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Visibilité</strong></td>
-<td>≥ 5 km</td>
-</tr>
-<tr>
-<td><strong>Distance des nuages (horizontale)</strong></td>
-<td>≥ 1500 m</td>
-</tr>
-<tr>
-<td><strong>Distance des nuages (verticale)</strong></td>
-<td>≥ 300 m (1000 ft)</td>
-</tr>
-</tbody>
-</table>
+<div class="success">
+<p><strong>À retenir</strong> : proche du sol, la hauteur minimale de 500 ft impose un <strong>plafond minimum déduit &gt; 500 ft</strong>. Sous la surface « S » à Vi ≤ 140 kt : <strong>visibilité ≥ 1500 m et plafond &gt; 500 ft</strong>.</p>
+</div>
+<p>Au-dessus de la surface « S » et sous FL100 : <strong>visibilité ≥ 5 km</strong>, nuages à 1500 m horizontalement et 300 m (1000 ft) verticalement, vitesse limitée à 250 kt.</p>
 <h3>VFR spécial (SVFR)</h3>
-<p><strong>Conditions</strong> :
-- Autorisation ATC obligatoire
-- En zone de contrôle (CTR) uniquement
-- Visibilité ≥ 1500 m (parfois 800 m de nuit si habilité)
-- Hors des nuages
-- En vue du sol</p>
-<p><strong>Utilisation typique</strong> :
-- Départ/arrivée d'un aérodrome en conditions météo dégradées
-- Transit à travers une CTR avec météo sous VMC</p>
+<p>Le VFR spécial permet de décoller, atterrir ou transiter dans un espace contrôlé en <strong>abaissant momentanément ses minima météo</strong> : il existe des conditions où le vol est autorisé en espace non contrôlé mais interdit en espace contrôlé (par exemple 10 km / 1000 ft) — la clairance de VFR spécial fait la « transition » entre les deux.</p>
+<p><strong>Côté pilote</strong> (SERA.5010b) :
+- Clairance ATC obligatoire — le contrôleur n'est pas tenu de la délivrer (densité du trafic, météo du terrain, points de passage imposés)
+- Interdit de nuit pour les avions (SERA.5010a)
+- Visibilité en vol ≥ 1500 m sur le trajet prévu (Vi ≤ 140 kt), hors des nuages et en vue du sol</p>
+<p><strong>Côté contrôleur</strong> (SERA.5010c) : la clairance ne peut être délivrée pour un décollage, un atterrissage ou une pénétration dans la zone de circulation ou le circuit de piste que si la météo rapportée sur l'aérodrome est <strong>visibilité ≥ 1500 m et plafond ≥ 600 ft</strong> (le transit n'est pas concerné). Des consignes particulières peuvent s'appliquer (carte VAC).</p>
+<div class="warning">
+<p><strong>Sécurité — CFIT</strong> : voler avec des minima météo réduits est un facteur contributif de « controlled flight into terrain ».</p>
+</div>
 <h3>Minima recommandés pilotes VFR</h3>
 <p>Au-delà des minima réglementaires, voici les <strong>seuils pratiques</strong> :</p>
 <table>
