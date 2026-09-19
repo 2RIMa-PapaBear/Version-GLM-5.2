@@ -1,4 +1,4 @@
-# Visualiseur METAR/TAF
+# Prévol
 
 **Météo aéronautique en temps réel pour pilotes VFR** — décodage et visualisation
 graphique des METAR/TAF, planification de vol, performances décollage et log de nav,
@@ -274,7 +274,7 @@ npm run deploy:test -- --mirror      # supprime aussi les fichiers distants disp
 - **2026-09-05** — FICHE TERRAIN v3 — feu vert pilote après aperçu PDF (Apercu_fiche_terrain.pdf, 3 terrains LFRN/LFRV/LFPF) : section Terrain en LIGNES LIBELL…
 - **2026-09-05** — FICHE TERRAIN v2 (retours pilote : ordre + lisibilité) : ① FRÉQUENCES en tête (sans sous-titre redondant) ② PISTES (seuils officiels affiché…
 - **2026-09-05** — FICHE TERRAIN COMPLÈTE dans l onglet « Fréquences & info terrain » (demande pilote, 4 arbitrages validés) : ① IDENTITÉ en chips — élévation,…
-<!-- docs:lastSha=cae498814cb00e0ce707b2939a5517dc9e1314b5 -->
+<!-- docs:lastSha=01d6440aa410e4a05de87164d4b4f57f1efd6d0f -->
 
 
 

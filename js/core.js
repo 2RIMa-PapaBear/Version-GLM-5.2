@@ -156,7 +156,7 @@ export const I18N = {
         watchdogTitle: "Surveillance des favoris",
 
         // --- Interface statique (index.html → setLanguage) ---
-        uiTitle: "Visualiseur METAR/TAF",
+        uiTitle: "Prévol",
         noticeBtn: "Notice",
         noticeBtnTitle: "Ouvrir la notice complète",
         flightModeTitle: "Basculer entre vol local et navigation",
@@ -310,7 +310,7 @@ export const I18N = {
         watchdogTitle: "Favorites watchdog",
 
         // --- Interface statique (index.html → setLanguage) ---
-        uiTitle: "METAR/TAF Viewer",
+        uiTitle: "Prévol",
         noticeBtn: "Manual",
         noticeBtnTitle: "Open the full manual",
         flightModeTitle: "Switch between local flight and navigation",

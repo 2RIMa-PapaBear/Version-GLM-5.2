@@ -1,6 +1,6 @@
 {
-  "name": "Visualiseur METAR/TAF",
-  "short_name": "METAR/TAF",
+  "name": "Prévol",
+  "short_name": "Prévol",
   "description": "Décodez et visualisez graphiquement les messages météo aéronautiques METAR et TAF. Outil gratuit pour pilotes.",
   "lang": "fr",
   "start_url": ".",
