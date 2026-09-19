@@ -70,22 +70,22 @@ page.on('request', req => {
 
 await page.goto('http://127.0.0.1:8651/index.html?icao=LFRV&mode=nav&dest=LFRC', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-// Attend le planificateur + le bouton PDF (plan calculé).
-await page.waitForSelector('#fp-navlog-pdf', { timeout: 60000 });
+// Attend le planificateur + le bouton dossier (plan calculé).
+await page.waitForSelector('#ff-print', { timeout: 60000 });
 await new Promise(r => setTimeout(r, 2500));   // profil/alternates se terminent
 
 // Onglets ouverts par l'app.
 let pdfTab = null;
 browser.on('targetcreated', async t => { try { const p = await t.page(); if (p) pdfTab = p; } catch { } });
 
-await page.click('#fp-navlog-pdf');
+await page.evaluate(() => document.getElementById('ff-print')?.click());
 await page.waitForSelector('#navlog-confirm-modal [data-ok]', { timeout: 10000 });
 await new Promise(r => setTimeout(r, 200));
 await page.click('#navlog-confirm-modal [data-ok]');
 
 // L'onglet reçoit la page habillée (data: iframe) une fois le PDF généré.
 let verdict = null;
-for (let i = 0; i < 30 && !verdict; i++) {
+for (let i = 0; i < 90 && !verdict; i++) {
     await new Promise(r => setTimeout(r, 500));
     try {
         if (!pdfTab) continue;

@@ -36,19 +36,19 @@ page.on('request', req => {
 });
 
 await page.goto('http://papabear56.free.fr/index.html?icao=LFRV&mode=nav&dest=LFRC', { waitUntil: 'domcontentloaded', timeout: 45000 });
-await page.waitForSelector('#fp-navlog-pdf', { timeout: 60000 });
+await page.waitForSelector('#ff-print', { timeout: 60000 });
 await new Promise(r => setTimeout(r, 2000));
 
 let pdfTab = null;
 browser.on('targetcreated', async t => { try { const p = await t.page(); if (p) pdfTab = p; } catch { } });
-await page.click('#fp-navlog-pdf');
+await page.evaluate(() => document.getElementById('ff-print')?.click());
 await page.waitForSelector('#navlog-confirm-modal [data-ok]', { timeout: 10000 });
 await new Promise(r => setTimeout(r, 300));
 await page.click('#navlog-confirm-modal [data-ok]');
 
 // Récupère le PDF depuis la page d'aperçu (iframe data:application/pdf;base64,…).
 let b64 = null;
-for (let i = 0; i < 40 && !b64; i++) {
+for (let i = 0; i < 90 && !b64; i++) {
     await new Promise(r => setTimeout(r, 500));
     try {
         if (!pdfTab) continue;

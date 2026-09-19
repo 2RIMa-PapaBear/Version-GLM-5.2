@@ -545,7 +545,7 @@
 <li><strong>On a local flight</strong>: a <strong>zone around the observed airfield</strong> — <strong>20 NM by default, adjustable from 10 to 40 NM</strong> ("Radius" field in the panel) — including the briefing of <strong>every airfield within that radius</strong>, <strong>yours always first</strong>, with "no VFR NOTAM" stated for those with none.</li>
 </ul>
 <p>Only <strong>VFR</strong> NOTAM are shown, within your flight levels (plan FL plus a climb margin). Each family (obstacles, procedures, airspace regulations…) is collapsed: open what matters to you. Text is shown <strong>in French</strong> where the official translation exists, with validity period and hours of activity. <strong>Refresh</strong> fetches a fresh briefing — NOTAM are never cached.</p>
-<p><strong>Printing</strong>: a checkbox precedes every NOTAM and every category. Only <strong>checked</strong> NOTAM are appended, grouped in flight order, as an <strong>annex to the nav log PDF</strong> ("Print nav log" button).</p>
+<p><strong>Printing</strong>: a checkbox precedes every NOTAM and every category. Only <strong>checked</strong> NOTAM are appended, grouped in flight order, as an <strong>annex to the nav log PDF</strong> ("Print flight file" button).</p>
 
 <h3>SIGMET / AIRMET</h3>
 <p>Active <strong>SIGMETs</strong> (hazardous phenomena: thunderstorms, severe icing, turbulence) and <strong>AIRMETs</strong> (moderate) near your airfield are detected and feed directly into the GO / NO-GO banner.</p>
@@ -630,8 +630,8 @@
 <p>The <i data-lucide="volume-2" class="li-ic"></i> button reads the METAR aloud (browser speech synthesis), ATIS-style.</p>
 <p><strong>Observation age</strong>: a small pill next to the airfield name shows how fresh the message is — <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#4ADE80;"></span> green (under an hour), <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#FBBF24;"></span> amber, <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#F87171;"></span> red (stale for briefing). It refreshes every minute and follows each message's own rhythm: a <strong>METAR</strong> (hourly observation) turns amber after an hour without renewal; a <strong>TAF</strong> (forecast issued every ~6 h) reads "Issued…" and stays green up to 6 h 30. If the network drops, the last message stays on display in red with its age: you always know what you are looking at.</p>
 
-<h3>Printable Nav Log</h3>
-<p>In the "Flight plan" panel, the <strong>"Print nav log"</strong> button generates the A5 log (3-4 pages: nav log, navigation computations, performance &amp; terrain, weight &amp; balance if the aircraft is configured — beyond 9 legs the nav log continues on a "VFR Flight Log (cont.)" page with the same layout — table filled with blank rows and the Cruise / Turning point / Downwind check boxes kept at the bottom — and the computations table fills the whole page before an extra "Leg details (continued)" page takes over). A <strong>verification modal</strong> lists the automatically computed values to check before any in-flight use; once confirmed, the PDF <strong>opens in a browser tab</strong> — the viewer's Print button is one click away (fallback: direct download if the tab is blocked).</p>
+<h3>Printable flight file</h3>
+<p>In Navigation mode, the <strong>"Print flight file"</strong> button in the "Flight file" panel generates the complete PDF: cover page, A5 log (nav log, navigation computations, performance &amp; terrain, weight &amp; balance if the aircraft is configured), weather, NOTAM, flight map and integrated VAC charts. Beyond 9 legs the nav log continues on a "VFR Flight Log (cont.)" page with the same layout — table filled with blank rows and the Cruise / Turning point / Downwind check boxes kept at the bottom — and the computations table fills the whole page before an extra "Leg details (continued)" page takes over. A <strong>verification modal</strong> lists the automatically computed values to check before any in-flight use; once confirmed, the PDF <strong>opens in a browser tab</strong> — the viewer's Print button is one click away (fallback: direct download if the tab is blocked).</p>
 
 <h3>Share by Link</h3>
 <p>The <i data-lucide="share-2" class="li-ic"></i> button generates a <strong>permalink</strong> containing the airfield, raw message and arrival time. A QR code lets you open it on mobile.</p>
@@ -1268,7 +1268,7 @@
 - <i data-lucide="check" class="li-ic"></i> <strong>Regional map</strong>: precipitation radar + nearby categories
 - <i data-lucide="check" class="li-ic"></i> <strong>Alternates comparator</strong> and route weather (Navigation mode)
 - <i data-lucide="check" class="li-ic"></i> <strong>Flight planner</strong>: courses, times, fuel, terrain — with waypoints inserted at the shortest route and named markers dropped at the pointer
-- <i data-lucide="check" class="li-ic"></i> Generates a <strong>printable A5 nav log</strong> (opened in a tab, ready to print)</p>
+- <i data-lucide="check" class="li-ic"></i> Generates the <strong>flight file PDF</strong> — A5 nav log, weather, NOTAM, map and VAC (opened in a tab, ready to print)</p>
 <p><strong>What the tool does NOT do (yet)</strong> :
 - <i data-lucide="x" class="li-ic"></i> Does not replace the official weather briefing
 - <i data-lucide="x" class="li-ic"></i> Does not make decisions for you (the verdict is an aid, not an order)

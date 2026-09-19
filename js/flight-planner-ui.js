@@ -1021,10 +1021,7 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
     window.dispatchEvent(new CustomEvent('navplan-changed'));
 
     container.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px;">
-            <div style="font-size:11px; color:var(--text-muted); font-family:'DM Mono',monospace;">${escapeHtml(from)} → ${escapeHtml(to)}</div>
-            <button id="fp-navlog-pdf" class="fp-print-btn" title="${isFr ? 'Génère et ouvre le log A5 à imprimer (plan de vol + METAR de départ)' : 'Generates and opens the printable A5 nav log (flight plan + departure METAR)'}"><i data-lucide="printer"></i> ${isFr ? 'Imprimer le log de nav' : 'Print nav log'}</button>
-        </div>
+        <div style="font-size:11px; color:var(--text-muted); font-family:'DM Mono',monospace; margin-bottom:8px;">${escapeHtml(from)} → ${escapeHtml(to)}</div>
         ${_renderInputs(from, to, fromName, toName, alt, tas, burn, isNight, isFr)}
 
         <div class="fp-grid" style="gap:8px 16px; margin-top:10px;">
@@ -1195,9 +1192,6 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
         </div>
     `;
     if (window.lucide) window.lucide.createIcons({ root: container });
-    container.querySelector('#fp-navlog-pdf')?.addEventListener('click', async () => {
-        if (await _confirmNavLogPdf(isFr)) _generateNavLogPdf();
-    });
     _wireInputs(container, from, to);
     _wireLeg2(container, { plan, isFr, isNight, tas, burn });
     _attachMinima(container, plan, isFr);
