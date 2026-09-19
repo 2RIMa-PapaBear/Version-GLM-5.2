@@ -176,7 +176,14 @@ function _render(body, ac, isFr) {
         <div class="wb-duration-group" title="${isFr ? 'Carburant requis = durée de vol prévue + roulage 10 min (départ et arrivée) + réserve finale 10 min (vol local de jour en vue du terrain) + réserve perso de l\u2019avion (fenêtre Flotte).' : 'Required fuel = planned duration + 10 min taxi (out and in) + 10 min final reserve (day local flight in sight of the field) + the aircraft\u2019s personal reserve (Fleet window).'}">
             <div class="wb-duration-head">
                 <span class="lab">${isFr ? 'Durée de vol prévue (min)' : 'Planned flight duration (min)'}</span>
-                <input type="number" step="5" min="0" max="600" id="wb-local-min" value="${savedMin}" placeholder="0">
+                <div class="wb-duration-ctl">
+                    <button type="button" class="wb-step-btn" data-step="-5" aria-label="${isFr ? 'Moins 5 minutes' : 'Minus 5 minutes'}" title="${isFr ? 'Moins 5 minutes' : 'Minus 5 minutes'}"><i data-lucide="minus"></i></button>
+                    <div class="wb-duration-field">
+                        <input type="number" step="5" min="0" max="600" id="wb-local-min" value="${savedMin}" placeholder="0">
+                        <span class="wb-unit">Min</span>
+                    </div>
+                    <button type="button" class="wb-step-btn" data-step="5" aria-label="${isFr ? 'Plus 5 minutes' : 'Plus 5 minutes'}" title="${isFr ? 'Plus 5 minutes' : 'Plus 5 minutes'}"><i data-lucide="plus"></i></button>
+                </div>
             </div>
             <div class="wb-fuel-grid" id="wb-local-devis"></div>
         </div>` : '';
@@ -224,6 +231,37 @@ function _render(body, ac, isFr) {
         try { localStorage.setItem('wb-local-min', String(durEl.value || '')); } catch {   }
         _recalc(body, ac, isFr);
     });
+    // Boutons ±5 min : à viser au doigt en vol plutôt qu'un clavier. Pas de
+    // 5 arrondi et clampé 0-600 ; la valeur posée en programme n'émet PAS
+    // d'événement input — on le relaie (même motif que les sliders), sinon
+    // localStorage, devis et tuile Carburant du dossier ne suivraient pas.
+    body.querySelectorAll('.wb-step-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (!durEl) return;
+            const step = parseInt(btn.dataset.step, 10) || 5;
+            const v = Math.min(600, Math.max(0, Math.round(((parseInt(durEl.value, 10) || 0) + step) / 5) * 5));
+            durEl.value = String(v);
+            durEl.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+    });
+    // « Min » colle au chiffre : le champ reste un number natif (tests QA,
+    // tuile Carburant du dossier), donc l'unité est un span positionné d'après
+    // la largeur RÉELLE du texte, mesurée par un miroir invisible de même
+    // police. Re-placé à chaque input (les boutons relaient l'événement) et
+    // quand la police DM Mono finit de charger.
+    const unitEl = body.querySelector('.wb-duration-field .wb-unit');
+    if (unitEl && durEl) {
+        const mirror = document.createElement('span');
+        mirror.className = 'wb-unit-mirror';
+        unitEl.parentNode.appendChild(mirror);
+        const placeUnit = () => {
+            mirror.textContent = durEl.value || durEl.placeholder || '';
+            unitEl.style.left = `calc(50% + ${mirror.offsetWidth / 2 + 7}px)`;
+        };
+        durEl.addEventListener('input', placeUnit);
+        placeUnit();
+        if (document.fonts?.ready) document.fonts.ready.then(placeUnit).catch(() => { });
+    }
     // Sliders : pilotent le champ numérique associé (même data-key). La
     // valeur posée par programme n'émet PAS d'événement input — on le
     // relaie, sinon la tuile Carburant du dossier ne suit pas le curseur
