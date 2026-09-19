@@ -106,7 +106,9 @@ function _ensureBadge() {
     _badge.id = 'data-age-badge';
     _badge.className = 'data-age-badge';
     _badge.style.display = 'none';
-    info.parentElement.insertBefore(_badge, info);
+    // En BOUT de la ligne d'info (retour pilote 19/09) : il suit le texte
+    // dans le flux au lieu d'ouvrir la ligne.
+    info.after(_badge);
     return _badge;
 }
 
