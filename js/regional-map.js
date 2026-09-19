@@ -42,7 +42,9 @@ let _lastLoadedIcao = null;
 let _cursorMarker = null;
 
 // Synchronise le marqueur de carte avec le curseur du profil d'élévation.
-document.addEventListener('elevation-hover', (e) => {
+// Garde Node (tests unitaires) : ce module est importé hors navigateur via
+// la chaîne flight-planner-ui → frequencies-ui → flight-mode.
+if (typeof document !== 'undefined') document.addEventListener('elevation-hover', (e) => {
     if (!_map) return;
     const d = e.detail;
     if (!d) {

@@ -438,7 +438,15 @@ body.mode-nav .dep-dest-toggle { display: flex; }
 .footer-wrap { margin-top: auto; display: flex; flex-direction: column; gap: 15px; }
 .footer a { color: #0288D1; text-decoration: none; }
 .footer a:hover { text-decoration: underline; }
-.info-bar { width: 100%; text-align: left; min-height: 20px; margin-top: 10px; }
+.info-bar {
+    width: 100%; text-align: left; min-height: 20px; margin-top: 10px;
+    /* Badge d'âge en BOUT de la première ligne (retour pilote 19/09) :
+    texte multi-lignes à gauche, olive en haut à droite — SANS wrap. Le
+    bandeau d'alerte TAF vit hors de cette barre (bloc propre dessous). */
+    display: flex; align-items: flex-start; gap: 0 8px;
+}
+.info-bar #lbl-info { flex: 1 1 auto; min-width: 0; }
+.info-bar #data-age-badge { flex: 0 0 auto; margin-left: auto; }
 .graph-container { position: relative; }
 .taf-canvas { touch-action: none; }
 .legend-bar-bottom { border-radius: 0 0 8px 8px; }
@@ -457,7 +465,7 @@ body.mode-nav .dep-dest-toggle { display: flex; }
 .card { animation: cardFadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .side-column-left { animation-delay: 0s; }
 .center-column > header { animation-delay: 0.08s; }
-.center-column > main { animation-delay: 0.16s; }
+.center-column > header.card > #main-content { animation-delay: 0.16s; }
 .side-column-right { animation-delay: 0.12s; }
 .center-column > aside { animation-delay: 0.24s; }
 .center-column > footer { animation-delay: 0.3s; }
@@ -1919,6 +1927,10 @@ body.map-overlay-open { overflow: hidden; }
 .frequencies-panel {
     padding: 14px 18px;
 }
+/* Graphique météo DANS la carte d'en-tête (retour pilote 19/09) :
+   petit espace sous la barre d'info (observation METAR). */
+.center-column > header.card > #main-content { margin-top: 10px; }
+
 /* Fréquences & Info terrain (mode navigation) : séparation départ / arrivée. */
 .af-dual-sep {
     height: 1px;
@@ -2878,7 +2890,7 @@ html.theme-light .neighbors-loading { background: rgba(255, 255, 255, 0.9); colo
 .data-age-badge {
     display: inline-flex; align-items: center; gap: 5px;
     font-size: 11px; font-weight: 600; letter-spacing: .3px;
-    border-radius: 999px; padding: 3px 9px; margin: 0 8px 4px 0;
+    border-radius: 999px; padding: 3px 9px; margin: 0 0 4px 8px;
     border: 1px solid transparent; vertical-align: middle;
 }
 .data-age-badge::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
