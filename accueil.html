@@ -124,6 +124,8 @@
     .acc-final h2 { margin: 0 0 6px; font-size: 19px; }
     .acc-final p { margin: 0 0 18px; color: var(--text-muted, #94A3B8); font-size: 13px; }
     .acc-foot { margin-top: 28px; text-align: center; font-size: 11px; color: var(--text-muted, #94A3B8); line-height: 1.7; }
+    .acc-foot a { color: var(--primary, #38BDF8); text-decoration: none; }
+    .acc-foot a:hover { text-decoration: underline; }
     .acc-foot .warning { color: #FBBF24; }
 
     @media (max-width: 760px) {
@@ -235,6 +237,7 @@
 
     <div class="acc-foot">
         <div style="font-weight:600;color:var(--text-color,#F8FAFC);">© 2026 PapaBear — Prévol · Web version 3.0</div>
+        <div>Contact — questions et retours de pilotes : <a id="acc-mail" href="#contact" title="Écrire au développeur"></a></div>
         <div>Sources : AviationWeather.gov · Service de l'Information Aéronautique (SIA) · Météo-France (AEROWEB) · openAIP · OpenStreetMap / OpenTopoMap</div>
         <div>Photos d'illustration : <a href="https://commons.wikimedia.org/wiki/File:Sunset202001251701.jpg" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a> — Xonqnopp, Lieven Smits (CC BY-SA 4.0)</div>
         <div class="warning">Avertissement : cet outil est fourni à titre purement indicatif et ne remplace
@@ -245,6 +248,16 @@
 <script>
     if (window.lucide) window.lucide.createIcons();
     else document.addEventListener('DOMContentLoaded', () => window.lucide && window.lucide.createIcons());
+    // Adresse contact assemblée en JS : absente du HTML brut, invisible aux
+    // robots collecteurs qui n'exécutent pas JavaScript.
+    document.addEventListener('DOMContentLoaded', () => {
+        const a = document.getElementById('acc-mail');
+        if (!a) return;
+        const m = ['papa', 'bear', 'wibox', 'fr'];
+        const addr = m[0] + m[1] + String.fromCharCode(64) + m[2] + '.' + m[3];
+        a.href = 'ma' + 'ilto:' + addr;
+        a.textContent = addr;
+    });
 </script>
 </body>
 </html>
