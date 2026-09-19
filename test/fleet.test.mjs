@@ -234,12 +234,46 @@ describe('flotte — limites par avion (A3)', () => {
         assert.equal(fleet.addAircraft({ name: 'C', groundRoll: 1, fiftyFt: 2, reserveExtraMin: 90 }).reserveExtraMin, 60);
     });
 
-    // Carburant UTILISABLE (L, manuel de vol) : plafonne l'emport du centrage.
-    test('carburant utilisable : enregistré si valide, null sinon (capacité du poste sinon)', () => {
-        assert.equal(fleet.addAircraft({ name: 'WT9', groundRoll: 500, fiftyFt: 1100, usableFuelL: 113 }).usableFuelL, 113);
-        assert.equal(fleet.addAircraft({ name: 'X', groundRoll: 1, fiftyFt: 2 }).usableFuelL, null);
-        assert.equal(fleet.addAircraft({ name: 'Y', groundRoll: 1, fiftyFt: 2, usableFuelL: 0 }).usableFuelL, null);
-        assert.equal(fleet.addAircraft({ name: 'Z', groundRoll: 1, fiftyFt: 2, usableFuelL: 5000 }).usableFuelL, null);
+    // Carburant INUTILISABLE (L, manuel de vol — 19/09) : le plafond
+    // d'emport vaut capacité du poste − inutilisable, le devis local
+    // l'ajoute au total requis.
+    test('carburant inutilisable : enregistré si valide, null sinon', () => {
+        assert.equal(fleet.addAircraft({ name: 'WT9', groundRoll: 500, fiftyFt: 1100, unusableFuelL: 6 }).unusableFuelL, 6);
+        assert.equal(fleet.addAircraft({ name: 'X', groundRoll: 1, fiftyFt: 2 }).unusableFuelL, null);
+        assert.equal(fleet.addAircraft({ name: 'Y', groundRoll: 1, fiftyFt: 2, unusableFuelL: 0 }).unusableFuelL, null);
+        assert.equal(fleet.addAircraft({ name: 'Z', groundRoll: 1, fiftyFt: 2, unusableFuelL: 500 }).unusableFuelL, null);
+    });
+
+    // MIGRATION (19/09) : l'ancien champ « utilisable » (113 L sur un poste
+    // de 119 L) devient « inutilisable » (119 − 113 = 6 L).
+    test('migration utilisable → inutilisable : 113 utilisables sur poste 119 L → 6 inutilisables', () => {
+        const wb = {
+            emptyMassKg: 354, emptyArmMm: 2641,
+            envelope: [[405, 2704], [600, 2748], [600, 2824], [405, 2824]],
+            stations: [{ name: 'Carburant', armMm: 2580, maxKg: 119, fuel: true }],
+        };
+        const ac = fleet.addAircraft({ name: 'WT9 old', groundRoll: 500, fiftyFt: 1100, usableFuelL: 113, wb });
+        assert.equal(ac.usableFuelL, undefined, 'champ legacy supprimé');
+        assert.equal(ac.unusableFuelL, 6);
+
+        // Lecture directe du localStorage ancien format : getFleet convertit
+        // et réécrit la flotte une seule fois.
+        _store.set('ac-fleet', JSON.stringify([{ id: 'old1', name: 'Legacy', groundRoll: 500, fiftyFt: 1100, usableFuelL: 113, wb }]));
+        const migrated = fleet.getFleet().find(a => a.id === 'old1');
+        assert.equal(migrated.unusableFuelL, 6);
+        assert.equal(migrated.usableFuelL, undefined);
+        assert.equal(JSON.parse(_store.get('ac-fleet')).find(a => a.id === 'old1').unusableFuelL, 6, 'réécrit dans localStorage');
+    });
+
+    test('usableFuelOf : capacité du poste − inutilisable (WT9 119 − 6 = 113) ; null sans poste carburant', () => {
+        const wb = {
+            emptyMassKg: 354, emptyArmMm: 2641,
+            envelope: [[405, 2704], [600, 2748], [600, 2824], [405, 2824]],
+            stations: [{ name: 'Carburant', armMm: 2580, maxKg: 119, fuel: true }],
+        };
+        assert.equal(fleet.usableFuelOf(fleet.addAircraft({ name: 'WT9 u6', groundRoll: 1, fiftyFt: 2, unusableFuelL: 6, wb })), 113);
+        assert.equal(fleet.usableFuelOf(fleet.addAircraft({ name: 'WT9 u0', groundRoll: 1, fiftyFt: 2, wb })), 119, 'sans inutilisable : capacité');
+        assert.equal(fleet.usableFuelOf(fleet.addAircraft({ name: 'noWb', groundRoll: 1, fiftyFt: 2 })), null);
     });
 
     test('références atterrissage optionnelles ; C172 par défaut les porte (POH)', () => {
@@ -269,7 +303,7 @@ describe('base avions — Dynamic WT9 LSA (fiche complète)', () => {
         assert.equal(wt9.safetyMargin, 15);
         assert.equal(wt9.cruiseSpeedKt, 100);
         assert.equal(wt9.fuelBurnLph, 18);
-        assert.equal(wt9.usableFuelL, 113, '119 L de capacité − 6 L inutilisables (pilote)');
+        assert.equal(wt9.unusableFuelL, 6, '6 L inutilisables (pilote) → 113 L utilisables sur 119 de capacité');
         assert.equal(wt9.xwindLimitKt, 25);
         assert.equal(wt9.reserveExtraMin, 5);
     });

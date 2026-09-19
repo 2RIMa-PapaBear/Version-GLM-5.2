@@ -101,6 +101,25 @@ export function getFleet() {
         if (!fleet.some(a => a.id === activeId)) _writeLs(LS_ACTIVE, firstRepaired.id);
     }
 
+    // MIGRATION (19/09, retour pilote) : le champ flotte « Utilisable (L) »
+    // devient « Inutilisable (L) » — la donnée POH stable est l'inutilisable,
+    // l'utilisable se déduit (capacité du poste − inutilisable). Les
+    // enregistrements existants sont convertis une seule fois via la
+    // capacité du poste carburant du centrage (ex. WT9 : 119 − 113 = 6).
+    let fuelMigrated = false;
+    for (const a of fleet) {
+        if (a.usableFuelL == null) continue;
+        if (!(a.unusableFuelL > 0)) {
+            const cap = _fuelStationCapacityL(a.wb);
+            if (cap > a.usableFuelL) {
+                a.unusableFuelL = Math.round((cap - a.usableFuelL) * 10) / 10;
+            }
+        }
+        delete a.usableFuelL;
+        fuelMigrated = true;
+    }
+    if (fuelMigrated) _writeLs(LS_FLEET, fleet);
+
     return fleet;
 }
 
@@ -345,6 +364,31 @@ function _sanitizeWb(raw) {
 }
 
 /**
+ * Capacité (L) du poste carburant du bloc centrage, null si inconnue
+ * (pas de bloc wb, ou poste carburant sans max saisi). Le poste carburant
+ * se saisit en litres : son max EST la capacité du réservoir.
+ */
+function _fuelStationCapacityL(wb) {
+    if (!wb || typeof wb !== 'object' || !Array.isArray(wb.stations)) return null;
+    const st = wb.stations.find(s => s && s.fuel === true);
+    const cap = Number(st?.maxKg);
+    return (isFinite(cap) && cap > 0) ? cap : null;
+}
+
+/**
+ * Carburant UTILISABLE (L) de l'avion : capacité du poste carburant du
+ * centrage − inutilisable du manuel de vol (ex. WT9 : 119 − 6 = 113).
+ * null si la capacité du poste est inconnue.
+ */
+export function usableFuelOf(ac) {
+    const cap = _fuelStationCapacityL(ac?.wb);
+    if (cap == null) return null;
+    const un = (ac?.unusableFuelL > 0) ? ac.unusableFuelL : 0;
+    const usable = Math.round((cap - un) * 10) / 10;
+    return usable > 0 ? usable : null;
+}
+
+/**
  * Nettoie/valide les données d'un avion. cruiseSpeedKt / fuelBurnLph sont
  * OPTIONNELS (null si absents ou invalides → le planificateur retombe sur
  * ses valeurs par défaut) : tous les avions n'ont pas encore ces infos.
@@ -361,7 +405,17 @@ function _sanitize(data) {
     const rem = parseInt(data.reserveExtraMin, 10);
     const lr = parseInt(data.ldgRoll, 10);
     const lf = parseInt(data.ldgFifty, 10);
-    const uf = parseInt(data.usableFuelL, 10);
+    let uf = parseInt(data.unusableFuelL, 10);
+    // MIGRATION (19/09) : ancien champ « utilisable » → « inutilisable »,
+    // converti si la capacité du poste carburant accompagne la charge
+    // (imports de fichiers flotte antérieurs au renommage).
+    if (isNaN(uf) || uf <= 0) {
+        const legacy = parseInt(data.usableFuelL, 10);
+        const cap = _fuelStationCapacityL(data.wb);
+        if (!isNaN(legacy) && legacy > 0 && cap > legacy) {
+            uf = Math.round((cap - legacy) * 10) / 10;
+        }
+    }
     const out = {
         name: String(data.name || 'Avion').slice(0, 40),
         registration: String(data.registration || '').slice(0, 12).toUpperCase(),
@@ -371,10 +425,11 @@ function _sanitize(data) {
         safetyMargin: isNaN(sm) ? 20 : Math.max(0, Math.min(50, sm)),
         cruiseSpeedKt: isNaN(cs) || cs <= 0 ? null : cs,
         fuelBurnLph: isNaN(fb) || fb <= 0 ? null : fb,
-        // Carburant UTILISABLE (L, manuel de vol — une partie du plein est
-        // inutilisable) : optionnel ; sans valeur, la capacité du poste
-        // carburant du centrage sert de plafond d'emport.
-        usableFuelL: isNaN(uf) || uf <= 0 || uf > 999 ? null : uf,
+        // Carburant INUTILISABLE (L, manuel de vol — jamais consommable,
+        // ex. 6 L sous la pompe) : optionnel ; le plafond d'emport du
+        // centrage vaut capacité du poste − inutilisable, et le devis du
+        // vol local l'ajoute au total requis.
+        unusableFuelL: isNaN(uf) || uf <= 0 || uf > 99 ? null : uf,
         // Limite vent traversier (kt, manuel de vol/école) : OPTIONNELLE —
         // le GO/NO-GO garde ses seuils génériques 12/15 kt sans elle.
         xwindLimitKt: isNaN(xw) || xw <= 0 || xw > 40 ? null : xw,

@@ -195,7 +195,7 @@ function _render() {
             <div class="fleet-form-row">
                 <label>${isFr ? 'Vitesse croisière (kt)' : 'Cruise speed (kt)'}<input type="number" id="fleet-cruise" placeholder="110" min="0" step="5"></label>
                 <label>${isFr ? 'Conso croisière (L/h)' : 'Cruise burn (L/h)'}<input type="number" id="fleet-burn" placeholder="35" min="0" step="1"></label>
-                <label title="${isFr ? 'Quantité UTILISABLE du manuel de vol (une partie du plein est inutilisable) — plafonne la saisie « Carburant embarqué » du centrage ; vide = capacité du poste carburant' : 'USABLE quantity from the POH (part of the load is unusable) — caps the W&B fuel entry; empty = fuel station capacity'}">${isFr ? 'Utilisable (L)' : 'Usable (L)'}<input type="number" id="fleet-usable" placeholder="${isFr ? 'ex. 113' : 'e.g. 113'}" min="0" max="999" step="1"></label>
+                <label title="${isFr ? 'Quantité INUTILISABLE du manuel de vol (jamais consommable, ex. 6 L sous la pompe) — le plafond « Carburant embarqué » du centrage vaut capacité du poste − inutilisable, et le devis du vol local l\u2019ajoute au total requis ; vide = tout le plein est utilisable' : 'UNUSABLE quantity from the POH (never burnable, e.g. 6 L below the pick-up) — the W&B fuel cap is station capacity − unusable, and the local-flight quote adds it to the required total; empty = the whole load is usable'}">${isFr ? 'Inutilisable (L)' : 'Unusable (L)'}<input type="number" id="fleet-unusable" placeholder="${isFr ? 'ex. 6' : 'e.g. 6'}" min="0" max="99" step="1"></label>
             </div>
             <div class="fleet-form-row">
                 <label title="${isFr ? 'Limite vent traversier (manuel de vol / école) — le GO/NO-GO l\u2019utilise à la place des seuils génériques 12/15 kt' : 'Crosswind limit (POH/club) — used by GO/NO-GO instead of generic 12/15 kt'}">${isFr ? 'Limite traversier (kt)' : 'Crosswind limit (kt)'}<input type="number" id="fleet-xwind" placeholder="${isFr ? 'ex. 12' : 'e.g. 12'}" min="0" max="40" step="1"></label>
@@ -425,7 +425,7 @@ function _applySuggestion(ac) {
         ['fleet-ldg-50ft', ac.ldgFifty],
         ['fleet-cruise', ac.cruiseSpeedKt],
         ['fleet-burn', ac.fuelBurnLph],
-        ['fleet-usable', ac.usableFuelL],
+        ['fleet-unusable', ac.unusableFuelL],
         ['fleet-xwind', ac.xwindLimitKt],
         ['fleet-reserve-extra', ac.reserveExtraMin],
     ];
@@ -475,7 +475,7 @@ function _fillForm(id) {
     document.getElementById('fleet-50ft').value = ac.fiftyFt || '';
     document.getElementById('fleet-cruise').value = ac.cruiseSpeedKt || '';
     document.getElementById('fleet-burn').value = ac.fuelBurnLph || '';
-    document.getElementById('fleet-usable').value = ac.usableFuelL || '';
+    document.getElementById('fleet-unusable').value = ac.unusableFuelL || '';
     document.getElementById('fleet-xwind').value = ac.xwindLimitKt || '';
     document.getElementById('fleet-reserve-extra').value = ac.reserveExtraMin || '';
     document.getElementById('fleet-ldg-roll').value = ac.ldgRoll || '';
@@ -503,7 +503,7 @@ function _resetForm() {
     document.getElementById('fleet-50ft').value = '';
     document.getElementById('fleet-cruise').value = '';
     document.getElementById('fleet-burn').value = '';
-    document.getElementById('fleet-usable').value = '';
+    document.getElementById('fleet-unusable').value = '';
     document.getElementById('fleet-xwind').value = '';
     document.getElementById('fleet-reserve-extra').value = '';
     document.getElementById('fleet-ldg-roll').value = '';
@@ -817,7 +817,7 @@ function _doSave() {
     // Champs optionnels : vides → null (retour aux défauts du planificateur).
     const cruise = document.getElementById('fleet-cruise').value.trim();
     const burn = document.getElementById('fleet-burn').value.trim();
-    const usable = document.getElementById('fleet-usable').value.trim();
+    const unusable = document.getElementById('fleet-unusable').value.trim();
     const xwind = document.getElementById('fleet-xwind').value.trim();
     const reserveExtra = document.getElementById('fleet-reserve-extra').value.trim();
     const ldgRoll = document.getElementById('fleet-ldg-roll').value.trim();
@@ -832,7 +832,7 @@ function _doSave() {
         fiftyFt: ft50,
         cruiseSpeedKt: cruise || null,
         fuelBurnLph: burn || null,
-        usableFuelL: usable || null,
+        unusableFuelL: unusable || null,
         xwindLimitKt: xwind || null,
         reserveExtraMin: reserveExtra || 0,
         ldgRoll: ldgRoll || null,

@@ -1,6 +1,6 @@
 import { state, escapeHtml, fetchAvecRelais, memoGet } from './core.js';
 import { getAirportByICAO, enrichAirport } from './ui-module.js';
-import { getActiveAircraftId, getActiveAircraft, getFleet, updateAircraft } from './aircraft-fleet.js';
+import { getActiveAircraftId, getActiveAircraft, getFleet, updateAircraft, usableFuelOf } from './aircraft-fleet.js';
 import { getActiveRunwayNameForIcao, evaluateTakeoffFromRaw, evaluateLandingAtDestination, fetchTafWithFallback, getAircraftRef } from './takeoff-performance.js';
 import { showTakeoffWidget } from './takeoff-ui.js';
 import { showFrequenciesWidget } from './frequencies-ui.js';
@@ -110,6 +110,7 @@ function _readPerf(acId) {
         tasKt: tasKt ?? def.tasKt,
         fuelBurnLph: fuelBurnLph ?? def.fuelBurnLph,
         reserveExtraMin: Number.isFinite(ac.reserveExtraMin) ? ac.reserveExtraMin : (def.reserveExtraMin ?? 0),
+        unusableFuelL: (ac.unusableFuelL > 0) ? ac.unusableFuelL : (def.unusableFuelL ?? 0),
     };
 }
 
@@ -178,8 +179,8 @@ export async function showFlightPlanner(fromIcao, toIcao) {
         && String(seq[seq.length - 1]).toUpperCase() === toIcao.toUpperCase())
         ? seq : [fromIcao, toIcao];
     const plan = route.length >= 3
-        ? await computeMultiLegFlightPlan(route, { cruiseAltFt: cruiseAlt, tasKt, fuelBurnLph: burn, isNight, diversionIcao: state.diversionIcao || null, reserveExtraMin: perf.reserveExtraMin ?? 0 })
-        : await computeFlightPlan(fromIcao, toIcao, { cruiseAltFt: cruiseAlt, tasKt, fuelBurnLph: burn, isNight, diversionIcao: state.diversionIcao || null, reserveExtraMin: perf.reserveExtraMin ?? 0 });
+        ? await computeMultiLegFlightPlan(route, { cruiseAltFt: cruiseAlt, tasKt, fuelBurnLph: burn, isNight, diversionIcao: state.diversionIcao || null, reserveExtraMin: perf.reserveExtraMin ?? 0, unusableFuelL: perf.unusableFuelL ?? 0 })
+        : await computeFlightPlan(fromIcao, toIcao, { cruiseAltFt: cruiseAlt, tasKt, fuelBurnLph: burn, isNight, diversionIcao: state.diversionIcao || null, reserveExtraMin: perf.reserveExtraMin ?? 0, unusableFuelL: perf.unusableFuelL ?? 0 });
 
     // Un calcul plus récent a pris la main (changement de départ/destination
     // pendant les fetchs) : ce rendu périmé ne doit pas l'écraser.
@@ -406,6 +407,7 @@ async function _generateNavLogPdfInto(tab, { file = false } = {}) {
             reserveMin: fuel.reserveMin ?? (stash.isNight ? RESERVES.NIGHT_MIN : RESERVES.DAY_MIN),
             groundMin: fuel.groundMin ?? 0, groundL: fuel.groundL ?? 0,
             diversionL: fuel.diversionL || 0,
+            unusableL: fuel.unusableL || 0,
             divIcao: fuel.diversion?.icao || null,
             divDistNm: fuel.diversion?.distNm ?? null,
             divTimeMin: fuel.diversion?.timeMin ?? null,
@@ -803,10 +805,11 @@ function _leg2Compute(plan, isNight, tas, burn) {
         tasKt: tas, fuelBurnLph: burn,
         reserveMin: (info ? (isNight ? RESERVES.NIGHT_MIN : RESERVES.DAY_MIN) : 10) + perso,
     }) : null;
-    // Embarqué (widget Centrage) plafonné au carburant UTILISABLE.
+    // Embarqué (widget Centrage) plafonné au carburant UTILISABLE (capacité
+    // du poste carburant − inutilisable du manuel de vol).
     const loads = resolveLoads(getActiveAircraftId());
     const onBoardRaw = loads.fuelL > 0 ? loads.fuelL : null;
-    const usable = ac?.usableFuelL > 0 ? ac.usableFuelL : null;
+    const usable = usableFuelOf(ac);
     const onBoard = (onBoardRaw != null && usable != null) ? Math.min(onBoardRaw, usable) : onBoardRaw;
     const req2legs = leg2 ? Math.round((plan.fuel.totalL + leg2.totalL) * 10) / 10 : null;
     const manque = (req2legs != null && onBoard != null) ? Math.round((req2legs - onBoard) * 10) / 10 : null;
@@ -1076,7 +1079,7 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
 
         <div class="fp-section" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color);">
             <div class="fp-section-title">${isFr ? 'Carburant' : 'Fuel'}</div>
-            <div class="fp-grid ${fuel.diversion ? 'fp-grid-5' : 'fp-grid-4'}" style="margin-top:6px;">
+            <div class="fp-grid fp-grid-${4 + (fuel.diversion ? 1 : 0) + (fuel.unusableL > 0 ? 1 : 0)}" style="margin-top:6px;">
                 <div class="fp-cell">
                     <div class="fp-label">${isFr ? 'Trajet' : 'Trip'}</div>
                     <div class="fp-value">${fuel.tripFuelL} L</div>
@@ -1094,6 +1097,11 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
                     <div class="fp-label">${isFr ? 'Réserve' : 'Reserve'} (${fuel.reserveMin ?? (isNight ? RESERVES.NIGHT_MIN : RESERVES.DAY_MIN)}min)</div>
                     <div class="fp-value">${fuel.reserveL} L</div>
                 </div>
+                ${fuel.unusableL > 0 ? `
+                <div class="fp-cell" title="${isFr ? 'Carburant inutilisable du manuel de vol (jamais consommable, mais embarqué dans le réservoir)' : 'Unusable fuel from the POH (never burnable, but on board in the tank)'}">
+                    <div class="fp-label">${isFr ? 'Inutilisable' : 'Unusable'}</div>
+                    <div class="fp-value">${fuel.unusableL} L</div>
+                </div>` : ''}
                 <div class="fp-cell">
                     <div class="fp-label">${isFr ? 'Total requis' : 'Total req.'}</div>
                     <div class="fp-value" style="color:var(--primary); font-weight:800; font-size:15px;">${fuel.totalL} L</div>

@@ -18,7 +18,7 @@
 import { state, escapeHtml } from './core.js';
 import { makeCollapsible } from './collapsible.js';
 import { getFlightMode } from './flight-mode.js';
-import { getActiveAircraft } from './aircraft-fleet.js';
+import { getActiveAircraft, usableFuelOf } from './aircraft-fleet.js';
 import { openFleetManager } from './fleet-ui.js';
 import { TAXI_MIN_DEP, TAXI_MIN_ARR } from './flight-planner.js';
 import {
@@ -37,7 +37,8 @@ let _fuelWarnActive = false;
 /** Carburant requis. En navigation : plan actif {totalL, tripFuelL, reserveL}.
  *  En vol local (A4) : durée estimée saisie dans le widget + réserve finale
  *  10 min (vol local de jour en vue du terrain), majorée de la réserve perso
- *  de l'avion — null sans durée saisie. */
+ *  de l'avion et du carburant INUTILISABLE du manuel de vol (jamais
+ *  consommable mais embarqué — 19/09, retour pilote) — null sans durée. */
 function _requiredFuel() {
     if (getFlightMode() === 'nav') {
         const f = state._lastNavPlan?.plan?.fuel;
@@ -54,12 +55,17 @@ function _requiredFuel() {
     const tripL = Math.round(min / 60 * burn * 10) / 10;
     const groundL = Math.round(groundMin / 60 * burn * 10) / 10;
     const reserveL = Math.round(reserveMin / 60 * burn * 10) / 10;
+    // Inutilisable du manuel de vol : jamais consommable, il doit être dans
+    // le réservoir EN PLUS du besoin utilisable (ex. WT9 : 6 L → un vol
+    // local d'1 h à 18 L/h requiert 18 + 3 + 4,5 + 6 = 31,5 L embarqués).
+    const unusableL = Math.round(((ac?.unusableFuelL > 0) ? ac.unusableFuelL : 0) * 10) / 10;
     return {
         local: true, tripMin: min, tripFuelL: tripL,
         groundMin, groundL,
         reserveL, reserveMin,
         reserveBaseMin: LOCAL_RESERVE_MIN, reserveExtraMin: ac?.reserveExtraMin || 0,
-        totalL: Math.round((tripL + groundL + reserveL) * 10) / 10,
+        unusableL,
+        totalL: Math.round((tripL + groundL + reserveL + unusableL) * 10) / 10,
     };
 }
 
@@ -140,10 +146,12 @@ function _render(body, ac, isFr) {
             <input type="number" step="any" min="0" name="wb-load" aria-label="Masse embarquée au poste" class="wb-load-in" data-key="st:${escapeHtml(s.name)}" data-max="${s.maxKg || ''}" value="${loads.masses[s.name] ?? ''}" placeholder="0">
             <input type="range" name="wb-load-range" aria-label="Réglage de la masse" class="wb-load-range" data-key="st:${escapeHtml(s.name)}" min="0" max="${s.maxKg ? Math.max(1, Math.round(massFromKg(s.maxKg, u.mass))) : 150}" step="1" value="${Math.round(massFromKg(loads.masses[s.name] || 0, u.mass))}">
         </label>`;
-    // Plafond d'emport : carburant UTILISABLE du manuel de vol si défini,
-    // sinon capacité du poste carburant du centrage.
-    const usableL = (ac.usableFuelL > 0) ? ac.usableFuelL : null;
-    const fuelMaxL = usableL ?? (fuelSt?.maxKg > 0 ? fuelSt.maxKg : null);
+    // Plafond d'emport : carburant UTILISABLE du manuel de vol = capacité
+    // du poste carburant du centrage − inutilisable (ex. WT9 : 119 − 6 =
+    // 113 L). Sans bloc centrage, pas de plafond.
+    const unusableL = (ac.unusableFuelL > 0) ? ac.unusableFuelL : 0;
+    const usableL = usableFuelOf(ac);
+    const fuelMaxL = usableL;
     const fuelCell = fuelSt ? `
         <label class="wb-load wb-load-fuel" title="${isFr
             ? (isNav
@@ -151,9 +159,9 @@ function _render(body, ac, isFr) {
                 : 'Quantité totale embarquée au décollage — saisie libre, mémorisée pour cet avion.')
             : (isNav
                 ? 'Total fuel at takeoff — pre-filled from the nav plan (trip + reserve), editable.'
-                : 'Total fuel at takeoff — free entry, saved for this aircraft.')}${usableL && fuelSt?.maxKg && usableL < fuelSt.maxKg ? (isFr
-                ? ` Carburant utilisable du manuel de vol (${usableL} L sur ${fuelSt.maxKg} L de capacité).`
-                : ` Usable fuel from the POH (${usableL} L out of ${fuelSt.maxKg} L capacity).`) : ''}">
+                : 'Total fuel at takeoff — free entry, saved for this aircraft.')}${unusableL > 0 && fuelSt?.maxKg && unusableL < fuelSt.maxKg ? (isFr
+                ? ` Inutilisable du manuel de vol : ${unusableL} L — plafond = capacité ${fuelSt.maxKg} − ${unusableL} = ${usableL} L utilisables.`
+                : ` Unusable fuel from the POH: ${unusableL} L — cap = capacity ${fuelSt.maxKg} − ${unusableL} = ${usableL} L usable.`) : ''}">
             <span class="wb-load-lab"><span class="lab">${isFr ? 'Carburant embarqué (L)' : 'Fuel on board (L)'}</span>${fuelMaxL ? ` <span class="val">Max ${fuelMaxL}</span>` : ''}</span>
             <input type="number" step="any" min="0" id="wb-fuel-l" data-key="fuel" data-max="${fuelMaxL || ''}" value="${loads.fuelL || ''}" placeholder="0">
             <input type="range" name="wb-load-range" aria-label="Réglage de la masse" class="wb-load-range" data-key="fuel" min="0" max="${fuelMaxL ? Math.max(1, Math.round(fuelMaxL)) : 200}" step="1" value="${Math.round(loads.fuelL || 0)}">
@@ -173,7 +181,7 @@ function _render(body, ac, isFr) {
     let savedMin = '';
     try { savedMin = String(parseInt(localStorage.getItem('wb-local-min'), 10) || ''); } catch {   }
     const durationGroup = (fuelSt && !isNav) ? `
-        <div class="wb-duration-group" title="${isFr ? 'Carburant requis = durée de vol prévue + roulage 10 min (départ et arrivée) + réserve finale 10 min (vol local de jour en vue du terrain) + réserve perso de l\u2019avion (fenêtre Flotte).' : 'Required fuel = planned duration + 10 min taxi (out and in) + 10 min final reserve (day local flight in sight of the field) + the aircraft\u2019s personal reserve (Fleet window).'}">
+        <div class="wb-duration-group" title="${isFr ? 'Carburant requis = durée de vol prévue + roulage 10 min (départ et arrivée) + réserve finale 10 min (vol local de jour en vue du terrain) + réserve perso et carburant inutilisable de l\u2019avion (fenêtre Flotte).' : 'Required fuel = planned duration + 10 min taxi (out and in) + 10 min final reserve (day local flight in sight of the field) + the aircraft\u2019s personal reserve and unusable fuel (Fleet window).'}">
             <div class="wb-duration-head">
                 <span class="lab">${isFr ? 'Durée de vol prévue (min)' : 'Planned flight duration (min)'}</span>
                 <div class="wb-duration-ctl">
@@ -214,10 +222,10 @@ function _render(body, ac, isFr) {
             ${isFr
                 ? (isNav
                     ? 'Carburant embarqué pré-rempli du plan de nav (modifiable) ; essence consommée = trajet du plan de vol (non modifiable). Point Arrivée = carburant embarqué − essence consommée. Enveloppe, postes et masse à vide : fenêtre Flotte.'
-                    : 'Durée prévue → devis carburant = durée estimée + roulage 10 min + réserve finale 10 min + réserve perso de l\u2019avion (fenêtre Flotte) ; le champ embarqué passe en rouge s\u2019il est insuffisant. Enveloppe, postes et masse à vide : fenêtre Flotte.')
+                    : 'Durée prévue → devis carburant = durée estimée + roulage 10 min + réserve finale 10 min + réserve perso + inutilisable du manuel de vol (fenêtre Flotte) ; le champ embarqué passe en rouge s\u2019il est insuffisant. Enveloppe, postes et masse à vide : fenêtre Flotte.')
                 : (isNav
                     ? 'Fuel on board pre-filled from the nav plan (editable); fuel burned = flight plan trip (read-only). Landing point = fuel on board − fuel burned. Envelope, stations and empty weight: Fleet window.'
-                    : 'Planned duration → required fuel (duration + 30 min reserve); the fuel field turns red when short. Envelope, stations and empty weight: Fleet window.')}
+                    : 'Planned duration → required fuel (duration + taxi + reserve + unusable fuel from the POH); the fuel field turns red when short. Envelope, stations and empty weight: Fleet window.')}
         </div>
     `;
     if (window.lucide) window.lucide.createIcons({ root: body });
@@ -304,6 +312,10 @@ function _render(body, ac, isFr) {
             partsEn.push(`reserve ${req.reserveL} L${req.local
                 ? (req.reserveExtraMin > 0 ? ` (${req.reserveBaseMin} + ${req.reserveExtraMin} personal)` : ` (${req.reserveBaseMin} min)`)
                 : (req.reserveMin ? ` (${req.reserveMin} min)` : '')}`);
+            if (req.unusableL > 0) {
+                partsFr.push(`inutilisable ${req.unusableL} L`);
+                partsEn.push(`unusable ${req.unusableL} L`);
+            }
             window.alert(isFr
                 ? `⚠ CARBURANT INSUFFISANT${route}\n\nEmbarqué : ${isFinite(fl2) ? fl2 : 0} L\nRequis : ${req.totalL} L (${partsFr.join(' + ')})\n\nLe champ « Carburant embarqué » restera rouge jusqu'à ce que la quantité embarquée atteigne le total requis.`
                 : `⚠ INSUFFICIENT FUEL${route}\n\nOn board: ${isFinite(fl2) ? fl2 : 0} L\nRequired: ${req.totalL} L (${partsEn.join(' + ')})\n\nThe "Fuel on board" field stays red until the quantity on board reaches the required total.`);
@@ -346,18 +358,20 @@ function _recalc(body, ac, isFr) {
         const under = !!req && loads.fuelL + 0.05 < req.totalL;
         fuelIn.classList.toggle('wb-under', under);
         if (!under) _fuelWarnActive = false;
-        // Vol local (18/09) : DEVIS détaillé en 4 cellules sous la durée —
-        // durée + roulage 10 min + réserve finale 10 min (+perso), comme
-        // les olives du devis de navigation.
+        // Vol local (18/09) : DEVIS détaillé sous la durée — durée + roulage
+        // 10 min + réserve finale 10 min (+perso) + inutilisable du manuel
+        // de vol (19/09), comme les olives du devis de navigation.
         const devisEl = body.querySelector('#wb-local-devis');
         if (devisEl) {
             if (req && req.local) {
+                devisEl.classList.toggle('wb-fuel-grid-5', req.unusableL > 0);
                 const cell = (lab, val, strong) =>
                     `<div class="wb-fuel-cell${strong ? ' wb-fuel-total' : ''}"><span>${lab}</span><b>${val}</b></div>`;
                 devisEl.innerHTML =
                     cell(`${isFr ? 'Durée' : 'Duration'} ${req.tripMin} min`, `${req.tripFuelL} L`)
                     + cell(`${isFr ? 'Roulage' : 'Taxi'} ${req.groundMin} min`, `${req.groundL} L`)
                     + cell(`${isFr ? 'Réserve' : 'Reserve'} ${req.reserveMin} min`, `${req.reserveL} L`)
+                    + (req.unusableL > 0 ? cell(isFr ? 'Inutilisable' : 'Unusable', `${req.unusableL} L`) : '')
                     + cell(isFr ? 'Total requis' : 'Total req.', `${req.totalL} L`, true);
             } else devisEl.innerHTML = '';
         }

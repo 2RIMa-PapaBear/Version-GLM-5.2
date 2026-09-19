@@ -1715,13 +1715,16 @@ body.map-overlay-open { overflow: hidden; }
 @media (max-width: 700px) {
     .wb-load-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-/* Devis carburant vol local (18/09) : 4 cellules type olives du planificateur. */
+/* Devis carburant vol local (18/09) : 4–5 cellules type olives du
+   planificateur — cellule « Inutilisable » (19/09) quand le manuel de
+   vol en cite une : la grille passe alors à 5 colonnes. */
 .wb-fuel-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 6px 8px;
     margin-top: 8px;
 }
+.wb-fuel-grid.wb-fuel-grid-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 @media (max-width: 700px) {
     .wb-fuel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -2356,6 +2359,11 @@ body.map-overlay-open { overflow: hidden; }
     grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
     gap: 6px 8px;
 }
+/* 6 cellules (19/09) : dégagement ET inutilisable du manuel de vol. */
+.fp-grid-6 {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 6px 6px;
+}
 
 /* Projet « deux étapes sans plein » : saisie + verdict sous le devis. */
 .fp-leg2-inputs {
@@ -2429,7 +2437,7 @@ body.map-overlay-open { overflow: hidden; }
 
 @media (max-width: 600px) {
     .fp-inputs { grid-template-columns: 1fr 1fr; }
-    .fp-grid, .fp-grid-3, .fp-grid-4, .fp-grid-5 { grid-template-columns: 1fr 1fr; }
+    .fp-grid, .fp-grid-3, .fp-grid-4, .fp-grid-5, .fp-grid-6 { grid-template-columns: 1fr 1fr; }
 }
 
 /* === Log de navigation (tableau waypoints) === */

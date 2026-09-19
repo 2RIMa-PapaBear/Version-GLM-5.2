@@ -602,9 +602,27 @@ function _drawCalcPage(doc, c) {
     y += 33;
 
     // ---- Ligne carburant : Trajet / [Dégagement] / Roulage+intégration /
-    // Réserve / Total requis ----
+    // Réserve / [Inutilisable] / Total requis ----
     y = section(null, y);
-    if (c.fuel?.divIcao) {
+    const uL = c.fuel?.unusableL || 0;
+    if (c.fuel?.divIcao && uL > 0) {
+        // 6 olives : Roulage + intégr. et Dégagement prioritaires (libellés
+        // longs — même garde-fou _cell que retour pilote 18/09).
+        const total = W - 5 * 12;
+        const wts = [0.7, 1.1, 1.05, 0.85, 0.95, 1.1];
+        const ws = wts.map(t => total * t / 5.75);
+        const xAt = (i) => L + ws.slice(0, i).reduce((a, b) => a + b, 0) + i * 12;
+        cell(xAt(0), y, ws[0], 29, fr ? 'Trajet' : 'Trip', `${c.fuel?.tripL ?? '—'} L`, { size: 9.5 });
+        cell(xAt(1), y, ws[1], 29, `${fr ? 'Dégagement' : 'Alternate'} ${c.fuel.divIcao}`,
+            `${c.fuel?.diversionL ?? '—'} L`, { size: 9.5 });
+        cell(xAt(2), y, ws[2], 29, `${fr ? 'Roulage + intégr.' : 'Taxi + integ.'} (${c.fuel?.groundMin ?? 0} min)`,
+            `${c.fuel?.groundL ?? 0} L`, { size: 9.5 });
+        cell(xAt(3), y, ws[3], 29, `${fr ? 'Réserve' : 'Reserve'} (${c.fuel?.reserveMin ?? ''} min)`,
+            `${c.fuel?.reserveL ?? '—'} L`, { size: 9.5 });
+        cell(xAt(4), y, ws[4], 29, fr ? 'Inutilisable' : 'Unusable', `${uL} L`, { size: 9.5 });
+        cell(xAt(5), y, ws[5], 29, fr ? 'Total requis' : 'Total req.',
+            `${c.fuel?.totalL ?? '—'} L`, { color: BLUE, size: 12 });
+    } else if (c.fuel?.divIcao) {
         // Trajet légèrement rétréci au profit de Dégagement, dont le
         // libellé porte le code du terrain (retour pilote 18/09).
         const total = W - 4 * 12;
@@ -620,6 +638,13 @@ function _drawCalcPage(doc, c) {
             `${c.fuel?.reserveL ?? '—'} L`, { size: 9.5 });
         cell(xAt(4), y, ws[4], 29, fr ? 'Total requis' : 'Total req.',
             `${c.fuel?.totalL ?? '—'} L`, { color: BLUE, size: 12 });
+    } else if (uL > 0) {
+        const fw = (W - 4 * 12) / 5;
+        cell(L, y, fw, 29, fr ? 'Trajet' : 'Trip', `${c.fuel?.tripL ?? '—'} L`);
+        cell(L + fw + 12, y, fw, 29, `${fr ? 'Roulage + intégr.' : 'Taxi + integ.'} (${c.fuel?.groundMin ?? 0} min)`, `${c.fuel?.groundL ?? 0} L`);
+        cell(L + 2 * (fw + 12), y, fw, 29, `${fr ? 'Réserve' : 'Reserve'} (${c.fuel?.reserveMin ?? ''} min)`, `${c.fuel?.reserveL ?? '—'} L`);
+        cell(L + 3 * (fw + 12), y, fw, 29, fr ? 'Inutilisable' : 'Unusable', `${uL} L`);
+        cell(L + 4 * (fw + 12), y, fw, 29, fr ? 'Total requis' : 'Total req.', `${c.fuel?.totalL ?? '—'} L`, { color: BLUE, size: 12 });
     } else {
         const fw = (W - 3 * 12) / 4;
         cell(L, y, fw, 29, fr ? 'Trajet' : 'Trip', `${c.fuel?.tripL ?? '—'} L`);
