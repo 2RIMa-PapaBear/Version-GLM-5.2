@@ -1717,9 +1717,10 @@ body.map-overlay-open { overflow: hidden; }
 .wb-dot-zf { background: #F87171; }
 .wb-out { color: #F87171; }
 
-/* Chargement du jour : 4 postes MAX par ligne ; le carburant (et la
-   consommée en navigation) ouvre toujours la ligne suivante, accompagné
-   des postes restants (ex. Bagages 1/2). Écran étroit : 2 colonnes. */
+/* Chargement du jour : 4 cellules MAX par ligne ; le carburant complète
+   la ligne des postes s'il reste une colonne, sinon il ouvre la ligne
+   suivante avec la durée (vol local) / la consommée (navigation). Écran
+   étroit : 2 colonnes. */
 .wb-load-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1739,6 +1740,52 @@ body.map-overlay-open { overflow: hidden; }
     .wb-fuel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .wb-fuel-grid:empty { display: none; }
+/* Groupe « Durée de vol prévue » (vol local, 19/09) : UN cadre réunit la
+   saisie de la durée (tête du cadre) et le devis carburant ; chaque cellule
+   du devis tient sur UNE ligne — libellé à gauche, valeur à droite. */
+.wb-duration-group {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    background: var(--inner-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 8px 9px;
+}
+.wb-duration-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.wb-duration-head .lab {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+.wb-duration-head input {
+    width: 76px;
+    background: var(--input-bg, #0F172A);
+    border: 1px solid var(--border-color);
+    color: var(--primary, #38BDF8);
+    border-radius: 6px;
+    padding: 6px 9px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    outline: none;
+}
+.wb-duration-head input:focus { border-color: var(--primary); }
+.wb-duration-group .wb-fuel-grid { margin-top: 0; }
+.wb-duration-group .wb-fuel-cell {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 3px 8px;
+    min-height: 23px;
+}
+.wb-duration-group .wb-fuel-cell span,
+.wb-duration-group .wb-fuel-cell b { white-space: nowrap; line-height: 1; }
 .wb-fuel-cell {
     background: var(--inner-bg);
     border: 1px solid var(--border-color);
@@ -1871,6 +1918,12 @@ body.map-overlay-open { overflow: hidden; }
  * ================================================================ */
 .frequencies-panel {
     padding: 14px 18px;
+}
+/* Fréquences & Info terrain (mode navigation) : séparation départ / arrivée. */
+.af-dual-sep {
+    height: 1px;
+    background: var(--border-color);
+    margin: 14px 0 12px;
 }
 
 /* ================================================================
@@ -2846,6 +2899,10 @@ html.theme-light .data-age-badge.age-old   { color: #B91C1C; background: rgba(23
     display: flex; flex-direction: column; gap: 4px;
     font-size: 11px;
 }
+/* Tuile cliquable → sa rubrique (retour pilote 19/09). */
+.ff-tile[data-goto] { cursor: pointer; transition: border-color .15s ease, background-color .15s ease; }
+.ff-tile[data-goto]:hover { border-color: var(--border-hover); background: var(--hover-bg); }
+.ff-tile[data-goto]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 .ff-tile-head {
     display: flex; align-items: center; gap: 6px;
     font-weight: 700; font-size: 11px;

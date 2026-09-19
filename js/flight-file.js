@@ -18,6 +18,12 @@
  * réelles est faite par _collectInputs (état de l'app + modules).
  * Rafraîchi : chargement METAR, dossier NOTAM, choix de dégagement,
  * et toutes les 60 s tant que le panneau est affiché.
+ *
+ * Chaque tuile est CLIQUABLE (retour pilote 19/09) et mène à sa
+ * rubrique : Météo → tableau de bord METAR, NOTAM → panneau SOFIA,
+ * VAC → ouverture de la première carte à consulter, Carburant → devis
+ * (plan en nav / widget Centrage en local), Perfs/Centrage → widgets
+ * (ou la flotte si la rubrique n'est pas calculable).
  * ================================================================ */
 
 import { state, escapeHtml } from './core.js';
@@ -204,11 +210,74 @@ export async function collectFileInputs() {
 
 let _timer = null;
 
-const _tile = (icon, title, status, detail, extra = '') => `
-    <div class="ff-tile" style="border-left:3px solid ${LVL[status] || LVL.warn};">
+// ----------------------------------------------------------------
+// Tuiles cliquables : chaque tuile mène à SA rubrique (retour pilote
+// 19/09). La cible est dépliée si elle était repliée (même persistance
+// que le clic sur son en-tête) puis la page y défile en douceur.
+// ----------------------------------------------------------------
+
+const _visible = (el) => !!el && el.offsetParent !== null;
+
+/** Déplie le panneau cible si replié, puis y fait défiler la page. */
+function _reveal(el) {
+    if (!el) return;
+    if (el.classList.contains('collapsible-panel') && !el.classList.contains('open')) {
+        el.classList.add('open');
+        try { localStorage.setItem('collapse-' + el.id, '1'); } catch { /* quota */ }
+    }
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/** Action d'une tuile cliquée : rubrique concernée. */
+function _gotoTile(key, tileEl) {
+    if (key === 'vac') {
+        // La rubrique VAC EST sa consultation : ouvre la première VAC
+        // encore « à consulter » (sinon la première du vol).
+        const btns = [...(tileEl?.querySelectorAll('button[data-vac]') || [])];
+        const target = btns.find(b => !getVacConsultedTs(b.dataset.vac)) || btns[0];
+        if (target) openVac(target.dataset.vac);
+        return;
+    }
+    if (key === 'weather') { _reveal(document.getElementById('metar-dashboard')); return; }
+    if (key === 'notam') { _reveal(document.getElementById('notam-panel')); return; }
+    if (key === 'fuel') {
+        // Requis en nav = devis du plan ; en local = durée du widget Centrage.
+        const planner = document.getElementById('flight-planner-panel');
+        const wb = document.getElementById('wb-widget');
+        if (_visible(planner) || _visible(wb)) {
+            _reveal(_visible(planner) ? planner : wb);
+            return;
+        }
+    }
+    if (key === 'perf' || key === 'wb' || key === 'fuel') {
+        const w = document.getElementById(key === 'perf' ? 'takeoff-widget' : 'wb-widget');
+        if (key !== 'fuel' && _visible(w)) { _reveal(w); return; }
+        // Widget masqué = rubrique non calculable (références flotte
+        // manquantes) : la partie concernée est la configuration flotte,
+        // et le widget est rafraîchi à la fermeture (même pattern que les
+        // boutons « Flotte » des en-têtes de widgets).
+        import('./fleet-ui.js').then(async ({ openFleetManager }) => {
+            if (key === 'perf') {
+                const { showTakeoffWidget } = await import('./takeoff-ui.js');
+                const icao = String(state.requestedIcao || state.lastParsed?.code || '').toUpperCase();
+                openFleetManager(() => showTakeoffWidget(icao));
+            } else {
+                const { refreshWbWidget } = await import('./wb-ui.js');
+                openFleetManager(() => refreshWbWidget());
+            }
+        }).catch(() => {});
+        return;
+    }
+}
+
+// data-goto : la tuile entière est CLIQUABLE et mène à sa rubrique (retour
+// pilote 19/09) — cf. _gotoTile ci-dessous.
+const _tile = (key, icon, title, status, detail, extra = '') => `
+    <div class="ff-tile" data-goto="${key}" role="button" tabindex="0" style="border-left:3px solid ${LVL[status] || LVL.warn};">
         <div class="ff-tile-head">
             <i data-lucide="${icon}" style="width:14px;height:14px;color:${LVL[status] || LVL.warn};"></i>
             <span>${title}</span>
+            <i data-lucide="corner-down-right" style="width:10px;height:10px;margin-left:auto;color:var(--text-muted);opacity:.7;"></i>
         </div>
         <div class="ff-tile-detail">${detail}</div>
         ${extra}
@@ -253,19 +322,19 @@ export async function showFlightFile(forceIcao) {
 
     body.innerHTML = `
         <div class="ff-grid">
-            ${_tile('cloud-sun', isFr ? 'Météo' : 'Weather', t.weather.status,
+            ${_tile('weather', 'cloud-sun', isFr ? 'Météo' : 'Weather', t.weather.status,
                 `${isFr ? 'METAR' : 'METAR'} ${inp.metarAgeMin != null ? _min(inp.metarAgeMin, isFr) : '—'}`
                 + `${inp.arr != null ? ` · ${isFr ? 'arrivée' : 'dest.'} ${t.weather.arr ? '✓' : '?'}` : ''}`
                 + (t.weather.taf === 'loaded' ? '' : t.weather.taf === 'none'
                     ? ` · TAF ${isFr ? 'sans objet' : 'n/a'}`
                     : ` · TAF ${isFr ? 'à charger' : 'missing'}`))}
-            ${_tile('file-text', 'NOTAM', t.notam.status,
+            ${_tile('notam', 'file-text', 'NOTAM', t.notam.status,
                 inp.notamCount
                     ? `${inp.notamCount}/${inp.notamTotal} ${isFr ? 'NOTAM · il y a' : 'NOTAM ·'} ${_min(inp.notamAgeMin, isFr)}`
                     : (isFr ? 'Aucun dossier chargé' : 'No briefing loaded'))}
-            ${_tile('map', 'VAC', t.vac.status,
+            ${_tile('vac', 'map', 'VAC', t.vac.status,
                 t.vac.items.length ? vacRows : (isFr ? 'Aucune VAC publiée sur ce vol' : 'No VAC charts on this flight'))}
-            ${_tile('fuel', isFr ? 'Carburant' : 'Fuel', t.fuel.status,
+            ${_tile('fuel', 'fuel', isFr ? 'Carburant' : 'Fuel', t.fuel.status,
                 inp.fuelRequired != null
                     ? `${isFr ? 'Requis' : 'Req.'} ${inp.fuelRequired} L` + (inp.fuelParts
                         ? ` (${isFr ? 'trajet' : 'trip'} ${inp.fuelParts.trip} + ${isFr ? 'roulage' : 'taxi'} ${inp.fuelParts.ground} + ${isFr ? 'rés.' : 'res.'} ${inp.fuelParts.reserve}${inp.fuelParts.diversion ? ` + ${isFr ? 'dégag.' : 'alt.'} ${inp.fuelParts.diversion}` : ''})`
@@ -273,10 +342,10 @@ export async function showFlightFile(forceIcao) {
                       + ` · ${isFr ? 'embarqué' : 'on board'} ${inp.fuelOnBoard ?? '—'} L`
                       + (inp.mode === 'nav' ? ` · ${isFr ? 'dégagement' : 'alternate'} ${inp.diversion ? '✓' : '—'}` : '')
                     : (isFr ? 'Devis non renseigné (durée ou plan)' : 'No fuel plan yet (duration or route)'))}
-            ${_tile('gauge', isFr ? 'Perfs piste' : 'Rwy perf', t.perf.status,
+            ${_tile('perf', 'gauge', isFr ? 'Perfs piste' : 'Rwy perf', t.perf.status,
                 `${isFr ? 'Décollage' : 'Takeoff'} ${inp.takeoffLevel ? (inp.takeoffLevel === 'ok' ? '✓' : '!') : '—'}`
                 + ` · ${isFr ? 'atterrissage' : 'landing'} ${inp.landingLevel ? (inp.landingLevel === 'ok' ? '✓' : '!') : (isFr ? '—' : 'n/a')}`)}
-            ${_tile('scale', isFr ? 'Centrage' : 'Balance', t.wb.status,
+            ${_tile('wb', 'scale', isFr ? 'Centrage' : 'Balance', t.wb.status,
                 t.wb.status === 'ok' ? (isFr ? 'Dans l\u2019enveloppe' : 'Within envelope')
                 : t.wb.status === 'danger' ? (isFr ? 'HORS LIMITES' : 'OUT OF LIMITS')
                 : (isFr ? 'Non configuré (flotte)' : 'Not configured (fleet)'))}
@@ -284,8 +353,8 @@ export async function showFlightFile(forceIcao) {
         <div style="font-size:10px; color:var(--text-muted); margin-top:8px; line-height:1.4;">
             <i data-lucide="info" style="width:11px;height:11px;vertical-align:middle;"></i>
             ${isFr
-                ? 'Vue de préparation — chaque rubrique doit être verte avant le vol. La VAC est attestée à son ouverture et jointe au PDF du dossier ; le dossier NOTAM n\u2019est jamais mis en cache.'
-                : 'Preparation view — every tile should be green before flight. VAC is attested on opening and attached to the dossier PDF; the NOTAM briefing is never cached.'}
+                ? 'Vue de préparation — chaque rubrique doit être verte avant le vol. Cliquez sur une tuile pour aller à sa rubrique. La VAC est attestée à son ouverture et jointe au PDF du dossier ; le dossier NOTAM n\u2019est jamais mis en cache.'
+                : 'Preparation view — every tile should be green before flight. Click a tile to jump to its section. VAC is attested on opening and attached to the dossier PDF; the NOTAM briefing is never cached.'}
         </div>
         ${inp.mode === 'nav' && inp.dest ? `
         <button id="ff-print" class="btn-primary" style="margin-top:10px; height:26px; padding:0 12px; font-size:12px;">
@@ -297,6 +366,21 @@ export async function showFlightFile(forceIcao) {
     body.querySelectorAll('button[data-vac]').forEach(btn => {
         btn.addEventListener('click', () => { openVac(btn.dataset.vac); });
     });
+
+    // Tuiles cliquables → rubrique concernée (retour pilote 19/09).
+    const grid = body.querySelector('.ff-grid');
+    if (grid) {
+        grid.addEventListener('click', (e) => {
+            if (e.target.closest('button')) return;   // « Voir » d'une VAC : action propre
+            const tile = e.target.closest('.ff-tile[data-goto]');
+            if (tile) _gotoTile(tile.dataset.goto, tile);
+        });
+        grid.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            const tile = e.target.closest('.ff-tile[data-goto]');
+            if (tile) { e.preventDefault(); _gotoTile(tile.dataset.goto, tile); }
+        });
+    }
 
     // PDF unique du dossier (B1 phase 2) — import dynamique : le générateur
     // (flight-planner-ui) importe ce module pour les tuiles, l'inverse en

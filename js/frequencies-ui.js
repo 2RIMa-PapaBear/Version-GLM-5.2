@@ -21,6 +21,7 @@ import { loadFreqSources, getAirportFreqs, getSiaAirac } from './freq-sia.js';
 import { loadSiaAux, getSiaAirfield, getSiaRunways, getSiaAuxAirac } from './sia-data.js';
 import { hasVac, openVac } from './vac-viewer.js';
 import { getDeclinationForIcao } from './magvar.js';
+import { getFlightMode } from './flight-mode.js';
 
 /**
  * Affiche/masque les onglets du terrain courant.
@@ -51,26 +52,61 @@ export async function showFrequenciesWidget(icao) {
     const sia = aux ? getSiaAirfield(icao) : null;
     const vac = getVacLink(icao);
 
-    const ident = identityRows(icao, apt, sia, state.lang === 'fr');
+    const isFr = state.lang === 'fr';
+    const ident = identityRows(icao, apt, sia, isFr);
     const runways = runwayRows(icao, apt, sia);
     const avecCarte = await hasVac(icao).catch(() => false);
 
+    // DESTINATION (navigation uniquement, retour pilote 19/09) : les deux
+    // onglets « Fréquences » et « Info terrain » doublent leurs blocs —
+    // départ puis arrivée, séparés par un trait. La destination suit le
+    // champ de la barre de nav (state.route en repli) ; ignorée en vol
+    // local et si elle confond le terrain observé.
+    let dest = null;
+    if (getFlightMode() === 'nav') {
+        const d = ((document.getElementById('route-to-input')?.value || '').trim().toUpperCase())
+            || (state.route?.length ? String(state.route[state.route.length - 1]).toUpperCase() : '');
+        if (/^[A-Z][A-Z0-9]{3}$/.test(d) && d !== icao) dest = d;
+    }
+    let apt2 = null, sia2 = null, vac2 = null, avecCarte2 = false, freqs2 = [], source2 = null;
+    if (dest) {
+        apt2 = getAirportByICAO(dest);
+        ({ source: source2, freqs: freqs2 } = getAirportFreqs(dest, apt2?.frequencies));
+        sia2 = aux ? getSiaAirfield(dest) : null;
+        vac2 = getVacLink(dest);
+        avecCarte2 = await hasVac(dest).catch(() => false);
+    }
+
     // ---- Onglet 1 : FRÉQUENCES ----
-    if (freqs.length) {
-        const isFr = state.lang === 'fr';
+    const freqBlocks = [];
+    if (freqs.length) freqBlocks.push({ freqs, source, title: isFr ? 'Fréquences' : 'Frequencies' });
+    if (freqs2.length) {
+        if (freqBlocks.length) freqBlocks[0].title = isFr ? 'Fréquences de départ' : 'Frequencies — departure';
+        freqBlocks.push({ freqs: freqs2, source: source2, title: isFr ? 'Fréquences d\u2019arrivée' : 'Frequencies — arrival' });
+    }
+    if (freqBlocks.length) {
         const body = makeCollapsible(freqContainer, isFr ? 'Fréquences' : 'Frequencies', 'radio-tower');
-        renderFrequencies(body, freqs, source, isFr);
+        renderFrequencies(body, freqBlocks, isFr);
         freqContainer.style.display = 'block';
     } else {
         freqContainer.style.display = 'none';
     }
 
     // ---- Onglet 2 : INFO TERRAIN ----
-    const hasTerrain = ident.length || runways.length || sia?.horAts || sia?.tel || sia?.horAvt || avecCarte || !!vac;
-    if (hasTerrain) {
-        const isFr = state.lang === 'fr';
+    const blocks = [{ icao, ident, runways, sia, vac, avecCarte, title: isFr ? 'Info terrain' : 'Airfield info' }];
+    if (dest) {
+        const ident2 = identityRows(dest, apt2, sia2, isFr);
+        const runways2 = runwayRows(dest, apt2, sia2);
+        if (ident2.length || runways2.length || sia2?.horAts || sia2?.tel || sia2?.horAvt || avecCarte2 || !!vac2) {
+            blocks[0].title = isFr ? 'Info terrain de départ' : 'Airfield info — departure';
+            blocks.push({ icao: dest, ident: ident2, runways: runways2, sia: sia2, vac: vac2, avecCarte: avecCarte2, title: isFr ? 'Info terrain d\u2019arrivée' : 'Airfield info — arrival' });
+        }
+    }
+    const hasData = (b) => b.ident.length || b.runways.length || b.sia?.horAts || b.sia?.tel || b.sia?.horAvt || b.avecCarte || !!b.vac;
+    const shown = blocks.filter(hasData);
+    if (shown.length) {
         const body = makeCollapsible(terrainContainer, isFr ? 'Info terrain' : 'Airfield info', 'id-card');
-        renderTerrain(body, { icao, ident, runways, sia, vac, isFr, avecCarte });
+        renderTerrain(body, shown, isFr);
         terrainContainer.style.display = 'block';
     } else {
         terrainContainer.style.display = 'none';
@@ -158,7 +194,19 @@ function runwayRows(icao, apt, sia) {
 
 // ---- Onglet 1 : FRÉQUENCES ---------------------------------------------------
 
-function renderFrequencies(container, freqs, source, isFr) {
+/** Rendu de l'onglet : un bloc par terrain (départ, puis arrivée en
+ * navigation), séparés par un trait. */
+function renderFrequencies(container, blocks, isFr) {
+    let html = '';
+    blocks.forEach((b, i) => {
+        if (i) html += `<div class="af-dual-sep"></div>`;
+        html += freqBlockHtml(b, isFr);
+    });
+    container.innerHTML = html;
+    if (window.lucide) window.lucide.createIcons({ root: container });
+}
+
+function freqBlockHtml({ freqs, source, title }, isFr) {
     // Codes d'horaires des organismes (eAIP AD 2.18) — info-bulle du badge.
     const HOR_CODES = {
         H24: isFr ? 'Service permanent 24 h/24' : 'Continuous service',
@@ -192,7 +240,7 @@ function renderFrequencies(container, freqs, source, isFr) {
 
     let html = `<div class="dash-title" style="margin-bottom:10px;">
         <i data-lucide="radio-tower" class="icon-sm"></i>
-        <span>${isFr ? 'Fréquences' : 'Frequencies'}</span>
+        <span>${escapeHtml(title)}</span>
     </div>
     <div style="display:flex; flex-direction:column; gap:5px;">`;
     primary.forEach(f => { html += freqRow(f); });
@@ -204,8 +252,7 @@ function renderFrequencies(container, freqs, source, isFr) {
         ${freqSourceNote(source, isFr)}
     </div>`;
 
-    container.innerHTML = html;
-    if (window.lucide) window.lucide.createIcons({ root: container });
+    return html;
 }
 
 /** Mention de source des fréquences (pied de l'onglet). */
@@ -234,10 +281,36 @@ function subsection(icon, label, innerHtml, isFr) {
     </div>`;
 }
 
-function renderTerrain(container, { icao, ident, runways, sia, vac, isFr, avecCarte }) {
+/** Rendu du panneau : un bloc par terrain (départ, puis arrivée en
+ * navigation), séparés par un trait. Les boutons VAC et sous-sections
+ * sont branchés pour TOUS les blocs. */
+function renderTerrain(container, blocks, isFr) {
+    let html = '';
+    blocks.forEach((b, i) => {
+        if (i) html += `<div class="af-dual-sep"></div>`;
+        html += terrainBlockHtml(b, isFr);
+    });
+
+    container.innerHTML = html;
+    if (window.lucide) window.lucide.createIcons({ root: container });
+
+    // Sous-sections repliables (horaires, avitaillement).
+    container.querySelectorAll('.ss-head').forEach(h => {
+        h.addEventListener('click', () => h.parentElement.classList.toggle('open'));
+    });
+
+    container.querySelectorAll('[data-vac-open]').forEach(btn => {
+        btn.addEventListener('click', function () {
+            this.disabled = true;
+            openVac(this.dataset.vacOpen).finally(() => { this.disabled = false; });
+        });
+    });
+}
+
+function terrainBlockHtml({ icao, ident, runways, sia, vac, avecCarte, title }, isFr) {
     let html = `<div class="dash-title" style="margin-bottom:10px;">
         <i data-lucide="id-card" class="icon-sm"></i>
-        <span>${isFr ? 'Info terrain' : 'Airfield info'}</span>
+        <span>${escapeHtml(title)}</span>
     </div>`;
 
     // Identité « Libellé : valeur », à la suite des deux-points (retour pilote).
@@ -314,18 +387,7 @@ function renderTerrain(container, { icao, ident, runways, sia, vac, isFr, avecCa
         ${terrainSourceNote(!!sia, isFr)}
     </div>`;
 
-    container.innerHTML = html;
-    if (window.lucide) window.lucide.createIcons({ root: container });
-
-    // Sous-sections repliables (horaires, avitaillement).
-    container.querySelectorAll('.ss-head').forEach(h => {
-        h.addEventListener('click', () => h.parentElement.classList.toggle('open'));
-    });
-
-    container.querySelector('[data-vac-open]')?.addEventListener('click', function () {
-        this.disabled = true;
-        openVac(this.dataset.vacOpen).finally(() => { this.disabled = false; });
-    });
+    return html;
 }
 
 /** Mention de source des infos terrain. Les cycles peuvent différer :
