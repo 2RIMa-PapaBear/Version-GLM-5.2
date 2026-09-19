@@ -2331,6 +2331,14 @@ body.map-overlay-open { overflow: hidden; }
 .fp-input:focus {
     border-color: var(--primary);
 }
+/* Conso du planificateur : PARAMÈTRE INFORMATIF (19/09) — lecture seule,
+   issue de la fiche avion (fenêtre Flotte) ; même langage que la
+   « Consommée » lecture seule du widget Centrage (tirets, texte neutre). */
+.fp-input.fp-input-ro {
+    border-style: dashed;
+    color: var(--text-color);
+    cursor: default;
+}
 
 /* Grilles du planificateur de vol (définies en CSS, pas en inline). */
 .fp-inputs {
