@@ -106,8 +106,10 @@ function _ensureBadge() {
     _badge.id = 'data-age-badge';
     _badge.className = 'data-age-badge';
     _badge.style.display = 'none';
-    // En BOUT de la ligne d'info (retour pilote 19/09) : il suit le texte
-    // dans le flux au lieu d'ouvrir la ligne.
+    // Frère immédiat de #lbl-info, dans le MÊME flux inline (retour pilote
+    // 19/09) : l'olive termine la phrase du texte. PIÈGE : ne PAS la mettre
+    // DANS #lbl-info — app.js réécrit son innerHTML à chaque rendu du METAR
+    // et l'effacerait (vu en test).
     info.after(_badge);
     return _badge;
 }

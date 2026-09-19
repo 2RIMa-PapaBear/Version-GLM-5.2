@@ -303,7 +303,7 @@ export function renderGoNoGo() {
     }
 
     container.innerHTML = `
-        <div class="go-nogo-content" style="display:flex; flex-direction:column; height:100%;">
+        <div class="go-nogo-content" style="display:flex; flex-direction:column; height:100%;" title="${isFr ? 'Verdict établi en fonction de vos réglages des minimums VFR.' : 'Verdict based on your VFR minima settings.'}">
             <div class="go-nogo-verdict-block" style="display:flex; flex-direction:column; align-items:center; gap:4px; padding-top:12px; padding-bottom:8px;">
                 <div class="go-nogo-icon" style="width:53px; height:53px; border-radius:50%; background:${result.color}22; border:3px solid ${result.color}; display:flex; align-items:center; justify-content:center;">
                     <i data-lucide="${icons[result.verdict]}" style="width:29px; height:29px; color:${result.color};"></i>

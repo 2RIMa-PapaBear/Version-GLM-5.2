@@ -440,13 +440,10 @@ body.mode-nav .dep-dest-toggle { display: flex; }
 .footer a:hover { text-decoration: underline; }
 .info-bar {
     width: 100%; text-align: left; min-height: 20px; margin-top: 10px;
-    /* Badge d'âge en BOUT de la première ligne (retour pilote 19/09) :
-    texte multi-lignes à gauche, olive en haut à droite — SANS wrap. Le
-    bandeau d'alerte TAF vit hors de cette barre (bloc propre dessous). */
-    display: flex; align-items: flex-start; gap: 0 8px;
+    /* Badge d'âge DANS le flux du texte (retour pilote 19/09) : frère inline
+    de #lbl-info, il termine la phrase au lieu d'une colonne à part. */
 }
-.info-bar #lbl-info { flex: 1 1 auto; min-width: 0; }
-.info-bar #data-age-badge { flex: 0 0 auto; margin-left: auto; }
+.info-bar #lbl-info { display: inline; }
 .graph-container { position: relative; }
 .taf-canvas { touch-action: none; }
 .legend-bar-bottom { border-radius: 0 0 8px 8px; }
