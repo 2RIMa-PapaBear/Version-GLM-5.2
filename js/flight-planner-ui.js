@@ -3,6 +3,7 @@ import { getAirportByICAO, enrichAirport } from './ui-module.js';
 import { getActiveAircraftId, getActiveAircraft, getFleet, updateAircraft } from './aircraft-fleet.js';
 import { getActiveRunwayNameForIcao, evaluateTakeoffFromRaw, evaluateLandingAtDestination, fetchTafWithFallback, getAircraftRef } from './takeoff-performance.js';
 import { showTakeoffWidget } from './takeoff-ui.js';
+import { showFrequenciesWidget } from './frequencies-ui.js';
 import { collectFileInputs, computeFileTiles, showFlightFile } from './flight-file.js';
 import { getVacIndexInfo, getVacConsultedTs } from './vac-viewer.js';
 import { getLastMetarObsMs } from './data-age.js';
@@ -219,6 +220,10 @@ export async function showFlightPlanner(fromIcao, toIcao) {
     // APRÈS ce chargement ne l'actualisait jamais (div vide). On re-rend
     // sur le terrain OBSERVÉ (consultation départ/arrivée comprise).
     showTakeoffWidget(state.requestedIcao || fromIcao);
+    // Idem pour l'onglet « Info terrain » : en navigation, le bloc
+    // « Info terrain d'arrivée » suit la destination (retour pilote
+    // 19/09) — saisie APRÈS le chargement du METAR comprise.
+    showFrequenciesWidget(state.requestedIcao || fromIcao);
     // Idem pour le panneau « Dossier de vol » : la tuile Carburant suit le
     // PLAN (total requis) — retour pilote 13/09 : elle ne bougeait pas à
     // la modification du PV.

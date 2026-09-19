@@ -143,6 +143,14 @@ export function setFlightMode(mode) {
         altC.style.display = 'none';
     }
 
+    // Re-rend l'onglet « Info terrain » : le bloc « d'arrivée » n'existe
+    // qu'en navigation (retour pilote 19/09) — sans cela, la bascule
+    // laissait l'ancien rendu affiché. Import dynamique anti-cycle
+    // (frequencies-ui importe flight-mode pour getFlightMode).
+    if (state.requestedIcao) {
+        import('./frequencies-ui.js').then(m => m.showFrequenciesWidget(state.requestedIcao));
+    }
+
     // Force un rafraîchissement du dashboard.
     if (state.refreshCallback) {
         state.lastRenderState = null;

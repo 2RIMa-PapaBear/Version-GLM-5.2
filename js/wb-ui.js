@@ -130,9 +130,10 @@ function _render(body, ac, isFr) {
     const stations = wb.stations.filter(s => !s.fuel && usable(s));
     const fuelSt = wb.stations.find(s => s.fuel && usable(s));
 
-    // Grille « chargement du jour » : 4 postes MAX par ligne ; le carburant
-    // (et la consommée en navigation) ouvre TOUJOURS la ligne suivante,
-    // accompagné des postes restants (ex. Bagages 1/2).
+    // Grille « chargement du jour » : 4 cellules MAX par ligne ; le carburant
+    // complète la ligne des postes dès qu'une colonne est libre (retour
+    // pilote 19/09), sinon il ouvre la ligne suivante avec la durée (vol
+    // local) / la consommée (navigation) et les postes restants.
     const stCell = (s) => `
         <label class="wb-load">
             <span class="wb-load-lab"><span class="lab">${escapeHtml(s.name)}</span>${s.maxKg ? ` <span class="val">Max ${_m(s.maxKg, u.mass)}</span>` : ''}</span>
@@ -166,17 +167,24 @@ function _render(body, ac, isFr) {
     // Vol local : devis carburant par DURÉE ESTIMÉE (A4) — durée + ROZ 30 min
     // (majorée de la réserve perso de l'avion) ; le requis s'affiche et le
     // champ « Carburant embarqué » passe en rouge s'il est insuffisant.
-    const durationCell = (fuelSt && !isNav) ? (() => {
-        let savedMin = '';
-        try { savedMin = String(parseInt(localStorage.getItem('wb-local-min'), 10) || ''); } catch {   }
-        return `
-        <label class="wb-load wb-load-fuel" title="${isFr ? 'Carburant requis = durée estimée du vol + roulage 10 min (départ et arrivée) + réserve finale 10 min (vol local de jour en vue du terrain) + réserve perso de l\u2019avion (fenêtre Flotte).' : 'Required fuel = estimated duration + 10 min taxi (out and in) + 10 min final reserve (day local flight in sight of the field) + the aircraft\u2019s personal reserve (Fleet window).'}">
-            <span class="wb-load-lab"><span class="lab">${isFr ? 'Durée prévue (min)' : 'Planned duration (min)'}</span></span>
-            <input type="number" step="5" min="0" max="600" id="wb-local-min" value="${savedMin}" placeholder="0">
-        </label>`;
-    })() : '';
+    // La durée et son devis partagent un même cadre (retour pilote 19/09) :
+    // l'input est la tête du cadre, le devis se dessine dessous dans
+    // #wb-local-devis (rempli par _recalc, inchangé).
+    let savedMin = '';
+    try { savedMin = String(parseInt(localStorage.getItem('wb-local-min'), 10) || ''); } catch {   }
+    const durationGroup = (fuelSt && !isNav) ? `
+        <div class="wb-duration-group" title="${isFr ? 'Carburant requis = durée de vol prévue + roulage 10 min (départ et arrivée) + réserve finale 10 min (vol local de jour en vue du terrain) + réserve perso de l\u2019avion (fenêtre Flotte).' : 'Required fuel = planned duration + 10 min taxi (out and in) + 10 min final reserve (day local flight in sight of the field) + the aircraft\u2019s personal reserve (Fleet window).'}">
+            <div class="wb-duration-head">
+                <span class="lab">${isFr ? 'Durée de vol prévue (min)' : 'Planned flight duration (min)'}</span>
+                <input type="number" step="5" min="0" max="600" id="wb-local-min" value="${savedMin}" placeholder="0">
+            </div>
+            <div class="wb-fuel-grid" id="wb-local-devis"></div>
+        </div>` : '';
     const line1 = stations.slice(0, 4);
     const rest = stations.slice(4);
+    // Carburant en bout de la ligne des postes s'il reste une colonne ;
+    // ligne pleine (4 postes) → il ouvre la ligne suivante comme avant.
+    const fuelUp = !!fuelCell && line1.length >= 1 && line1.length <= 3;
 
     body.innerHTML = `
         <div class="wb-ac-line">
@@ -184,9 +192,9 @@ function _render(body, ac, isFr) {
             <span class="wb-units">${u.mass} / ${u.arm}</span>
         </div>
         <div class="fleet-wb-sub">${isFr ? `CHARGEMENT DU JOUR (${u.mass.toUpperCase()})` : `TODAY'S LOADING (${u.mass.toUpperCase()})`}</div>
-        ${line1.length ? `<div class="wb-load-grid">${line1.map(stCell).join('')}</div>` : ''}
-        ${(rest.length || fuelCell || burnCell) ? `<div class="wb-load-grid">${rest.map(stCell).join('')}${durationCell}${fuelCell}${burnCell}</div>` : ''}
-        ${!isNav ? '<div class="wb-fuel-grid" id="wb-local-devis"></div>' : ''}
+        ${line1.length ? `<div class="wb-load-grid">${line1.map(stCell).join('')}${fuelUp ? fuelCell : ''}</div>` : ''}
+        ${(rest.length || (!fuelUp && fuelCell) || burnCell) ? `<div class="wb-load-grid">${rest.map(stCell).join('')}${fuelUp ? '' : fuelCell}${burnCell}</div>` : ''}
+        ${durationGroup}
         <div class="wb-chart-host"></div>
         <div class="wb-results">
             <div class="wb-res"><span class="wb-dot wb-dot-to"></span><span class="wb-res-val" id="wb-res-to"></span></div>
@@ -309,9 +317,9 @@ function _recalc(body, ac, isFr) {
                 const cell = (lab, val, strong) =>
                     `<div class="wb-fuel-cell${strong ? ' wb-fuel-total' : ''}"><span>${lab}</span><b>${val}</b></div>`;
                 devisEl.innerHTML =
-                    cell(`${isFr ? 'Durée' : 'Duration'}<br>${req.tripMin} min`, `${req.tripFuelL} L`)
-                    + cell(`${isFr ? 'Roulage' : 'Taxi'}<br>${req.groundMin} min`, `${req.groundL} L`)
-                    + cell(`${isFr ? 'Réserve' : 'Reserve'}<br>${req.reserveMin} min`, `${req.reserveL} L`)
+                    cell(`${isFr ? 'Durée' : 'Duration'} ${req.tripMin} min`, `${req.tripFuelL} L`)
+                    + cell(`${isFr ? 'Roulage' : 'Taxi'} ${req.groundMin} min`, `${req.groundL} L`)
+                    + cell(`${isFr ? 'Réserve' : 'Reserve'} ${req.reserveMin} min`, `${req.reserveL} L`)
                     + cell(isFr ? 'Total requis' : 'Total req.', `${req.totalL} L`, true);
             } else devisEl.innerHTML = '';
         }
