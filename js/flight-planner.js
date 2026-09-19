@@ -260,6 +260,21 @@ function _withDiversion(fuel, diversion) {
     };
 }
 
+// Enrichit le bloc fuel avec le carburant INUTILISABLE du manuel de vol
+// (19/09, retour pilote — « pareil pour les navigations ») : jamais
+// consommable mais présent dans le réservoir, le total requis l'inclut.
+// Champ unusableL exposé pour les devis écran / dossier / PDF.
+// Pure — exportée pour les tests.
+export function withUnusableFuel(fuel, unusableFuelL) {
+    const unusableL = Math.round(((unusableFuelL > 0) ? unusableFuelL : 0) * 10) / 10;
+    if (!(unusableL > 0)) return { ...fuel, unusableL: 0 };
+    return {
+        ...fuel,
+        unusableL,
+        totalL: Math.round((fuel.totalL + unusableL) * 10) / 10,
+    };
+}
+
 /**
  * Projet « DEUX ÉTAPES SANS PLEIN » : minimum réglementaire de la 2ᵉ étape —
  * roulage ×2 + intégration (forfaits au sol) + navigation + réserve finale.
@@ -329,9 +344,9 @@ export async function computeFlightPlan(fromIcao, toIcao, params) {
     // de l'avion actif (flotte) — le devis et le PDF affichent cette valeur.
     const reserveMin = (params.isNight ? RESERVE_MIN_NIGHT : RESERVE_MIN_DAY)
         + (Number.isFinite(params.reserveExtraMin) ? Math.max(0, Math.min(60, params.reserveExtraMin)) : 0);
-    const fuel = _withDiversion(
+    const fuel = withUnusableFuel(_withDiversion(
         { ...computeFuel(legTimeMin, params.fuelBurnLph, reserveMin, GROUND_MIN), reserveMin },
-        _diversionFor(toLat, toLon, params.diversionIcao, params.fuelBurnLph, gsKt));
+        _diversionFor(toLat, toLon, params.diversionIcao, params.fuelBurnLph, gsKt)), params.unusableFuelL);
 
     const elevProfile = await fetchRouteElevation(fromLat, fromLon, toLat, toLon, null,
         [_officialElevFt(fromIcao, fromApt), _officialElevFt(toIcao, toApt)]);
@@ -372,6 +387,7 @@ export function getDefaultAircraftPerf() {
         tasKt: ac?.cruiseSpeedKt ?? 110,
         fuelBurnLph: ac?.fuelBurnLph ?? 35,
         reserveExtraMin: ac?.reserveExtraMin ?? 0,
+        unusableFuelL: ac?.unusableFuelL ?? 0,
     };
 }
 
@@ -466,14 +482,14 @@ export async function computeMultiLegFlightPlan(route, params) {
     const dest = waypoints[waypoints.length - 1];
     const avgGsKt = totalTimeMin > 0 ? totalDistanceNm / (totalTimeMin / 60) : 0;
     const diversion = _diversionFor(dest.lat, dest.lon, params.diversionIcao, params.fuelBurnLph, avgGsKt);
-    const fuel = _withDiversion({
+    const fuel = withUnusableFuel(_withDiversion({
         tripFuelL: Math.round(totalTripFuelL * 10) / 10,
         reserveL: Math.round(totalReserveL * 10) / 10,
         groundMin: GROUND_MIN,
         groundL: Math.round(groundL * 10) / 10,
         totalL: Math.round((totalTripFuelL + totalReserveL + groundL) * 10) / 10,
         reserveMin,
-    }, diversion);
+    }, diversion), params.unusableFuelL);
     return {
         waypoints,
         legs,

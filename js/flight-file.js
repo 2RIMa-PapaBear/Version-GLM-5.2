@@ -165,16 +165,19 @@ export async function collectFileInputs() {
         if (f) fuelParts = {
             trip: f.tripFuelL, ground: f.groundL ?? 0,
             reserve: f.reserveL, diversion: f.diversionL || 0,
+            unusable: f.unusableL || 0,
         };
     } else {
         const min = parseInt(document.getElementById('wb-local-min')?.value, 10);
         if (Number.isFinite(min) && min > 0) {
             const burn = ac.fuelBurnLph ?? 35;
             // Vol local : durée + roulage 10 min (départ+arrivée) + réserve
-            // finale 10 min (jour, vue du terrain) — même formule que le
-            // devis du widget Centrage (18/09).
+            // finale 10 min (jour, vue du terrain) + inutilisable du manuel
+            // de vol — même formule que le devis du widget Centrage
+            // (18/09, inutilisable ajouté le 19/09).
             const reserveMin = 10 + (ac.reserveExtraMin || 0);
-            fuelRequired = Math.round(((min + 10 + reserveMin) / 60 * burn) * 10) / 10;
+            const unusable = (ac.unusableFuelL > 0) ? ac.unusableFuelL : 0;
+            fuelRequired = Math.round(((min + 10 + reserveMin) / 60 * burn + unusable) * 10) / 10;
         }
     }
 
@@ -337,7 +340,7 @@ export async function showFlightFile(forceIcao) {
             ${_tile('fuel', 'fuel', isFr ? 'Carburant' : 'Fuel', t.fuel.status,
                 inp.fuelRequired != null
                     ? `${isFr ? 'Requis' : 'Req.'} ${inp.fuelRequired} L` + (inp.fuelParts
-                        ? ` (${isFr ? 'trajet' : 'trip'} ${inp.fuelParts.trip} + ${isFr ? 'roulage' : 'taxi'} ${inp.fuelParts.ground} + ${isFr ? 'rés.' : 'res.'} ${inp.fuelParts.reserve}${inp.fuelParts.diversion ? ` + ${isFr ? 'dégag.' : 'alt.'} ${inp.fuelParts.diversion}` : ''})`
+                        ? ` (${isFr ? 'trajet' : 'trip'} ${inp.fuelParts.trip} + ${isFr ? 'roulage' : 'taxi'} ${inp.fuelParts.ground} + ${isFr ? 'rés.' : 'res.'} ${inp.fuelParts.reserve}${inp.fuelParts.diversion ? ` + ${isFr ? 'dégag.' : 'alt.'} ${inp.fuelParts.diversion}` : ''}${inp.fuelParts.unusable ? ` + ${isFr ? 'inutil.' : 'unus.'} ${inp.fuelParts.unusable}` : ''})`
                         : '')
                       + ` · ${isFr ? 'embarqué' : 'on board'} ${inp.fuelOnBoard ?? '—'} L`
                       + (inp.mode === 'nav' ? ` · ${isFr ? 'dégagement' : 'alternate'} ${inp.diversion ? '✓' : '—'}` : '')

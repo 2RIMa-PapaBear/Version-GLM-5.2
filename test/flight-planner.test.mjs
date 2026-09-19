@@ -25,7 +25,34 @@ import {
     RESERVES,
     TAXI_MIN_DEP, TAXI_MIN_ARR, INTEGRATION_MIN,
     computeLeg2Fuel,
+    withUnusableFuel,
 } from '../js/flight-planner.js';
+
+describe('withUnusableFuel (inutilisable du manuel de vol — 19/09, navigations)', () => {
+    test('0 ou absent : total inchangé, unusableL 0', () => {
+        const f0 = withUnusableFuel({ tripFuelL: 18, reserveL: 4.5, groundL: 3, totalL: 25.5 }, 0);
+        assert.equal(f0.totalL, 25.5);
+        assert.equal(f0.unusableL, 0);
+        const fU = withUnusableFuel({ tripFuelL: 18, reserveL: 4.5, groundL: 3, totalL: 25.5 }, undefined);
+        assert.equal(fU.totalL, 25.5);
+        assert.equal(fU.unusableL, 0);
+    });
+
+    test('6 L : total +6 (pilote : 1 h à 18 L/h → 18 + 3 + 4,5 + 6 = 31,5 L)', () => {
+        const f = withUnusableFuel(computeFuel(60, 18, 15, 10), 6);
+        assert.equal(f.tripFuelL, 18);
+        assert.equal(f.groundL, 3);
+        assert.equal(f.reserveL, 4.5);
+        assert.equal(f.unusableL, 6);
+        assert.equal(f.totalL, 31.5);
+    });
+
+    test('compose après la branche dégagement (total déjà majoré : 30,4 + 6 = 36,4)', () => {
+        const f = withUnusableFuel({ totalL: 30.4, diversionL: 5 }, 6);
+        assert.equal(f.totalL, 36.4);
+        assert.equal(f.diversionL, 5);
+    });
+});
 
 describe('computeDiversionLeg (branche dégagement du devis carburant)', () => {
     test('distance / temps / carburant depuis la destination (0,5° lat ≈ 30 NM)', () => {

@@ -1,6 +1,7 @@
 // QA DEVIS CARBURANT DÉTAILLÉ (17/09) : forfaits roulage+intégration au devis
 // écran (ligne dédiée, total = trajet + forfaits + réserve + dégagement),
-// réserve vol locale 10 min, plafond embarqué = carburant UTILISABLE.
+// réserve vol locale 10 min, plafond embarqué = capacité poste − INUTILISABLE,
+// devis local incluant l'inutilisable (19/09 : 30 min → 9 + 3 + 4,5 + 6 = 22,5 L).
 // PIÈGE harnais : flotte pré-chargée AVEC centrage (sinon widget masqué) et
 // dialogues dismissés — l alerte synchrone « CARBURANT INSUFFISANT » (0 L
 // embarqué au chargement) FIGE un navigateur headless.
@@ -37,13 +38,13 @@ const ok = m => console.log('OK  ' + m);
 const ko = m => { failures++; console.log('KO  ' + m); };
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
-// Flotte du profil : avion type WT9 AVEC centrage + 113 L utilisables (le
+// Flotte du profil : avion type WT9 AVEC centrage + 6 L inutilisables (le
 // widget Centrage se masque sans bloc wb).
 await page.evaluateOnNewDocument(() => {
     const ac = {
         id: 'ac_qa_wt9', name: 'QA WT9', registration: '', type: 'WT9',
         groundRoll: 540, fiftyFt: 1148, safetyMargin: 15,
-        cruiseSpeedKt: 100, fuelBurnLph: 18, usableFuelL: 113,
+        cruiseSpeedKt: 100, fuelBurnLph: 18, unusableFuelL: 6,
         xwindLimitKt: 25, reserveExtraMin: 5, ldgRoll: 246, ldgFifty: 863,
         wb: {
             units: { mass: 'kg', arm: 'm' },
@@ -62,7 +63,8 @@ await page.evaluateOnNewDocument(() => {
     localStorage.setItem('ac-active-id', 'ac_qa_wt9');
 });
 
-// ① NAV : devis avec « Roulage + intégr. » 15 min, total = trajet+forfait+réserve(+dégag.)
+// ① NAV : devis avec « Roulage + intégr. » 15 min, « Inutilisable » 6 L
+// (19/09), total = trajet+forfait+réserve(+dégag.)+inutilisable.
 await page.goto('http://127.0.0.1:8662/index.html?icao=LFRV&mode=nav&dest=LFOO', { waitUntil: 'domcontentloaded', timeout: 30000 });
 await page.waitForFunction(() => [...document.querySelectorAll('.fp-section-title')].some(t => /Carburant|Fuel/.test(t.textContent)), { timeout: 30000 });
 await wait(2500);
@@ -75,19 +77,25 @@ const groundCell = lignes.find(l => /Roulage|Taxi/i.test(l));
 (groundCell ? ok : ko)('devis : ligne « Roulage + intégr. » présente');
 (/15min/.test(groundCell || '') ? ok : ko)('devis : forfait 15 min affiché');
 (/4\.5 L/.test(groundCell || '') ? ok : ko)('devis : 4,5 L à 18 L/h');
+const unusableCell = lignes.find(l => /Inutilisable|Unusable/i.test(l));
+(unusableCell ? ok : ko)('devis : cellule « Inutilisable » présente (navigation)');
+(/6 L/.test(unusableCell || '') ? ok : ko)('devis : inutilisable = 6 L (manuel de vol)');
 const num = l => parseFloat((l.match(/([\d.]+) L/) || [])[1]);
 const trip = num(lignes.find(l => /Trajet|Trip/.test(l)) || '');
 const res = num(lignes.find(l => /Réserve|Reserve/.test(l)) || '');
+const un = unusableCell ? num(unusableCell) : 0;
 const div = lignes.find(l => /Dégagement|Alternate/.test(l)) ? num(lignes.find(l => /Dégagement|Alternate/.test(l))) : 0;
 const tot = num(lignes.find(l => /Total/.test(l)) || '');
-(Math.abs(tot - (trip + 4.5 + res + div)) < 0.15 ? ok : ko)(`devis : total ${tot} = trajet ${trip} + 4,5 + réserve ${res} + dégag. ${div}`);
+(Math.abs(tot - (trip + 4.5 + res + div + un)) < 0.15 ? ok : ko)(`devis : total ${tot} = trajet ${trip} + 4,5 + réserve ${res} + dégag. ${div} + inutil. ${un}`);
 
 // ① bis PROJET 2 ÉTAPES : saisie ICAO → requis 2 étapes + verdict, embarqué
-// piloté depuis le widget Centrage, persistance au rechargement.
+// piloté depuis le widget Centrage, persistance au rechargement. Le requis
+// compte l'inutilisable UNE fois (via le total du plan, 19/09) : 36,4 + 38
+// = 74,4 L → témoin embarqué 80 L.
 await page.evaluate(() => {
-    // Embarqué 70 L dans le widget Centrage (même page, dashboard).
+    // Embarqué 80 L dans le widget Centrage (même page, dashboard).
     const f = document.getElementById('wb-fuel-l');
-    if (f) { f.value = '70'; f.dispatchEvent(new Event('input', { bubbles: true })); }
+    if (f) { f.value = '80'; f.dispatchEvent(new Event('input', { bubbles: true })); }
     const i = document.getElementById('fp-leg2-icao');
     i.value = 'LFRD';
     i.dispatchEvent(new Event('change', { bubbles: true }));
@@ -98,8 +106,9 @@ const leg2a = await page.evaluate(() => ({
 }));
 console.log('étape 2 :', JSON.stringify(leg2a.block));
 (/Requis 2 étapes/.test(leg2a.block) ? ok : ko)('étape 2 : « Requis 2 étapes » affiché');
+(/74\.4 L/.test(leg2a.block) ? ok : ko)('étape 2 : requis 74,4 L (plan 36,4 + étape 38, inutilisable compté une fois)');
 (/sans vent/.test(leg2a.block) ? ok : ko)('étape 2 : temps étiqueté « sans vent »');
-(/possibles sans complément de plein/.test(leg2a.block) ? ok : ko)('étape 2 : verdict OK avec 70 L à bord');
+(/possibles sans complément de plein/.test(leg2a.block) ? ok : ko)('étape 2 : verdict OK avec 80 L à bord');
 // Bascule : embarqué insuffisant → avitaillement.
 await page.evaluate(() => {
     const f = document.getElementById('wb-fuel-l');
@@ -141,7 +150,8 @@ const leg2d = await page.evaluate(() => ({
 console.log('après changement de destination :', JSON.stringify(leg2d));
 (leg2d.icao === '' ? ok : ko)('2ᵉ étape remise à vide quand la route change');
 
-// ② LOCAL : réserve 10 min + plafond Max 113 (utilisable).
+// ② LOCAL : réserve 10 min + inutilisable 6 L (devis 5 cellules) + plafond
+// Max 113 (capacité 119 − 6 inutilisables).
 await page.goto('http://127.0.0.1:8662/index.html?icao=LFRV', { waitUntil: 'domcontentloaded', timeout: 30000 });
 await page.waitForFunction(() => document.getElementById('wb-local-min'), { timeout: 30000 });
 await page.evaluate(() => {
@@ -156,12 +166,13 @@ const local = await page.evaluate(() => ({
     label: document.querySelector('#wb-fuel-l')?.closest('label')?.textContent.replace(/\s+/g, ' ').trim() || '',
 }));
 console.log('devis local :', JSON.stringify(local.cells), '· max embarqué :', local.fuelMax);
-(local.cells.length === 4 ? ok : ko)('devis local : 4 cellules (Durée / Roulage / Réserve / Total)');
+(local.cells.length === 5 ? ok : ko)('devis local : 5 cellules (Durée / Roulage / Réserve / Inutilisable / Total)');
 (/9 L/.test(local.cells[0] || '') ? ok : ko)('cellule Durée = 9 L (30 min à 18 L/h)');
 (/Roulage.*10 min.*3 L/.test(local.cells[1] || '') ? ok : ko)('cellule Roulage = 3 L (10 min)');
 (/Réserve.*15 min.*4[.,]5 L/.test(local.cells[2] || '') ? ok : ko)('cellule Réserve = 4,5 L (10 + 5 perso)');
-(/16[.,]5 L/.test(local.cells[3] || '') ? ok : ko)('Total requis = 16,5 L (9 + 3 + 4,5)');
-(local.fuelMax === '113' ? ok : ko)(`plafond embarqué = utilisable 113 L (capacité poste 119)`);
+(/Inutilisable.*6 L/.test(local.cells[3] || '') ? ok : ko)('cellule Inutilisable = 6 L (manuel de vol)');
+(/22[.,]5 L/.test(local.cells[4] || '') ? ok : ko)('Total requis = 22,5 L (9 + 3 + 4,5 + 6)');
+(local.fuelMax === '113' ? ok : ko)(`plafond embarqué = 113 L (capacité 119 − 6 inutilisables)`);
 (pageErrors.length === 0 ? ok : ko)('zéro erreur JS' + (pageErrors.length ? ' — ' + pageErrors[0] : ''));
 server.close(); await browser.close();
 console.log(failures === 0 ? 'SMOKE OK' : `SMOKE KO (${failures})`);

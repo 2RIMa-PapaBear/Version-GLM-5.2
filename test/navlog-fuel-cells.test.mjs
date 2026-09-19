@@ -59,4 +59,44 @@ describe('libellés des olives (page Calcul de navigation)', () => {
         // Les libellés longs ne débordent plus : repliés ou réduits, jamais accolés.
         assert.ok(!fuel.some(l => /ROULAGE.*15 MIN/.test(l.ligne)), '« Roulage + intégr. » ne déborde plus (repli ou réduction)');
     });
+
+    test('variante 6 olives (dégagement + inutilisable 19/09) : aucun libellé ne déborde', () => {
+        const s6 = JSON.parse(JSON.stringify(sample));
+        s6.calc.fuel.unusableL = 6;
+        const labels = [];
+        const Patched = class extends jsPDF {
+            constructor(opts) {
+                super(opts);
+                const dText = this.text.bind(this);
+                this.text = (t, x, y, o) => {
+                    const font = this.internal.getFont();
+                    const size = this.internal.getFontSize();
+                    if (font.fontName === 'helvetica' && font.fontStyle === 'bold' && size <= 6.5) {
+                        const cs = o?.charSpace || 0;
+                        const lignes = Array.isArray(t) ? t.map(String) : String(t).split('\n');
+                        for (const ligne of lignes) {
+                            if (ligne) labels.push({ ligne, w: this.getTextWidth(ligne) + ligne.length * cs });
+                        }
+                    }
+                    return dText(t, x, y, o);
+                };
+            }
+        };
+        drawNavLogPdf(Patched, s6);
+        // Largeurs 6 olives : total = W − 5×12 = 326,3 pt, poids
+        // [0,7 1,1 1,05 0,85 0,95 1,1]/5,75 → utiles : Trajet ~28, Dégagement
+        // ~50, Roulage ~48, Réserve ~36, Inutilisable ~42, Total ~50 pt.
+        const FUEL6 = ['TRAJET', 'DÉGAGEMENT', 'ROULAGE', 'RÉSERVE', 'INUTILISABLE', 'TOTAL REQUIS'];
+        const BORNES6 = { 'TRAJET': 28.5, 'DÉGAGEMENT': 51, 'ROULAGE': 48.5, 'RÉSERVE': 37, 'INUTILISABLE': 42.5, 'TOTAL REQUIS': 51 };
+        const fuel = labels.filter(l => FUEL6.some(k => l.ligne.startsWith(k)));
+        assert.ok(fuel.length >= 6, `libellés carburant trouvés (${fuel.length})`);
+        assert.ok(fuel.some(l => l.ligne.startsWith('INUTILISABLE')), 'olive « Inutilisable » rendue');
+        const pire = fuel.reduce((a, b) => (b.w > a.w ? b : a), { ligne: '', w: 0 });
+        console.log(`ligne carburant 6 olives : ${fuel.length} libellés, le plus large « ${pire.ligne} » ${Math.round(pire.w)} pt`);
+        for (const l of fuel) {
+            const borne = BORNES6[FUEL6.find(k => l.ligne.startsWith(k))];
+            assert.ok(l.w <= borne, `« ${l.ligne} » ${Math.round(l.w)} pt > ${borne} pt (sa cellule)`);
+        }
+        assert.ok(!fuel.some(l => /ROULAGE.*INTÉGR\.\s*\(15 MIN\)/.test(l.ligne)), '« Roulage + intégr. (15 min) » replié/réduit, jamais en une ligne débordante');
+    });
 });
