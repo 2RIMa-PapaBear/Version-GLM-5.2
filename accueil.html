@@ -33,12 +33,6 @@
         display: flex; align-items: center; justify-content: center; color: var(--primary, #38BDF8);
         box-shadow: 0 0 34px rgba(56, 189, 248, .22);
     }
-    .acc-badge {
-        display: inline-flex; align-items: center; gap: 7px; margin-bottom: 16px;
-        padding: 5px 13px; border-radius: 999px; font-size: 11.5px; font-weight: 600;
-        color: var(--primary, #38BDF8); background: rgba(56, 189, 248, .10);
-        border: 1px solid rgba(56, 189, 248, .30);
-    }
     .acc-hero h1 { margin: 0 0 10px; font-size: 34px; letter-spacing: .2px; }
     .acc-hero .acc-sub { margin: 0 auto 6px; max-width: 660px; color: var(--text-color, #F8FAFC); font-size: 16.5px; font-weight: 500; }
     .acc-hero p { margin: 0 auto; max-width: 640px; color: var(--text-muted, #94A3B8); font-size: 14px; line-height: 1.65; }
@@ -77,11 +71,6 @@
     }
     .acc-shot .acc-shot-bar i { width: 9px; height: 9px; border-radius: 50%; background: #334155; }
     .acc-shot .acc-shot-bar span { margin-left: 6px; font-size: 11px; color: var(--text-muted, #94A3B8); font-family: 'DM Mono', monospace; }
-    .acc-shot figcaption {
-        position: absolute; right: 10px; top: 40px; padding: 5px 11px; border-radius: 8px;
-        background: rgba(2, 6, 23, .82); border: 1px solid var(--border-color, #334155);
-        font-size: 11.5px; font-weight: 600; color: var(--text-color, #F8FAFC);
-    }
     .acc-shots .acc-col { display: flex; flex-direction: column; gap: 14px; }
 
     /* ---- Grille de fonctions ---- */
@@ -138,9 +127,8 @@
 
     <div class="acc-hero">
         <div class="acc-logo"><i data-lucide="plane" style="width:32px;height:32px;"></i></div>
-        <div class="acc-badge"><i data-lucide="shield-check" style="width:13px;height:13px;"></i> Données officielles — SIA · Météo-France · NOAA</div>
         <h1>Visualiseur METAR/TAF</h1>
-        <div class="acc-sub">Le briefing VFR complet, du METAR du matin au dossier de vol imprimé.</div>
+        <div class="acc-sub">Le briefing VFR complet, du METAR au dossier de vol imprimé.</div>
         <p>Météo décryptée à la minute, carte régionale aux couleurs du jour, planification et carburant,
            dossier imprimable — dans une seule page, sur PC comme sur téléphone.</p>
         <div class="acc-cta">
@@ -159,24 +147,21 @@
         <figure class="acc-shot" style="margin:0;">
             <div class="acc-shot-bar"><i></i><i></i><i></i><span>carte régionale · LFRV → LFOO</span></div>
             <img src="assets/accueil/carte.jpg" alt="Carte régionale : route, pastilles VFR et espaces aériens">
-            <figcaption>Route, pastilles VFR, espaces SIA, radar</figcaption>
         </figure>
         <div class="acc-col">
             <figure class="acc-shot" style="margin:0;">
                 <div class="acc-shot-bar"><i></i><i></i><i></i><span>calcul de navigation</span></div>
                 <img src="assets/accueil/plan.jpg" alt="Calcul de navigation : devis carburant et minima VFR">
-                <figcaption>Devis carburant · minima VFR</figcaption>
             </figure>
             <figure class="acc-shot" style="margin:0;">
                 <div class="acc-shot-bar"><i></i><i></i><i></i><span>dossier de vol</span></div>
                 <img src="assets/accueil/dossier.jpg" alt="Dossier de vol : tuiles météo, NOTAM, VAC, carburant">
-                <figcaption>Tuiles du dossier de vol</figcaption>
             </figure>
         </div>
     </div>
 
     <h2 class="acc-h2" id="fonctions">Tout ce qu'il faut pour préparer — et vivre — un vol VFR</h2>
-    <p class="acc-h2sub">Chaque information vient d'une source officielle ; rien ne remplace votre jugement de commandant de bord.</p>
+    <p class="acc-h2sub">Chaque information vient d'une source officielle ; mais rien ne remplace votre jugement de commandant de bord.</p>
     <div class="acc-grid">
         <div class="acc-card">
             <h2><span class="acc-ic"><i data-lucide="cloud-sun" style="width:17px;height:17px;"></i></span> Météo décryptée, temps réel</h2>
