@@ -1,7 +1,7 @@
 {
   "name": "metar-taf-visualiseur",
   "version": "3.0.0",
-  "description": "Visualiseur METAR/TAF — Météo aéronautique en temps réel",
+  "description": "Prévol — Météo aéronautique en temps réel",
   "private": true,
   "type": "module",
   "scripts": {
