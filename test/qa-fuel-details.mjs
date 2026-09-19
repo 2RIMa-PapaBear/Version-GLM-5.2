@@ -87,6 +87,14 @@ const un = unusableCell ? num(unusableCell) : 0;
 const div = lignes.find(l => /Dégagement|Alternate/.test(l)) ? num(lignes.find(l => /Dégagement|Alternate/.test(l))) : 0;
 const tot = num(lignes.find(l => /Total/.test(l)) || '');
 (Math.abs(tot - (trip + 4.5 + res + div + un)) < 0.15 ? ok : ko)(`devis : total ${tot} = trajet ${trip} + 4,5 + réserve ${res} + dégag. ${div} + inutil. ${un}`);
+// Conso : PARAMÈTRE INFORMATIF (retour pilote 19/09) — lecture seule, issue
+// de la fiche avion (18 L/h de la flotte QA), jamais saisie ici.
+const burnRo = await page.evaluate(() => ({
+    ro: document.getElementById('fp-burn')?.readOnly === true,
+    val: document.getElementById('fp-burn')?.value || '',
+}));
+(burnRo.ro ? ok : ko)('conso (L/h) : champ informatif lecture seule (fenêtre Flotte)');
+(burnRo.val === '18' ? ok : ko)(`conso affichée = fiche avion (18 L/h, lu : « ${burnRo.val} »)`);
 
 // ① bis PROJET 2 ÉTAPES : saisie ICAO → requis 2 étapes + verdict, embarqué
 // piloté depuis le widget Centrage, persistance au rechargement. Le requis

@@ -163,8 +163,9 @@ export async function showFlightPlanner(fromIcao, toIcao) {
     if (altInput && altInput.value) cruiseAlt = parseInt(altInput.value, 10);
     const tasInput = body.querySelector('#fp-tas');
     let tasKt = tasInput?.value ? parseInt(tasInput.value, 10) : perf.tasKt;
-    const burnInput = body.querySelector('#fp-burn');
-    let burn = burnInput?.value ? parseInt(burnInput.value, 10) : perf.fuelBurnLph;
+    // Conso : PARAMÈTRE INFORMATIF (retour pilote 19/09) — toujours celle de
+    // la fiche avion (fenêtre Flotte), jamais modifiable dans le calcul.
+    const burn = perf.fuelBurnLph;
     const nightInput = body.querySelector('#fp-night');
     const isNight = nightInput ? nightInput.checked : false;
 
@@ -1434,9 +1435,9 @@ function _renderInputs(from, to, fromName, toName, alt, tas, burn, isNight, isFr
                 <span>${isFr ? 'Vitesse air (kt)' : 'TAS (kt)'}</span>
                 <input type="number" id="fp-tas" value="${tas}" min="0" step="5" class="fp-input">
             </label>
-            <label class="fp-input-label">
-                <span>${isFr ? 'Conso (L/h)' : 'Burn (L/h)'}</span>
-                <input type="number" id="fp-burn" value="${burn}" min="0" step="1" class="fp-input">
+            <label class="fp-input-label" title="${isFr ? 'Consommation de croisière de l\u2019avion actif — PARAMÈTRE INFORMATIF : issue de la fiche avion (fenêtre Flotte), elle alimente le devis mais ne se modifie pas ici.' : 'Cruise burn of the active aircraft — INFORMATIONAL: from the aircraft sheet (Fleet window), it feeds the quote but is not editable here.'}">
+                <span>${isFr ? 'Conso (L/h) · info' : 'Burn (L/h) · info'}</span>
+                <input type="number" id="fp-burn" value="${burn}" min="0" step="1" class="fp-input fp-input-ro" readonly tabindex="-1" aria-readonly="true">
             </label>
             <label class="fp-night-label" title="${isFr ? 'Vol de nuit (réserve 45 min au lieu de 30)' : 'Night flight (45 min reserve)'}">
                 <input type="checkbox" id="fp-night" ${isNight ? 'checked' : ''}>
@@ -1472,9 +1473,9 @@ function _wireInputs(container, from, to) {
         }
     };
     // change/blur : recalc immédiat (l'utilisateur a fini de saisir).
+    // La conso n'y figure pas : champ informatif lecture seule (19/09).
     container.querySelector('#fp-cruise-alt')?.addEventListener('change', recalc);
     container.querySelector('#fp-tas')?.addEventListener('change', recalc);
-    container.querySelector('#fp-burn')?.addEventListener('change', recalc);
     container.querySelector('#fp-night')?.addEventListener('change', recalc);
     // IMPORTANT : on n'écoute QUE 'change' (déclenché à la perte de focus / Entrée),
     // jamais 'input' (frappe clavier). Sinon showFlightPlanner recrée le DOM et
