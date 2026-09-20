@@ -17,6 +17,46 @@ function _officialElevFt(icao, apt = null) {
     return getSiaAirfield(icao)?.elevFt ?? apt?.elevation ?? null;
 }
 
+/** Profil de REPLI « sans relief » (20/09, retour pilote) : quand le service
+ *  d'élévation ne répond pas (quota Open-Meteo saturé…), le profil reste
+ *  AFFICHÉ — interpolation linéaire entre les élévations OFFICIELLES des
+ *  terrains de la route (les lat/lon suivent la ligne entre terrains, pour
+ *  que les zones aériennes traversées se calculent quand même), drapeau
+ *  noTerrain pour le bandeau de panne écran + PDF. La marge de
+ *  franchissement, elle, n'est JAMAIS calculée sur ce repli. Exporté pour
+ *  les tests. */
+export function _fallbackProfile(anchors) {
+    const ok = (anchors || []).filter(a => Number.isFinite(a?.lat) && Number.isFinite(a?.lon));
+    if (ok.length < 2) ok.push({ ...ok[0] });
+    const PER_SEG = 8;
+    const points = [];
+    let distKm = 0;
+    for (let s = 0; s < ok.length - 1; s++) {
+        const a = ok[s], b = ok[s + 1];
+        distKm += greatCircleDistanceNm(a.lat, a.lon, b.lat, b.lon) * 1.852;
+        for (let i = 0; i < PER_SEG; i++) {
+            const t = i / PER_SEG;
+            points.push({
+                frac: null,   // posé après la boucle (0 → 1 sur le total)
+                lat: a.lat + (b.lat - a.lat) * t,
+                lon: a.lon + (b.lon - a.lon) * t,
+                elevFt: Math.round((a.elevFt ?? 0) + ((b.elevFt ?? 0) - (a.elevFt ?? 0)) * t),
+            });
+        }
+    }
+    const last = ok[ok.length - 1];
+    points.push({ frac: 1, lat: last.lat, lon: last.lon, elevFt: Math.round(last.elevFt ?? 0) });
+    points.forEach((p, i) => { p.frac = i / (points.length - 1); });
+    const elevs = points.map(p => p.elevFt);
+    return {
+        points,
+        minFt: Math.min(...elevs),
+        maxFt: Math.max(...elevs),
+        distTotalKm: Math.round(distKm),
+        noTerrain: true,
+    };
+}
+
 // Zones aériennes traversées par la route (rectangles d'altitude du profil
 // d'élévation) : bbox du corridor → items openAIP → groupes. Non bloquant —
 // null silencieux si l'API/cache est indisponible. Une correction manuelle
@@ -348,10 +388,19 @@ export async function computeFlightPlan(fromIcao, toIcao, params) {
         { ...computeFuel(legTimeMin, params.fuelBurnLph, reserveMin, GROUND_MIN), reserveMin },
         _diversionFor(toLat, toLon, params.diversionIcao, params.fuelBurnLph, gsKt)), params.unusableFuelL);
 
-    const elevProfile = await fetchRouteElevation(fromLat, fromLon, toLat, toLon, null,
+    const elevReal = await fetchRouteElevation(fromLat, fromLon, toLat, toLon, null,
         [_officialElevFt(fromIcao, fromApt), _officialElevFt(toIcao, toApt)]);
-    const routeObstacles = await _routeObstacles(elevProfile);
-    const clearance = elevProfile
+    // (20/09, retour pilote) Relief indisponible (quota Open-Meteo saturé…) :
+    // le profil reste AFFICHÉ SANS RELIEF — interpolation entre les élévations
+    // officielles des extrémités, drapeau noTerrain pour le bandeau de panne
+    // (écran et PDF). Le calcul de marge de franchissement, lui, exige le
+    // VRAI relief : il reste absent tant qu'Open-Meteo ne répond pas.
+    const elevProfile = elevReal ?? _fallbackProfile([
+        { lat: fromLat, lon: fromLon, elevFt: _officialElevFt(fromIcao, fromApt) ?? 0 },
+        { lat: toLat, lon: toLon, elevFt: _officialElevFt(toIcao, toApt) ?? 0 },
+    ]);
+    const routeObstacles = await _routeObstacles(elevReal);
+    const clearance = elevReal
         ? evaluateClearance(elevProfile, params.cruiseAltFt, 1000, routeObstacles)
         : null;
     const routeAirspaces = await loadRouteAirspaces(elevProfile, params.cruiseAltFt);
@@ -468,9 +517,14 @@ export async function computeMultiLegFlightPlan(route, params) {
     for (let i = 0; i < waypoints.length - 1; i++) {
         legCoords.push([waypoints[i].lat, waypoints[i].lon, waypoints[i + 1].lat, waypoints[i + 1].lon]);
     }
-    const elevProfile = await fetchMultiSegmentElevation(legCoords, waypoints.map(w => w.elevFt));
-    const routeObstacles = await _routeObstacles(elevProfile);
-    const clearance = elevProfile ? evaluateClearance(elevProfile, params.cruiseAltFt, 1000, routeObstacles) : null;
+    const elevReal = await fetchMultiSegmentElevation(legCoords, waypoints.map(w => w.elevFt));
+    // (20/09, retour pilote) Voir computeFlightPlan : sans relief service,
+    // profil de REPLI interpolé entre les élévations officielles des
+    // terrains de la route (départ, étapes, arrivée) + drapeau noTerrain.
+    const elevProfile = elevReal ?? _fallbackProfile(
+        waypoints.map(w => ({ lat: w.lat, lon: w.lon, elevFt: w.elevFt ?? 0 })));
+    const routeObstacles = await _routeObstacles(elevReal);
+    const clearance = elevReal ? evaluateClearance(elevProfile, params.cruiseAltFt, 1000, routeObstacles) : null;
     const routeAirspaces = await loadRouteAirspaces(elevProfile, params.cruiseAltFt);
 
     const totalReserveL = (reserveMin / 60) * params.fuelBurnLph;

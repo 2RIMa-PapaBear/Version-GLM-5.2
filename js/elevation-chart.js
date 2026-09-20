@@ -1,4 +1,5 @@
 import { themeTokens } from './night-mode.js';
+import { state } from './core.js';
 import { horLabel, isRdpZone } from './airspace-profile.js';
 /* ================================================================
  * ELEVATION CHART — Profil d'élévation interactif (canvas)
@@ -26,6 +27,7 @@ let _fromIcao = '';
 let _toIcao = '';
 let _waypoints = null;        // [{icao, lat, lon}] waypoints intermédiaires (ou null).
 let _zones = null;            // groupes d'espaces aériens traversés (airspace-profile.js).
+let _noTerrain = false;       // profil SANS relief (service saturé) → bandeau visible (20/09).
 let _hoverFrac = null;       // position du curseur (0-1), null si hors canvas.
 let _hoverY = null;          // ordonnée du curseur (px CSS), pour le survol des zones.
 let _zoomMax = null;         // plafond de l'échelle Y (ft), null = auto ; la base est fixée au sol.
@@ -55,6 +57,7 @@ export function renderElevationChart(containerId, profile, cruiseAltFt, fromIcao
 
     container.style.display = 'block';
     _profile = profile;
+    _noTerrain = !!profile.noTerrain;   // profil de repli : bandeau de panne (20/09)
     _cruiseFt = cruiseAltFt || 0;
     _waypoints = (waypoints && waypoints.length > 2) ? waypoints : null;
     _zones = routeAirspaces || null;
@@ -222,6 +225,30 @@ function _draw() {
     _ctx.strokeStyle = '#FB923C';
     _ctx.lineWidth = 1.8;
     _ctx.stroke();
+
+    // --- Panne du service de relief (20/09) : bandeau AMBRE visible — le
+    // graphe est un REPLI interpolé entre les élévations des terrains, pas
+    // du vrai relief ---
+    if (_noTerrain) {
+        const fr = state.lang !== 'en';
+        const txt = fr ? 'Relief momentanément indisponible (service saturé), réessayez plus tard'
+                       : 'Terrain temporarily unavailable (service saturated), try again later';
+        _ctx.font = '600 11px "DM Sans", sans-serif';
+        const tw = _ctx.measureText(txt).width;
+        const bw = tw + 22, bh = 22;
+        const bx = PAD.left + (plotW - bw) / 2, by = PAD.top + 6;
+        _ctx.fillStyle = 'rgba(245,158,11,0.16)';
+        _ctx.strokeStyle = 'rgba(245,158,11,0.7)';
+        _ctx.lineWidth = 1;
+        _ctx.beginPath();
+        if (_ctx.roundRect) _ctx.roundRect(bx, by, bw, bh, 6);
+        else _ctx.rect(bx, by, bw, bh);
+        _ctx.fill(); _ctx.stroke();
+        _ctx.fillStyle = '#D97706';
+        _ctx.textAlign = 'center';
+        _ctx.fillText(txt, bx + bw / 2, by + 15);
+        _ctx.textAlign = 'left';
+    }
 
     // --- Ligne altitude de croisière ---
     if (_cruiseFt > yMin && _cruiseFt < yMax) {

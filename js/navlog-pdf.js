@@ -1857,6 +1857,24 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr, CH = 128) {
         doc.text(`${Math.round(pr.cruiseAltFt)} ft`, xR - 4, yc - 4, { align: 'right' });
     }
 
+    // Panne du service de relief (20/09, retour pilote) : le graphe est un
+    // REPLI interpolé entre les élévations des terrains — bandeau ambre
+    // VISIBLE en haut du graphe, jamais une disparition silencieuse.
+    if (pr.noTerrain) {
+        const msg = fr ? 'RELIEF MOMENTANÉMENT INDISPONIBLE (SERVICE SATURÉ), RÉESSAYEZ PLUS TARD'
+                       : 'TERRAIN TEMPORARILY UNAVAILABLE (SERVICE SATURATED), TRY AGAIN LATER';
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(6);
+        const tw = doc.getTextWidth(msg);
+        const bw = tw + 14, bh = 13;
+        const bx = Math.max(xL, (xL + xR - bw) / 2), by = yT + 5;
+        doc.setFillColor(254, 243, 199);          // amber-100
+        doc.setDrawColor(217, 119, 6);            // amber-600
+        doc.setLineWidth(0.7);
+        doc.roundedRect(bx, by, bw, bh, 2.5, 2.5, 'FD');
+        _setInk(doc, [180, 83, 9]);               // amber-700
+        doc.text(msg, bx + bw / 2, by + 9, { align: 'center' });
+    }
+
     // Codes waypoints : rangement gauche → droite, 2e rangée en cas de
     // collision, puis filet (part du code) + pastille en haut du cadre.
     wpLabels.forEach(l => {
