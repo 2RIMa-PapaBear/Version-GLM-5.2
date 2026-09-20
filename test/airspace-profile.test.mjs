@@ -123,6 +123,32 @@ test('computeRouteAirspaces : entrées invalides → null', () => {
     assert.equal(computeRouteAirspaces(ROUTE, []), null);
 });
 
+// (20/09, retour pilote PDF) Doublons d'étiquettes sur le profil :
+// ① items d'un même organisme portant des fréquences de VALEURS différentes
+//   (ex. deux APP publiées) — l'ancienne clé « fréquence|nom » créait DEUX
+//   groupes « LA ROCHELLE » → TMA LA ROCHELLE 1/3 étiquetées deux fois ;
+// ② zones sans fréquence (D 18 A3) présentes en géométries openAIP
+//   doublées → deux segments chevauchants du même secteur.
+test('computeRouteAirspaces : organisme à fréquences différentes → UN groupe ; géométries doublées → UN segment (doublons PDF 20/09)', () => {
+    const items = [
+        zone('TMA LA ROCHELLE 1', '127.815', 1000, 5500, SQ(0.3, 0.5), 'LA ROCHELLE INFORMATION'),
+        zone('TMA LA ROCHELLE 3', '127.215', 1000, 5500, SQ(0.5, 0.7), 'LA ROCHELLE INFORMATION'),
+        // Zone D sans fréquence, géométrie doublée (items chevauchants) :
+        zone('D 18 A3', null, 0, 3000, SQ(0.15, 0.35)),
+        zone('D 18 A3', null, 0, 3000, SQ(0.18, 0.33)),
+    ];
+    const gs = computeRouteAirspaces(ROUTE, items);
+    // « LA ROCHELLE INFO » : UN groupe malgré les deux fréquences.
+    const tma = gs.filter(g => g.name === 'LA ROCHELLE INFO');
+    assert.equal(tma.length, 1, `un seul groupe LA ROCHELLE INFO (reçu : ${tma.length})`);
+    assert.ok(['127.815', '127.215'].includes(tma[0].freq), 'fréquence conservée (première non nulle)');
+    assert.equal(tma[0].segs.length, 2, 'secteurs 1 et 3, un segment chacun');
+    // « D 18 A3 » : UN groupe, UN segment fusionné (chevauchement).
+    const dz = gs.filter(g => g.name === 'D 18 A3');
+    assert.equal(dz.length, 1, `un seul groupe D 18 A3 (reçu : ${dz.length})`);
+    assert.equal(dz[0].segs.length, 1, `géométries doublées fusionnées (${dz[0].segs.length} segments)`);
+});
+
 test('computeRouteAirspaces : filtre altitude du vol (croisière 3500 ft, tolérance 500)', () => {
     const items = [
         zone('CTR RENNES', '120.500', 0, 1500, SQ(0.5, 1.5), 'RENNES TWR'),        // SOUS le vol → écartée

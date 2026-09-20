@@ -375,15 +375,21 @@ export function _dropOpenAipDuplicates(items, sia) {
         .replace(/\s+PARTIE\s+(?=[A-Z0-9.]+$)/, ' ')
         .replace(/\b0+(\d)/g, '$1')   // « DINARD 01 » ≡ « DINARD 1 » (retour pilote 09/09)
         .replace(/\s+/g, ' ').trim();
+    // (20/09, retour pilote « priorité SIA ») Séparateurs de secteur : le SIA
+    // écrit « TMA AQUITAINE 2-1 » quand openAIP écrit « TMA AQUITAINE 2.1 » —
+    // clé COLLÉE (alphanumérique seul) pour rapprocher les deux graphies,
+    // sinon la copie openAIP survit et la zone se dessine deux fois.
+    const glued = (n) => norm(n).replace(/[^A-Z0-9]/g, '');
     const siaNames = new Set();
     for (const z of sia) {
         const n = String(z.name || '').toUpperCase();
         siaNames.add(n);
         siaNames.add(norm(z.name));
+        siaNames.add(glued(z.name));
     }
     const siaRdp = new Set(sia.map(z => _rdpKey(z.name)).filter(Boolean));
     return items.filter(z => sia.includes(z)
-        || !(siaNames.has(String(z.name || '').toUpperCase()) || siaNames.has(norm(z.name)) || siaRdp.has(_rdpKey(z.name))));
+        || !(siaNames.has(String(z.name || '').toUpperCase()) || siaNames.has(norm(z.name)) || siaNames.has(glued(z.name)) || siaRdp.has(_rdpKey(z.name))));
 }
 
 async function _loadCellsGrid(minLat, minLon, maxLat, maxLon) {

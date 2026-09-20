@@ -8,7 +8,7 @@ import { collectFileInputs, computeFileTiles, showFlightFile } from './flight-fi
 import { getVacIndexInfo, getVacConsultedTs } from './vac-viewer.js';
 import { getLastMetarObsMs } from './data-age.js';
 import { getLastNotamFetchTs } from './notam.js';
-import { drawNavLogPdf, drawNotamAnnex, drawFileCover, drawWeatherPage, drawVacPages } from './navlog-pdf.js';
+import { drawNavLogPdf, drawNotamAnnex, drawFileCover, drawWeatherPage, drawVacPages, drawElevationProfilePage } from './navlog-pdf.js';
 import { getSelectedNotams, getCurrentNotams } from './notam.js';
 import { computeWb, resolveLoads, normalizeEnvelope } from './wb-core.js';
 import { makeCollapsible } from './collapsible.js';
@@ -746,6 +746,14 @@ async function _generateNavLogPdfInto(tab, { file = false, local = false } = {})
         }
     }
     _notamAnnexe();
+    // ---- (20/09, retour pilote) Page DÉDIÉE au profil d'élévation : format
+    // PAYSAGE, graphe sur toute la largeur, insérée JUSTE AVANT la carte de
+    // vol. Uniquement en dossier complet AVEC route (le vol local n'a pas
+    // de profil) ; chaque source dégrade seule.
+    if (file && profile) {
+        try { drawElevationProfilePage(doc, profile); }
+        catch (e) { console.warn('page profil d\u2019élévation ignorée :', e.message); }
+    }
     // ---- B7 : carte de vol (« carte de secours ») en DERNIÈRE page —
     // ajoutée APRÈS la remontée garde/météo pour rester en fin de dossier.
     // Cadrage = la route seule (sémantique « Cadrer plan ») ; alternates et
