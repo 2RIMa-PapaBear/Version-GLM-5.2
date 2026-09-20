@@ -499,6 +499,9 @@ async function _search(body, planRoute) {
     again.style.cssText = 'margin:8px 0;padding:6px 12px;font-size:12px;';
     again.textContent = tr ? 'Actualiser' : 'Refresh';
     body.innerHTML = rendered;
+    // Le résumé suit le dossier réellement affiché (sinon « Aucun plan actif. »
+    // reste figé au-dessus d'un dossier de zone généré — retour pilote 20/09).
+    _refreshSummary();
     // B2 (AZBA) + tuile NOTAM du dossier de vol : le dossier vient d'arriver
     // — on prévient APRÈS le rendu des cases (le compte de la tuile lit la
     // SÉLECTION ; dispatch avant innerHTML = course perdue = « Aucun dossier
@@ -659,7 +662,11 @@ function _refreshSummary() {
         : ` (+${excluded.length}${breakdown ? (anyUntyped ? ` ${isFr() ? 'dont' : 'incl.'} ${breakdown}` : ` ${unit} ${isFr() ? 'dont' : 'incl.'} ${breakdown}`) : ` ${unit}`})`;
     el.textContent = (Array.isArray(clean) ? clean.length : false)
         ? (isFr() ? `Trajet : ${clean.join(' → ')}${exclTxt} · demi-couloir 15 NM · rayon AD 30 NM · ${flTxt} · VFR` : `Route: ${clean.join(' → ')}${exclTxt} · corridor 15 NM · AD radius 30 NM · ${flTxt} · VFR`)
-        : (isFr() ? 'Aucun plan actif.' : 'No active plan.');
+        : (state.requestedIcao
+            ? (isFr()
+                ? `Vol local — dossier du terrain ${state.requestedIcao} et de sa zone (${getRadiusNm()} NM) via « Actualiser ».`
+                : `Local flight — dossier for ${state.requestedIcao} and its area (${getRadiusNm()} NM) via “Refresh”.`)
+            : (isFr() ? 'Aucun plan actif.' : 'No active plan.'));
 }
 
 // Montage : le panneau apparaît avec le planificateur (mode Navigation).
