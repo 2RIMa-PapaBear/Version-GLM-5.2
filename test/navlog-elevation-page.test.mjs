@@ -120,8 +120,7 @@ describe('page dédiée profil d\u2019élévation (20/09)', () => {
             'deux traversées disjointes = deux étiquettes (comportement conservé)');
     });
 
-    test('activités LONGUES des zones R/D/P : repli sur 2 lignes MAX, jamais une seule ligne longue (retour pilote 20/09)', () => {
-        const ACT = 'Activités spécifiques défense, tirs, bombardements, activités aériennes diverses';
+    test('activités LONGUES des zones R/D/P : repli sur 2 lignes MAX, jamais une seule ligne longue (retour pilote 20/09)', () => {        const ACT = 'Activités spécifiques défense, tirs, bombardements, activités aériennes diverses';
         const pr = JSON.parse(JSON.stringify(sample.perf.profile));
         pr.routeAirspaces = [{
             name: 'R 147', up: 1500, lo: 800, freq: null,
@@ -157,5 +156,25 @@ describe('page dédiée profil d\u2019élévation (20/09)', () => {
         // Le contenu est bien réparti : les mots-clés se retrouvent sur l'ensemble des lignes.
         assert.ok(/d[ée]fense|activit[ée]s/i.test(subs.map(x => x.l).join(' ')),
             `activité identifiable dans ${JSON.stringify(subs.map(x => x.l))}`);
+    });
+
+    test('panne du service de relief : bandeau VISIBLE sur la page dédiée (retour pilote 20/09)', () => {
+        const pr2 = JSON.parse(JSON.stringify(sample.perf.profile));
+        pr2.noTerrain = true;
+        const t5 = [];
+        const P5 = class extends jsPDF {
+            constructor(o) {
+                super(o);
+                const dT = this.text.bind(this);
+                this.text = (t, x, y, op) => {
+                    (Array.isArray(t) ? t.map(String) : String(t).split('\n')).forEach(l => { if (l) t5.push(l); });
+                    return dT(t, x, y, op);
+                };
+            }
+        };
+        const d5 = drawNavLogPdf(P5, { ...sample, perf: { ...sample.perf, profile: pr2 } });
+        drawElevationProfilePage(d5, pr2);
+        assert.ok(t5.some(l => /RELIEF MOMENTAN[ÉE]MENT INDISPONIBLE/.test(l)),
+            'bandeau « Relief momentanément indisponible » rendu sur la page');
     });
 });

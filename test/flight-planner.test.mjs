@@ -26,6 +26,7 @@ import {
     TAXI_MIN_DEP, TAXI_MIN_ARR, INTEGRATION_MIN,
     computeLeg2Fuel,
     withUnusableFuel,
+    _fallbackProfile,
 } from '../js/flight-planner.js';
 
 describe('withUnusableFuel (inutilisable du manuel de vol — 19/09, navigations)', () => {
@@ -308,5 +309,38 @@ describe('computeLeg2Fuel (projet deux étapes sans plein)', () => {
         assert.equal(computeLeg2Fuel({ distNm: 50, tasKt: 0, fuelBurnLph: 18, reserveMin: 30 }), null);
         assert.equal(computeLeg2Fuel({ tasKt: 100, fuelBurnLph: 18, reserveMin: 30 }), null);   // ni distance ni durée
         assert.equal(computeLeg2Fuel({ distNm: 0, localMin: 0, tasKt: 100, fuelBurnLph: 18, reserveMin: 30 }), null);
+    });
+});
+
+// (20/09, retour pilote) Profil de REPLI « sans relief » : service
+// d'élévation saturé (HTTP 429 Open-Meteo) → le profil reste affiché,
+// interpolé entre les élévations officielles des terrains, drapeau
+// noTerrain pour le bandeau de panne écran + PDF.
+describe('_fallbackProfile (repli sans relief, 20/09)', () => {
+    test('interpolation extrémités + étapes : points réguliers, lat/lon suivis, drapeau', () => {
+        const pr = _fallbackProfile([
+            { lat: 47.60, lon: -3.10, elevFt: 150 },
+            { lat: 48.60, lon: -1.00, elevFt: 250 },
+        ]);
+        assert.equal(pr.noTerrain, true, 'drapeau posé');
+        assert.ok(pr.points.length >= 8, `points réguliers (${pr.points.length})`);
+        assert.ok(pr.points[0].frac === 0 && pr.points.at(-1).frac === 1, 'frac 0 → 1');
+        assert.equal(pr.points[0].elevFt, 150);
+        assert.equal(pr.points.at(-1).elevFt, 250);
+        assert.ok(pr.points.every(p => Number.isFinite(p.lat) && Number.isFinite(p.lon)),
+            'lat/lon présents (zones aériennes calculables)');
+        assert.equal(pr.minFt, 150); assert.equal(pr.maxFt, 250);
+        assert.ok(pr.distTotalKm > 180 && pr.distTotalKm < 220, `distance LFRV→LFOO plausible (${pr.distTotalKm} km)`);
+    });
+
+    test('3 terrains (multi-étapes) : l’étape intermédiaire est un point du profil', () => {
+        const pr = _fallbackProfile([
+            { lat: 47.6, lon: -3.1, elevFt: 100 },
+            { lat: 48.1, lon: -2.0, elevFt: 400 },
+            { lat: 48.6, lon: -1.0, elevFt: 200 },
+        ]);
+        assert.equal(pr.maxFt, 400);
+        const mid = pr.points.find(p => Math.abs(p.elevFt - 400) < 1 && p.frac > 0.2 && p.frac < 0.8);
+        assert.ok(mid, 'sommet = l’étape intermédiaire');
     });
 });
