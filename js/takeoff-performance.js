@@ -666,6 +666,8 @@ export function evaluateLandingFromRaw(icao, metar) {
 
     // Vent du brut (vrai) → piste PRÉVUE magnétique (correction déclinaison).
     let headwindKt = null;
+    let crosswindKt = null;
+    let crosswindSide = null;
     let activeName = null;
     const mW = String(metar.raw || '').match(/\b(\d{3}|VRB)(\d{2,3})(?:G\d{2,3})?KT\b/);
     const wind = mW ? { dir: mW[1] === 'VRB' ? null : parseInt(mW[1], 10), speed: parseInt(mW[2], 10) } : null;
@@ -675,7 +677,13 @@ export function evaluateLandingFromRaw(icao, metar) {
         const sel = selectBestRunway(apt.runways, wind, null, dec);
         if (sel?.active) {
             const magWindDir = (((wind.dir - dec) % 360) + 360) % 360;
-            headwindKt = Math.round(wind.speed * Math.cos((magWindDir - sel.active.hdg) * Math.PI / 180));
+            const angle = (magWindDir - sel.active.hdg) * Math.PI / 180;
+            headwindKt = Math.round(wind.speed * Math.cos(angle));
+            const xw = Math.round(wind.speed * Math.sin(angle));
+            if (Math.abs(xw) >= 1) {
+                crosswindKt = Math.abs(xw);
+                crosswindSide = xw > 0 ? 'D' : 'G';   // sin > 0 = vent de droite
+            }
             activeName = sel.active.name;
         }
     }
@@ -686,7 +694,7 @@ export function evaluateLandingFromRaw(icao, metar) {
         headwindKt: headwindKt ?? 0, surfaceCode, wet, contaminated,
     });
     if (!corr) return null;
-    return _landingVerdict(icao, daResult, corr, headwindKt, activeName, true);
+    return _landingVerdict(icao, daResult, corr, headwindKt, activeName, true, { crosswindKt, crosswindSide });
 }
 
 // Cache session des atterrissages de destination (10 min) — le widget se

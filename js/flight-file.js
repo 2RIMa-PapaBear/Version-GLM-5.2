@@ -310,6 +310,13 @@ export async function showFlightFile(forceIcao) {
     const inp = await collectFileInputs();
     const t = computeFileTiles(inp);
 
+    // Bouton « Imprimer » (19/09) : navigation → destination choisie ;
+    // vol local → dossier PDF « vol local » déverrouillé quand toutes les
+    // rubriques sont AU VERT, la VAC exceptée (facultative — retour pilote).
+    const printReady = inp.mode === 'nav'
+        ? !!inp.dest
+        : ['weather', 'notam', 'fuel', 'perf', 'wb'].every(k => t[k]?.status === 'ok');
+
     // ---- Tuile VAC : une ligne par terrain à VAC, bouton « Voir ».
     const vacRows = t.vac.items.map(v => {
         const seen = getVacConsultedTs(v.icao);
@@ -359,11 +366,20 @@ export async function showFlightFile(forceIcao) {
                 ? 'Vue de préparation — chaque rubrique doit être verte avant le vol. Cliquez sur une tuile pour aller à sa rubrique. La VAC est attestée à son ouverture et jointe au PDF du dossier ; le dossier NOTAM n\u2019est jamais mis en cache.'
                 : 'Preparation view — every tile should be green before flight. Click a tile to jump to its section. VAC is attested on opening and attached to the dossier PDF; the NOTAM briefing is never cached.'}
         </div>
-        ${inp.mode === 'nav' && inp.dest ? `
-        <button id="ff-print" class="btn-primary" style="margin-top:10px; height:26px; padding:0 12px; font-size:12px;">
+        <button id="ff-print" class="btn-primary" ${printReady ? '' : 'disabled'}
+            title="${inp.mode === 'nav'
+                ? (printReady
+                    ? (isFr ? 'Générer le PDF du dossier de vol (log de nav + VAC + NOTAM).' : 'Generate the flight file PDF (nav log + VAC + NOTAM).')
+                    : (isFr ? 'Choisissez une destination pour générer le PDF du dossier (log de nav + VAC + NOTAM).' : 'Set a destination to generate the flight file PDF (nav log + VAC + NOTAM).'))
+                : (printReady
+                    ? (isFr ? 'Imprimer le dossier de vol local (page de garde, log terrain, météo, NOTAM, carte, VAC, centrage).' : 'Print the local flight file (cover, field log, weather, NOTAM, map, VAC, balance).')
+                    : (isFr
+                        ? 'Le dossier s\u2019imprime quand les rubriques Météo, NOTAM, Carburant, Perfs et Centrage sont au vert — la VAC est facultative.'
+                        : 'The dossier prints once Weather, NOTAM, Fuel, Runway perf and Balance tiles are green — VAC is optional.'))}"
+            style="margin-top:10px; height:26px; padding:0 12px; font-size:12px;">
             <i data-lucide="printer" style="width:13px;height:13px;vertical-align:-2px;"></i>
             ${isFr ? 'Imprimer le dossier de vol' : 'Print flight file'}
-        </button>` : ''}
+        </button>
     `;
 
     body.querySelectorAll('button[data-vac]').forEach(btn => {

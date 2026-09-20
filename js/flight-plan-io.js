@@ -38,11 +38,12 @@ export function readCurrentPlan() {
     const wps = [];
     const wpInput = document.getElementById('fp-waypoints');
     // Le champ affiche les VRAIS noms des repères libres : le parse partagé
-    // restitue les codes (OACI ou ZZxx) du plan.
+    // restitue les codes du plan (OACI ou nom-slug du repère — 19/09, plus
+    // de ZZxx).
     const codes = wpInput ? parseWaypointsField(wpInput.value) : [];
     for (const code of codes) {
         const apt = getAirportByICAO(code);
-        if (/^ZZ[A-Z]{2}$/.test(code) && apt?.lat != null) {
+        if (apt?.freeWp && apt?.lat != null) {
             // Repère libre : conserve nom + position pour une restitution fidèle.
             wps.push({ name: apt.name || code, lat: apt.lat, lon: apt.lon });
         } else {
@@ -286,11 +287,11 @@ function _resolvePoint(p) {
     document.dispatchEvent(new CustomEvent('restore-free-waypoint', {
         detail: { lat: p.lat, lon: p.lon, name: (p.name || '').trim().slice(0, 24) || 'WPT' },
     }));
-    return null;   // le code ZZxx sera lu depuis le registre au moment de poser la liste
+    return null;   // le code (nom du repère) sera lu depuis le registre au moment de poser la liste
 }
 
 // Extrémité GPX/KML : code OACI connu, sinon le repère libre VENANT d'être
-// créé (son code ZZxx est annoncé de façon synchrone par l'événement).
+// créé (son code, dérivé du nom, est annoncé de façon synchrone).
 function _resolveEndpoint(p) {
     return _resolvePoint(p) || _createdCodes[_createdCodes.length - 1] || null;
 }
@@ -322,7 +323,7 @@ export function restorePlan(planOrPoints, settings = null) {
     _createdCodes = [];
 
     // Repères libres d'abord : chaque dispatch crée le marqueur et annonce
-    // son code ZZxx dans l'ordre (événement synchrone 'free-waypoint-created'
+    // son code (nom) dans l'ordre (événement synchrone 'free-waypoint-created'
     // — ou file d'attente de la carte si elle n'est pas encore initialisée).
     for (const w of (plan.wps || [])) {
         if (w && typeof w.lat === 'number' && typeof w.lon === 'number') {

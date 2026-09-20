@@ -126,13 +126,18 @@ export function flattenFirList(list) {
     return out;
 }
 
-/** Codes des repères libres (clic droit carte) : des points UTILES AU PLAN
- * mais inconnus de SOFIA — les envoyer au PIB fait répondre HTTP 400. */
-const FREE_WP_RE = /^ZZ[A-Z]{2}$/;
+/** Codes des repères libres (clic droit carte, points VFR) : des points
+ *  UTILES AU PLAN mais inconnus de SOFIA — les envoyer au PIB fait
+ *  répondre HTTP 400. Identifiés par leur drapeau freeWp au memo (le code
+ *  d'un repère est son NOM depuis le 19/09 — plus de regex ZZxx : un slug
+ *  peut ressembler à un OACI, seul le drapeau est fiable). */
+export function _isFreeWp(code) {
+    return memoGet(String(code || '').toUpperCase())?.freeWp === true;
+}
 
-/** Nature lisible d'un ZZxx exclu : VOR / NDB / point VFR quand le repère
- *  vient de la couche radiophares (fréquence typée conservée au memo),
- *  repère libre sinon (posé au clic droit). Retourne le libellé FR et EN. */
+/** Nature lisible d'un repère libre exclu : VOR / NDB / point VFR quand le
+ *  repère vient de la couche radiophares (fréquence typée conservée au
+ *  memo), repère libre sinon (posé au clic droit). Retourne FR et EN. */
 export function _freeWpNature(code) {
     const f = memoGet(code)?.frequencies?.[0]?.type;
     if (f === 'VOR') return { fr: 'VOR', en: 'VOR' };
@@ -172,7 +177,7 @@ export function _excludedItems(codes, t) {
 /** Construit le payload relais depuis l'état du plan (pur, testable). */
 export function buildPibRequest(route, opts = {}) {
     const clean = (route || []).map(c => String(c || '').toUpperCase().trim())
-        .filter(c => /^[A-Z][A-Z0-9]{3}$/.test(c) && !FREE_WP_RE.test(c));
+        .filter(c => /^[A-Z][A-Z0-9]{3}$/.test(c) && !_isFreeWp(c));
     return {
         route: clean,
         validFrom: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
@@ -454,10 +459,10 @@ async function _search(body, planRoute) {
     body.innerHTML = `<p style="font-size:12px;">${tr ? 'Recherche du dossier NOTAM…' : 'Fetching NOTAM…'}</p>`;
     const local = !!planRoute._local;
     // Repères libres exclus du dossier : SOFIA ne connaît que des terrains —
-    // un code ZZxx dans la route fait échouer toute la requête (HTTP 400).
-    const excluded = local ? [] : planRoute.filter(c => FREE_WP_RE.test(String(c || '').toUpperCase()));
+    // un point libre dans la route fait échouer toute la requête (HTTP 400).
+    const excluded = local ? [] : planRoute.filter(c => _isFreeWp(c));
     const route = local ? planRoute.icaos
-        : planRoute.filter(c => !FREE_WP_RE.test(String(c || '').toUpperCase()));
+        : planRoute.filter(c => !_isFreeWp(c));
     const excludedDetails = excluded.length ? _excludedItems(excluded, tr) : null;
     let pib;
     if (local) {
@@ -640,8 +645,8 @@ function _refreshSummary() {
             : `${r} NM zone around ${route.icaos[0]} · ${flTxt} · VFR`;
         return;
     }
-    const excluded = Array.isArray(route) ? route.filter(c => FREE_WP_RE.test(String(c || '').toUpperCase())) : [];
-    const clean = Array.isArray(route) ? route.filter(c => !FREE_WP_RE.test(String(c || '').toUpperCase())) : route;
+    const excluded = Array.isArray(route) ? route.filter(c => _isFreeWp(c)) : [];
+    const clean = Array.isArray(route) ? route.filter(c => !_isFreeWp(c)) : route;
     // « (+2 repères libres dont 1 VOR, 1 point VFR) » : la nature des exclus
     // est détaillée quand ils viennent de la couche radiophares.
     const breakdown = excluded.length ? _excludedBreakdown(excluded, isFr()) : null;

@@ -1,7 +1,7 @@
 import { state, escapeHtml, fetchAvecRelais, memoGet } from './core.js';
 import { getAirportByICAO, enrichAirport } from './ui-module.js';
 import { getActiveAircraftId, getActiveAircraft, getFleet, updateAircraft, usableFuelOf } from './aircraft-fleet.js';
-import { getActiveRunwayNameForIcao, evaluateTakeoffFromRaw, evaluateLandingAtDestination, fetchTafWithFallback, getAircraftRef } from './takeoff-performance.js';
+import { getActiveRunwayNameForIcao, evaluateTakeoffFromRaw, evaluateLandingFromRaw, evaluateLandingAtDestination, fetchTafWithFallback, getAircraftRef } from './takeoff-performance.js';
 import { showTakeoffWidget } from './takeoff-ui.js';
 import { showFrequenciesWidget } from './frequencies-ui.js';
 import { collectFileInputs, computeFileTiles, showFlightFile } from './flight-file.js';
@@ -283,14 +283,60 @@ async function _generateNavLogPdf(opts = {}) {
 }
 
 /** PDF UNIQUE du dossier de vol (B1 phase 2) : le bouton du panneau
- *  « Dossier de vol » (flight-file.js, import dynamique anti-cycle). */
+ *  « Dossier de vol » (flight-file.js, import dynamique anti-cycle).
+ *  Vol local (retour pilote 19/09) : même organisation de dossier, log
+ *  réduit au terrain (en-tête + devis local, tronçons vierges). */
 export function printFlightFile() {
     const isFr = state.lang === 'fr';
-    _confirmNavLogPdf(isFr, { file: true }).then(ok => { if (ok) _generateNavLogPdf({ file: true }); });
+    const local = !(typeof document !== 'undefined' && document.body?.classList.contains('mode-nav'));
+    _confirmNavLogPdf(isFr, { file: true, local }).then(ok => { if (ok) _generateNavLogPdf({ file: true, local }); });
 }
 
-async function _generateNavLogPdfInto(tab, { file = false } = {}) {
-    const stash = state._lastNavPlan;
+async function _generateNavLogPdfInto(tab, { file = false, local = false } = {}) {
+    let stash = state._lastNavPlan;
+    if (local) {
+        // VOL LOCAL : plan synthétique terrain → terrain. Le dossier garde
+        // l'organisation de la navigation (garde / log / météo / NOTAM /
+        // carte / VAC / centrage) ; le log se réduit à l'en-tête (QNH, vent,
+        // piste, durée) et au devis carburant local — les tronçons restent
+        // VIERGES, remplis à la main pour les tours de piste.
+        const icao = String(state.requestedIcao || '').toUpperCase();
+        const apt = getAirportByICAO(icao);
+        const memo = memoGet(icao);
+        const lat = memo?.lat ?? apt?.lat ?? null;
+        const lon = memo?.lon ?? apt?.lon ?? null;
+        if (!/^[A-Z][A-Z0-9]{3}$/.test(icao) || lat == null || lon == null) return;
+        const ac0 = getActiveAircraft() || {};
+        const burn = ac0.fuelBurnLph ?? 35;
+        // Même formule que le devis du widget Centrage / la tuile Carburant.
+        const min = parseInt(document.getElementById('wb-local-min')?.value, 10) || 0;
+        const reserveMin = 10 + (ac0.reserveExtraMin || 0);
+        const unusableL = (ac0.unusableFuelL > 0) ? ac0.unusableFuelL : 0;
+        const r1 = (v) => Math.round(v * 10) / 10;
+        const tripL = r1(min / 60 * burn);
+        const groundL = r1(10 / 60 * burn);
+        const reserveL = r1(reserveMin / 60 * burn);
+        stash = {
+            plan: {
+                from: { icao, lat, lon, elevFt: apt?.elevation ?? null },
+                to: { icao, lat, lon, elevFt: apt?.elevation ?? null },
+                distanceNm: null, distanceKm: null,
+                trueCourse: null, magHeading: null, trueHeading: null,
+                wind: null, windCorrection: {}, groundSpeed: null,
+                legTimeMin: min,
+                fuel: {
+                    tripFuelL: tripL, groundMin: 10, groundL,
+                    reserveMin, reserveL, unusableL,
+                    totalL: r1(tripL + groundL + reserveL + unusableL),
+                    diversionL: 0, diversion: null,
+                },
+                cruiseAltFt: null, tasKt: null, declination: null,
+                elevationProfile: null, obstacles: [], clearance: null,
+                routeAirspaces: null, waypoints: null, legs: null,
+            },
+            tas: null, alt: null, burn, isNight: false, isFr: state.lang === 'fr',
+        };
+    }
     if (!stash?.plan) return;
     const { plan, tas } = stash;
     if (!window.jspdf?.jsPDF) { console.warn('jsPDF indisponible (vendor/jspdf.umd.min.js)'); return; }
@@ -356,7 +402,8 @@ async function _generateNavLogPdfInto(tab, { file = false } = {}) {
     };
 
     let remain = totalNm;
-    const rows = legs.map((lg, i) => {
+    // Vol local : table des tronçons VIERGE (tours de piste à la main).
+    const rows = local ? [] : legs.map((lg, i) => {
         const rm = ((Math.round((lg.trueCourse ?? 0) - decl) % 360) + 360) % 360;
         const row = {
             from: _wpDisplayName(lg.from.icao), to: _wpDisplayName(lg.to.icao),
@@ -389,6 +436,9 @@ async function _generateNavLogPdfInto(tab, { file = false } = {}) {
     };
     const calc = {
         isFr: state.lang === 'fr',
+        // Vol local (19/09) : la page « Calcul de navigation » est SAUTÉE
+        // (sans route elle n'a pas d'objet) — drapeau lu par drawNavLogPdf.
+        local,
         fromIcao, toIcao,
         fromName: getAirportByICAO(fromIcao)?.name || fromIcao,
         toName: getAirportByICAO(toIcao)?.name || toIcao,
@@ -458,6 +508,33 @@ async function _generateNavLogPdfInto(tab, { file = false } = {}) {
         }
     }
 
+    // Vol local (19/09) : ATTERRISSAGE sur le MÊME terrain, calculé comme le
+    // décollage sur le METAR frais récupéré ci-dessus — la coupe se dessine
+    // sous celle de décollage (page Performances). Références POH atterrissage
+    // de la flotte requises (ldgRoll/ldgFifty).
+    let landing = null;
+    if (local && qnh != null && oat != null) {
+        const l = evaluateLandingFromRaw(fromIcao, {
+            raw: metarRaw, qnh, oat,
+            elevationFt: getSiaAirfield(fromIcao)?.elevFt ?? getAirportByICAO(fromIcao)?.elevation ?? null,
+        });
+        if (l) {
+            // Même convention que le verdict écran : franchissement 50 ft
+            // MAJORÉ +20 % avant LDA, marge = piste − franchissement majoré.
+            const fiftyMarginedFt = Math.round(l.fiftyFt * 1.2);
+            landing = {
+                da: l.da,
+                rollM: FT_TO_M(l.rollFt), fiftyM: FT_TO_M(fiftyMarginedFt),
+                runwayLengthM: l.runwayLength != null ? FT_TO_M(l.runwayLength) : null,
+                marginM: l.margin != null ? FT_TO_M(l.margin) : null,
+                level: l.level, message: l.message,
+                headwindKt: l.headwindKt, crosswindKt: l.crosswindKt ?? null, crosswindSide: l.crosswindSide ?? null,
+                rwy: l.runwayName, forecast: l.forecast,
+                refLabel: (ac.ldgRoll && ac.ldgFifty) ? `${FT_TO_M(ac.ldgRoll)}/${FT_TO_M(ac.ldgFifty)}` : '—',
+            };
+        }
+    }
+
     // Profil d'élévation : mêmes points que le graphique écran ; les waypoints
     // intermédiaires sont localisés par le point de profil le plus proche.
     let profile = null;
@@ -487,10 +564,14 @@ async function _generateNavLogPdfInto(tab, { file = false } = {}) {
     // Alternates viables à ± 25 NM de la route (départ → waypoints → dest.),
     // tous aérodromes (openAIP) — METAR de la station la plus proche si le
     // terrain n'en émet pas (marqué « * » dans le PDF).
-    const routePts = (isMulti && plan.waypoints?.length)
-        ? plan.waypoints.map(w => ({ icao: w.icao, lat: w.lat, lon: w.lon }))
-        : [plan.from, plan.to].map(a => ({ icao: a.icao, lat: a.lat, lon: a.lon }));
-    const altRows = await getEnRouteAlternates(routePts, 25, 8).catch(() => null);
+    // Vol local : route réduite au terrain (carte centrée sur le champ et
+    // ses terrains de déroutement) ; navigation : départ → étapes → dest.
+    const routePts = local
+        ? [plan.from]
+        : (isMulti && plan.waypoints?.length)
+            ? plan.waypoints.map(w => ({ icao: w.icao, lat: w.lat, lon: w.lon }))
+            : [plan.from, plan.to].map(a => ({ icao: a.icao, lat: a.lat, lon: a.lon }));
+    const altRows = await getEnRouteAlternates(routePts, 25, local ? 6 : 8).catch(() => null);
     let alternates = null;
     if (altRows?.length) {
         alternates = {
@@ -508,7 +589,7 @@ async function _generateNavLogPdfInto(tab, { file = false } = {}) {
             })),
         };
     }
-    const perf = { isFr: isFr3, fromIcao, toIcao, runway, takeoff, profile, alternates };
+    const perf = { isFr: isFr3, fromIcao, toIcao, runway, takeoff, profile, alternates, landing };
 
     // Centrage : si l'avion actif a un bloc wb configuré (fenêtre Flotte),
     // la page 4 « Centrage » est ajoutée — chargement mémorisé s'il existe,
@@ -610,7 +691,9 @@ async function _generateNavLogPdfInto(tab, { file = false } = {}) {
             const n0 = doc.getNumberOfPages();
             drawFileCover(doc, {
                 isFr: isFr3, generatedLabel,
-                routeLabel: `${fromIcao} - ${toIcao}${state.diversionIcao ? ` · ${isFr3 ? 'dégagement' : 'alt.'} ${state.diversionIcao}` : ''}`,
+                routeLabel: local
+                    ? `${fromIcao} · ${isFr3 ? 'vol local' : 'local flight'}`
+                    : `${fromIcao} - ${toIcao}${state.diversionIcao ? ` · ${isFr3 ? 'dégagement' : 'alt.'} ${state.diversionIcao}` : ''}`,
                 aircraftLabel: `${ac.name || ''}${ac.registration ? ' (' + ac.registration + ')' : ''}`.trim() || '—',
                 rows, vac: tiles.vac.items.map(v => ({ icao: v.icao, ts: getVacConsultedTs(v.icao), jointe: vacPagesData.some(x => x.icao === v.icao) })),
                 vacAirac: vacInfo.airac,
@@ -650,7 +733,7 @@ async function _generateNavLogPdfInto(tab, { file = false } = {}) {
             if (state.diversionIcao && state.diversionIcao !== toIcao) {
                 await addTafBlock(isFr3 ? 'Déroutement' : 'Alternate', state.diversionIcao);
             }
-            await addTafBlock(isFr3 ? 'Arrivée' : 'Destination', toIcao);
+            await addTafBlock(local ? (isFr3 ? 'Terrain' : 'Field') : (isFr3 ? 'Arrivée' : 'Destination'), toIcao);
             drawWeatherPage(doc, { isFr: isFr3, generatedLabel, dep, terrains });
             // ORDRE PILOTE 16/09 : garde / log / météo / NOTAM. La garde et
             // la météo sont générées à la suite du log — une SEULE remontée
@@ -700,7 +783,9 @@ async function _generateNavLogPdfInto(tab, { file = false } = {}) {
             const mapData = await buildFlightMapData({
                 isFr: isFr3,
                 generatedLabel: new Date().toLocaleString([], { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-                routeLabel: `${fromIcao} - ${toIcao}${state.diversionIcao ? ` · ${isFr3 ? 'dégagement' : 'alt.'} ${state.diversionIcao}` : ''}`,
+                routeLabel: local
+                    ? `${fromIcao} · ${isFr3 ? 'vol local' : 'local flight'}`
+                    : `${fromIcao} - ${toIcao}${state.diversionIcao ? ` · ${isFr3 ? 'dégagement' : 'alt.'} ${state.diversionIcao}` : ''}`,
                 route: mapRoute,
                 alternates: mapAlts,
                 notams: getCurrentNotams(),
@@ -723,7 +808,7 @@ async function _generateNavLogPdfInto(tab, { file = false } = {}) {
     }
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const filename = file
-        ? `Dossier_${fromIcao}-${toIcao}_${today}.pdf`
+        ? (local ? `Dossier_${fromIcao}_local_${today}.pdf` : `Dossier_${fromIcao}-${toIcao}_${today}.pdf`)
         : `Log-nav_${fromIcao}-${toIcao}_${today}.pdf`;
     // Le PDF s'ouvre dans un onglet, dans une PAGE HTML HABILLÉE : il y est
     // embarqué en <iframe src="data:application/pdf;base64,…">. En HTTPS le
@@ -737,7 +822,9 @@ async function _generateNavLogPdfInto(tab, { file = false } = {}) {
             const dataUri = doc.output('datauristring');
             const blobUrl = URL.createObjectURL(doc.output('blob'));
         const title = (file
-            ? (isFr3 ? `Dossier de vol ${fromIcao}-${toIcao}` : `Flight file ${fromIcao}-${toIcao}`)
+            ? (local
+                ? (isFr3 ? `Dossier de vol local ${fromIcao}` : `Local flight file ${fromIcao}`)
+                : (isFr3 ? `Dossier de vol ${fromIcao}-${toIcao}` : `Flight file ${fromIcao}-${toIcao}`))
             : (isFr3 ? `Log de nav ${fromIcao}-${toIcao}` : `Nav log ${fromIcao}-${toIcao}`))
             + (typeof carteOmise === 'string' ? carteOmise : '');
             tab.document.open();
@@ -1210,7 +1297,7 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
 // complet, {file:true}) : rappelle que le document est calculé automatiquement
 // et liste ce que le pilote doit vérifier avant de l'utiliser en vol.
 // Promesse → true si l'utilisateur confirme.
-function _confirmNavLogPdf(isFr, { file = false } = {}) {
+function _confirmNavLogPdf(isFr, { file = false, local = false } = {}) {
     return new Promise(resolve => {
         document.getElementById('navlog-confirm-modal')?.remove();
         const modal = document.createElement('div');
@@ -1219,7 +1306,19 @@ function _confirmNavLogPdf(isFr, { file = false } = {}) {
         modal.setAttribute('role', 'dialog');
         modal.setAttribute('aria-modal', 'true');
 
-        const items = isFr ? [
+        // Vol local (19/09) : vérifications pertinentes d'un circuit — pas de
+        // caps / Z sécu / Tsv qui n'existent pas sans route.
+        const items = local ? (isFr ? [
+            ['clock', '<b>Durée estimée</b> — le devis carburant (durée + roulage + réserve + inutilisable) en découle'],
+            ['gauge', '<b>QNH et vent du terrain</b> — METAR capturé à l\'instant de la génération, souvent périmé au décollage'],
+            ['radio', '<b>Piste en service et fréquences</b> — à confirmer sur une carte VAC / NOTAM à jour'],
+            ['fuel', '<b>Carburant embarqué</b> — à recouper avec la jauge avant le vol'],
+        ] : [
+            ['clock', '<b>Estimated duration</b> — the fuel quote (duration + taxi + reserve + unusable) follows from it'],
+            ['gauge', '<b>Field QNH and wind</b> — METAR captured when generated, likely outdated at takeoff'],
+            ['radio', '<b>Runway in use and frequencies</b> — confirm against an up-to-date VAC chart / NOTAM'],
+            ['fuel', '<b>Fuel on board</b> — cross-check against the gauge before the flight'],
+        ]) : (isFr ? [
             ['compass', '<b>Caps (RM/CM) et dérive</b> — recalculés avec le vent <i>estimé</i> au moment du calcul, pas le vent réel'],
             ['mountain', '<b>Altitudes</b> — Z sécu (relief + 1000 ft) et altitude retenue, à confronter au relief réel et aux zones réglementées'],
             ['clock', '<b>Temps de vol (Tsv/Tav) et vitesse sol</b> — dépendants du vent réel rencontré'],
@@ -1233,7 +1332,7 @@ function _confirmNavLogPdf(isFr, { file = false } = {}) {
             ['fuel', '<b>Fuel</b> — trip and reserve to be cross-checked against the aircraft POH and actual consumption'],
             ['radio', '<b>Frequencies and runway in use</b> — confirm against an up-to-date VAC chart / NOTAM'],
             ['gauge', '<b>Departure QNH and wind</b> — METAR captured when generated, likely outdated at takeoff'],
-        ];
+        ]);
 
         modal.innerHTML = `
             <div class="modal-content" style="max-width:540px;">
@@ -1241,7 +1340,9 @@ function _confirmNavLogPdf(isFr, { file = false } = {}) {
                     <h2 style="display:flex;align-items:center;gap:10px;">
                         <i data-lucide="alert-triangle" style="width:20px;height:20px;color:#F59E0B;"></i>
                         ${file
-                            ? (isFr ? 'Dossier de vol — à vérifier avant impression' : 'Flight file — verify before printing')
+                            ? (local
+                                ? (isFr ? 'Dossier de vol local — à vérifier avant impression' : 'Local flight file — verify before printing')
+                                : (isFr ? 'Dossier de vol — à vérifier avant impression' : 'Flight file — verify before printing'))
                             : (isFr ? 'À vérifier avant d\'imprimer' : 'Verify before printing')}
                     </h2>
                     <button class="btn-close-modal" data-cancel title="${isFr ? 'Annuler' : 'Cancel'}" aria-label="${isFr ? 'Annuler' : 'Cancel'}"><i data-lucide="x"></i></button>
@@ -1249,8 +1350,12 @@ function _confirmNavLogPdf(isFr, { file = false } = {}) {
                 <div class="modal-body" style="font-size:12.5px; line-height:1.55; color:var(--text-color);">
                     <p style="margin:0 0 10px 0;">
                         ${isFr
-                            ? 'Ce log de nav est <b>généré automatiquement</b> à partir des données du planificateur (vent Open-Meteo estimé à l\'altitude de croisière, relief, performances saisies). Ces valeurs sont une <b>aide à la préparation, pas une garantie</b>. Avant tout usage en vol, vérifiez chaque valeur :'
-                            : 'This nav log is <b>generated automatically</b> from the flight planner data (estimated Open-Meteo wind at cruise altitude, terrain, entered performance). These values are a <b>preparation aid, not a guarantee</b>. Before any in-flight use, verify every value:'}
+                            ? (local
+                                ? 'Ce dossier de vol local est <b>généré automatiquement</b> (METAR, NOTAM, devis carburant du widget Centrage). Ces valeurs sont une <b>aide à la préparation, pas une garantie</b>. Avant le vol, vérifiez chaque valeur :'
+                                : 'Ce log de nav est <b>généré automatiquement</b> à partir des données du planificateur (vent Open-Meteo estimé à l\'altitude de croisière, relief, performances saisies). Ces valeurs sont une <b>aide à la préparation, pas une garantie</b>. Avant tout usage en vol, vérifiez chaque valeur :')
+                            : (local
+                                ? 'This local flight file is <b>generated automatically</b> (METAR, NOTAM, fuel quote from the Balance widget). These values are a <b>preparation aid, not a guarantee</b>. Before the flight, verify every value:'
+                                : 'This nav log is <b>generated automatically</b> from the flight planner data (estimated Open-Meteo wind at cruise altitude, terrain, entered performance). These values are a <b>preparation aid, not a guarantee</b>. Before any in-flight use, verify every value:')}
                     </p>
                     <div style="display:flex; flex-direction:column; gap:7px; margin:0 0 10px 0;">
                         ${items.map(([icon, txt]) => `
@@ -1352,13 +1457,9 @@ function _renderError(container, from, to, isFr) {
 // le code restant technique (permalien, pipeline).
 // Exporté pour navlog-pdf via le sample (rows/waypoints portent `name`).
 export function _wpDisplayName(code) {
-    if (!/^ZZ[A-Z]{2}$/.test(code)) return code;
-    const apt = getAirportByICAO(code);
-    const n = (apt?.name || '').trim();
-    if (!n || n === code) return code;
-    // Premier mot utile, majuscules, ≤ 9 caractères (colonnes du log).
-    const first = n.split(/\s+/)[0].replace(/[^\w-]/g, '');
-    return (first || code).toUpperCase().slice(0, 9);
+    // Le code d'un repère libre EST son nom (slug, 19/09 — plus de ZZxx) :
+    // rien à traduire, le code s'affiche tel quel.
+    return code;
 }
 
 // Le champ Waypoints affiche les VRAIS noms des repères libres (VOR, NDB,
@@ -1368,15 +1469,17 @@ export function _wpDisplayName(code) {
 let _resolveFreeWpToken = null;
 export function registerFreeWpResolver(fn) { _resolveFreeWpToken = fn; }
 
-/** Valeur du champ Waypoints → codes (OACI ou ZZxx), sans doublon.
- *  Un token invalide qui ne résout aucun repère connu est écarté. */
+/** Valeur du champ Waypoints → codes (OACI ou nom-slug du repère libre),
+ *  sans doublon. Un token invalide qui ne résout aucun repère connu est
+ *  écarté. Les codes de repères (issus du nom : « RV-E », « LOR »…) ne
+ *  sont PAS des OACI 4 lettres — tiret et 2-10 caractères admis. */
 export function parseWaypointsField(value) {
     const out = [];
     for (const t of String(value || '').toUpperCase().split(/\s+/)) {
         if (!t) continue;
         if (/^[A-Z][A-Z0-9]{3}$/.test(t)) { out.push(t); continue; }
         const code = _resolveFreeWpToken?.(t);
-        if (code && /^[A-Z][A-Z0-9]{3}$/.test(code)) out.push(code);
+        if (code && /^[A-Z0-9][A-Z0-9-]{0,9}$/.test(code)) out.push(code);
     }
     return [...new Set(out)];
 }
@@ -1391,20 +1494,20 @@ export function formatWaypointsField(codes) {
 function _renderInputs(from, to, fromName, toName, alt, tas, burn, isNight, isFr) {
     const waypointsValue = (state.route && state.route.length > 2)
         ? formatWaypointsField(state.route.slice(1, -1)) : '';
-    // Liste lisible des étapes : code + nom de l'aérodrome (ou nom du repère),
-    // avec crayon de renommage pour les repères libres (pseudo-codes ZZxx).
+    // Liste lisible des étapes : code + nom de l'aérodrome (ou nom complet
+    // du repère), crayon de renommage pour les repères libres (code = nom).
     const wps = (state.route && state.route.length > 2) ? state.route.slice(1, -1) : [];
     const wpListHtml = wps.length ? `
         <div id="fp-waypoint-list" class="fp-waypoint-list">
             ${wps.map((code, i) => {
                 const apt = getAirportByICAO(code);
                 const name = apt?.name || code;
-                const renamable = /^ZZ[A-Z]{2}$/.test(code);
-                const display = renamable ? _wpDisplayName(code) : code;
+                const renamable = !!apt?.freeWp;
+                const display = code;
                 return `<div class="fp-wp-row">
                     <span class="fp-wp-num">${i + 1}.</span>
                     <span class="fp-wp-code">${escapeHtml(display)}</span>
-                    ${renamable && display !== name ? `<span class="fp-wp-name">${escapeHtml(name)}</span>` : (renamable ? '' : `<span class="fp-wp-name">${escapeHtml(name)}</span>`)}
+                    ${!renamable || display !== name ? `<span class="fp-wp-name">${escapeHtml(name)}</span>` : ''}
                     ${renamable ? `<button class="fp-wp-rename" data-icao="${escapeHtml(code)}" title="${isFr ? 'Renommer ce repère' : 'Rename this waypoint'}"><i data-lucide="pencil" style="width:12px;height:12px;"></i></button>` : ''}
                     <button class="fp-wp-del" data-icao="${escapeHtml(code)}" title="${isFr ? 'Retirer ce waypoint du plan' : 'Remove this waypoint from the plan'}"><i data-lucide="x" style="width:12px;height:12px;"></i></button>
                 </div>`;

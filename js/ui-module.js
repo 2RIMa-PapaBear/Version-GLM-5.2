@@ -12,9 +12,23 @@ let AIRPORTS = [];
 let AIRPORTS_BY_ICAO = new Map();
 
 function rebuildIndex() {
+    // PRÉSERVE les entrées ajoutées au RUNTIME absentes de la base (repères
+    // libres — code = nom, aérodromes découverts openAIP) : la base se charge en
+    // ASYNCHRONE et un plan restauré au démarrage enregistre ses repères
+    // AVANT qu'elle finisse — sans cette garde, la reconstruction de l'index
+    // les effaçait et le log PDF retombait sur les codes bruts au lieu
+    // des noms (retour pilote 19/09).
+    const inDb = new Set(AIRPORTS.map(a => a && a.icao && a.icao.toUpperCase()));
+    const runtimeKeep = [];
+    for (const [k, v] of AIRPORTS_BY_ICAO) {
+        if (!inDb.has(k)) runtimeKeep.push([k, v]);
+    }
     AIRPORTS_BY_ICAO = new Map();
     for (const a of AIRPORTS) {
         if (a && a.icao) AIRPORTS_BY_ICAO.set(a.icao.toUpperCase(), a);
+    }
+    for (const [k, v] of runtimeKeep) {
+        if (!AIRPORTS_BY_ICAO.has(k)) AIRPORTS_BY_ICAO.set(k, v);
     }
 }
 
@@ -75,6 +89,16 @@ export function enrichAirport(icao, enriched) {
     const existing = AIRPORTS_BY_ICAO.get(key) || {};
 
     AIRPORTS_BY_ICAO.set(key, { ...existing, ...enriched, icao: key });
+}
+
+/** Retire une entrée de l'index (repère libre supprimé ou re-clé lors d'un
+ *  renommage : son code est désormais dérivé de son NOM — plus de ZZxx). */
+export function forgetAirport(icao) {
+    if (!icao) return;
+    const key = icao.toUpperCase();
+    AIRPORTS_BY_ICAO.delete(key);
+    const i = AIRPORTS.findIndex(a => a && a.icao && a.icao.toUpperCase() === key);
+    if (i >= 0) AIRPORTS.splice(i, 1);
 }
 
 export function sanitizeStorage() {
@@ -645,9 +669,8 @@ function _acGlobalClickHandler(e) {
     });
 }
 
-let synth = null;
-export function lireMETAR(t) { if ('speechSynthesis' in window) { synth = window.speechSynthesis; synth.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = state.lang === 'fr' ? 'fr-FR' : 'en-US'; u.rate = 0.9; synth.speak(u); } }
-export function stopAudio() { if (synth) synth.cancel(); }
+// (19/09) Lecture audio METAR/TAF supprimée (retour pilote) : boutons
+// « Lire » / « Stop » et synthèse vocale retirés de l'interface.
 
 export function toggleLanguage() { setLanguage(state.lang === 'fr' ? 'en' : 'fr'); if (state.refreshCallback) state.refreshCallback(); }
 
@@ -661,7 +684,7 @@ export function setLanguage(l) {
     // Textes statiques d'index.html (header, panneaux latéraux, légende carte...).
     const dict = {
         'lbl-source': tr.lblSource, 'lbl-aero-hours': tr.lblAeroHours,
-        'btn-add-favorite': tr.btnAddFavorite, 'btn-read-metar': tr.btnReadMetar, 'btn-stop-audio': tr.btnStopAudio,
+        'btn-add-favorite': tr.btnAddFavorite,
         'lbl-favoris-title': tr.favorisTitle, 'footer-warning': tr.footerWarning,
         'leg-clr': tr.legClr, 'leg-few': tr.legFew, 'leg-sct': tr.legSct, 'leg-bkn': tr.legBkn, 'leg-ovc': tr.legOvc, 'leg-vv': tr.legVv,
         'ui-title': tr.uiTitle, 'lbl-notice': tr.noticeBtn,

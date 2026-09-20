@@ -47,7 +47,7 @@ const HIDDEN_SELECTORS = [
     '#frequencies-widget',       // fréquences (déjà connues au briefing)
     '#alternates-container',     // alternates (déjà décidé)
     '#flight-planner-panel',     // planner
-    '.audio-controls',           // boutons audio/PDF (déjà faits)
+    '.audio-controls',           // bascule départ/destination (décision faite au briefing)
 ];
 
 /**

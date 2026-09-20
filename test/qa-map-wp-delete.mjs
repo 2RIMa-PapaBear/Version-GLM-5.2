@@ -1,6 +1,6 @@
 // QA SUPPRESSION DEPUIS L ÉTIQUETTE (17/09) : le « × » des points de passage
 // sur la carte — waypoints de route (data-icao → event remove-waypoint) et
-// repères libres ZZxx (data-code → _deleteFreeWaypoint). Clics SOURIS RÉELS
+// repères libres (data-code → _deleteFreeWaypoint). Clics SOURIS RÉELS
 // sur le bouton : valide aussi le pointer-events:auto du tooltip Leaflet.
 // PIÈGE recouvrement : selon le cadrage, une étiquette passe SOUS la barre
 // d en-tête de la carte ou la commande bas-gauche — on glisse la carte (vrai
