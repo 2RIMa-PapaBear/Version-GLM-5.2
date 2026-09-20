@@ -786,7 +786,7 @@ const _omPending = new Map();
 const _OM_DELAY = 1500;
 const _OM_RETRY_BASE = 3000;
 const _OM_FRESH_MS = 5 * 60 * 1000;        // cache mémoire : 5 min (fraîcheur)
-const _OM_STALE_MS = 60 * 60 * 1000;       // rétention persistante : 1 h (20/09)
+const _OM_STALE_MS = 30 * 60 * 1000;       // rétention persistante : 30 min (choix pilote 20/09)
 const _OM_IDB = 'openmeteo:v1';            // cache IndexedDB (par IP, survit au rechargement)
 
 /** Cache persistant des réponses Open-Meteo (20/09, consigne pilote « option 1 ») :
@@ -828,7 +828,7 @@ export async function fetchOpenMeteo(url) {
 
     if (_omPending.has(url)) return _omPending.get(url);
 
-    // Cache persistant : une réponse de moins d'une heure évite LA requête
+    // Cache persistant : une réponse de moins de 30 min évite LA requête
     // (l'appel réseau ne part que si rien n'est connu côté IP).
     const persisted = await _omIdbGet(url);
     if (persisted && Date.now() - persisted.ts < _OM_STALE_MS) {
