@@ -40,6 +40,16 @@ export async function fetchRouteElevation(fromLat, fromLon, toLat, toLon, sample
     const cached = _cache.get(key);
     if (cached && Date.now() - cached.ts < TTL_MS) return cached.profile;
 
+    // Cache persistant (20/09) : une route déjà calculée dans les 24 h est
+    // resservie telle quelle, même si les sources de relief tombent ensuite.
+    try {
+        const persisted = await _idbGetProfile(key);
+        if (persisted?.profile && Date.now() - persisted.ts < TTL_MS) {
+            _cache.set(key, { profile: persisted.profile, ts: persisted.ts });
+            return persisted.profile;
+        }
+    } catch { /* IndexedDB indisponible : réseau seul */ }
+
     try {
 
         const lats = [];
@@ -110,11 +120,43 @@ export async function fetchRouteElevation(fromLat, fromLon, toLat, toLon, sample
         };
 
         _cache.set(key, { profile, ts: Date.now() });
+        // Persistance (20/09, consigne pilote) : une navigation déjà faite
+        // reste consultable même si les sources de relief tombent ensuite.
+        _idbPutProfile(key, profile).catch(() => {});
         return profile;
     } catch (e) {
         console.warn('Route elevation fetch failed:', e.message);
         return null;
     }
+}
+
+// Cache persistant IndexedDB des profils déjà calculés (mémoire seule
+// sinon) — lecture en tête de fetchRouteElevation.
+const _IDB_NAME = 'route-elevation:v1';
+async function _idbPutProfile(key, profile) {
+    const db = await new Promise((res, rej) => {
+        const r = indexedDB.open(_IDB_NAME, 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('cache', { keyPath: 'key' });
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+    });
+    const tx = db.transaction('cache', 'readwrite');
+    tx.objectStore('cache').put({ key, profile, ts: Date.now() });
+}
+async function _idbGetProfile(key) {
+    try {
+        const db = await new Promise((res, rej) => {
+            const r = indexedDB.open(_IDB_NAME, 1);
+            r.onupgradeneeded = () => r.result.createObjectStore('cache', { keyPath: 'key' });
+            r.onsuccess = () => res(r.result);
+            r.onerror = () => rej(r.error);
+        });
+        return await new Promise((res) => {
+            const t = db.transaction('cache').objectStore('cache').get(key);
+            t.onsuccess = () => res(t.result || null);
+            t.onerror = () => res(null);
+        });
+    } catch { return null; }
 }
 
 export function evaluateClearance(profile, cruiseAltFt, minClearanceFt = 1000, obstacles = null) {
