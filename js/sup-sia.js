@@ -20,7 +20,7 @@ import { state } from './core.js';
 
 import { makeCollapsible } from './collapsible.js';
 
-import { getAirportByICAO } from './ui-module.js';
+import { getAirportByICAO, getAirportsInBbox } from './ui-module.js';
 
 // Chemin RELATIF au canal (PAS bigDataUrl : sa redirection racine-prod ne
 // vaut que pour les données volumineuses partagées cells/VAC — sur /test/,
@@ -192,6 +192,7 @@ function _render(data) {
     // Accepte l enveloppe {generatedAt, items} OU le tableau brut (les
     // appelants historiques passaient les deux — un filter sur l enveloppe
     // jetait silencieusement via le .catch de l init).
+    if (data) _lastData = data;
     const items = Array.isArray(data) ? data : (data?.items || []);
     const isFr = state.lang === 'fr';
     const body = _panel?.querySelector('.sup-body');
@@ -199,14 +200,23 @@ function _render(data) {
     const dayIso = new Date().toISOString().slice(0, 10);
     const isNav = document.body.classList.contains('mode-nav');
     // Vol local (retour pilote 20/09) : le terrain observé tient lieu de plan —
-    // son ICAO et les régions couvertes par sa position alimentent la même
-    // mise en avant « votre vol » qu'en navigation.
+    // son ICAO, les régions couvertes par sa position ET les terrains du
+    // voisinage (≤ 50 NM, piste ≥ 1 000 m — même filtre que les pastilles) :
+    // une ZRT « à proximité de l'AD LFRH » doit remonter quand l'app est
+    // ouverte sur LFRV.
     const icaos = isNav ? planIcaos() : (state.requestedIcao ? [state.requestedIcao] : []);
     let regs = isNav ? planRegions() : [];
     if (!isNav && state.requestedIcao) {
         const apt = getAirportByICAO(state.requestedIcao);
         if (apt && Number.isFinite(apt.lat) && Number.isFinite(apt.lon)) {
             regs = regionsForPoint(apt.lat, apt.lon);
+            const R_KM = 50 * 1.852;                        // voisinage 50 NM
+            const dLat = R_KM / 111.32;
+            const dLon = R_KM / (111.32 * Math.max(0.3, Math.cos(apt.lat * Math.PI / 180)));
+            const voisins = getAirportsInBbox(apt.lat - dLat, apt.lon - dLon, apt.lat + dLat, apt.lon + dLon);
+            for (const v of voisins) {
+                if (v.icao !== state.requestedIcao && !icaos.includes(v.icao)) icaos.push(v.icao);
+            }
         }
     }
     const q = _filters.q.trim().toLowerCase();
@@ -248,6 +258,7 @@ function _render(data) {
         </div>`;
     }).join('')
         : `<div class="sup-empty">${isFr ? 'Aucune Sup ne correspond aux filtres.' : 'No SUP matches the filters.'}</div>`;
+    _renduPourIcao = state.requestedIcao || null;
 }
 
 function _esc(s) {
@@ -307,10 +318,17 @@ export async function initSupPanel() {
 }
 
 let _lastData = null;
+let _renduPourIcao = null; // terrain observé pour lequel le panneau a été rendu
 
 /** Re-rendu quand le plan change (mise en avant « votre vol »). */
 if (typeof document !== 'undefined') {
     document.addEventListener('route-changed', async () => {
         if (_panel && _lastData) _render(_lastData);
+    });
+    // Vol local : le terrain OBSERVÉ a changé (retour pilote 20/09) — re-rendu
+    // avec sa pertinence, sinon le panneau reste sans « votre vol ».
+    document.addEventListener('airport-changed', (e) => {
+        const icao = e.detail?.icao || null;
+        if (_panel && _lastData && icao && icao !== _renduPourIcao) _render(_lastData);
     });
 }
