@@ -154,12 +154,19 @@ function _cell(doc, x, yc, w, h, label, value, opt = {}) {
             lines = doc.splitTextToSize(lab, usable);
             size -= 0.5;
         } while (lines.length > 2 && size >= 4.5);
-        doc.text(lines, x + 7, yc + 7.5, { lineHeightFactor: 1.2 });
+        // Libellé REPLIÉ sur 2 lignes : bloc remonté et resserré — la VALEUR
+        // descend d'autant (retour pilote 19/09 : quelques px d'air entre
+        // l'annotation repliée et le chiffre, la cellule gagne en lisibilité ;
+        // largeur des cadres inchangée).
+        doc.text(lines, x + 7, yc + 6.5, { lineHeightFactor: 1.15 });
     }
     doc.setFontSize(6.5);
     doc.setFont('courier', 'bold'); doc.setFontSize(opt.size || 10.5);
     _setInk(doc, opt.color || INK);
-    doc.text(_trunc(doc, value ?? '—', w - 14), x + 7, yc + h - 7);
+    // Valeur : baseline un cran plus basse quand le libellé occupe deux
+    // lignes — l'écart annotation/chiffre reste lisible dans l'olive.
+    const wrap = !uneLigne;
+    doc.text(_trunc(doc, value ?? '—', w - 14), x + 7, yc + h - (wrap ? 5 : 7));
 }
 
 // Section .fp-section : filet supérieur + titre majuscule grisé éventuel.
@@ -605,15 +612,17 @@ function _drawCalcPage(doc, c) {
     y += 33;
 
     // ---- Ligne carburant : Trajet / [Dégagement] / Roulage+intégration /
-    // Réserve / [Inutilisable] / Total requis ----
+    // Réserve / [Inut.] / Total requis ----
     y = section(null, y);
     const uL = c.fuel?.unusableL || 0;
     if (c.fuel?.divIcao && uL > 0) {
         // 6 olives : Roulage + intégr. et Dégagement prioritaires (libellés
-        // longs — même garde-fou _cell que retour pilote 18/09).
+        // longs — même garde-fou _cell que retour pilote 18/09). « Inut. »
+        // (libellé raccourci 19/09 soir) cède de la place à « Roulage +
+        // intégr. », le plus long de la ligne.
         const total = W - 5 * 12;
-        const wts = [0.7, 1.1, 1.05, 0.85, 0.95, 1.1];
-        const ws = wts.map(t => total * t / 5.75);
+        const wts = [0.6, 1.05, 1.25, 0.95, 0.6, 1.2];
+        const ws = wts.map(t => total * t / 5.65);
         const xAt = (i) => L + ws.slice(0, i).reduce((a, b) => a + b, 0) + i * 12;
         cell(xAt(0), y, ws[0], 29, fr ? 'Trajet' : 'Trip', `${c.fuel?.tripL ?? '—'} L`, { size: 9.5 });
         cell(xAt(1), y, ws[1], 29, `${fr ? 'Dégagement' : 'Alternate'} ${c.fuel.divIcao}`,
@@ -622,7 +631,7 @@ function _drawCalcPage(doc, c) {
             `${c.fuel?.groundL ?? 0} L`, { size: 9.5 });
         cell(xAt(3), y, ws[3], 29, `${fr ? 'Réserve' : 'Reserve'} (${c.fuel?.reserveMin ?? ''} min)`,
             `${c.fuel?.reserveL ?? '—'} L`, { size: 9.5 });
-        cell(xAt(4), y, ws[4], 29, fr ? 'Inutilisable' : 'Unusable', `${uL} L`, { size: 9.5 });
+        cell(xAt(4), y, ws[4], 29, fr ? 'Inut.' : 'Unus.', `${uL} L`, { size: 9.5 });
         cell(xAt(5), y, ws[5], 29, fr ? 'Total requis' : 'Total req.',
             `${c.fuel?.totalL ?? '—'} L`, { color: BLUE, size: 12 });
     } else if (c.fuel?.divIcao) {
@@ -642,12 +651,17 @@ function _drawCalcPage(doc, c) {
         cell(xAt(4), y, ws[4], 29, fr ? 'Total requis' : 'Total req.',
             `${c.fuel?.totalL ?? '—'} L`, { color: BLUE, size: 12 });
     } else if (uL > 0) {
-        const fw = (W - 4 * 12) / 5;
-        cell(L, y, fw, 29, fr ? 'Trajet' : 'Trip', `${c.fuel?.tripL ?? '—'} L`);
-        cell(L + fw + 12, y, fw, 29, `${fr ? 'Roulage + intégr.' : 'Taxi + integ.'} (${c.fuel?.groundMin ?? 0} min)`, `${c.fuel?.groundL ?? 0} L`);
-        cell(L + 2 * (fw + 12), y, fw, 29, `${fr ? 'Réserve' : 'Reserve'} (${c.fuel?.reserveMin ?? ''} min)`, `${c.fuel?.reserveL ?? '—'} L`);
-        cell(L + 3 * (fw + 12), y, fw, 29, fr ? 'Inutilisable' : 'Unusable', `${uL} L`);
-        cell(L + 4 * (fw + 12), y, fw, 29, fr ? 'Total requis' : 'Total req.', `${c.fuel?.totalL ?? '—'} L`, { color: BLUE, size: 12 });
+        // 5 olives sans dégagement : « Inut. » (raccourci) cède aussi là sa
+        // place à « Roulage + intégr. » (retour pilote 19/09 soir).
+        const fwInut = (W - 4 * 12);
+        const wts5 = [1, 1.3, 0.95, 0.6, 1.15];
+        const ws5 = wts5.map(t => fwInut * t / 5);
+        const xAt5 = (i) => L + ws5.slice(0, i).reduce((a, b) => a + b, 0) + i * 12;
+        cell(xAt5(0), y, ws5[0], 29, fr ? 'Trajet' : 'Trip', `${c.fuel?.tripL ?? '—'} L`);
+        cell(xAt5(1), y, ws5[1], 29, `${fr ? 'Roulage + intégr.' : 'Taxi + integ.'} (${c.fuel?.groundMin ?? 0} min)`, `${c.fuel?.groundL ?? 0} L`);
+        cell(xAt5(2), y, ws5[2], 29, `${fr ? 'Réserve' : 'Reserve'} (${c.fuel?.reserveMin ?? ''} min)`, `${c.fuel?.reserveL ?? '—'} L`);
+        cell(xAt5(3), y, ws5[3], 29, fr ? 'Inut.' : 'Unus.', `${uL} L`);
+        cell(xAt5(4), y, ws5[4], 29, fr ? 'Total requis' : 'Total req.', `${c.fuel?.totalL ?? '—'} L`, { color: BLUE, size: 12 });
     } else {
         const fw = (W - 3 * 12) / 4;
         cell(L, y, fw, 29, fr ? 'Trajet' : 'Trip', `${c.fuel?.tripL ?? '—'} L`);
