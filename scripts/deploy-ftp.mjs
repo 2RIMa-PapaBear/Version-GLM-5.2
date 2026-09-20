@@ -34,6 +34,7 @@ const STATE_PATH = path.join(ROOT, 'deploy.state.json');
 const ALLOWED = [
     'index.html', 'accueil.html', 'sw.js', 'manifest.webmanifest', 'favicon.ico', 'icon.svg',
     'notice-fr.html', 'notice-en.html',
+    'robots.txt', 'sitemap.xml', 'og-image.png',
     'js/', 'css/', 'vendor/', 'data/', 'assets/accueil/',
 ];
 // … sauf les CELLULES openAIP (voir ci-dessous). vendor/pdfjs a rejoint la

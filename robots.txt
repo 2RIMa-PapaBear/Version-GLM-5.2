@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://papabear56.pages-perso.free.fr/sitemap.xml
