@@ -12,7 +12,7 @@ import {
     initAutocomplete, handleInput, handleScroll, toggleLanguage, setLanguage,
     updateFinalUI, _hideDashboard, addToHistory, toggleFavorite,
     updateHighlights, getAirportByICAO, _selectAndFetch, enrichAirport,
-    getStartupFavorite
+    getStartupFavorite, initGeoDepart
 } from './ui-module.js';
 import { initTheme, toggleTheme } from './night-mode.js';
 import { dataAgeUpdate, initDataAge } from './data-age.js';
@@ -1124,5 +1124,14 @@ document.addEventListener('DOMContentLoaded', async function () {
             if (input) input.value = icaoToLoad;
             setTimeout(() => telechargerMessage('metar'), 300);
         }
+        // Si la géolocalisation est déjà accordée : affine ensuite vers la station
+        // la plus proche (le terrain de repli s'affiche d'abord — l'app ne doit
+        // jamais s'ouvrir vide — puis l'affinage géoloc prend le relais une fois
+        // le point GPS obtenu, sans écraser un choix déjà fait par le pilote).
+        initGeoDepart(icaoToLoad, (icao) => {
+            const input = document.getElementById('icaoInput');
+            if (input) input.value = icao;
+            telechargerMessage('metar');
+        });
     }
 });

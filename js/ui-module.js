@@ -1,4 +1,4 @@
-import { I18N, PALETTE, UNIFIED_RED, REGEX_BLOCKS_PATTERN, parseVisiToMeters, getCeiling, findActiveValueAtHour, CAT_COLORS, catColorRgba } from './core.js';
+import { I18N, PALETTE, UNIFIED_RED, REGEX_BLOCKS_PATTERN, parseVisiToMeters, getCeiling, findActiveValueAtHour, CAT_COLORS, catColorRgba, getNearestAirport } from './core.js';
 import { state, memoGet } from './core.js';
 import { escapeHtml } from './core.js';
 import { dessinerGraphique, updateWindCompass, calculateFlightCategoryRobust, parseWindString, selectBestRunway, getForecastAtHour } from './engine.js';
@@ -81,6 +81,26 @@ export function getAirportsInBbox(minLat, minLon, maxLat, maxLon) {
             (a.longestRunway || 0) >= 1000
         )
         .map(a => ({ icao: a.icao, name: a.name, lat: a.lat, lon: a.lon }));
+}
+
+// Démarrage géolocalisé : si la permission géolocalisation est DÉJÀ accordée,
+// affine le terrain initial vers la station la plus proche. Jamais de demande
+// de permission au démarrage (intrusif) : permission « prompt » ou refusée →
+// rien ne se passe. `appliquer(icao)` est appelé au plus une fois, et seulement
+// si le pilote n'a pas déjà changé de terrain entre-temps.
+export function initGeoDepart(icaoCharge, appliquer) {
+    try {
+        navigator.permissions?.query({ name: 'geolocation' }).then((perm) => {
+            if (perm?.state !== 'granted') return;
+            navigator.geolocation.getCurrentPosition((pos) => {
+                const proche = getNearestAirport(pos.coords?.latitude, pos.coords?.longitude, AIRPORTS);
+                if (!proche?.icao || proche.icao === icaoCharge) return;
+                const input = document.getElementById('icaoInput');
+                if (!input || input.value.trim().toUpperCase() !== icaoCharge) return;
+                appliquer(proche.icao);
+            }, () => {}, { timeout: 8000, maximumAge: 300000 });
+        }).catch(() => {});
+    } catch { /* Permissions API indisponible : on garde le terrain initial */ }
 }
 
 export function enrichAirport(icao, enriched) {
