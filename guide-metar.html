@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comment lire un METAR — guide simple et complet | Prévol</title>
+<meta name="description" content="Apprenez à lire un METAR en dix minutes : vent, visibilité, nuages, QNH, temps significatifs, tendances TEMPO et BECMG. Guide pour pilotes VFR, avec deux messages réels décodés groupe par groupe.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://papabear56.pages-perso.free.fr/guide-metar.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Prévol">
+<meta property="og:title" content="Comment lire un METAR — guide simple et complet">
+<meta property="og:description" content="Vent, visibilité, nuages, QNH, tendances : apprenez à décoder n'importe quel METAR groupe par groupe, avec deux exemples réels traduits ligne à ligne.">
+<meta property="og:url" content="https://papabear56.pages-perso.free.fr/guide-metar.html">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:image" content="https://papabear56.pages-perso.free.fr/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Prévol — guide de lecture du METAR pour pilotes VFR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Comment lire un METAR — guide simple et complet">
+<meta name="twitter:description" content="Apprenez à décoder n'importe quel METAR groupe par groupe, avec deux exemples réels traduits ligne à ligne.">
+<meta name="twitter:image" content="https://papabear56.pages-perso.free.fr/og-image.png">
+<link rel="icon" href="favicon.ico" type="image/x-icon">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css?v=1.335">
+<script src="vendor/lucide.min.js?v=1.335" defer></script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "À quelle fréquence un METAR est-il publié ?",
+      "acceptedAnswer": { "@type": "Answer", "text": "En France, la plupart des aérodromes publient un METAR toutes les 30 minutes ou toutes les heures, quelques minutes après l'heure d'observation. Un METAR spécial (SPECI) peut être émis à tout moment entre deux émissions régulières si les conditions changent de façon significative." } },
+    { "@type": "Question", "name": "Que signifie CAVOK dans un METAR ?",
+      "acceptedAnswer": { "@type": "Answer", "text": "CAVOK (Ceiling And Visibility OK) remplace la visibilité, le temps significatif et les nuages lorsqu'ils sont tous favorables à la fois : visibilité de 10 km ou plus, aucun nuage en dessous de 5 000 pieds (ou sous la hauteur de section minimale), pas de cumulonimbus et aucun phénomène météo significatif." } },
+    { "@type": "Question", "name": "Que signifie le QNH, par exemple Q1015 ?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Q1015 indique un QNH de 1015 hPa : la pression ramenée au niveau de la mer, à caler sur l'altimètre au sol pour lire l'altitude de l'aérodrome. Si la valeur commence par un zéro (Q0994), la pression est inférieure à 1000 hPa." } },
+    { "@type": "Question", "name": "Quelle différence entre METAR, SPECI et TAF ?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Le METAR est l'observation régulière d'un aérodrome, le SPECI est une observation spéciale publiée entre deux METAR quand les conditions changent notablement, et le TAF est une prévision de l'évolution attendue sur 24 à 30 heures. Voir notre guide dédié au TAF." } }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Prévol", "item": "https://papabear56.pages-perso.free.fr/accueil.html" },
+    { "@type": "ListItem", "position": 2, "name": "Comment lire un METAR" }
+  ]
+}
+</script>
+<style>
+    /* Guides — réutilise le thème (variables, cartes) de css/style.css ;
+       classes préfixées .gd- sur la base des classes .acc- de accueil.html. */
+    .acc-page { max-width: 900px; margin: 0 auto; padding: 0 20px 50px; }
+    .gd-hero { position: relative; text-align: center; padding: 54px 10px 26px; overflow: hidden; }
+    .gd-hero > * { position: relative; z-index: 2; }
+    .gd-hero > img.gd-hero-bg { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 30%; }
+    .gd-hero::before { content: ''; position: absolute; inset: -40% -20% auto; height: 130%; z-index: 1;
+        background: radial-gradient(42% 55% at 38% 42%, rgba(56, 189, 248, .14), transparent 70%),
+                    radial-gradient(35% 45% at 68% 55%, rgba(45, 212, 191, .10), transparent 70%);
+        pointer-events: none; }
+    .gd-hero::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+        background: linear-gradient(180deg, rgba(7, 12, 24, .58) 0%, rgba(7, 12, 24, .74) 55%, rgba(7, 12, 24, .95) 100%); }
+    .gd-hero .gd-brand { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 18px; padding: 7px 14px;
+        border-radius: 999px; border: 1px solid var(--border-color, #334155); background: rgba(15, 23, 42, .8);
+        color: var(--primary, #38BDF8); font-size: 12px; font-weight: 600; text-decoration: none; }
+    .gd-hero .gd-brand:hover { border-color: var(--primary, #38BDF8); }
+    .gd-hero h1 { margin: 0 0 10px; font-size: 36px; font-weight: 700; letter-spacing: -0.5px; }
+    .gd-hero p { margin: 0 auto; max-width: 660px; color: var(--text-muted, #94A3B8); font-size: 14.5px; line-height: 1.65; }
+
+    .gd-body { margin-top: 8px; }
+    .gd-body h2 { margin: 38px 0 10px; font-size: 19px; }
+    .gd-body h3 { margin: 24px 0 8px; font-size: 15px; color: var(--text-color, #F8FAFC); }
+    .gd-body p, .gd-body li { color: var(--text-muted, #94A3B8); font-size: 14px; line-height: 1.75; }
+    .gd-body strong { color: var(--text-color, #F8FAFC); }
+    .gd-body a { color: var(--primary, #38BDF8); text-decoration: none; }
+    .gd-body a:hover { text-decoration: underline; }
+    .gd-body ul, .gd-body ol { padding-left: 22px; margin: 8px 0 18px; }
+
+    table.gd-t { width: 100%; border-collapse: collapse; margin: 14px 0 22px; font-size: 13px; }
+    .gd-t th, .gd-t td { text-align: left; padding: 9px 12px; border: 1px solid var(--border-color, #334155); vertical-align: top; }
+    .gd-t th { background: var(--inner-bg, #0F172A); color: var(--text-color, #F8FAFC); font-size: 12.5px; }
+    .gd-t td { color: var(--text-muted, #94A3B8); }
+    .gd-t td:first-child { font-family: 'DM Mono', monospace; color: var(--primary, #38BDF8); white-space: nowrap; }
+
+    .gd-code { font-family: 'DM Mono', monospace; font-size: 14px; color: var(--text-color, #F8FAFC);
+        background: var(--inner-bg, #0F172A); border: 1px solid var(--border-color, #334155);
+        border-radius: 10px; padding: 13px 16px; overflow-x: auto; margin: 12px 0 8px;
+        white-space: pre-wrap; word-break: break-word; }
+    .gd-code b { color: var(--primary, #38BDF8); font-weight: 500; }
+    .gd-trad { font-size: 12.5px; color: var(--text-muted, #94A3B8); margin: 0 0 20px; line-height: 1.7; }
+
+    .gd-tip { border-left: 3px solid var(--primary, #38BDF8); background: rgba(56, 189, 248, .07);
+        padding: 10px 14px; border-radius: 0 10px 10px 0; font-size: 13px; line-height: 1.7;
+        margin: 14px 0 22px; color: var(--text-color, #F8FAFC); }
+
+    .gd-faq dt { font-weight: 700; color: var(--text-color, #F8FAFC); font-size: 14px; margin-top: 18px; }
+    .gd-faq dd { margin: 5px 0 0; color: var(--text-muted, #94A3B8); font-size: 13px; line-height: 1.7; }
+
+    .gd-also { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0 0; }
+    .gd-also a { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 10px;
+        text-decoration: none; font-size: 13px; font-weight: 600;
+        background: var(--inner-bg, #0F172A); border: 1px solid var(--border-color, #334155);
+        color: var(--text-muted, #94A3B8); transition: border-color .15s, color .15s; }
+    .gd-also a:hover { border-color: var(--primary, #38BDF8); color: var(--primary, #38BDF8); }
+
+    .acc-final { margin-top: 40px; text-align: center; padding: 30px 20px; border-radius: 14px;
+        background: radial-gradient(60% 120% at 50% 0%, rgba(56, 189, 248, .12), transparent 75%), var(--inner-bg, #0F172A);
+        border: 1px solid var(--border-color, #334155); }
+    .acc-final h2 { margin: 0 0 6px; font-size: 19px; }
+    .acc-final p { margin: 0 0 18px; color: var(--text-muted, #94A3B8); font-size: 13px; }
+    .acc-go { display: inline-flex; align-items: center; gap: 10px; padding: 13px 28px; border-radius: 11px;
+        text-decoration: none; font-weight: 700; font-size: 15px;
+        background: rgba(56, 189, 248, .16); color: var(--primary, #38BDF8); border: 1px solid var(--primary, #38BDF8); }
+    .acc-go:hover { background: rgba(56, 189, 248, .30); }
+    .acc-foot { margin-top: 28px; text-align: center; font-size: 11px; color: var(--text-muted, #94A3B8); line-height: 1.7; }
+    .acc-foot a { color: var(--primary, #38BDF8); text-decoration: none; }
+    .acc-foot .warning { color: #FBBF24; }
+
+    @media (max-width: 760px) {
+        .gd-hero { padding-top: 36px; }
+        .gd-hero h1 { font-size: 27px; }
+        .acc-page { padding: 0 14px 40px; }
+        .gd-t { font-size: 12px; }
+        .gd-t th, .gd-t td { padding: 7px 8px; }
+    }
+</style>
+</head>
+<body>
+<div class="acc-page">
+
+    <div class="gd-hero">
+        <img class="gd-hero-bg" src="assets/accueil/hero.jpg" alt="" decoding="async" fetchpriority="high">
+        <a class="gd-brand" href="accueil.html"><i data-lucide="plane" style="width:14px;height:14px;"></i> Prévol — Guides météo</a>
+        <h1>Comment lire un METAR</h1>
+        <p>Le METAR est le bulletin météo de l'aérodrome, publié plusieurs fois par heure.
+           Une suite de codes énigmatique au premier regard — mais qui se lit en dix minutes
+           une fois la logique comprise. Suivez le guide.</p>
+    </div>
+
+    <div class="gd-body">
+
+        <h2>Qu'est-ce qu'un METAR ?</h2>
+        <p>Le <strong>METAR</strong> (<em>METeorological Aerodrome Report</em>) est l'observation météo
+           officielle d'un aérodrome, établie par une station au sol et publiée à heure fixe — en France,
+           généralement toutes les <strong>30 minutes</strong> pour les grands terrains, toutes les
+           <strong>heures</strong> pour les autres. Entre deux émissions, un <strong>SPECI</strong> (observation
+           spéciale) peut paraître si les conditions changent de façon notable.</p>
+        <p>C'est la photo du temps réel sur le terrain. Sa prévision d'évolution s'appelle le
+           <a href="guide-taf.html">TAF</a> — les deux se lisent ensemble au briefing.</p>
+
+        <h2>Le message, groupe par groupe</h2>
+        <p>Prenons un exemple typique et décomposons-le :</p>
+        <div class="gd-code">LFPB 201330Z 24010G20KT 9999 FEW025 18/12 Q1015 NOSIG=</div>
+        <table class="gd-t">
+            <tr><th>Groupe</th><th>Signification</th></tr>
+            <tr><td>LFPB</td><td>Code OACI du terrain — Paris-Le Bourget</td></tr>
+            <tr><td>201330Z</td><td>Observation du 20 à 13 h 30 UTC</td></tr>
+            <tr><td>24010G20KT</td><td>Vent du 240° à 10 nœuds, rafales à 20 nœuds</td></tr>
+            <tr><td>9999</td><td>Visibilité supérieure ou égale à 10 km</td></tr>
+            <tr><td>FEW025</td><td>Nuages épars (1 à 2 octas) à 2 500 ft</td></tr>
+            <tr><td>18/12</td><td>Température 18 °C, point de rosée 12 °C</td></tr>
+            <tr><td>Q1015</td><td>QNH 1015 hPa</td></tr>
+            <tr><td>NOSIG</td><td>Aucun changement significatif attendu</td></tr>
+        </table>
+        <p>Chaque groupe a une position fixe et un format codifié. Voyons-les en détail.</p>
+
+        <h3>1. Le code OACI : où ?</h3>
+        <p>Quatre lettres identifient l'aérodrome. Le premier préfixe indique le pays
+           (<strong>LF</strong> pour la France), les deux suivantes le terrain
+           (<strong>LFPB</strong> = Paris-Le Bourget, <strong>LFPO</strong> = Paris-Orly,
+           <strong>LFRB</strong> = Brest-Bretagne).</p>
+
+        <h3>2. Jour et heure : quand ?</h3>
+        <p><strong>201330Z</strong> se lit « le 20 du mois à 13 h 30 » — et le <strong>Z</strong> final
+           rappelle que tout est en <strong>UTC</strong> (heure « zulu »). En été, il faut ajouter 2 heures
+           pour l'heure française : 13 h 30 UTC = 15 h 30 locale. Réflexe indispensable au briefing :
+           toujours convertir, l'app affiche d'ailleurs les deux.</p>
+
+        <h3>3. Le vent : d'où et à quelle force ?</h3>
+        <p><strong>24010G20KT</strong> : le vent <em>souffle du</em> 240° (donc de l'ouest-sud-ouest) à
+           10 nœuds, avec <strong>rafales</strong> (<strong>G</strong> = <em>gust</em>) à 20 nœuds dès que
+           l'écart dépasse 10 kt.</p>
+        <ul>
+            <li><strong>VRB05KT</strong> : vent variable en direction, 5 kt (typique des anticyclones).</li>
+            <li><strong>00000KT</strong> : vent calme.</li>
+            <li><strong>24010G20KT 300V280</strong> : la variation d'ambiance (de 300° à 280°) apparaît en fin de groupe.</li>
+        </ul>
+        <div class="gd-tip">Comparez la direction et la force du vent à la piste en service :
+           c'est le calcul vent de travers / vent arrière qui décide de la piste utilisable et des
+           performances décollage. La rose des vents de Prévol le visualise pour chaque terrain.</div>
+
+        <h3>4. La visibilité : jusqu'où voit-on ?</h3>
+        <p>En mètres. <strong>9999</strong> signifie « 10 km ou plus » (maximum du code).
+           <strong>6000</strong> = 6 km. Sous 10 km, on peut préciser une direction
+           (<strong>8000 2000NE</strong> : 8 km partout sauf 2 km vers le nord-est).</p>
+
+        <h3>5. CAVOK : le groupe qui n'existe pas</h3>
+        <p>Lorsque tout va bien à la fois, <strong>CAVOK</strong> (<em>Ceiling And Visibility OK</em>)
+           remplace d'un coup trois groupes : visibilité ≥ 10 km, aucun nuage sous 5 000 ft (ni
+           cumulonimbus), aucun phénomène significatif. Un METAR avec CAVOK est une bonne nouvelle
+           à lire très vite.</p>
+
+        <h3>6. Le temps significatif : qu'est-ce qui tombe ?</h3>
+        <p>Ce groupe n'apparaît que s'il se passe quelque chose. Il combine jusqu'à trois éléments :</p>
+        <table class="gd-t">
+            <tr><th>Préfixe</th><th>Signification</th><th>Exemple</th></tr>
+            <tr><td>-</td><td>faible</td><td>-RA pluie faible</td></tr>
+            <tr><td>+</td><td>fort</td><td>+TS orage fort</td></tr>
+            <tr><td>VC</td><td>au voisinage (8 à 16 km)</td><td>VCSH averses voisines</td></tr>
+        </table>
+        <table class="gd-t">
+            <tr><th>Code</th><th>Phénomène</th><th>Code</th><th>Phénomène</th></tr>
+            <tr><td>RA</td><td>pluie</td><td>TS</td><td>orage</td></tr>
+            <tr><td>SN</td><td>neige</td><td>SH</td><td>averses</td></tr>
+            <tr><td>DZ</td><td>bruine</td><td>FZ</td><td>surliquéfaction (givrage)</td></tr>
+            <tr><td>BR</td><td>brume (visi 1-5 km)</td><td>FG</td><td>brouillard (visi &lt; 1 km)</td></tr>
+            <tr><td>HZ</td><td>brume sèche</td><td>GR</td><td>grêle</td></tr>
+        </table>
+        <p><strong>-RADZ</strong> se lit donc « pluie et bruine faibles » ; <strong>+TSRA</strong>
+           « orage fort avec pluie ».</p>
+
+        <h3>7. Les nuages : qu'est-ce qui couvre le ciel ?</h3>
+        <p>Deux informations par groupe : la <strong>quantité en octas</strong> et l'
+           <strong>altitude en centaines de pieds</strong> au-dessus de l'aérodrome.</p>
+        <table class="gd-t">
+            <tr><th>Code</th><th>Quantité</th><th>Exemple</th><th>Lecture</th></tr>
+            <tr><td>FEW</td><td>1-2 octas</td><td>FEW025</td><td>épars à 2 500 ft</td></tr>
+            <tr><td>SCT</td><td>3-4 octas</td><td>SCT035</td><td>fragmentés à 3 500 ft</td></tr>
+            <tr><td>BKN</td><td>5-7 octas</td><td>BKN012</td><td>couvert par endroits à 1 200 ft — c'est le plafond</td></tr>
+            <tr><td>OVC</td><td>8 octas</td><td>OVC008</td><td>couvert à 800 ft — plafond</td></tr>
+            <tr><td>NSC</td><td colspan="3">aucun nuage significatif sous 5 000 ft</td></tr>
+        </table>
+        <p>Les suffixes <strong>CB</strong> (cumulonimbus) et <strong>TCU</strong> (towering cumulus)
+           signalent les nuages dangereux : <strong>TSRA CB015</strong> est un message à prendre
+           très au sérieux. Le premier groupe <strong>BKN</strong> ou <strong>OVC</strong> définit
+           le <strong>plafond</strong>, clé de la <a href="guide-fenetre-vfr.html">fenêtre VFR</a>.</p>
+
+        <h3>8. Température et point de rosée : l'air est-il humide ?</h3>
+        <p><strong>18/12</strong> : 18 °C au sol, point de rosée 12 °C. Un préfixe
+           <strong>M</strong> indique le négatif (<strong>M06</strong> = −6 °C). L'<strong>écart</strong>
+           entre les deux vaut de l'or : resserré (2-3°), l'air est saturant — brouillard ou stratus
+           possible au petit matin, et <strong>givrage carburateur</strong> probable sur moteur à
+           carburateur. Prévol affiche d'ailleurs une zone de risque dédiée.</p>
+
+        <h3>9. Le QNH : la pression pour l'altimètre</h3>
+        <p><strong>Q1015</strong> = pression ramenée au niveau de la mer, 1015 hPa : la valeur à caler
+           sur l'altimètre au sol. Si elle commence par un zéro, la pression est sous 1000 hPa
+           (<strong>Q0994</strong> = 994 hPa) — se produit dans les dépressions profondes.</p>
+
+        <h3>10. Les tendances : et ensuite ?</h3>
+        <p>En fin de message, parfois suivies du signe « = » de fin de bulletin :</p>
+        <ul>
+            <li><strong>NOSIG</strong> : aucun changement significatif attendu — le plus beau mot du code.</li>
+            <li><strong>BECMG</strong> : évolution progressive et durable pendant la période indiquée.</li>
+            <li><strong>TEMPO</strong> : fluctuations temporaires — moins d'une heure à la fois, et au total
+                moins de la moitié de la période. <strong>TEMPO 1500</strong> : la visi tombera par instants
+                à 1 500 m, mais pas durablement.</li>
+        </ul>
+
+        <h2>Deux exemples complets décodés</h2>
+        <h3>Belle journée d'été</h3>
+        <div class="gd-code">LFPO 121130Z 20008KT 9999 SCT035 21/11 Q1021 NOSIG=</div>
+        <p class="gd-trad">Orly, le 12 à 11 h 30 UTC. Vent du 200° à 8 kt. Visibilité ≥ 10 km.
+           Nuages fragmentés à 3 500 ft. 21 °C, point de rosée 11 °C (air sec, pas d'inquiétude).
+           QNH 1021. Rien de significatif à venir : journée de vol paisible.</p>
+        <h3>Journée plus musclée</h3>
+        <div class="gd-code">LFRB 041530Z 30025G40KT 2500 -RA BKN008 OVC015 09/08 Q0988 TEMPO 1500 RA BKN004=</div>
+        <p class="gd-trad">Brest, le 4 à 15 h 30 UTC. Vent du 300° à 25 kt, rafales 40 kt — punchy.
+           Visibilité 2,5 km sous pluie faible. Plafond à 800 ft (BKN008), couche couverte à 1 500 ft.
+           9 °C, rosée 8 °C : air très humide. QNH 988 — la dépression est là. Tendance : par instants,
+           visi 1 500 m sous pluie, plafond tombant à 400 ft. Le verdict GO/NO-GO s'impose de lui-même.</p>
+
+        <h2>Pour aller plus loin</h2>
+        <p>Le METAR ne dit rien de l'avenir proche : c'est le rôle du TAF. Et pour transformer
+           visibilité et plafond en décision de vol, direction la fenêtre VFR.</p>
+        <div class="gd-also">
+            <a href="guide-taf.html"><i data-lucide="clock" style="width:15px;height:15px;"></i> Comment décoder un TAF</a>
+            <a href="guide-fenetre-vfr.html"><i data-lucide="sun" style="width:15px;height:15px;"></i> La fenêtre VFR</a>
+            <a href="notice-fr.html"><i data-lucide="book-open" style="width:15px;height:15px;"></i> Notice de Prévol</a>
+        </div>
+    </div>
+
+    <div class="acc-final">
+        <h2>Laissez l'app décoder pour vous</h2>
+        <p>Prévol traduit chaque METAR en français clair, le visualise (rose des vents, plafond, tendances)
+           et calcule la fenêtre de vol du jour — sur PC comme sur mobile.</p>
+        <a class="acc-go" href="index.html"><i data-lucide="arrow-right-circle" style="width:19px;height:19px;"></i> Ouvrir l'application</a>
+    </div>
+
+    <div class="acc-foot">
+        <div style="font-weight:600;color:var(--text-color,#F8FAFC);">© 2026 PapaBear — Prévol · Guides météo aéronautique</div>
+        <div>Sources : AviationWeather.gov · OACI Annexe 3 · Service de l'Information Aéronautique (SIA)</div>
+        <div class="warning">Avertissement : ce guide est fourni à titre pédagogique et ne remplace ni le briefing officiel, ni la documentation réglementaire.</div>
+    </div>
+
+</div>
+<script>
+    if (window.lucide) window.lucide.createIcons();
+    else document.addEventListener('DOMContentLoaded', () => window.lucide && window.lucide.createIcons());
+</script>
+</body>
+</html>

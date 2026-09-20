@@ -36,6 +36,7 @@ const ALLOWED = [
     'notice-fr.html', 'notice-en.html',
     'robots.txt', 'sitemap.xml', 'og-image.png',
     'googlede163c2d99f6240d.html',
+    'guide-metar.html', 'guide-taf.html', 'guide-fenetre-vfr.html',
     'js/', 'css/', 'vendor/', 'data/', 'assets/accueil/',
 ];
 // … sauf les CELLULES openAIP (voir ci-dessous). vendor/pdfjs a rejoint la
