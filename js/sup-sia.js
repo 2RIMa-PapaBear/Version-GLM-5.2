@@ -20,6 +20,8 @@ import { state } from './core.js';
 
 import { makeCollapsible } from './collapsible.js';
 
+import { getAirportByICAO } from './ui-module.js';
+
 // Chemin RELATIF au canal (PAS bigDataUrl : sa redirection racine-prod ne
 // vaut que pour les données volumineuses partagées cells/VAC — sur /test/,
 // sup-sia.json est servi par /test/data/ par deploy-test ; en racine par pub).
@@ -196,8 +198,17 @@ function _render(data) {
     if (!body) return;
     const dayIso = new Date().toISOString().slice(0, 10);
     const isNav = document.body.classList.contains('mode-nav');
-    const icaos = isNav ? planIcaos() : [];
-    const regs = isNav ? planRegions() : [];
+    // Vol local (retour pilote 20/09) : le terrain observé tient lieu de plan —
+    // son ICAO et les régions couvertes par sa position alimentent la même
+    // mise en avant « votre vol » qu'en navigation.
+    const icaos = isNav ? planIcaos() : (state.requestedIcao ? [state.requestedIcao] : []);
+    let regs = isNav ? planRegions() : [];
+    if (!isNav && state.requestedIcao) {
+        const apt = getAirportByICAO(state.requestedIcao);
+        if (apt && Number.isFinite(apt.lat) && Number.isFinite(apt.lon)) {
+            regs = regionsForPoint(apt.lat, apt.lon);
+        }
+    }
     const q = _filters.q.trim().toLowerCase();
 
     let rows = items;
@@ -219,7 +230,7 @@ function _render(data) {
     const nMatch = matched.filter(x => x.rel.n).length;
     _panel.querySelector('.sup-summary').innerHTML = isFr
         ? `${items.length} Sup SIA en vigueur (maj ${new Date(data?.generatedAt || Date.now()).toLocaleDateString()})`
-            + ` — affichées : ${matched.length}${isNav && nMatch ? ` dont <b style="color:#FBBF24;">${nMatch} pour votre vol</b>` : ''}`
+            + ` — affichées : ${matched.length}${nMatch ? ` dont <b style="color:#FBBF24;">${nMatch} pour votre vol</b>` : ''}`
         : `${items.length} SIA SUP in force — shown: ${matched.length}`;
 
     body.innerHTML = matched.length ? matched.map(({ s, rel }) => {
