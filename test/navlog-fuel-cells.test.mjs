@@ -83,14 +83,15 @@ describe('libellés des olives (page Calcul de navigation)', () => {
             }
         };
         drawNavLogPdf(Patched, s6);
-        // Largeurs 6 olives : total = W − 5×12 = 326,3 pt, poids
-        // [0,7 1,1 1,05 0,85 0,95 1,1]/5,75 → utiles : Trajet ~28, Dégagement
-        // ~50, Roulage ~48, Réserve ~36, Inutilisable ~42, Total ~50 pt.
-        const FUEL6 = ['TRAJET', 'DÉGAGEMENT', 'ROULAGE', 'RÉSERVE', 'INUTILISABLE', 'TOTAL REQUIS'];
-        const BORNES6 = { 'TRAJET': 28.5, 'DÉGAGEMENT': 51, 'ROULAGE': 48.5, 'RÉSERVE': 37, 'INUTILISABLE': 42.5, 'TOTAL REQUIS': 51 };
+        // Largeurs 6 olives (19/09 soir, « Inut. » cède à « Roulage + intégr. ») :
+        // total = W − 5×12 = 326,3 pt, poids [0,6 1,05 1,25 0,95 0,6 1,2]/5,65 →
+        // utiles : Trajet ~22, Dégagement ~44, Roulage ~54, Réserve ~41,
+        // Inut. ~22, Total ~53 (« TOTAL REQUIS » 50 pt tient en 1 ligne).
+        const FUEL6 = ['TRAJET', 'DÉGAGEMENT', 'ROULAGE', 'RÉSERVE', 'INUT.', 'TOTAL REQUIS'];
+        const BORNES6 = { 'TRAJET': 23, 'DÉGAGEMENT': 45, 'ROULAGE': 54.5, 'RÉSERVE': 41.5, 'INUT.': 22.5, 'TOTAL REQUIS': 54 };
         const fuel = labels.filter(l => FUEL6.some(k => l.ligne.startsWith(k)));
         assert.ok(fuel.length >= 6, `libellés carburant trouvés (${fuel.length})`);
-        assert.ok(fuel.some(l => l.ligne.startsWith('INUTILISABLE')), 'olive « Inutilisable » rendue');
+        assert.ok(fuel.some(l => l.ligne.startsWith('INUT.')), 'olive « Inut. » rendue (libellé raccourci 19/09 soir)');
         const pire = fuel.reduce((a, b) => (b.w > a.w ? b : a), { ligne: '', w: 0 });
         console.log(`ligne carburant 6 olives : ${fuel.length} libellés, le plus large « ${pire.ligne} » ${Math.round(pire.w)} pt`);
         for (const l of fuel) {
