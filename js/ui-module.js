@@ -93,7 +93,9 @@ export function initGeoDepart(icaoCharge, appliquer) {
         navigator.permissions?.query({ name: 'geolocation' }).then((perm) => {
             if (perm?.state !== 'granted') return;
             navigator.geolocation.getCurrentPosition((pos) => {
-                const proche = getNearestAirport(pos.coords?.latitude, pos.coords?.longitude, AIRPORTS);
+                // Piste ≥ 1 000 m : même filtre que les pastilles carte — les
+                // strips openAIP n'ont souvent ni METAR ni fiche complète.
+                const proche = getNearestAirport(pos.coords?.latitude, pos.coords?.longitude, AIRPORTS, 1000);
                 if (!proche?.icao || proche.icao === icaoCharge) return;
                 const input = document.getElementById('icaoInput');
                 if (!input || input.value.trim().toUpperCase() !== icaoCharge) return;

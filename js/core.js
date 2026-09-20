@@ -905,7 +905,7 @@ async function _omFetchQueued(url) {
 // ================================================================
 const RAYON_TERRE_KM = 6371;
 
-export function getNearestAirport(lat, lon, liste) {
+export function getNearestAirport(lat, lon, liste, minRunwayM = 0) {
     if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Array.isArray(liste)) return null;
     const rad = Math.PI / 180;
     let best = null, bestKm = Infinity;
@@ -914,6 +914,9 @@ export function getNearestAirport(lat, lon, liste) {
         // n'accepte que ça) et aux coordonnées complètes sont candidats.
         if (!a?.icao || !/^[A-Z][A-Z0-9]{3}$/.test(a.icao)) continue;
         if (!Number.isFinite(a.lat) || !Number.isFinite(a.lon)) continue;
+        // Restriction optionnelle : piste référencée ≥ minRunwayM (les strips
+        // openAIP sans SIA n'ont souvent ni METAR ni fiche terrain complète).
+        if (minRunwayM > 0 && (a.longestRunway || 0) < minRunwayM) continue;
         const dLat = (a.lat - lat) * rad, dLon = (a.lon - lon) * rad;
         const s = Math.sin(dLat / 2) ** 2
             + Math.cos(lat * rad) * Math.cos(a.lat * rad) * Math.sin(dLon / 2) ** 2;
