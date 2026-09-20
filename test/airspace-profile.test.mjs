@@ -149,7 +149,24 @@ test('computeRouteAirspaces : organisme à fréquences différentes → UN group
     assert.equal(dz[0].segs.length, 1, `géométries doublées fusionnées (${dz[0].segs.length} segments)`);
 });
 
-test('computeRouteAirspaces : filtre altitude du vol (croisière 3500 ft, tolérance 500)', () => {
+// (20/09, consigne pilote) Zones RÉGLEMENTÉES : toujours visibles sur le
+// profil et dessinées en rouge hachuré — reconnaissance par nom, SIA comme
+// openAIP, sans confondre avec CTR/TMA/SIV.
+test('isRdpZone : graphies SIA et openAIP, négatifs contrôlés', async () => {
+    const { isRdpZone } = await import('../js/airspace-profile.js');
+    assert.ok(isRdpZone('R 147'));
+    assert.ok(isRdpZone('R 149 E'));
+    assert.ok(isRdpZone('D 18 A3'));
+    assert.ok(isRdpZone('LF-P23 LOINTAIN'));
+    assert.ok(isRdpZone('LF-D18A4 ATLANTIQUE BREST'));
+    assert.ok(!isRdpZone('CTR RENNES'));
+    assert.ok(!isRdpZone('TMA LA ROCHELLE 1'));
+    assert.ok(!isRdpZone('SIV RENNES SUD A'));
+    assert.ok(!isRdpZone('RMZ VANNES'));
+    assert.ok(!isRdpZone(''));
+});
+
+test('computeRouteAirspaces : filtre altitude du vol (croisière 3500 ft, tolérance 1000 — CTR/TMA)', () => {
     const items = [
         zone('CTR RENNES', '120.500', 0, 1500, SQ(0.5, 1.5), 'RENNES TWR'),        // SOUS le vol → écartée
         zone('SIV RENNES SUD A', '134.000', 0, 11500, SQ(0.5, 1.5), 'RENNES INFORMATION'),  // englobe 3500 → gardée
@@ -165,6 +182,24 @@ test('computeRouteAirspaces : filtre altitude du vol (croisière 3500 ft, tolér
     assert.ok(names.includes('RASANTE INFO'), 'plancher à moins de 500 ft au-dessus : conservé');
     assert.ok(!names.includes('RENNES TWR'), 'CTR sous le vol ne doit pas apparaître');
     assert.ok(!names.some(n => n.includes('HAUTE')), 'zone au-dessus du vol ne doit pas apparaître');
+
+    // (20/09, consigne pilote) Zones RÉGLEMENTÉES : TOUJOURS visibles quand
+    // la route les traverse, même largement survolées (R 147 800-1500 ft et
+    // R 162 1000-2000 ft à 3500 ft de croisière) — les CTR/TMA comparables
+    // restent filtrées (plafond < croisière − 1000 ft).
+    const rdp = [
+        zone('R 147', null, 800, 1500, SQ(0.5, 1.5)),
+        zone('R 162', null, 1000, 2000, SQ(0.5, 1.5)),
+        zone('D 18 A3', null, 0, 3000, SQ(0.5, 1.5)),
+        zone('LF-P23 LOINTAIN', null, 0, 1500, SQ(0.5, 1.5)),
+        zone('CTR COMPARABLE', '118.3', 0, 2000, SQ(0.5, 1.5), 'COMPARABLE TWR'),   // plafond 2000 < 2500 → filtrée
+    ];
+    const rdpNames = computeRouteAirspaces(ROUTE, rdp, { cruiseAltFt: 3500 }).map(g => g.name);
+    assert.ok(rdpNames.includes('R 147'), 'R 147 survolée doit apparaître');
+    assert.ok(rdpNames.includes('R 162'), 'R 162 survolée doit apparaître');
+    assert.ok(rdpNames.includes('D 18 A3'), 'D survolée doit apparaître');
+    assert.ok(rdpNames.includes('LF-P23 LOINTAIN'), 'P survolée doit apparaître (graphie LF-)');
+    assert.ok(!rdpNames.includes('COMPARABLE TWR'), 'CTR de plafond équivalent reste filtrée');
 
     // Sans altitude (0/null) : tout est conservé (comportement antérieur —
     // TMA HAUTE reste écartée par le filtre plancher > 5000 ft, sans rapport).

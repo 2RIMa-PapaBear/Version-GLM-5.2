@@ -344,8 +344,12 @@ export function _rdpKey(name) {
     // Zéros initiaux écartés : « LF-R042 » ≡ « R 42 » (openAIP zéro-initialise,
     // même règle que les noms — retour pilote 09/09 « CTR DINARD 01/1 »).
     const noZeros = (k) => k.replace(/^(.)0+(\d)/, '$1$2');
-    let m = n.match(/^LF-([RDP]\d+(?:[A-Z]\d?)?(?:\(\d+\))?)\b/);
-    if (m) return noZeros(m[1]);
+    // openAIP « LF-… » : suffixe de secteur COLLÉ (« LF-R278A ») OU ESPACÉ —
+    // « LF-D18 A3 MODIFIED » (retour pilote 20/09 : sans l'espace optionnel,
+    // la clé s'arrêtait à « D18 » et ne rattrapait pas le « D 18 A3 » du SIA,
+    // la copie openAIP doublait la zone sur la carte et le profil).
+    let m = n.match(/^LF-([RDP]\d+)(?: ?([A-Z]\d?))?(?: ?(\(\d+\)))?\b/);
+    if (m) return noZeros(m[1] + (m[2] || '') + (m[3] || ''));
     // SIA : « R 278 », « D 59B »… mais AUSSI « R 149 E » (suffixe ESPACÉ) —
     // sans l'espace optionnel la clé s'arrêtait à « R149 » et ne rattrapait
     // pas « LF-R149E » : les deux copies se dessinaient (retour pilote 09/09).
@@ -364,12 +368,77 @@ export function _isZrt(name) {
 }
 const dropZrt = (items) => items.filter(it => !_isZrt(it.name));
 
+// (20/09, consigne pilote) DOUBLONS GÉOMÉTRIQUES : deux sources peuvent
+// publier la MÊME zone sous des noms incomparables (SIA « D 18 A3 » vs
+// openAIP « Zone militaire de Rochefort »). Empreinte = bbox + centroïde +
+// surface (shoelace / cercle) + tranches verticales : deux zones de la
+// même empreinte et des mêmes limites verticales sont LA même zone.
+// Exporté pour les tests.
+export function _geomStats(z) {
+    const lim = (l) => {
+        if (!l || !Number.isFinite(+l.value)) return null;
+        const u = String(l.unit ?? '').toUpperCase();
+        if (u === '6' || u === 'FL') return Math.round(+l.value * 100);
+        if (u === '1' || u === 'FT' || u === '') return Math.round(+l.value);
+        if (u === 'M') return Math.round(+l.value * 3.28);
+        return Math.round(+l.value);
+    };
+    const g = z.geometry;
+    let bbox = null, area = 0, cx = 0, cy = 0, n = 0;
+    if (g?.type === 'Point' && z.radius?.value > 0) {
+        const [x, y] = g.coordinates;
+        const d = z.radius.value / 60 / Math.cos(y * Math.PI / 180) || z.radius.value / 60;
+        bbox = [x - d, y - z.radius.value / 60, x + d, y + z.radius.value / 60];
+        area = Math.PI * (z.radius.value / 60) ** 2;
+        cx = x; cy = y;
+    } else {
+        const ring = g?.coordinates?.[0];
+        if (Array.isArray(ring) && ring.length >= 3) {
+            let a = 90, b = -90, c = 180, d2 = -180, s = 0;
+            for (let i = 0; i < ring.length; i++) {
+                const [x, y] = ring[i], [x2, y2] = ring[(i + 1) % ring.length];
+                s += x * y2 - x2 * y;
+                if (y < a) a = y; if (y > b) b = y;
+                if (x < c) c = x; if (x > d2) d2 = x;
+                cx += x; cy += y; n++;
+            }
+            bbox = [c, a, d2, b];
+            area = Math.abs(s) / 2;
+            cx /= n; cy /= n;
+        }
+    }
+    if (!bbox) return null;
+    return { bbox, area, cx, cy, lo: lim(z.lowerLimit), up: lim(z.upperLimit) };
+}
+
+/** Deux zones de la même EMPREinte géométrique ? (limites verticales
+ *  égales à ±200 ft — arrondis FL —, bbox IoU ≥ 0,55, centroïdes à
+ *  ≤ 0,04° (~2,5 NM), surfaces dans le rapport 0,7–1,45 : les contours
+ *  simplifiés openAIP et densifiés SIA diffèrent un peu.) Exporté. */
+export function _geomDuplicate(a, b) {
+    if (!a || !b) return false;
+    // Verticales : les deux connues et proches (sinon on ne conclut pas).
+    if (a.lo == null || b.lo == null || a.up == null || b.up == null) return false;
+    if (Math.abs(a.lo - b.lo) > 200 || Math.abs(a.up - b.up) > 200) return false;
+    const [ax0, ay0, ax1, ay1] = a.bbox, [bx0, by0, bx1, by1] = b.bbox;
+    const iw = Math.min(ax1, bx1) - Math.max(ax0, bx0);
+    const ih = Math.min(ay1, by1) - Math.max(ay0, by0);
+    if (iw <= 0 || ih <= 0) return false;
+    const iArea = iw * ih;
+    const uArea = (ax1 - ax0) * (ay1 - ay0) + (bx1 - bx0) * (by1 - by0) - iArea;
+    if (iArea / uArea < 0.55) return false;
+    if (Math.hypot(a.cx - b.cx, a.cy - b.cy) > 0.04) return false;
+    const r = a.area > 0 && b.area > 0 ? Math.max(a.area / b.area, b.area / a.area) : Infinity;
+    return r <= 1.45;
+}
+
 /** Écarte les zones openAIP déjà couvertes par la base SIA : par nom exact
  *  (ou normalisé — « SIV RENNES SUD partie A » ≡ « SIV RENNES SUD A », le
  *  mot « partie » vient du NomPartie XML ; les noms à trait d'union comme
- *  « SARREBRUCK-PARTIE FRANCE » ne sont pas touchés), ou par désignateur
- *  R/D/P (LF-R278 ≡ R 278). Les items SIA passent tel quel. Exporté pour
- *  les tests. */
+ *  « SARREBRUCK-PARTIE FRANCE » ne sont pas touchés), par désignateur
+ *  R/D/P (LF-R278 ≡ R 278), OU PAR EMPREINTE GÉOMÉTRIQUE (20/09 : même
+ *  forme + mêmes tranches verticales = même zone, noms incomparables
+ *  compris). Les items SIA passent tel quel. Exporté pour les tests. */
 export function _dropOpenAipDuplicates(items, sia) {
     const norm = (n) => String(n || '').toUpperCase()
         .replace(/\s+PARTIE\s+(?=[A-Z0-9.]+$)/, ' ')
@@ -388,8 +457,15 @@ export function _dropOpenAipDuplicates(items, sia) {
         siaNames.add(glued(z.name));
     }
     const siaRdp = new Set(sia.map(z => _rdpKey(z.name)).filter(Boolean));
-    return items.filter(z => sia.includes(z)
-        || !(siaNames.has(String(z.name || '').toUpperCase()) || siaNames.has(norm(z.name)) || siaNames.has(glued(z.name)) || siaRdp.has(_rdpKey(z.name))));
+    // Empreintes SIA pour la passe géométrique (20/09) — seules les zones
+    // à verticales et géométrie exploitables y participent.
+    const siaStats = sia.map(_geomStats).filter(Boolean);
+    return items.filter(z => {
+        if (sia.includes(z)) return true;
+        if (siaNames.has(String(z.name || '').toUpperCase()) || siaNames.has(norm(z.name)) || siaNames.has(glued(z.name)) || siaRdp.has(_rdpKey(z.name))) return false;
+        const st = siaStats.length ? _geomStats(z) : null;
+        return !(st && siaStats.some(s => _geomDuplicate(st, s)));
+    });
 }
 
 async function _loadCellsGrid(minLat, minLon, maxLat, maxLon) {

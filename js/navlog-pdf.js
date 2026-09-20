@@ -1662,8 +1662,16 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr, CH = 128) {
         return out;
     };
     if (_zones?.length) {
+        // Zones RÉGLEMENTÉES R/D/P (consigne pilote 20/09) : trait ROUGE et
+        // remplissage HACHURÉ rouge (diagonales) — elles se détachent des
+        // espaces contrôlés bleu pâle. Regex miroir de isRdpZone
+        // (airspace-profile.js) : ce module reste volontairement sans import.
+        const _rdp = (g) => /^(?:LF-)?[RDP][\s-]?\d/i.test(String(g?.name || '').trim())
+            || (g?.segs || []).some(s => /^(?:LF-)?[RDP][\s-]?\d/i.test(String(s?.zone || '').trim()));
+        const RDP_LN = [220, 38, 38];   // red-600
         for (const g of _zones) {
             if (_isSiv(g)) continue;
+            const rdp = _rdp(g);
             const clamped = g.up > yMax;
             const byT = Math.max(yOf(Math.min(g.up, yMax)), yT);
             const byB = Math.min(Math.max(yOf(g.lo), yT), yB);
@@ -1671,12 +1679,27 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr, CH = 128) {
             for (const [fa, fb] of _mergeRanges(g.ranges)) {
                 const x0 = Math.max(xOf(fa), xL), x1 = Math.min(xOf(fb), xR);
                 if (x1 - x0 < 2) continue;
-                doc.setFillColor(232, 246, 253);
-                doc.rect(x0, byT, x1 - x0, byB - byT, 'F');
-                doc.setDrawColor(...SIV_MAP_LN); doc.setLineWidth(0.7);
-                doc.rect(x0, byT, x1 - x0, byB - byT, 'S');
+                if (rdp) {
+                    // Hachures rouges : diagonales montantes bornées au cadre
+                    // (pas de motif natif jsPDF — segments calculés, pas de 5 pt).
+                    doc.setDrawColor(...RDP_LN); doc.setLineWidth(0.4);
+                    const h = byB - byT, sp = 5;
+                    for (let k = x0 - h; k < x1; k += sp) {
+                        const xa = Math.max(x0, k), xb = Math.min(x1, k + h);
+                        if (xb - xa < 0.5) continue;
+                        doc.line(xa, byB - (xa - k), xb, byB - (xb - k));
+                    }
+                    doc.setLineWidth(0.9);
+                    doc.rect(x0, byT, x1 - x0, byB - byT, 'S');
+                } else {
+                    doc.setFillColor(232, 246, 253);
+                    doc.rect(x0, byT, x1 - x0, byB - byT, 'F');
+                    doc.setDrawColor(...SIV_MAP_LN); doc.setLineWidth(0.7);
+                    doc.rect(x0, byT, x1 - x0, byB - byT, 'S');
+                }
                 if (clamped) {   // plafond au-dessus de l'échelle : bord haut pointillé
                     doc.setLineDashPattern([3, 2], 0); doc.setLineWidth(0.7);
+                    doc.setDrawColor(...(rdp ? RDP_LN : SIV_MAP_LN));
                     doc.line(x0 + 1, byT, x1 - 1, byT);
                     doc.setLineDashPattern([], 0);
                 }
@@ -1685,7 +1708,7 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr, CH = 128) {
                     const sx = xOf((g.segs[i - 1].fb + g.segs[i].fa) / 2);
                     if (sx <= x0 || sx >= x1) continue;
                     doc.setLineDashPattern([2.5, 2], 0); doc.setLineWidth(0.5);
-                    doc.setDrawColor(...SIV_MAP_LN);
+                    doc.setDrawColor(...(rdp ? RDP_LN : SIV_MAP_LN));
                     doc.line(sx, byT + 1, sx, byB - 1);
                     doc.setLineDashPattern([], 0);
                 }
@@ -1719,6 +1742,7 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr, CH = 128) {
                         freq: sub,
                         cx: (bx0 + bx1) / 2,
                         boxW: bx1 - bx0,
+                        bh: byB - byT,
                         cy: byB - byT >= 11 ? cy - 1.5 : cy + 2,
                     });
                 }
@@ -1743,9 +1767,27 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr, CH = 128) {
             _setInk(doc, SIV_TX);
             doc.text(name, Math.min(b.cx, xR - 4), b.cy, { align: 'center' });
             if (b.freq) {
+                // Activité/horaire des zones R/D/P (retour pilote 20/09) :
+                // textes LONGS (60 car. — « Activités spécifiques défense,
+                // tirs, bombardements… ») : bornés par LEUR CADRE (pas par
+                // l'anti-collision, qui laissait déborder jusqu'à mi-graphe)
+                // et repliés sur DEUX lignes MAX, 2ᵉ ligne tronquée ; cadre
+                // trop bas → une ligne tronquée comme avant.
                 doc.setFont('helvetica', 'normal'); doc.setFontSize(5.5);
-                const fq = doc.getTextWidth(b.freq) > allowed ? _trunc(doc, b.freq, allowed) : b.freq;
-                doc.text(fq, Math.min(b.cx, xR - 4), b.cy + 5, { align: 'center' });
+                const allowedSub = Math.max(12, b.boxW - 2);
+                let l1 = b.freq, l2 = null;
+                if (doc.getTextWidth(l1) > allowedSub) {
+                    if (b.bh >= 15) {
+                        const ls = doc.splitTextToSize(String(b.freq), allowedSub).filter(Boolean);
+                        l1 = ls[0] || l1;
+                        l2 = ls[1] ?? null;
+                        if (ls.length > 2) l2 = _trunc(doc, l2, allowedSub - 1);
+                    }
+                    if (doc.getTextWidth(l1) > allowedSub) l1 = _trunc(doc, l1, allowedSub);
+                    if (l2 && doc.getTextWidth(l2) > allowedSub) l2 = _trunc(doc, l2, allowedSub);
+                }
+                doc.text(l1, Math.min(b.cx, xR - 4), b.cy + 4.5, { align: 'center' });
+                if (l2) doc.text(l2, Math.min(b.cx, xR - 4), b.cy + 9, { align: 'center' });
             }
         }
     }

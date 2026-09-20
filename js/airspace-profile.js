@@ -18,9 +18,22 @@ const FT_PER_M = 3.28084;
 // Filtres identiques au rendu de la carte (airspaces.js).
 const ADMIN_NAME_RE = /\bFIR\b|\bUIR\b|\bLTA\b/;
 const MAX_BASE_FT = 5000;
-// Tolérance autour de l'altitude de croisière : une limite de zone à moins
-// de 500 ft du niveau de vol reste affichée (marge d'anticipation).
-export const ALT_TOLERANCE_FT = 500;
+// Tolérance autour de l'altitude de croisière pour les espaces CONTRÔLÉS
+// (CTR/TMA/CTA/SIV…) : une limite à moins de 1000 ft du niveau de vol reste
+// affichée — élargie de 500 → 1000 ft (consigne pilote 20/09 : une CTR/TMA
+// survolée de près garde sa place sur le profil).
+export const ALT_TOLERANCE_FT = 1000;
+// Zones RÉGLEMENTÉES (R/D/P) : TOUJOURS visibles sur le profil dès que la
+// route les traverse géographiquement (consigne pilote 20/09 : R 147
+// 800-1500 ft et R 162 1000-2000 ft survolées à ~3500 ft doivent y
+// figurer — information de sécurité : descente, activation NOTAM…).
+const RDP_NAME_RE = /^(?:LF-)?[RDP][\s-]?\d/i;
+/** Zone RÉGLEMENTÉE (R/D/P) ? — SIA « R 147 », openAIP « LF-P23… ». Piloté
+ *  par le rendu : R/D/P toujours visibles sur le profil et dessinées en
+ *  trait rouge + hachures rouges (consigne pilote 20/09). */
+export function isRdpZone(name) {
+    return RDP_NAME_RE.test(String(name || '').trim());
+}
 // Tronçon minimal pour dessiner une zone (en fraction de route) : écarte
 // les coins à peine effleurés (≈ 1,5 NM sur une navigation de 100 NM).
 const MIN_SPAN_FRAC = 0.012;
@@ -182,9 +195,11 @@ export function computeRouteAirspaces(points, items, opts) {
         if (up == null || up <= 0) continue;            // plafond inconnu : on ignore
         if (lo > MAX_BASE_FT) continue;                  // plancher trop haut pour du VFR
         if (up <= lo) continue;
-        // Altitude du vol : hors tranche verticale (marge 500 ft) → la zone
-        // ne concerne pas ce vol (entièrement au-dessus ou en dessous).
-        if (cruise != null && (up < cruise - ALT_TOLERANCE_FT || lo > cruise + ALT_TOLERANCE_FT)) continue;
+        // Altitude du vol : hors tranche verticale (marge 1000 ft) → la zone
+        // ne concerne pas ce vol (entièrement au-dessus ou en dessous) —
+        // SAUF zones réglementées R/D/P, toujours retenues (consigne 20/09).
+        if (cruise != null && !isRdpZone(as.name || as.designator)
+            && (up < cruise - ALT_TOLERANCE_FT || lo > cruise + ALT_TOLERANCE_FT)) continue;
 
         const ranges = crossedRanges(points, as.geometry,
             (as.radius && Number.isFinite(as.radius.value)) ? as.radius.value : 5);

@@ -1,5 +1,5 @@
 import { themeTokens } from './night-mode.js';
-import { horLabel } from './airspace-profile.js';
+import { horLabel, isRdpZone } from './airspace-profile.js';
 /* ================================================================
  * ELEVATION CHART — Profil d'élévation interactif (canvas)
  * ================================================================
@@ -374,11 +374,31 @@ function _altTxt(ft) {
     return `${Math.round(ft)} ft`;
 }
 
-/** Rectangles des zones traversées ; renvoie la zone survolée (ou null). */
+/** Rectangles des zones traversées ; renvoie la zone survolée (ou null).
+ *  Zones RÉGLEMENTÉES R/D/P (consigne pilote 20/09) : trait ROUGE et
+ *  remplissage HACHURÉ rouge — elles se détachent des espaces contrôlés. */
+let _rdpHatch = null;
+function _rdpHatchPattern() {
+    if (_rdpHatch) return _rdpHatch;
+    const c = document.createElement('canvas');
+    c.width = c.height = 8;
+    const h = c.getContext('2d');
+    h.strokeStyle = 'rgba(239,68,68,0.50)';
+    h.lineWidth = 1.4;
+    h.beginPath();
+    h.moveTo(-2, 10); h.lineTo(10, -2);
+    h.moveTo(-2, 2); h.lineTo(2, -2);
+    h.moveTo(6, 10); h.lineTo(10, 6);
+    h.stroke();
+    _rdpHatch = _ctx.createPattern(c, 'repeat');
+    return _rdpHatch;
+}
+
 function _drawZones(xOf, yOf, yMax, plotW, plotH) {
     if (!_zones?.length) return null;
     let hovered = null;
     for (const g of _zones) {
+        const rdp = isRdpZone(g.name) || (g.segs || []).some(s => isRdpZone(s.zone));
         const clamped = g.up > yMax;
         const yT = yOf(Math.min(g.up, yMax));
         const yB = yOf(g.lo);
@@ -388,9 +408,15 @@ function _drawZones(xOf, yOf, yMax, plotW, plotH) {
             const x1 = Math.min(xOf(fb), PAD.left + plotW);
             if (x1 - x0 < 2) continue;
 
-            _ctx.fillStyle = 'rgba(56,189,248,0.10)';
-            _ctx.fillRect(x0, yT, x1 - x0, yB - yT);
-            _ctx.strokeStyle = 'rgba(56,189,248,0.85)';
+            if (rdp) {
+                _ctx.fillStyle = _rdpHatchPattern();
+                _ctx.fillRect(x0, yT, x1 - x0, yB - yT);
+                _ctx.strokeStyle = 'rgba(239,68,68,0.9)';
+            } else {
+                _ctx.fillStyle = 'rgba(56,189,248,0.10)';
+                _ctx.fillRect(x0, yT, x1 - x0, yB - yT);
+                _ctx.strokeStyle = 'rgba(56,189,248,0.85)';
+            }
             _ctx.lineWidth = 1.2;
             _ctx.strokeRect(x0 + 0.5, yT + 0.5, x1 - x0 - 1, yB - yT - 1);
             if (clamped) {   // plafond au-dessus de l'échelle : bord haut pointillé
@@ -406,7 +432,7 @@ function _drawZones(xOf, yOf, yMax, plotW, plotH) {
                 const sx = xOf((g.segs[i - 1].fb + g.segs[i].fa) / 2);
                 if (sx <= x0 || sx >= x1) continue;
                 _ctx.setLineDash([3, 3]);
-                _ctx.strokeStyle = 'rgba(56,189,248,0.5)';
+                _ctx.strokeStyle = rdp ? 'rgba(239,68,68,0.5)' : 'rgba(56,189,248,0.5)';
                 _ctx.lineWidth = 1;
                 _ctx.beginPath();
                 _ctx.moveTo(sx, yT + 1);
