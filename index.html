@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Prévol — Météo aéronautique en temps réel pour pilotes VFR</title>
-    <meta name="description" content="Décodez et visualisez graphiquement les messages météo aéronautiques METAR et TAF. Prévisions aérodrome, plafond, visibilité, vent, catégorie VFR/IFR. Outil gratuit pour pilotes.">
-    <meta name="keywords" content="METAR, TAF, météo aéronautique, visualiseur METAR, décodeur TAF, VFR, IFR, plafond, visibilité, vent, aviation météo, météo aéroport, OACI, pilote">
+    <title>Prévol — Briefing VFR complet : météo, log de nav, suivi GPS</title>
+    <meta name="description" content="Briefing VFR complet : météo temps réel (METAR, TAF), planification de vol, log de nav imprimable, dossier de vol et suivi GPS en direct. Gratuit, PC et mobile.">
+    <meta name="keywords" content="dossier de vol VFR, prévol, briefing aéronautique, METAR, TAF, météo aéronautique, planification de vol, log de nav, navlog, suivi GPS vol, visualiseur METAR, VFR, plafond, visibilité, OACI, pilote">
     <meta name="author" content="PapaBear">
     <meta name="robots" content="index, follow">
     <meta name="google-site-verification" content="os-zlfT3wzk-IMUqsgJwGcq-2rKRPwDYvhWg0pSnsko">
@@ -15,8 +15,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="METAR/TAF">
     <link rel="canonical" href="https://papabear56.pages-perso.free.fr/">
-    <meta property="og:title" content="Prévol — Météo aéronautique en temps réel pour pilotes VFR">
-    <meta property="og:description" content="Décodez et visualisez graphiquement les messages météo aéronautiques METAR et TAF. Outil gratuit pour pilotes.">
+    <meta property="og:title" content="Prévol — Briefing VFR complet : météo, log de nav, suivi GPS">
+    <meta property="og:description" content="Briefing VFR complet : météo temps réel (METAR, TAF), planification de vol, log de nav imprimable, dossier de vol et suivi GPS en direct. Gratuit, PC et mobile.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://papabear56.pages-perso.free.fr/">
     <meta property="og:site_name" content="Prévol">
@@ -25,10 +25,10 @@
     <meta property="og:image" content="https://papabear56.pages-perso.free.fr/og-image.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="Prévol — décodeur METAR/TAF pour pilotes VFR">
+    <meta property="og:image:alt" content="Prévol — briefing et dossier de vol VFR : météo, log de nav, suivi GPS">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Prévol — Météo aéronautique">
-    <meta name="twitter:description" content="Décodez et visualisez les messages METAR/TAF. Outil gratuit pour pilotes.">
+    <meta name="twitter:title" content="Prévol — Briefing VFR complet">
+    <meta name="twitter:description" content="Météo METAR/TAF, planification de vol, log de nav imprimable, dossier de vol et suivi GPS en direct. Gratuit pour pilotes.">
     <meta name="twitter:image" content="https://papabear56.pages-perso.free.fr/og-image.png">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="apple-touch-icon" sizes="180x180" href="favicon.ico">
@@ -57,9 +57,17 @@
       "@context": "https://schema.org",
       "@type": "WebApplication",
       "name": "Prévol",
-      "description": "Décodez et visualisez graphiquement les messages météo aéronautiques METAR et TAF. Outil gratuit pour pilotes.",
+      "description": "Briefing VFR complet pour pilotes : météo aéronautique temps réel (METAR, TAF), planification de vol, log de nav imprimable, dossier de vol PDF (NOTAM, cartes VAC) et suivi GPS du vol en direct. Outil gratuit.",
       "applicationCategory": "NavigationApplication",
       "operatingSystem": "Any",
+      "featureList": [
+        "Météo aéronautique temps réel : METAR, TAF, SIGMET, radar de précipitations",
+        "Planification de vol VFR avec waypoints, alternates et devis carburant",
+        "Log de nav A5 imprimable et dossier de vol PDF (NOTAM, Sup AIP, cartes VAC)",
+        "Suivi GPS du vol en direct : position, trace et rejeu des navigations",
+        "Carte régionale : espaces aériens SIA, obstacles, relief, vents en altitude",
+        "Performances décollage/atterrissage et centrage-masse par avion"
+      ],
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
       "author": { "@type": "Person", "name": "PapaBear" },
       "url": "https://papabear56.pages-perso.free.fr/",
@@ -81,7 +89,7 @@
     <header class="card">
         <div class="header-row">
             <div class="header-title-block">
-                <h1 id="ui-title">Prévol<span class="sr-only"> — météo aéronautique en temps réel pour pilotes VFR</span></h1>
+                <h1 id="ui-title">Prévol<span class="sr-only"> — briefing VFR complet : météo aéronautique, planification de vol, log de nav et suivi GPS en direct</span></h1>
                 <span class="header-subtitle">Aviation Weather Decoder</span>
             </div>
             <div class="header-controls" style="display:flex; gap:10px; align-items:center;">
