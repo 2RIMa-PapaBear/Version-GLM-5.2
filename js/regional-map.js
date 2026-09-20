@@ -169,7 +169,13 @@ async function _initOrRefresh() {
     const isFirstInit = !_map;
     if (isFirstInit) {
         const el = document.getElementById('regional-map');
-        if (!el || typeof L === 'undefined') return;
+        if (!el) return;
+        if (typeof L === 'undefined') {
+            // Leaflet chargé à la demande (perf : −521 Ko au démarrage de l'app —
+            // CSS + lib + plugin rotate, dans cet ordre grâce à async=false).
+            try { await window.__chargerLib(['vendor/leaflet.min.css', 'vendor/leaflet.min.js', 'vendor/leaflet-rotate.js']); }
+            catch { console.warn('Leaflet indisponible (vendor/) — carte régionale inactive'); return; }
+        }
 
         // rotate: true (plugin vendor/leaflet-rotate.js) : autorise la rotation
         // « Route haut » du suivi GPS (js/gps.js). L'instance est déclarée au
