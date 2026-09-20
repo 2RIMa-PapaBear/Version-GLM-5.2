@@ -896,3 +896,31 @@ async function _omFetchQueued(url) {
         _omRunning = false;
     }
 }
+
+// ================================================================
+// GÉOLOCALISATION — station la plus proche d'un point
+// (démarrage de l'app quand la permission géolocalisation est déjà
+// accordée — voir initGeoDepart dans ui-module.js). Pur et testable
+// sous Node : la liste est fournie par l'appelant.
+// ================================================================
+const RAYON_TERRE_KM = 6371;
+
+export function getNearestAirport(lat, lon, liste) {
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Array.isArray(liste)) return null;
+    const rad = Math.PI / 180;
+    let best = null, bestKm = Infinity;
+    for (const a of liste) {
+        // Seuls les terrains à code OACI exploitable (le champ de recherche
+        // n'accepte que ça) et aux coordonnées complètes sont candidats.
+        if (!a?.icao || !/^[A-Z][A-Z0-9]{3}$/.test(a.icao)) continue;
+        if (!Number.isFinite(a.lat) || !Number.isFinite(a.lon)) continue;
+        const dLat = (a.lat - lat) * rad, dLon = (a.lon - lon) * rad;
+        const s = Math.sin(dLat / 2) ** 2
+            + Math.cos(lat * rad) * Math.cos(a.lat * rad) * Math.sin(dLon / 2) ** 2;
+        const km = 2 * RAYON_TERRE_KM * Math.asin(Math.sqrt(s));
+        if (km < bestKm) { bestKm = km; best = a; }
+    }
+    return best
+        ? { icao: best.icao, name: best.name ?? '', lat: best.lat, lon: best.lon, km: Math.round(bestKm * 10) / 10 }
+        : null;
+}
