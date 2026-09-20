@@ -213,7 +213,7 @@ export function createRadioPointsController(map, deps = {}) {
                 // « le clic droit ne fonctionne pas sur les points VFR, ils ne
                 // s ajoutent pas au FP ») — même chemin que le bouton du popup
                 // (repère NOMMÉ avec fréquence/nature), et arrêt de propagation
-                // pour ne pas retomber sur le repère libre ZZxx du contextmenu
+                // pour ne pas retomber sur le repère libre du contextmenu
                 // carte (même mécanique que les pastilles terrains).
                 m.on('contextmenu', (e) => {
                     L.DomEvent.stopPropagation(e);

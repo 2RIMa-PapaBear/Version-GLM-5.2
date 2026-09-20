@@ -75,7 +75,7 @@ const creation = await page.evaluate(() => {
 if (creation.err) ko(creation.err);
 else {
     console.log('waypoints :', JSON.stringify(creation.wp), '· repères :', JSON.stringify(creation.label));
-    (/ZZ[A-Z]{2}/.test(creation.wp) ? ok : ko)('Valider : repère ZZ** AJOUTÉ au champ Waypoints');
+    (String(creation.wp).split(' ').includes('QA') ? ok : ko)('Valider : repère « QA » (slug du nom, plus de ZZxx) AJOUTÉ au champ Waypoints');
     (/QA PT LIBRE/.test(creation.label) ? ok : ko)('marqueur ambre + étiquette posés sur la carte');
     (creation.x ? ok : ko)('étiquette du repère : bouton « × » de suppression (data-code)');
 }
@@ -155,7 +155,7 @@ else {
         }, 600));
     });
     console.log('après clic droit (repère retiré du plan) :', JSON.stringify(apresDroit));
-    (/ZZ[A-Z]{2}/.test(apresDroit.wp) ? ok : ko)('clic droit sur le repère : re-ajouté au plan' + (apresDroit.err ? ` — ${apresDroit.err}` : ''));
+    (String(apresDroit.wp).split(' ').includes('QA') ? ok : ko)('clic droit sur le repère : re-ajouté au plan' + (apresDroit.err ? ` — ${apresDroit.err}` : ''));
 }
 
 // ④ Aucune erreur JavaScript pendant tout le flux (le bug historique était un

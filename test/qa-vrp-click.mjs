@@ -149,8 +149,9 @@ try {
     if (res.vrp?.desc && String(res.vrpClick).includes(res.vrp.desc.slice(0, 20))) ok('description officielle SIA dans le popup');
     String(res.vrpClick).includes('+ Waypoint') ? ok('bouton « + Waypoint » présent') : ko('bouton + Waypoint absent');
     // Le handler add-waypoint (même chemin que le bouton « + Waypoint » du
-    // popup, validé) insère le CODE du repère nommé créé (ZZxx, nom = RV-E).
-    (res.wpAfter && res.wpAfter !== res.wpBefore && /ZZ[A-Z]{2}/.test(res.wpAfter))
+    // popup, validé) insère le CODE du repère = son NOM (19/09 : plus de
+    // ZZxx) — ici « RV-E ».
+    (res.wpAfter && res.wpAfter !== res.wpBefore && /RV-E/.test(res.wpAfter))
         ? ok('clic droit : VRP ajouté au plan (repère nommé ' + String(res.wpAfter).slice(0, 40) + ' = ' + res.vrp?.name + ')')
         : ko('clic droit : champ Waypoints inchangé (« ' + String(res.wpAfter).slice(0, 60) + ' »)');
     res.vrpLabel && res.vrpLabel.includes('RV-E')

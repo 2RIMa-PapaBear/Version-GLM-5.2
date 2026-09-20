@@ -35,28 +35,37 @@ test('buildPibRequest : route nettoyée + paramètres par défaut', () => {
     assert.ok(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(r.validFrom));
 });
 
-test('buildPibRequest : repères libres ZZxx écartés (SOFIA les rejette en HTTP 400)', () => {
-    const r = buildPibRequest(['LFRV', 'ZZAB', 'LFRC', 'ZZCD']);
-    assert.deepEqual(r.route, ['LFRV', 'LFRC'], 'seuls les terrains réels partent au PIB');
+// Repères libres : depuis le 19/09, leur code est leur NOM (slug) — plus de
+// ZZxx. L'exclusion SOFIA se fait par DRAPEAU freeWp au memo : un slug peut
+// ressembler à un OACI (ex. « DINN »), la forme ne suffit plus.
+import { memoSet } from '../js/core.js';
+import { _isFreeWp } from '../js/notam.js';
+
+test('buildPibRequest : repères libres (drapeau freeWp) écartés — SOFIA les rejette en HTTP 400', () => {
+    memoSet('DINN', { name: 'DINN', lat: 47, lon: -2, freeWp: true });       // slug en forme d'OACI
+    memoSet('RV-E', { name: 'RV-E EVRON', lat: 48, lon: -0.5, freeWp: true }); // tiret : jamais un OACI
+    const r = buildPibRequest(['LFRV', 'DINN', 'LFRC', 'RV-E']);
+    assert.deepEqual(r.route, ['LFRV', 'LFRC'], 'seuls les terrains réels partent au PIB (slug OACI-forme compris)');
     // Le plan est réduite aux terrains AVANT le calcul des tronçons : les
-    // legs n'héritent jamais d'un ZZxx.
+    // legs n'héritent jamais d'un repère libre.
     assert.deepEqual(waypointLegs(r.route), []);
+    assert.equal(_isFreeWp('DINN'), true);
+    assert.equal(_isFreeWp('LFRV'), false, 'un terrain réel n\u2019est jamais un repère libre');
 });
 
 // Nature des exclusions (retour pilote 12/09 « dont VOR/NDB/point VFR ») :
-// un ZZxx venu de la couche radiophares porte sa fréquence typée au memo.
-import { memoSet } from '../js/core.js';
+// un repère venu de la couche radiophares porte sa fréquence typée au memo.
 import { _freeWpNature, _excludedBreakdown, _excludedItems } from '../js/notam.js';
 
-test('nature des ZZxx exclus : VOR/NDB/point VFR typés, repère libre sinon', () => {
-    memoSet('ZZAB', { name: 'MENUY (VOR)', lat: 47, lon: -2, frequencies: [{ freq: 114.5, type: 'VOR', primary: true }] });
-    memoSet('ZZCD', { name: 'Pont de Saint-Nazaire', lat: 47.2, lon: -2.2, frequencies: [{ freq: 0, type: 'VRP' }] });
-    assert.equal(_freeWpNature('ZZAB').fr, 'VOR');
-    assert.equal(_freeWpNature('ZZCD').fr, 'point VFR');
-    assert.equal(_freeWpNature('ZZEF'), null, 'repère libre sans fréquence typée');
-    assert.equal(_excludedBreakdown(['ZZAB', 'ZZCD'], true), '1 VOR, 1 point VFR');
-    assert.equal(_excludedItems(['ZZAB'], true)[0], 'VOR MENUY', 'suffixe « (VOR) » du nom retiré');
-    assert.equal(_excludedItems(['ZZEF'], false)[0], 'free waypoint ZZEF', 'sans memo : repli code');
+test('nature des repères exclus : VOR/NDB/point VFR typés, repère libre sinon', () => {
+    memoSet('MENUY', { name: 'MENUY (VOR)', lat: 47, lon: -2, freeWp: true, frequencies: [{ freq: 114.5, type: 'VOR', primary: true }] });
+    memoSet('PONT', { name: 'Pont de Saint-Nazaire', lat: 47.2, lon: -2.2, freeWp: true, frequencies: [{ freq: 0, type: 'VRP' }] });
+    assert.equal(_freeWpNature('MENUY').fr, 'VOR');
+    assert.equal(_freeWpNature('PONT').fr, 'point VFR');
+    assert.equal(_freeWpNature('LIBRE'), null, 'repère libre sans fréquence typée');
+    assert.equal(_excludedBreakdown(['MENUY', 'PONT'], true), '1 VOR, 1 point VFR');
+    assert.equal(_excludedItems(['MENUY'], true)[0], 'VOR MENUY', 'suffixe « (VOR) » du nom retiré');
+    assert.equal(_excludedItems(['LIBRE'], false)[0], 'free waypoint LIBRE', 'sans memo : repli code');
 });
 
 // Groupes complets + filtre VFR + FL du plan (retours pilote 10/09)

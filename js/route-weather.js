@@ -20,7 +20,7 @@ let _lastRoutePoints = [];
 // Étiquette d'un point de passage : texte + bouton « × » de suppression
 // intégré (retour pilote 17/09 : suppression directement depuis la carte).
 // data-icao = waypoint de route (→ event remove-waypoint) ;
-// data-code = repère libre ZZxx (→ _deleteFreeWaypoint, regional-map).
+// data-code = repère libre (→ _deleteFreeWaypoint, regional-map).
 export function waypointLabelHtml(text, delAttrs, title) {
     const attrs = Object.entries(delAttrs || {})
         .map(([k, v]) => `${k}="${escapeHtml(String(v))}"`).join(' ');
@@ -98,12 +98,12 @@ export async function showRouteWeather(map, fromIcao, toIcao, opts = {}) {
     // Marqueurs intermédiaires pour les waypoints (cercles ambre) — ajoutés directement
     // à la map (pas à la polyline, qui n'accepte pas addTo).
     // Étiquette permanente du CODE OACI + « × » de suppression pour les
-    // aérodromes ; les repères libres (ZZxx) portent déjà leur nom (et leur
+    // aérodromes ; les repères libres portent déjà leur nom (et leur
     // « × ») via leur marqueur dédié (pas de doublon d'étiquette). La
     // suppression vit dans l'étiquette : le popup ne garde que Renommer.
     const isFr = state.lang === 'fr';
     _waypointMarkers = routePoints.slice(1, -1).map(p => {
-        const isFreeWp = /^ZZ[A-Z]{2}$/.test(p[2]);
+        const isFreeWp = !!getAirportByICAO(p[2])?.freeWp;
         const apt = getAirportByICAO(p[2]);
         const name = apt?.name && apt.name !== p[2] ? apt.name : null;
         const marker = L.circleMarker([p[0], p[1]], {

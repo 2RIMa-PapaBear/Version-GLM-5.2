@@ -1,5 +1,5 @@
 import { state, I18N, fetchAvecRelais, memoGet, memoSet, surfaceLabel } from './core.js';
-import { getAirportByICAO, getAirportsInBbox, enrichAirport } from './ui-module.js';
+import { getAirportByICAO, getAirportsInBbox, enrichAirport, forgetAirport } from './ui-module.js';
 import { parseWaypointsField, formatWaypointsField, registerFreeWpResolver, _wpDisplayName } from './flight-planner-ui.js';
 import { parseVisiToMeters, getCeiling } from './core.js';
 import { showRouteWeather, resetRouteFit, waypointLabelHtml } from './route-weather.js';
@@ -188,7 +188,7 @@ async function _initOrRefresh() {
         _initLayerControls();
 
         // Rejoue les repères libres reçus avant l'init (import d'un plan avec
-        // panneau carte jamais ouvert) : leurs codes ZZxx sont annoncés,
+        // panneau carte jamais ouvert) : leurs codes (noms) sont annoncés,
         // puis la route est retracée complète.
         if (_pendingFreeWps.length) {
             const pending = _pendingFreeWps.splice(0);
@@ -470,15 +470,14 @@ function _mountZoomAirfieldButton(bar) {
  * ----------------------------------------------------------------
  * Un clic droit sur la carte (ou le bouton « + Waypoint » puis un
  * clic) ouvre un mini-éditeur au point : le pilote nomme son repère
- * (« Pont de Tancarville »…) et le valide. Chaque repère reçoit un
- * pseudo-code ZZ01…ZZ99 « enrichi » dans la base locale via
- * enrichAirport() : planificateur, insertion intelligente, déclinaison,
- * carte et log PDF le traitent alors comme un terrain ordinaire.
+ * (« Pont de Tancarville »…) et le valide. Le CODE du repère EST son nom
+ * (slug) — enrichi dans la base locale via enrichAirport() : planificateur,
+ * insertion intelligente, déclinaison, carte, log PDF et fichiers exportés
+ * le portent tel quel (retour pilote 19/09 : plus aucun code ZZxx).
  * Clic sur le repère → Renommer / + Plan / Supprimer.
  * ================================================================ */
 
-let _freeWaypoints = new Map();   // 'ZZAA' → { lat, lon, name, marker, hit }
-let _freeWpSeq = 1;
+let _freeWaypoints = new Map();   // code (= nom slug) → { lat, lon, name, marker, hit }
 
 // Coordonnées en degrés-minutes aviation (ex. « 4851N 00221W ») — nom par
 // défaut d'un repère posé hors zone connue.
@@ -505,19 +504,21 @@ function _nearestKnownAirport(lat, lon) {
     return bestD <= R ? best : null;
 }
 
-// Pseudo-codes en LETTRES uniquement (ZZAA, ZZAB…) : reconnaissables par
-// /^ZZ[A-Z]{2}$/ pour le renommage. Aucun ZZ** réel dans airports.json →
-// pas de collision avec un vrai code OACI.
-function _nextFreeWpCode() {
-    const letters = (n) => {
-        let s = '';
-        n = n - 1;
-        for (let i = 0; i < 2; i++) { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26); }
-        return s;   // 1 → 'AA' … 676 → 'ZZ'
-    };
-    let code;
-    do { code = 'ZZ' + letters(_freeWpSeq++); }
-    while (_freeWaypoints.has(code) || getAirportByICAO(code));
+// Code d'un repère libre : DÉRIVÉ DE SON NOM (retour pilote 19/09 : plus
+// AUCUN code technique ZZxx — ni à l'écran, ni dans les fichiers de plan).
+// Premier mot utile du nom, majuscules, sans accents, [A-Z0-9-] ≤ 9 ; les
+// points VFR/radiophares gardent ainsi leur identité réelle (« RV-E »,
+// « LOR »). Repli : ses coordonnées DM. Collision (terrain réel ou autre
+// repère) → suffixe numérique.
+function _slugForName(name) {
+    const norm = String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+    return (norm.match(/[A-Z0-9][A-Z0-9-]{0,8}/) || [''])[0] || null;
+}
+
+function _freeWpCode(name, lat, lon) {
+    const base = (_slugForName(name) || _formatDmCoords(lat, lon).replace(/\s+/g, '')).slice(0, 10);
+    let code = base, n = 2;
+    while (_freeWaypoints.has(code) || getAirportByICAO(code)) code = (base + (n++)).slice(0, 10);
     return code;
 }
 
@@ -575,33 +576,24 @@ function _openFreeWpEditor(latlng, code = null) {
         .openOn(_map);
 }
 
-function _createFreeWaypoint(lat, lon, name, freq, kind) {
-    const code = _nextFreeWpCode();
-    // Enregistre le repère comme un « terrain » : tout le pipeline de nav
-    // (planner, insertion intelligente, magvar, route, PDF) le résoudra.
-    // Une fréquence (VOR/NDB) est conservée : elle s'affichera dans le
-    // détail des waypoints, écran et log PDF.
-    const freqNum = parseFloat(freq);
-    const extras = (Number.isFinite(freqNum) && freqNum > 0)
-        ? { frequencies: [{ freq: freqNum, name: '', type: kind || 'COM', primary: true }] }
-        : {};
-    enrichAirport(code, { lat, lon, name, ...extras });
-    memoSet(code, { name, lat, lon, ...extras });
-
-    const marker = L.circleMarker([lat, lon], {
+// Monte les couches d'un repère libre (cercle + étiquette avec « × », hit
+// portant le popup d'édition) — utilisé à la création ET au renommage (le
+// re-clé par le nom recrée les couches : leurs closures portent le code).
+function _mountFreeWpLayers(code, wp) {
+    const marker = L.circleMarker([wp.lat, wp.lon], {
         radius: 7, fillColor: '#FBBF24', color: '#fff',
         weight: 2, opacity: 1, fillOpacity: 0.9,
     }).addTo(_map);
     // Étiquette permanente du nom + « × » de suppression (retour pilote
     // 17/09 : on supprime le repère directement depuis son étiquette).
     marker.bindTooltip(
-        waypointLabelHtml(name, { 'data-code': code }, state.lang === 'fr' ? 'Supprimer le repère' : 'Delete waypoint'),
+        waypointLabelHtml(wp.name, { 'data-code': code }, state.lang === 'fr' ? 'Supprimer le repère' : 'Delete waypoint'),
         { permanent: true, direction: 'right', className: 'free-wp-label', interactive: true });
     // Marqueur DOM superposé au cercle SVG — même remède que les pastilles
     // (da0feda1) : le clic sur un path SVG recouvert par les couches et le
     // point d'étape de la route n'est pas fiable, c'est le HIT qui porte le
     // popup d'édition (Renommer / + Plan).
-    const hit = L.marker([lat, lon], {
+    const hit = L.marker([wp.lat, wp.lon], {
         interactive: true,
         keyboard: false,
         icon: L.divIcon({ className: 'pin-hit', iconSize: [16, 16], iconAnchor: [8, 8] }),
@@ -614,7 +606,30 @@ function _createFreeWaypoint(lat, lon, name, freq, kind) {
         if (!_freeWpInPlan(code)) document.dispatchEvent(new CustomEvent('add-waypoint', { detail: { icao: code } }));
         else hit.openPopup();
     });
-    _freeWaypoints.set(code, { lat, lon, name, marker, hit });
+    wp.marker = marker;
+    wp.hit = hit;
+}
+
+function _createFreeWaypoint(lat, lon, name, freq, kind) {
+    // Le code EST le nom (slug) — plus de pseudo-code ZZxx (retour pilote
+    // 19/09) : points VFR « RV-E », « LOR »… et repères personnalisés
+    // gardent leur identité partout (écran, plan, PDF, fichiers exportés).
+    const code = _freeWpCode(name, lat, lon);
+    // Enregistre le repère comme un « terrain » : tout le pipeline de nav
+    // (planner, insertion intelligente, magvar, route, PDF) le résoudra.
+    // Une fréquence (VOR/NDB) est conservée : elle s'affichera dans le
+    // détail des waypoints, écran et log PDF. freeWp marque le point pour
+    // les exclusions NOTAM (SOFIA ne connaît que des terrains).
+    const freqNum = parseFloat(freq);
+    const extras = (Number.isFinite(freqNum) && freqNum > 0)
+        ? { frequencies: [{ freq: freqNum, name: '', type: kind || 'COM', primary: true }] }
+        : {};
+    enrichAirport(code, { lat, lon, name, freeWp: true, ...extras });
+    memoSet(code, { name, lat, lon, freeWp: true, ...extras });
+
+    const wp = { lat, lon, name };
+    _mountFreeWpLayers(code, wp);
+    _freeWaypoints.set(code, wp);
 
     // Insertion intelligente + recalcul du plan (handler add-waypoint d'app.js)
     // + annonce du code créé (l'import d'un plan recompose l'ordre du fichier).
@@ -626,13 +641,35 @@ function _renameFreeWaypoint(code, name) {
     const wp = _freeWaypoints.get(code);
     if (!wp) return;
     // Préserve le plan : parse du champ AVANT le renommage (l'ancien nom
-    // ne résoudrait plus ensuite), champ réécrit en noms à jour puis recalculé.
+    // ne résoudrait plus ensuite), champ réécrit à jour puis recalculé.
     const wpInput = document.getElementById('fp-waypoints');
     const codes = wpInput?.value.trim() ? parseWaypointsField(wpInput.value) : null;
     wp.name = name;
-    enrichAirport(code, { name });
-    memoSet(code, { name, lat: wp.lat, lon: wp.lon });
-    wp.marker.setTooltipContent(waypointLabelHtml(name, { 'data-code': code }, state.lang === 'fr' ? 'Supprimer le repère' : 'Delete waypoint'));
+    // Le code dérive du nom : un renommage qui change le slug RE-CLÉ le
+    // repère (index, couches, plan) sous son nouveau code.
+    const slug = _slugForName(name);
+    if (slug && slug !== code) {
+        const old = getAirportByICAO(code) || {};
+        const newCode = _freeWpCode(name, wp.lat, wp.lon);
+        _map?.removeLayer(wp.marker);
+        _map?.removeLayer(wp.hit);
+        _freeWaypoints.delete(code);
+        enrichAirport(newCode, { lat: wp.lat, lon: wp.lon, name, freeWp: true,
+            frequencies: old.frequencies || undefined });
+        memoSet(newCode, { name, lat: wp.lat, lon: wp.lon, freeWp: true,
+            frequencies: old.frequencies || undefined });
+        forgetAirport(code);
+        _mountFreeWpLayers(newCode, wp);
+        _freeWaypoints.set(newCode, wp);
+        if (codes) {
+            const i = codes.indexOf(code);
+            if (i >= 0) codes[i] = newCode;
+        }
+    } else {
+        enrichAirport(code, { name });
+        memoSet(code, { name, lat: wp.lat, lon: wp.lon });
+        wp.marker.setTooltipContent(waypointLabelHtml(name, { 'data-code': code }, state.lang === 'fr' ? 'Supprimer le repère' : 'Delete waypoint'));
+    }
     // (le popup est bindé avec une fonction : il se re-rendra à la prochaine ouverture)
     if (wpInput && codes) {
         wpInput.value = formatWaypointsField(codes);
@@ -646,6 +683,7 @@ function _deleteFreeWaypoint(code) {
     _map?.removeLayer(wp.marker);
     _map?.removeLayer(wp.hit);
     _freeWaypoints.delete(code);
+    forgetAirport(code);
     const wpInput = document.getElementById('fp-waypoints');
     if (wpInput && wpInput.value.trim()) {
         const wps = parseWaypointsField(wpInput.value).filter(w => w !== code);
@@ -656,8 +694,8 @@ function _deleteFreeWaypoint(code) {
 
 // Renommage d'un repère depuis le plan de vol (flight-planner-ui émet l'événement).
 if (typeof document !== 'undefined') {
-    // Résolution nom affiché → code ZZxx pour le champ Waypoints du planner
-    // (le champ montre les VRAIS noms : « DIN », « LOR », « E2 »…).
+    // Résolution nom saisi → code du repère (slug du nom) pour le champ
+    // Waypoints du planner (le champ montre les VRAIS noms : « DIN », « LOR »…).
     registerFreeWpResolver((token) => {
         const t = String(token || '').trim().toUpperCase();
         if (!t) return null;

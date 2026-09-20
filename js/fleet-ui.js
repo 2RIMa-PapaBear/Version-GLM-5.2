@@ -91,6 +91,18 @@ function _ensureModal() {
                 </button>
             </div>
             <div id="fleet-content" class="fleet-content"></div>
+            <div class="fleet-form-actions">
+                <div class="fleet-form-actions-row">
+                    <button id="fleet-save" class="btn-primary"><i data-lucide="save"></i> ${isFr ? 'Enregistrer' : 'Save'}</button>
+                    <button id="fleet-cancel-form" class="btn-secondary" style="display:none;">${isFr ? 'Annuler' : 'Cancel'}</button>
+                </div>
+                <div class="fleet-form-hint">
+                    <i data-lucide="info"></i>
+                    <span>${isFr
+                        ? 'Distances issues du manuel de vol (POH) au niveau de la mer en atmosphère standard. La vitesse et la consommation de croisière alimentent la feuille de calcul de navigation (temps de vol, carburant).'
+                        : 'Distances from the POH at sea level / standard atmosphere. Cruise speed and fuel burn feed the navigation flight plan (ETE, fuel).'}</span>
+                </div>
+            </div>
         </div>
     `;
     document.body.appendChild(overlay);
@@ -213,17 +225,7 @@ function _render() {
                 </summary>
                 <div class="fleet-wb-body" id="fleet-wb-body"></div>
             </details>
-            <div class="fleet-form-hint">
-                <i data-lucide="info"></i>
-                <span>${isFr
-                    ? 'Distances issues du manuel de vol (POH) au niveau de la mer en atmosphère standard. La vitesse et la consommation de croisière alimentent la feuille de calcul de navigation (temps de vol, carburant).'
-                    : 'Distances from the POH at sea level / standard atmosphere. Cruise speed and fuel burn feed the navigation flight plan (ETE, fuel).'}</span>
-            </div>
             <div id="fleet-form-error" style="min-height:0; color:var(--danger); font-size:12px; padding:0 2px;" aria-live="polite"></div>
-            <div class="fleet-form-actions">
-                <button id="fleet-save" class="btn-primary"><i data-lucide="save"></i> ${isFr ? 'Enregistrer' : 'Save'}</button>
-                <button id="fleet-cancel-form" class="btn-secondary" style="display:none;">${isFr ? 'Annuler' : 'Cancel'}</button>
-            </div>
         </div>
     </div>`;
 
@@ -264,8 +266,10 @@ function _render() {
         });
     });
 
-    content.querySelector('#fleet-save').addEventListener('click', _doSave);
-    content.querySelector('#fleet-cancel-form').addEventListener('click', _resetForm);
+    // Barre d'actions : PIED FIXE de la fenêtre (hors zone défilante) —
+    // document-level car les boutons ne sont plus dans #fleet-content.
+    document.getElementById('fleet-save').addEventListener('click', _doSave);
+    document.getElementById('fleet-cancel-form').addEventListener('click', _resetForm);
 
     // --- Import d'UN avion (remplace l'avion ciblé, id et statut actif
     //     conservés ; le fichier doit contenir un seul avion). ---

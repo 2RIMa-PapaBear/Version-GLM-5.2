@@ -10,7 +10,7 @@ import { tzGet, tzPut } from './db.js';
 import {
     sanitizeStorage, initAirportsDB, updateFavoritesUI, renderSearchHistory,
     initAutocomplete, handleInput, handleScroll, toggleLanguage, setLanguage,
-    lireMETAR, stopAudio, updateFinalUI, _hideDashboard, addToHistory, toggleFavorite,
+    updateFinalUI, _hideDashboard, addToHistory, toggleFavorite,
     updateHighlights, getAirportByICAO, _selectAndFetch, enrichAirport,
     getStartupFavorite
 } from './ui-module.js';
@@ -284,17 +284,6 @@ export function genererGraphique() {
     showTakeoffWidget(state.requestedIcao || res.code);
     showFlightFile(state.requestedIcao || res.code);
     refreshWbWidget(state.requestedIcao || res.code);
-
-    // Met à jour le label du bouton lecture audio selon le type de message.
-    const readBtn = document.getElementById('btn-read-metar');
-    if (readBtn) {
-        const isFr = state.lang === 'fr';
-        const label = state.isMetar
-            ? (isFr ? 'Lire METAR' : 'Read METAR')
-            : (isFr ? 'Lire TAF' : 'Read TAF');
-        readBtn.innerHTML = `<i data-lucide='volume-2' class='icon-sm'></i> ${label}`;
-        if (window.lucide) window.lucide.createIcons({ root: readBtn });
-    }
 }
 
 /**
@@ -802,8 +791,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         const icao = document.getElementById('icaoInput').value.trim().toUpperCase();
         if (icao.length === 4) { toggleFavorite(icao); updateFavoritesUI(_selectAndFetch); }
     });
-    document.getElementById('btn-read-metar').addEventListener('click', () => lireMETAR(document.getElementById('tafInput').value));
-    document.getElementById('btn-stop-audio').addEventListener('click', stopAudio);
+    // (19/09) Plus de lecture audio METAR/TAF : boutons « Lire » et « Stop »
+    // supprimés sur demande du pilote — la synthèse vocale aussi.
 
     // Toggle Départ/Destination (mode Navigation uniquement).
     // Bascule le contenu de #icaoInput entre le terrain courant et la destination.

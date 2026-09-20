@@ -432,6 +432,15 @@ body.mode-nav .dep-dest-toggle { display: flex; }
 .side-column .btn-primary { background: rgba(15, 23, 42, 0.65); color: var(--primary); border: 1px solid var(--border-color); font-size: 12px; padding: 8px 12px; width: 100%; justify-content: center; }
 .side-column .btn-primary:hover { background: var(--input-bg); border-color: var(--border-hover); box-shadow: none; }
 .btn-secondary { background: rgba(255,255,255,0.08); color: var(--text-color); border: 1px solid var(--border-color); padding: 10px 15px; border-radius: var(--radius-sm); cursor: pointer; font-weight: 600; transition: all 0.25s cubic-bezier(0.22,1,0.36,1); display: flex; align-items:center; position: relative; overflow: hidden;}
+/* Boutons désactivés (ex. « Imprimer le dossier » en vol local, 19/09) :
+   visibles mais GRISÉS — pas de survol, pas de clic. */
+.btn-primary:disabled, .btn-secondary:disabled {
+    opacity: .45;
+    filter: saturate(.35);
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+}
 .btn-secondary:hover { background: var(--hover-bg-strong); border-color: var(--border-hover); transform: translateY(-1px); }
 
 .footer { font-size: 0.8rem; color: var(--text-muted); text-align: center; }
@@ -480,8 +489,8 @@ body.mode-nav .dep-dest-toggle { display: flex; }
 
 @media print {
     body { background: #fff; color: #000; padding: 0; }
-    .side-column, .btn-fetch-metar, .btn-fetch-taf, .btn-help, .btn-lang-toggle, 
-    .btn-add-favorite, .btn-read-metar, .btn-stop-audio, .audio-controls, 
+    .side-column, .btn-fetch-metar, .btn-fetch-taf, .btn-help, .btn-lang-toggle,
+    .btn-add-favorite, .audio-controls,
     .btn-clear-history, .fav-remove-btn, .fav-drag-handle, .canvas-tooltip, .aero-legend-bar { display: none !important; }
     .container { grid-template-columns: 1fr; max-width: 100%; }
     .card { box-shadow: none; border: 1px solid #ccc; background: #fff; }
@@ -1281,14 +1290,19 @@ body.map-overlay-open { overflow: hidden; }
     padding: 20px;
 }
 
+/* Colonne flex : en-tête + CONTENU SEUL défilant + pied d'actions fixe
+   (retour pilote 19/09 : « Enregistrer » toujours visible et IMMOBILE —
+   le sticky dérivait sur la fin du défilement). */
 .fleet-modal {
     background: var(--bg-card, #0F172A);
     border: 1px solid var(--border-color, #334155);
     border-radius: 14px;
     width: 100%;
     max-width: 560px;
-    max-height: 90vh;
-    overflow-y: auto;
+    max-height: 95vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
 }
 
@@ -1296,12 +1310,9 @@ body.map-overlay-open { overflow: hidden; }
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 18px 22px;
+    padding: 12px 20px;
     border-bottom: 1px solid var(--border-color);
-    position: sticky;
-    top: 0;
     background: var(--bg-card, #0F172A);
-    z-index: 1;
 }
 .fleet-modal-header h2 {
     font-size: 17px;
@@ -1324,9 +1335,9 @@ body.map-overlay-open { overflow: hidden; }
 }
 .fleet-close:hover { background: rgba(255,255,255,0.08); color: var(--text-color); }
 
-.fleet-content { padding: 18px 22px; }
+.fleet-content { padding: 12px 20px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 
-.fleet-list-section { margin-bottom: 24px; }
+.fleet-list-section { margin-bottom: 14px; }
 .fleet-section-title {
     font-size: 11px;
     text-transform: uppercase;
@@ -1340,11 +1351,11 @@ body.map-overlay-open { overflow: hidden; }
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 14px;
+    padding: 10px 12px;
     background: rgba(255,255,255,0.03);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     transition: border-color 0.15s;
 }
 .fleet-item-active {
@@ -1363,16 +1374,20 @@ body.map-overlay-open { overflow: hidden; }
     color: var(--secondary, #FBBF24);
     font-size: 12px;
 }
+/* Colonne info rétractable : les stats longues (8 valeurs sur la fiche
+   complète) se replient sur plusieurs lignes SANS pousser les icônes
+   hors de la carte (retour pilote 19/09 — « les icônes débordent »). */
+.fleet-item-info { flex: 1; min-width: 0; margin-right: 8px; }
 .fleet-item-stats {
     font-size: 11px;
     color: var(--text-muted);
     margin-top: 3px;
     display: flex;
-    gap: 6px;
+    flex-wrap: wrap;
+    gap: 3px 6px;
     font-family: 'DM Mono', monospace;
 }
-
-.fleet-item-actions { display: flex; gap: 4px; }
+.fleet-item-actions { display: flex; gap: 4px; flex-shrink: 0; }
 .fleet-mini-btn {
     background: none;
     border: 1px solid transparent;
@@ -1388,8 +1403,8 @@ body.map-overlay-open { overflow: hidden; }
 .fleet-mini-btn.fleet-delete:hover { color: #EF4444; }
 .fleet-mini-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
-.fleet-form-section { border-top: 1px solid var(--border-color); padding-top: 18px; }
-.fleet-form { display: flex; flex-direction: column; gap: 12px; }
+.fleet-form-section { border-top: 1px solid var(--border-color); padding-top: 12px; }
+.fleet-form { display: flex; flex-direction: column; gap: 9px; }
 .fleet-form-row { display: flex; gap: 12px; }
 .fleet-form-row label {
     flex: 1;
@@ -1405,7 +1420,7 @@ body.map-overlay-open { overflow: hidden; }
     border: 1px solid var(--border-color);
     color: var(--text-color, #F8FAFC);
     border-radius: 6px;
-    padding: 8px 10px;
+    padding: 7px 10px;
     font-family: 'DM Sans', sans-serif;
     font-size: 13px;
     outline: none;
@@ -1483,7 +1498,19 @@ body.map-overlay-open { overflow: hidden; }
 }
 .fleet-io .fleet-io-btn i { width: 14px; height: 14px; }
 
-.fleet-form-actions { display: flex; gap: 8px; }
+/* Pied FIXE de la fenêtre flotte : hors de la zone défilante (colonne
+   flex de .fleet-modal), « Enregistrer » ne bouge jamais. La note POH
+   est INTÉGRÉE À DROITE des boutons, sur la même ligne (retour pilote
+   19/09) : elle prend l'espace restant, le pied reste bas. */
+.fleet-form-actions {
+    display: flex; align-items: center; gap: 14px;
+    padding: 9px 20px;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-card, #0F172A);
+    box-shadow: 0 -10px 16px -12px rgba(0, 0, 0, .6);
+}
+.fleet-form-actions-row { display: flex; gap: 8px; flex-shrink: 0; }
+.fleet-form-actions .fleet-form-hint { margin: 0; font-size: 10px; padding: 5px 10px; flex: 1 1 auto; min-width: 0; }
 .fleet-form-actions .btn-primary,
 .fleet-form-actions .btn-secondary {
     padding: 9px 18px;

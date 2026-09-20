@@ -1,5 +1,5 @@
 // QA NOTAM × repères libres (retour pilote 12/09 « Erreur : SOFIA HTTP 400 ») :
-// un plan contenant un code ZZxx (repère libre, clic droit carte) ne doit plus
+// un plan contenant un repère libre (clic droit carte / point VFR) ne doit plus
 // être envoyé tel quel à SOFIA — la route interrogée est nettoyée, le dossier
 // s'affiche avec la mention du repère exclu, aucune erreur.
 // Le POST /notam part vers le VRAI worker (meteo-relais) — seule la météo est
@@ -96,14 +96,14 @@ await page.waitForFunction(() => {
 // Plan AVEC repère libre : exactement l'état qui provoquait « SOFIA HTTP 400 ».
 // (dispatch sur WINDOW, comme le vrai code flight-planner-ui/recalc ;
 // config.local.js dévie le relay vers wrangler dev — on reforce le VRAI
-// worker pour tester le chemin applicatif réel. ZZAB est typé VOR : les
+// worker pour tester le chemin applicatif réel. MENUY est typé VOR : les
 // mentions d'exclusion doivent détailler sa nature — retour pilote 12/09.)
 await page.evaluate(async () => {
     const { state, memoSet } = await import('/js/core.js');
     const { config } = await import('/js/config.js');
     config.NOTAM_RELAY_URL = 'https://meteo-relais.papabear56.workers.dev/notam';
-    memoSet('ZZAB', { name: 'MENUY (VOR)', lat: 47, lon: -2, frequencies: [{ freq: 114.5, type: 'VOR', primary: true }] });
-    state.route = ['LFRV', 'ZZAB', 'LFRC'];
+    memoSet('MENUY', { name: 'MENUY (VOR)', lat: 47, lon: -2, freeWp: true, frequencies: [{ freq: 114.5, type: 'VOR', primary: true }] });
+    state.route = ['LFRV', 'MENUY', 'LFRC'];
     window.dispatchEvent(new CustomEvent('route-changed'));
 });
 await new Promise(r => setTimeout(r, 400));
@@ -131,12 +131,12 @@ const resTxt = await page.evaluate(() => document.getElementById('notam-results'
 resTxt.includes('SOFIA-Briefing (SIA)') ? ok('en-tête du dossier présent') : ko('en-tête du dossier absent');
 resTxt.includes('VOR MENUY') && resTxt.includes('inconnu de SOFIA') ? ok('mention « VOR MENUY non interrogé (terrain inconnu de SOFIA) » affichée') : ko(`mention typée absente du dossier : « ${resTxt.slice(0, 160)} »`);
 
-// La requête réellement partie ne contenait PAS le ZZxx.
+// La requête réellement partie ne contenait PAS le repère libre.
 const mainPost = notamPosts[0];
 if (mainPost) {
     const sent = JSON.parse(mainPost.body).route;
     JSON.stringify(sent) === JSON.stringify(['LFRV', 'LFRC'])
-        ? ok(`requête partie : route ${JSON.stringify(sent)} (ZZAB écarté)`)
+        ? ok(`requête partie : route ${JSON.stringify(sent)} (MENUY écarté)`)
         : ko(`requête partie avec ${JSON.stringify(sent)}`);
 } else ko('aucun POST /notam observé');
 

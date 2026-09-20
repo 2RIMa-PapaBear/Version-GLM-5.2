@@ -402,7 +402,7 @@ function _routePtsFromUI(depIcao, toVal) {
         const apt = getAirportByICAO(code);
         const memo = memoGet(code);
         const lat = memo?.lat ?? apt?.lat ?? null, lon = memo?.lon ?? apt?.lon ?? null;
-        if (lat == null || lon == null) continue;   // p.ex. ZZxx non résolu
+        if (lat == null || lon == null) continue;   // p.ex. repère libre non résolu
         pts.push({ icao: code, lat, lon });
     }
     return pts.length >= 2 ? pts : null;

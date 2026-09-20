@@ -499,8 +499,11 @@ export function drawNavLogPdf(jsPDFCtor, d) {
     // page avec les checks croisière / point tournant / vent arrière »). ----
     if ((d.rows || []).length > N_ROWS) _drawLogContinuation(doc, d);
 
-    // ---- Page 2 : « Calcul de navigation » (bloc écran du planificateur) ----
-    if (d.calc) {
+    // ---- Page 2 : « Calcul de navigation » (bloc écran du planificateur).
+    // VOL LOCAL (19/09) : pas de page calcul — sans route elle n'a pas
+    // d'objet ; le devis carburant vit sur le log (page 1) et les perfs
+    // (décollage + atterrissage) sur la page Performances. ----
+    if (d.calc && !d.calc.local) {
         _drawCalcPage(doc, d.calc);
         // Page de continuation du tableau waypoints (> 10 tronçons) :
         // même gabarit que la page 2, insérée juste après.
@@ -868,9 +871,12 @@ function _drawPerfPage(doc, p) {
     doc.setDrawColor(...INK); doc.setLineWidth(0.8);
     doc.rect(15, 29.9, 388.6, 551.9, 'S');
 
-    // ---- Ligne mono « LFPB → LFRM » (même en-tête que la page 2) ----
+    // ---- Ligne mono « LFPB → LFRM » (même en-tête que la page 2) —
+    // vol local : terrain seul, sans flèche. ----
     doc.setFont('courier', 'normal'); doc.setFontSize(8); _setInk(doc, MUTED);
-    doc.text(`${p.fromIcao} → ${p.toIcao}`.replace('→', '-'), L + 1.5, 45);
+    doc.text(p.fromIcao === p.toIcao
+        ? `${p.fromIcao} - ${fr ? 'vol local' : 'local flight'}`
+        : `${p.fromIcao} → ${p.toIcao}`.replace('→', '-'), L + 1.5, 45);
 
     let y = 56;
 
@@ -927,9 +933,69 @@ function _drawPerfPage(doc, p) {
         y += 14;
     }
 
-    // ---- Section 2 : profil d'élévation de la route ----
-    // (tiret entre les OACI : le glyphe → n'existe pas en WinAnsi)
+    // ---- Section 1bis : performances d'ATTERRISSAGE (vol local, 19/09) :
+    // même terrain que le décollage, profil posé SOUS celui de décollage. ----
+    const ldg = p.landing;
+    if (ldg) {
+        const lvlL = ldg.level === 'danger' ? 'danger' : ((ldg.level === 'caution' || ldg.level === 'limitative') ? 'caution' : 'ok');
+        const lvlColorL = lvlL === 'danger' ? REDTX : (lvlL === 'caution' ? AMBER : GREEN);
+        const rwyTxtL = ldg.rwy ? ` · RWY ${ldg.rwy}${ldg.forecast ? ' ' + (fr ? '(prévue)' : '(exp.)') : ''}` : '';
+        y = section(fr ? `Atterrissage — ${p.fromIcao}${rwyTxtL}` : `Landing — ${p.fromIcao}${rwyTxtL}`, y);
+
+        const cw4l = (W - 3 * 7) / 4;
+        // Ordre pilote (19/09 soir) : Franchissement 50 ft PUIS roulement.
+        cell(L, y, cw4l, 29, fr ? 'Franch. 50 ft (+20 %)' : '50 ft (+20%)', `${ldg.fiftyM} m`);
+        cell(L + cw4l + 7, y, cw4l, 29, fr ? 'Roulement' : 'Ground roll', `${ldg.rollM} m`);
+        cell(L + 2 * (cw4l + 7), y, cw4l, 29, fr ? 'Densité-alt.' : 'Density alt.', `${ldg.da} ft`);
+        cell(L + 3 * (cw4l + 7), y, cw4l, 29, fr ? 'Réf. avion (m)' : 'A/C ref (m)', ldg.refLabel, { size: 9.5 });
+        y += 35;
+
+        // Rangée pondérée : le vent combiné (axial + travers) est long —
+        // « 8 kt de face / 1 kt de droite » — sa cellule est plus large.
+        const rw2 = W - 2 * 7;
+        const cwPiste = rw2 * 0.85 / 3, cwVent = rw2 * 1.3 / 3, cwMarge = rw2 * 0.85 / 3;
+        const xPiste = L, xVent = L + cwPiste + 7, xMarge = L + cwPiste + cwVent + 2 * 7;
+        cell(xPiste, y, cwPiste, 29, fr ? 'Longueur piste' : 'Runway length',
+             ldg.runwayLengthM != null ? `${ldg.runwayLengthM} m` : '—');
+        // Vent axial + traversier COMBINÉS (retour pilote 19/09 soir) :
+        // « 3 kt de face / 1 kt de droite ».
+        const hw = ldg.headwindKt;
+        let hwTxt = '—';
+        if (hw != null) {
+            const axial = fr ? `${Math.abs(hw)} kt ${hw >= 0 ? 'de face' : 'arrière'}` : `${Math.abs(hw)} kt ${hw >= 0 ? 'head' : 'tailwind'}`;
+            const xw = (ldg.crosswindKt != null && ldg.crosswindSide)
+                ? (fr
+                    ? `${ldg.crosswindKt} kt ${ldg.crosswindSide === 'D' ? 'de droite' : 'de gauche'}`
+                    : `${ldg.crosswindKt} kt from the ${ldg.crosswindSide === 'D' ? 'right' : 'left'}`)
+                : null;
+            hwTxt = xw ? `${axial} / ${xw}` : axial;
+        }
+        cell(xVent, y, cwVent, 29, fr ? 'Vent' : 'Wind', hwTxt,
+             { color: (hw != null && hw < 0) ? AMBER : INK, size: hwTxt.length > 13 ? 8 : 10 });
+        cell(xMarge, y, cwMarge, 29, fr ? 'Marge (50 ft)' : 'Margin (50 ft)',
+             ldg.marginM != null ? `${ldg.marginM >= 0 ? '+' : ''}${ldg.marginM} m` : '—',
+             { color: ldg.marginM != null ? lvlColorL : MUTED, size: 12 });
+        y += 35;
+
+        // Coupe de la piste : finale 50 ft, toucher, roulement jusqu'à
+        // l'arrêt, marge restante — miroir de la coupe de décollage.
+        if (ldg.runwayLengthM != null && ldg.runwayLengthM > 0) {
+            y = _drawLandingProfile(doc, ldg, L, R, y + 2, fr);
+        } else {
+            y += 4;
+        }
+
+        if (lvlL !== 'ok' && ldg.marginM != null) {
+            y = _alertBanner(doc, L, R, W, y, lvlL === 'danger', ldg.message);
+        } else {
+            y += 2;
+        }
+    }
+
+    // ---- Section 2 : profil d'élévation de la route — VOL LOCAL : sans
+    // objet (pas de route), section sautée (19/09). ----
     const pr = p.profile;
+    if (p.fromIcao !== p.toIcao) {
     y = section(fr ? `Profil d'élévation — ${pr?.fromIcao ?? p.fromIcao} - ${pr?.toIcao ?? p.toIcao}`
                    : `Elevation profile — ${pr?.fromIcao ?? p.fromIcao} - ${pr?.toIcao ?? p.toIcao}`, y);
     if (pr?.points?.length) {
@@ -939,6 +1005,7 @@ function _drawPerfPage(doc, p) {
         doc.text(fr ? 'Profil d\'élévation indisponible (relief Open-Meteo inaccessible)'
                     : 'Elevation profile unavailable (Open-Meteo terrain unavailable)', L + 1.5, y + 6);
         y += 14;
+    }
     }
 
     // ---- Section 3 : alternates viables le long de la route ----
@@ -1119,6 +1186,93 @@ function _drawTakeoffProfile(doc, t, L, R, yTop, fr) {
         const marge = `${fr ? 'Marge' : 'Margin'} ${t.marginM >= 0 ? '+' : ''}${t.marginM} m · ${fr ? 'piste' : 'runway'} ${t.runwayLengthM} m`;
         _setInk(doc, t.marginM >= 0 ? lvlColor : REDTX);
         doc.text(marge, R - 2, t.marginM >= 0 ? yBase + 14 : ay - 12 * 0.9, { align: 'right' });
+    }
+
+    return yBase + 20;
+}
+
+/** Coupe de piste ATTERRISSAGE (vol local, 19/09) — MIROIR EXACT du schéma
+ *  écran (takeoff-profile.js landingProfileSvg) : repère 50 ft écarté du
+ *  bord avec son étiquette posée AVANT lui, avion en approche AU repère
+ *  assiette nez bas sur la pente, posé-arrêté en fin de roulement avec
+ *  « arrêt · X m » AU-DESSUS, marge en barre au-dessus de la piste.
+ *  Échelle fonctionnelle écran : la distance d'arrêt occupe ~2/3 du cadre. */
+function _drawLandingProfile(doc, l, L, R, yTop, fr) {
+    const lvl = l.level === 'danger' ? 'danger' : ((l.level === 'caution' || l.level === 'limitative') ? 'caution' : 'ok');
+    const lvlColor = lvl === 'danger' ? REDTX : (lvl === 'caution' ? AMBER : GREEN);
+    const W = R - L;
+    const yBase = yTop + 44;                    // ligne de piste (≈ RWY_Y)
+    const TOP50 = yTop + 12;                    // hauteur 50 ft (≈ FT50_Y)
+
+    // Échelle fonctionnelle (retour pilote 13/09 écran) : l'arrêt à ~2/3.
+    const spanM = Math.min(l.runwayLengthM, l.fiftyM * 1.6);
+    const pxPerM = W / spanM;
+    const rollM = Math.min(l.rollM, l.fiftyM);   // garde-fou écran
+    // Repère 50 ft au-dessus du SEUIL, écarté du bord pour son étiquette
+    // « 50 ft » posée AVANT lui (proportion du 44 px écran sur 340).
+    const fiftyX = L + 50;
+    const stopTrueX = L + l.fiftyM * pxPerM;
+    const stopX = Math.min(stopTrueX, R - 2);
+    const touchX = Math.max(fiftyX + 26, Math.min(L + (l.fiftyM - rollM) * pxPerM, stopX - 8));
+    const rwyEndX = L + l.runwayLengthM * pxPerM;
+    const rwyEndInFrame = rwyEndX <= R + 0.5;
+    const descentAngle = Math.atan2((yBase - 3) - (TOP50 + 7), Math.max(1, touchX - fiftyX)) * 180 / Math.PI;
+    const s = 1.18 * Math.min(1.5, Math.max(1, W / 340));   // planeScale écran
+
+    // Sol hachuré + piste + jalons (seuil à gauche, fin de piste si visible).
+    doc.setDrawColor(...BANDL); doc.setLineWidth(0.4);
+    for (let x = L + 3; x < R - 4; x += 7) doc.line(x, yBase + 6, x + 4, yBase + 2);
+    doc.setDrawColor(...LINE); doc.setLineWidth(0.7);
+    doc.line(L, yBase, R, yBase);
+    doc.setLineWidth(1.2);
+    doc.line(L + 1, yBase - 5, L + 1, yBase + 2);
+    if (rwyEndInFrame) doc.line(rwyEndX - 1, yBase - 5, rwyEndX - 1, yBase + 2);
+
+    // Descente (couleur verdict) du repère 50 ft au toucher, puis roulement
+    // jusqu'à l'arrêt ; repère 50 ft en pointillés jusqu'à la piste.
+    doc.setDrawColor(...lvlColor); doc.setLineWidth(2.2);
+    doc.line(fiftyX, TOP50 + 7, touchX, yBase - 3);
+    doc.setLineWidth(2.6);
+    doc.line(touchX, yBase - 2.5, stopX, yBase - 2.5);
+    doc.setDrawColor(...LINE); doc.setLineWidth(0.4);
+    doc.setLineDashPattern([2, 3], 0);
+    doc.line(fiftyX, TOP50 + 8, fiftyX, yBase);
+    doc.setLineDashPattern([], 0);
+
+    // Marge restante : barre au-dessus de la piste de l'arrêt à la fin,
+    // « +X m » centré si la place le permet ; « manque » en rouge sinon.
+    if (l.marginM != null && l.marginM >= 0) {
+        const endX = rwyEndInFrame ? rwyEndX : R;
+        const mw = endX - stopX - 6;
+        if (mw > 4) {
+            doc.setFillColor(...lvlColor);
+            doc.roundedRect(stopX + 3, yBase - 8, mw, 3.5, 1.5, 1.5, 'F');
+            if (mw >= 46) {
+                doc.setFont('courier', 'bold'); doc.setFontSize(8); _setInk(doc, lvlColor);
+                doc.text(`+${l.marginM} m`, (stopX + endX) / 2, yBase - 12, { align: 'center' });
+            }
+        }
+    } else if (l.marginM != null) {
+        doc.setFont('courier', 'bold'); doc.setFontSize(8); _setInk(doc, REDTX);
+        doc.text(`${fr ? 'manque' : 'short'} ${Math.abs(l.marginM)} m`, stopX + 2, TOP50 + 4, { align: 'right' });
+    }
+
+    // Avions (comme l'écran) : en APPROCHE au repère 50 ft — assiette sur la
+    // pente, nez bas (PLANE_TILT + pente ≈ compensation de l'inclinaison
+    // native) — et posé-arrêté en fin de roulement, à plat sur la piste.
+    _planeIcon(doc, fiftyX + 10.5 * s, TOP50 - 2.1 * s, s, PLANE_TILT + descentAngle);
+    _planeIcon(doc, Math.max(stopX - 15 * s, touchX + 2), yBase - 0.35 - (PLANE_DROP + PLANE_LIFT) * s, s, PLANE_TILT);
+
+    // Étiquettes (positions écran) : « 50 ft » AVANT le repère ; roulement
+    // centré SOUS la piste ; « arrêt · X m » AU-DESSUS de l'avion posé.
+    doc.setFont('courier', 'bold'); doc.setFontSize(7); _setInk(doc, MUTED);
+    doc.text('50 ft', fiftyX - 6, TOP50 + 5, { align: 'right' });
+    if (stopX - touchX > 44) {
+        doc.text(`${rollM} m`, (touchX + stopX) / 2, yBase + 14, { align: 'center' });
+    }
+    if (stopTrueX <= R - 1) {
+        doc.setFont('courier', 'bold'); doc.setFontSize(8); _setInk(doc, lvlColor);
+        doc.text(`${fr ? 'arrêt' : 'stop'} · ${l.fiftyM} m`, Math.min(stopX, R - 4), yBase - 28, { align: 'right' });
     }
 
     return yBase + 20;
