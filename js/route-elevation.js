@@ -1,5 +1,6 @@
 // fetch direct (sans proxy ni queue) : l'endpoint /elevation d'Open-Meteo autorise
 // CORS nativement et n'a pas de limite stricte nécessitant la queue de fetchOpenMeteo.
+import { sampleElevationsTerrarium } from './terrain-tiles.js';
 async function _fetchElevation(url) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 12000);
@@ -49,17 +50,27 @@ export async function fetchRouteElevation(fromLat, fromLon, toLat, toLon, sample
             lons.push((fromLon + (toLon - fromLon) * t).toFixed(4));
         }
 
-        const url = `${ENDPOINT}?latitude=${lats.join(',')}&longitude=${lons.join(',')}`;
-        let data;
+        // SOURCE PRIMAIRE : tuiles Terrarium d'AWS (choix pilote 20/09) —
+        // gratuites, sans clé ni quota. Repli n° 2 : Open-Meteo (quota
+        // journalier). Dernier repli (profil interpolé + bandeau) : en
+        // amont, dans flight-planner.
+        let elevs = null;
         try {
-            data = await _fetchElevation(url);
-        } catch (e) {
-            console.warn('Route elevation fetch error:', e.message);
-            return null;
+            elevs = await sampleElevationsTerrarium(lats.map((v, i) => ({ lat: parseFloat(v), lon: parseFloat(lons[i]) })));
+            if (Array.isArray(elevs) && elevs.length !== n) elevs = null;
+        } catch { elevs = null; }
+        if (!elevs) {
+            const url = `${ENDPOINT}?latitude=${lats.join(',')}&longitude=${lons.join(',')}`;
+            let data;
+            try {
+                data = await _fetchElevation(url);
+            } catch (e) {
+                console.warn('Route elevation fetch error:', e.message);
+                return null;
+            }
+            if (!data) return null;
+            elevs = data?.elevation;
         }
-        if (!data) return null;
-
-        const elevs = data?.elevation;
         if (!Array.isArray(elevs) || elevs.length !== n) return null;
 
         const points = [];
