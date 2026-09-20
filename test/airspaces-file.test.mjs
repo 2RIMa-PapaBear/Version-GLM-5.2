@@ -108,6 +108,19 @@ test('_rdpKey : désignateurs R/D/P des deux conventions de nommage', () => {
     assert.equal(_rdpKey('CTR VANNES'), null);
 });
 
+// (20/09, retour pilote carte + profil) openAIP publie « LF-D18 A3 MODIFIED » —
+// suffixe de secteur ESPACÉ après le LF- : sans l'espace optionnel, la clé
+// s'arrêtait à « D18 » et ne rattrapait pas le « D 18 A3 » du SIA → la copie
+// openAIP doublait la zone.
+test('_rdpKey : suffixe ESPACÉ côté LF- (« LF-D18 A3 MODIFIED » ≡ « D 18 A3 »)', () => {
+    assert.equal(_rdpKey('LF-D18 A3 MODIFIED'), _rdpKey('D 18 A3'), 'clés identiques');
+    assert.equal(_rdpKey('LF-D18 A3 MODIFIED'), 'D18A3');
+    // Comportements antérieurs préservés : collé, zéro initial, espacé SIA.
+    assert.equal(_rdpKey('LF-R278A'), 'R278A');
+    assert.equal(_rdpKey('LF-R042'), 'R42');
+    assert.equal(_rdpKey('R 149 E'), 'R149E');
+});
+
 test('_dropOpenAipDuplicates : la copie SIA prime, y compris par désignateur', () => {
     const sia = [{ name: 'R 278' }, { name: 'R 279' }, { name: 'CTR VANNES' }, { name: 'R 149 E' }];
     const oaip = [
@@ -144,6 +157,35 @@ test('_dropOpenAipDuplicates : « partie X » normalisé (SIV RENNES SUD partie 
     ];
     const out = _dropOpenAipDuplicates(oaip, sia);
     assert.deepEqual(out.map(z => z.name), ['CTR SARREBRUCK PARTIE FRANCE', 'SIV RENNES NORD']);
+});
+
+// (20/09, consigne pilote) DOUBLONS GÉOMÉTRIQUES : même zone publiée sous
+// des noms incomparables → écartée par l'empreinte (bbox + centroïde +
+// surface + tranches verticales). Les zones DISTINCTES (verticales
+// différentes, emplacements différents) restent.
+test('_dropOpenAipDuplicates : même EMPREINTE sous nom incomparable → doublon écarté (20/09)', () => {
+    const RING = [[-1.10, 46.10], [-0.90, 46.10], [-0.90, 46.25], [-1.10, 46.25], [-1.10, 46.10]];
+    const zone = (name, lo, up, ring = RING) => ({
+        name,
+        lowerLimit: { value: lo, unit: 'FT' },
+        upperLimit: { value: up, unit: 'FT' },
+        geometry: { type: 'Polygon', coordinates: [ring] },
+    });
+    const sia = [zone('D 18 A3', 0, 3000)];
+    const oaip = [
+        // Même forme, mêmes tranches, nom sans AUCUN rapport → doublon.
+        zone('ZONE MILITAIRE ROCHEFORT', 0, 3000),
+        // Même forme MAIS tranches différentes (TMA au-dessus) → conservée.
+        zone('TMA AU-DESSUS', 3000, 11500),
+        // Même nom d'esprit MAIS emplacement différent → conservée.
+        zone('AUTRE ZONE MILITAIRE', 0, 3000, [[2.0, 47.0], [2.2, 47.0], [2.2, 47.15], [2.0, 47.15], [2.0, 47.0]]),
+        // Sans verticales exploitables → jamais écartée géométriquement.
+        { name: 'MYSTERE', geometry: { type: 'Polygon', coordinates: [RING] } },
+    ];
+    const out = _dropOpenAipDuplicates(oaip, sia);
+    assert.deepEqual(out.map(z => z.name).sort(),
+        ['AUTRE ZONE MILITAIRE', 'MYSTERE', 'TMA AU-DESSUS'],
+        'seule la copie de même empreinte disparaît');
 });
 
 // (20/09) Séparateurs de secteur : SIA « 2-1 » ≡ openAIP « 2.1 » — sinon la

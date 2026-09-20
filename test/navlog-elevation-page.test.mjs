@@ -97,8 +97,7 @@ describe('page dédiée profil d\u2019élévation (20/09)', () => {
         assert.equal(n3, 1, `« TMA LA ROCHELLE 3 » dessiné ${n3} fois (attendu 1)`);
     });
 
-    test('zones : traversées DISJOINTES (sortie puis re-entrée) → 2 étiquettes conservées', () => {
-        const pr = JSON.parse(JSON.stringify(sample.perf.profile));
+    test('zones : traversées DISJOINTES (sortie puis re-entrée) → 2 étiquettes conservées', () => {        const pr = JSON.parse(JSON.stringify(sample.perf.profile));
         pr.routeAirspaces = [{
             name: 'LA ROCHELLE', up: 5500, lo: 1000, freq: null,
             ranges: [[0.1, 0.3], [0.6, 0.8]],
@@ -119,5 +118,44 @@ describe('page dédiée profil d\u2019élévation (20/09)', () => {
         drawElevationProfilePage(d3, pr);
         assert.equal(t3.filter(l => l.includes('TMA LA ROCHELLE 1')).length, 2,
             'deux traversées disjointes = deux étiquettes (comportement conservé)');
+    });
+
+    test('activités LONGUES des zones R/D/P : repli sur 2 lignes MAX, jamais une seule ligne longue (retour pilote 20/09)', () => {
+        const ACT = 'Activités spécifiques défense, tirs, bombardements, activités aériennes diverses';
+        const pr = JSON.parse(JSON.stringify(sample.perf.profile));
+        pr.routeAirspaces = [{
+            name: 'R 147', up: 1500, lo: 800, freq: null,
+            ranges: [[0.15, 0.45]],
+            segs: [{ zone: 'R 147', fa: 0.15, fb: 0.45, act: ACT, hor: 'NOTAM' }],
+        }];
+        const subs = [];
+        const P4 = class extends jsPDF {
+            constructor(o) {
+                super(o);
+                const dT = this.text.bind(this);
+                this.text = (t, x, y, op) => {
+                    const f = this.internal.getFont();
+                    const s = this.internal.getFontSize();
+                    // Seconde ligne des cadres : helvetica normal 5,5 pt.
+                    if (f.fontName === 'helvetica' && f.fontStyle === 'normal' && s === 5.5) {
+                        (Array.isArray(t) ? t.map(String) : String(t).split('\n')).forEach(l => {
+                            if (l) subs.push({ l, w: this.getTextWidth(l) });
+                        });
+                    }
+                    return dT(t, x, y, op);
+                };
+            }
+        };
+        const d4 = drawNavLogPdf(P4, { ...sample, perf: { ...sample.perf, profile: pr } });
+        drawElevationProfilePage(d4, pr);
+        assert.ok(subs.length >= 1, 'activité rendue');
+        assert.ok(!subs.some(x => x.l === `${ACT.toUpperCase()} · NOTAM`), 'le texte entier sur UNE ligne est interdit');
+        // 2 lignes MAX, chacune bornée par la largeur du cadre (seg 0,15-0,45
+        // sur le graphe dédié ≈ 154 pt ; tolérance 1 pt).
+        assert.ok(subs.length <= 2, `plus de 2 lignes : ${JSON.stringify(subs.map(x => x.l))}`);
+        assert.ok(subs.every(x => x.w <= 155), `ligne plus large que le cadre : ${JSON.stringify(subs)}`);
+        // Le contenu est bien réparti : les mots-clés se retrouvent sur l'ensemble des lignes.
+        assert.ok(/d[ée]fense|activit[ée]s/i.test(subs.map(x => x.l).join(' ')),
+            `activité identifiable dans ${JSON.stringify(subs.map(x => x.l))}`);
     });
 });

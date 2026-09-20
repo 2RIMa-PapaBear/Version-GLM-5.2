@@ -16,6 +16,7 @@ Thumbs.db
 
 # ZCode (fichiers internes de l'agent)
 .zcode/
+.v2c/
 
 # Sauvegardes / copies
 *Copie*
