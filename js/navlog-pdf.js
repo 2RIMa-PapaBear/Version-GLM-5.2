@@ -117,10 +117,13 @@ function _trunc(doc, text, maxW) {
 // 6 pt centrée dans la bande de marge sous le cadre extérieur.
 function _footer(doc, isFr) {
     doc.setFont('helvetica', 'normal'); doc.setFontSize(6); _setInk(doc, MUTED);
+    // Conscient de l'orientation de la page COURANTE (la page profil
+    // d'élévation est paysage — 20/09).
+    const pw = doc.internal.pageSize.getWidth(), ph = doc.internal.pageSize.getHeight();
     doc.text(isFr
         ? 'Document généré automatiquement — aide à la préparation. Vérifiez chaque valeur avant le vol (météo, POH, VAC, NOTAM).'
         : 'Automatically generated preparation aid — verify every value before flight (weather, POH, charts, NOTAM).',
-        PAGE.w / 2, 590.2, { align: 'center' });
+        pw / 2, ph - 5.1, { align: 'center' });
 }
 
 // ---------------------------------------------------------------------------
@@ -526,6 +529,36 @@ export function drawNavLogPdf(jsPDFCtor, d) {
     return doc;
 }
 
+/** Page DÉDIÉE au profil d'élévation (20/09, retour pilote) : format
+ *  PAYSAGE (A5 tourné), graphe sur TOUTE la largeur — insérée par le
+ *  générateur du dossier juste AVANT la carte de vol. Même bandeau titre
+ *  + cadre extérieur que les autres pages, adaptés au sens paysage. */
+export function drawElevationProfilePage(doc, pr) {
+    const fr = pr.isFr !== false;
+    doc.addPage([PAGE.h, PAGE.w], 'landscape');   // 595,32 × 419,53
+
+    const L = 16.4, R = PAGE.h - 16.4, W = R - L, MID = (L + R) / 2;
+
+    // Bandeau titre + cadre extérieur (même style que les pages portrait).
+    doc.setFillColor(17, 24, 39);
+    doc.rect(L, 14.3, W, 16.2, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(SZ.doc); _setInk(doc, [255, 255, 255]);
+    doc.text(fr ? 'Profil d\u2019élévation de la route' : 'Route elevation profile', MID, 25.2, { align: 'center' });
+    doc.setDrawColor(...INK); doc.setLineWidth(0.8);
+    doc.rect(L - 1.4, 29.9, W + 2.8, PAGE.w - 29.9 - 12, 'S');
+
+    // Ligne mono « LFPB - LFRM » (même en-tête que les autres pages).
+    doc.setFont('courier', 'normal'); doc.setFontSize(8); _setInk(doc, MUTED);
+    doc.text(`${pr.fromIcao ?? ''} - ${pr.toIcao ?? ''} · ${pr.distTotalKm} km`, L + 1.5, 45);
+
+    // Graphe sur TOUTE la largeur, plus haut qu'en section (220 pt au lieu
+    // de 128) : la page dédiée l'autorise.
+    _drawElevationChart(doc, pr, L, R, 52, fr, 220);
+
+    _footer(doc, fr);
+    return doc;
+}
+
 // ---------------------------------------------------------------------------
 // Page 2 — « Calcul de navigation » : reproduction du bloc écran du
 // planificateur (flight-planner-ui.js, _renderResult), SANS le bouton
@@ -616,14 +649,12 @@ function _drawCalcPage(doc, c) {
     y = section(null, y);
     const uL = c.fuel?.unusableL || 0;
     if (c.fuel?.divIcao && uL > 0) {
-        // 6 olives : Roulage + intégr. et Dégagement prioritaires (libellés
-        // longs — même garde-fou _cell que retour pilote 18/09). « Inut. »
-        // (libellé raccourci 19/09 soir) cède de la place à « Roulage +
-        // intégr. », le plus long de la ligne.
-        const total = W - 5 * 12;
-        const wts = [0.6, 1.05, 1.25, 0.95, 0.6, 1.2];
-        const ws = wts.map(t => total * t / 5.65);
-        const xAt = (i) => L + ws.slice(0, i).reduce((a, b) => a + b, 0) + i * 12;
+        // 6 olives — LARGEURS PILOTE (19/09 soir, rév. 20/09) : Trajet 56
+        // (valeur « 115.5 L » entière), Dégagement 62, Roulage 75, Réserve
+        // 66,3, Inut. 32, Total 60 ; gouttières 7 pt (alignées sur les
+        // lignes du dessus) → 56+62+75+66,3+32+60+5×7 = 386,3 = W. ✓
+        const ws = [56, 62, 75, 66.3, 32, 60];
+        const xAt = (i) => L + ws.slice(0, i).reduce((a, b) => a + b, 0) + i * 7;
         cell(xAt(0), y, ws[0], 29, fr ? 'Trajet' : 'Trip', `${c.fuel?.tripL ?? '—'} L`, { size: 9.5 });
         cell(xAt(1), y, ws[1], 29, `${fr ? 'Dégagement' : 'Alternate'} ${c.fuel.divIcao}`,
             `${c.fuel?.diversionL ?? '—'} L`, { size: 9.5 });
@@ -636,11 +667,12 @@ function _drawCalcPage(doc, c) {
             `${c.fuel?.totalL ?? '—'} L`, { color: BLUE, size: 12 });
     } else if (c.fuel?.divIcao) {
         // Trajet légèrement rétréci au profit de Dégagement, dont le
-        // libellé porte le code du terrain (retour pilote 18/09).
-        const total = W - 4 * 12;
+        // libellé porte le code du terrain (retour pilote 18/09). Gouttière
+        // 8 pt comme le reste de la ligne carburant (19/09 soir).
+        const total = W - 4 * 7;
         const wts = [0.8, 1.2, 1, 1, 1];
         const ws = wts.map(t => total * t / 5);
-        const xAt = (i) => L + ws.slice(0, i).reduce((a, b) => a + b, 0) + i * 12;
+        const xAt = (i) => L + ws.slice(0, i).reduce((a, b) => a + b, 0) + i * 7;
         cell(xAt(0), y, ws[0], 29, fr ? 'Trajet' : 'Trip', `${c.fuel?.tripL ?? '—'} L`, { size: 9.5 });
         cell(xAt(1), y, ws[1], 29, `${fr ? 'Dégagement' : 'Alternate'} ${c.fuel.divIcao}`,
             `${c.fuel?.diversionL ?? '—'} L`, { size: 9.5 });
@@ -651,23 +683,24 @@ function _drawCalcPage(doc, c) {
         cell(xAt(4), y, ws[4], 29, fr ? 'Total requis' : 'Total req.',
             `${c.fuel?.totalL ?? '—'} L`, { color: BLUE, size: 12 });
     } else if (uL > 0) {
-        // 5 olives sans dégagement : « Inut. » (raccourci) cède aussi là sa
-        // place à « Roulage + intégr. » (retour pilote 19/09 soir).
-        const fwInut = (W - 4 * 12);
-        const wts5 = [1, 1.3, 0.95, 0.6, 1.15];
-        const ws5 = wts5.map(t => fwInut * t / 5);
-        const xAt5 = (i) => L + ws5.slice(0, i).reduce((a, b) => a + b, 0) + i * 12;
-        cell(xAt5(0), y, ws5[0], 29, fr ? 'Trajet' : 'Trip', `${c.fuel?.tripL ?? '—'} L`);
-        cell(xAt5(1), y, ws5[1], 29, `${fr ? 'Roulage + intégr.' : 'Taxi + integ.'} (${c.fuel?.groundMin ?? 0} min)`, `${c.fuel?.groundL ?? 0} L`);
-        cell(xAt5(2), y, ws5[2], 29, `${fr ? 'Réserve' : 'Reserve'} (${c.fuel?.reserveMin ?? ''} min)`, `${c.fuel?.reserveL ?? '—'} L`);
-        cell(xAt5(3), y, ws5[3], 29, fr ? 'Inut.' : 'Unus.', `${uL} L`);
+        // 5 olives sans dégagement — LARGEURS PILOTE (19/09 soir, rév. 20/09),
+        // TOUT sur UNE ligne et pleine largeur : Trajet 56 (valeur « 115.5 L »
+        // entière), Roulage + intégr. 113 (une ligne à 6 pt : 99 pt), Réserve
+        // 90,3, Inut. 32, Total 67 ; gouttières 7 pt (comme les lignes du
+        // dessus) → 56+113+90,3+32+67+4×7 = 386,3 = W. ✓
+        const ws5 = [56, 113, 90.3, 32, 67];
+        const xAt5 = (i) => L + ws5.slice(0, i).reduce((a, b) => a + b, 0) + i * 7;
+        cell(xAt5(0), y, ws5[0], 29, fr ? 'Trajet' : 'Trip', `${c.fuel?.tripL ?? '—'} L`, { size: 9.5 });
+        cell(xAt5(1), y, ws5[1], 29, `${fr ? 'Roulage + intégr.' : 'Taxi + integ.'} (${c.fuel?.groundMin ?? 0} min)`, `${c.fuel?.groundL ?? 0} L`, { size: 9.5 });
+        cell(xAt5(2), y, ws5[2], 29, `${fr ? 'Réserve' : 'Reserve'} (${c.fuel?.reserveMin ?? ''} min)`, `${c.fuel?.reserveL ?? '—'} L`, { size: 9.5 });
+        cell(xAt5(3), y, ws5[3], 29, fr ? 'Inut.' : 'Unus.', `${uL} L`, { size: 9.5 });
         cell(xAt5(4), y, ws5[4], 29, fr ? 'Total requis' : 'Total req.', `${c.fuel?.totalL ?? '—'} L`, { color: BLUE, size: 12 });
     } else {
-        const fw = (W - 3 * 12) / 4;
+        const fw = (W - 3 * 7) / 4;
         cell(L, y, fw, 29, fr ? 'Trajet' : 'Trip', `${c.fuel?.tripL ?? '—'} L`);
-        cell(L + fw + 12, y, fw, 29, `${fr ? 'Roulage + intégr.' : 'Taxi + integ.'} (${c.fuel?.groundMin ?? 0} min)`, `${c.fuel?.groundL ?? 0} L`);
-        cell(L + 2 * (fw + 12), y, fw, 29, `${fr ? 'Réserve' : 'Reserve'} (${c.fuel?.reserveMin ?? ''} min)`, `${c.fuel?.reserveL ?? '—'} L`);
-        cell(L + 3 * (fw + 12), y, fw, 29, fr ? 'Total requis' : 'Total req.', `${c.fuel?.totalL ?? '—'} L`, { color: BLUE, size: 12 });
+        cell(L + fw + 7, y, fw, 29, `${fr ? 'Roulage + intégr.' : 'Taxi + integ.'} (${c.fuel?.groundMin ?? 0} min)`, `${c.fuel?.groundL ?? 0} L`);
+        cell(L + 2 * (fw + 7), y, fw, 29, `${fr ? 'Réserve' : 'Reserve'} (${c.fuel?.reserveMin ?? ''} min)`, `${c.fuel?.reserveL ?? '—'} L`);
+        cell(L + 3 * (fw + 7), y, fw, 29, fr ? 'Total requis' : 'Total req.', `${c.fuel?.totalL ?? '—'} L`, { color: BLUE, size: 12 });
     }
     y += 33;
 
@@ -1006,21 +1039,9 @@ function _drawPerfPage(doc, p) {
         }
     }
 
-    // ---- Section 2 : profil d'élévation de la route — VOL LOCAL : sans
-    // objet (pas de route), section sautée (19/09). ----
-    const pr = p.profile;
-    if (p.fromIcao !== p.toIcao) {
-    y = section(fr ? `Profil d'élévation — ${pr?.fromIcao ?? p.fromIcao} - ${pr?.toIcao ?? p.toIcao}`
-                   : `Elevation profile — ${pr?.fromIcao ?? p.fromIcao} - ${pr?.toIcao ?? p.toIcao}`, y);
-    if (pr?.points?.length) {
-        y = _drawElevationChart(doc, pr, L, R, y, fr);
-    } else {
-        doc.setFont('helvetica', 'italic'); doc.setFontSize(8); _setInk(doc, MUTED);
-        doc.text(fr ? 'Profil d\'élévation indisponible (relief Open-Meteo inaccessible)'
-                    : 'Elevation profile unavailable (Open-Meteo terrain unavailable)', L + 1.5, y + 6);
-        y += 14;
-    }
-    }
+    // (20/09) Le profil d'élévation a sa PROPRE PAGE paysage pleine largeur,
+    // insérée par le générateur du dossier juste avant la carte de vol
+    // (drawElevationProfilePage) — plus de section sur cette page.
 
     // ---- Section 3 : alternates viables le long de la route ----
     const al = p.alternates;
@@ -1561,11 +1582,11 @@ function _drawCentroChart(doc, c, xL, xR, yT, CH) {
 // pointillée, waypoints ambre, grille + labels ft/km), adapté au papier blanc.
 // Retourne l'ordonnée Y après le graphique.
 // ---------------------------------------------------------------------------
-function _drawElevationChart(doc, pr, L, R, yTopSection, fr) {
+function _drawElevationChart(doc, pr, L, R, yTopSection, fr, CH = 128) {
     const xL = L + 42, xR = R - 6;
     // 15 pt sous le titre : rangée(s) des codes OACI des waypoints, AU-DESSUS
     // du cadre (lisibilité, consigne pilote) — le graphe commence plus bas.
-    const yT = yTopSection + 19, CH = 128, yB = yT + CH;
+    const yT = yTopSection + 19, yB = yT + CH;
     const plotW = xR - xL;
 
     // Échelle Y : englobe le terrain + l'altitude de croisière (comme le web)
@@ -1627,6 +1648,19 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr) {
         return freq;
     };
     const _boxLabels = [];   // dessinées après tous les cadres (anti-collision)
+    // Union des tronçons traversés (20/09, retour pilote : des ranges
+    // CHEVAUCHANTS d'un même organisme faisaient dessiner chaque secteur
+    // deux fois — « TMA LA ROCHELLE 1/3 » en double, superposés). Les
+    // traversées DISJOINTES (sortie puis re-entrée) restent distinctes.
+    const _mergeRanges = (ranges) => {
+        const out = [];
+        for (const [fa, fb] of [...ranges].sort((a, b) => a[0] - b[0])) {
+            const last = out[out.length - 1];
+            if (last && fa <= last[1] + 0.005) last[1] = Math.max(last[1], fb);
+            else out.push([fa, fb]);
+        }
+        return out;
+    };
     if (_zones?.length) {
         for (const g of _zones) {
             if (_isSiv(g)) continue;
@@ -1634,7 +1668,7 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr) {
             const byT = Math.max(yOf(Math.min(g.up, yMax)), yT);
             const byB = Math.min(Math.max(yOf(g.lo), yT), yB);
             if (byB - byT < 3) continue;
-            for (const [fa, fb] of g.ranges) {
+            for (const [fa, fb] of _mergeRanges(g.ranges)) {
                 const x0 = Math.max(xOf(fa), xL), x1 = Math.min(xOf(fb), xR);
                 if (x1 - x0 < 2) continue;
                 doc.setFillColor(232, 246, 253);
@@ -1676,8 +1710,12 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr) {
                     const sub = freq || (/^(R|D|P)\b/i.test(zone)
                         ? ([s.act, s.hor ? String(s.hor).toUpperCase() : null].filter(Boolean).join(' · ') || null)
                         : null);
+                    const label = zone.replace(/\s+partie\s+/i, ' ');
+                    // Dédoublonnage (20/09) : même libellé déjà posé à ≤ 4 pt
+                    // → chevauchement de tronçons résiduel, on n'ajoute pas.
+                    if (_boxLabels.some(b => b.label === label && Math.abs(b.cx - (bx0 + bx1) / 2) < 4)) continue;
                     _boxLabels.push({
-                        label: zone.replace(/\s+partie\s+/i, ' '),
+                        label,
                         freq: sub,
                         cx: (bx0 + bx1) / 2,
                         boxW: bx1 - bx0,

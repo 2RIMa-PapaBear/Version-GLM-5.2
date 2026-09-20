@@ -196,9 +196,16 @@ export function computeRouteAirspaces(points, items, opts) {
         // l'organisme (« RENNES INFO ») mais le survol doit dire LEQUEL
         // des secteurs (Sud A, Nord, Cotentin…) est sous le curseur.
         const zone = String(as.name || as.designator || '').trim();
-        const key = `${freq ?? '-'}|${name}`;
+        // (20/09, retour pilote PDF) Clé = NOM SEUL (normalisé), PAS la
+        // fréquence : les items d'un même organisme peuvent porter des
+        // fréquences différentes (certaines nulles) — deux groupes
+        // « LA ROCHELLE » dessinaient chaque secteur DEUX fois sur le
+        // profil (TMA LA ROCHELLE 1/3, TMA AQUITAINE 2.1/2.2, D 18 A3…).
+        // La fréquence du groupe = la première non nulle rencontrée.
+        const key = String(name || '').replace(/\s+/g, ' ').trim().toUpperCase();
         let g = byKey.get(key);
-        if (!g) { g = { name, freq, lo: Infinity, up: -Infinity, ranges: [], segs: [] }; byKey.set(key, g); }
+        if (!g) { g = { name, freq: null, lo: Infinity, up: -Infinity, ranges: [], segs: [] }; byKey.set(key, g); }
+        if (freq && !g.freq) g.freq = freq;
         g.lo = Math.min(g.lo, lo);
         g.up = Math.max(g.up, up);
         g.ranges.push(...ranges);
@@ -210,13 +217,34 @@ export function computeRouteAirspaces(points, items, opts) {
         }
     }
 
+    // (20/09) Un même SECTEUR peut venir de plusieurs items openAIP (géométrie
+    // multi-parties, sources doublées) : union de ses tronçons CHEVAUCHANTS
+    // par nom de secteur — sinon le profil du PDF l'étiquette une fois par
+    // item. Les parties DISJOINTES d'une même zone (deux traversées réelles)
+    // restent des segments distincts : une étiquette chacune.
     const groups = [...byKey.values()].map(g => {
+        const byZone = new Map();   // zone normalisée → segments fusionnables
+        for (const s of g.segs) {
+            const zk = String(s.zone || '').replace(/\s+/g, ' ').trim().toUpperCase();
+            const list = byZone.get(zk) || [];
+            const overl = list.find(m => s.fa <= m.fb + MERGE_TOL_FRAC && s.fb >= m.fa - MERGE_TOL_FRAC);
+            if (overl) {
+                overl.fa = Math.min(overl.fa, s.fa);
+                overl.fb = Math.max(overl.fb, s.fb);
+                overl.up = Math.max(overl.up, s.up);
+                overl.act ??= s.act;
+                overl.hor ??= s.hor;
+            } else {
+                list.push({ fa: s.fa, fb: s.fb, up: s.up, zone: s.zone, act: s.act, hor: s.hor });
+                byZone.set(zk, list);
+            }
+        }
         const ranges = _mergeRanges(g.ranges);
         return {
             name: g.name, freq: g.freq, lo: g.lo, up: g.up,
             span: Math.max(...ranges.map(r => r[1] - r[0])),
             ranges,
-            segs: g.segs.sort((a, b) => a.fa - b.fa),
+            segs: [...byZone.values()].flat().sort((a, b) => a.fa - b.fa),
         };
     });
     if (!groups.length) return null;

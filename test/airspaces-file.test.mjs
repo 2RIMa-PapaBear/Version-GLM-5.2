@@ -146,6 +146,25 @@ test('_dropOpenAipDuplicates : « partie X » normalisé (SIV RENNES SUD partie 
     assert.deepEqual(out.map(z => z.name), ['CTR SARREBRUCK PARTIE FRANCE', 'SIV RENNES NORD']);
 });
 
+// (20/09) Séparateurs de secteur : SIA « 2-1 » ≡ openAIP « 2.1 » — sinon la
+// copie openAIP survit au dédoublonnage et la zone (TMA AQUITAINE…) se
+// dessine DEUX fois sur la carte et le profil d'élévation.
+test('_dropOpenAipDuplicates : séparateurs de secteur « 2-1 » ≡ « 2.1 » (SIA prime, retour pilote 20/09)', () => {
+    const sia = [
+        { name: 'TMA AQUITAINE 2-1' },
+        { name: 'TMA AQUITAINE 2-2' },
+        { name: 'TMA LA ROCHELLE 2.1' },                 // graphie inverse : SIA à point, openAIP au tiret
+    ];
+    const oaip = [
+        { name: 'TMA AQUITAINE 2.1', frequencies: [{ value: '127.815' }] },
+        { name: 'TMA AQUITAINE 2-2' },
+        { name: 'TMA LA ROCHELLE 2-1' },
+        { name: 'TMA AQUITAINE 9' },                     // inconnu du SIA ici : conservé
+    ];
+    const out = _dropOpenAipDuplicates(oaip, sia);
+    assert.deepEqual(out.map(z => z.name), ['TMA AQUITAINE 9']);
+});
+
 test('_expandFileItem : activité officielle des zones R/D/P transportée', () => {
     const it = _expandFileItem({ i: 'r279', n: 'R 279', ty: 15, ic: null, lo: [0, 1], up: [145, 6], f: null, act: 'Parachutage', g: { t: 1, c: [[[-3, 47], [-2.9, 47], [-2.9, 47.1], [-3, 47]]] } });
     assert.equal(it.activity, 'Parachutage');
