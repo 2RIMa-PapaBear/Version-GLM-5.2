@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comment décoder un TAF — guide simple et complet | Prévol</title>
+<meta name="description" content="Apprenez à décoder un TAF : période de validité, FM, BECMG, TEMPO, PROB30, NSC… Guide pas à pas pour pilotes VFR, avec un exemple réel décodé ligne à ligne et les pièges à éviter.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://papabear56.pages-perso.free.fr/guide-taf.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Prévol">
+<meta property="og:title" content="Comment décoder un TAF — guide simple et complet">
+<meta property="og:description" content="Période de validité, FM, BECMG, TEMPO, PROB30 : apprenez à lire une prévision d'aérodrome TAF groupe par groupe, avec un exemple réel décodé ligne à ligne.">
+<meta property="og:url" content="https://papabear56.pages-perso.free.fr/guide-taf.html">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:image" content="https://papabear56.pages-perso.free.fr/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Prévol — guide de lecture du TAF pour pilotes VFR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Comment décoder un TAF — guide simple et complet">
+<meta name="twitter:description" content="Apprenez à lire une prévision d'aérodrome TAF groupe par groupe, avec un exemple réel décodé ligne à ligne.">
+<meta name="twitter:image" content="https://papabear56.pages-perso.free.fr/og-image.png">
+<link rel="icon" href="favicon.ico" type="image/x-icon">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css?v=1.335">
+<script src="vendor/lucide.min.js?v=1.335" defer></script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "À quelle fréquence le TAF est-il publié ?",
+      "acceptedAnswer": { "@type": "Answer", "text": "En France, le TAF est émis quatre fois par jour à 00, 06, 12 et 18 UTC, quelques dizaines de minutes avant le début de sa période de validité. Un TAF amendé (AMD) ou corrigé (COR) peut paraître à tout moment entre deux émissions dès que la prévision change de façon significative." } },
+    { "@type": "Question", "name": "Que signifie TEMPO dans un TAF ?",
+      "acceptedAnswer": { "@type": "Answer", "text": "TEMPO décrit des fluctuations temporaires : chaque épisode dure moins d'une heure, et leur total n'excède pas la moitié de la période indiquée. TEMPO 2012/2016 6000 signifie que la visibilité tombera par instants à 6 km entre 12 h et 16 h UTC le 20, sans que ce soit durable." } },
+    { "@type": "Question", "name": "Que signifie PROB30 ou PROB40 ?",
+      "acceptedAnswer": { "@type": "Answer", "text": "PROB30 ou PROB40 annonce un risque dont la probabilité est estimée à 30 % ou 40 %, appliqué uniquement à la visibilité, au temps significatif, au vent ou aux nuages. PROB30 TEMPO 0800 FG : il y a trois chances sur dix de voir la visibilité tomber à 800 m dans le brouillard pendant la période." } },
+    { "@type": "Question", "name": "Quelle différence entre BECMG et TEMPO ?",
+      "acceptedAnswer": { "@type": "Answer", "text": "BECMG décrit un changement durable : dès la fin de la fenêtre indiquée, les nouvelles conditions remplacent les anciennes de façon permanente. TEMPO décrit des fluctuations temporaires qui reviennent à la normale : il faut donc préparer les deux scénarios pendant toute la fenêtre, mais sans les considérer comme acquises." } }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Prévol", "item": "https://papabear56.pages-perso.free.fr/accueil.html" },
+    { "@type": "ListItem", "position": 2, "name": "Comment décoder un TAF" }
+  ]
+}
+</script>
+<style>
+    /* Guides — réutilise le thème (variables, cartes) de css/style.css ;
+       classes préfixées .gd- sur la base des classes .acc- de accueil.html. */
+    .acc-page { max-width: 900px; margin: 0 auto; padding: 0 20px 50px; }
+    .gd-hero { position: relative; text-align: center; padding: 54px 10px 26px; overflow: hidden; }
+    .gd-hero > * { position: relative; z-index: 2; }
+    .gd-hero > img.gd-hero-bg { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 30%; }
+    .gd-hero::before { content: ''; position: absolute; inset: -40% -20% auto; height: 130%; z-index: 1;
+        background: radial-gradient(42% 55% at 38% 42%, rgba(56, 189, 248, .14), transparent 70%),
+                    radial-gradient(35% 45% at 68% 55%, rgba(45, 212, 191, .10), transparent 70%);
+        pointer-events: none; }
+    .gd-hero::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+        background: linear-gradient(180deg, rgba(7, 12, 24, .58) 0%, rgba(7, 12, 24, .74) 55%, rgba(7, 12, 24, .95) 100%); }
+    .gd-hero .gd-brand { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 18px; padding: 7px 14px;
+        border-radius: 999px; border: 1px solid var(--border-color, #334155); background: rgba(15, 23, 42, .8);
+        color: var(--primary, #38BDF8); font-size: 12px; font-weight: 600; text-decoration: none; }
+    .gd-hero .gd-brand:hover { border-color: var(--primary, #38BDF8); }
+    .gd-hero h1 { margin: 0 0 10px; font-size: 36px; font-weight: 700; letter-spacing: -0.5px; }
+    .gd-hero p { margin: 0 auto; max-width: 660px; color: var(--text-muted, #94A3B8); font-size: 14.5px; line-height: 1.65; }
+
+    .gd-body { margin-top: 8px; }
+    .gd-body h2 { margin: 38px 0 10px; font-size: 19px; }
+    .gd-body h3 { margin: 24px 0 8px; font-size: 15px; color: var(--text-color, #F8FAFC); }
+    .gd-body p, .gd-body li { color: var(--text-muted, #94A3B8); font-size: 14px; line-height: 1.75; }
+    .gd-body strong { color: var(--text-color, #F8FAFC); }
+    .gd-body a { color: var(--primary, #38BDF8); text-decoration: none; }
+    .gd-body a:hover { text-decoration: underline; }
+    .gd-body ul, .gd-body ol { padding-left: 22px; margin: 8px 0 18px; }
+
+    table.gd-t { width: 100%; border-collapse: collapse; margin: 14px 0 22px; font-size: 13px; }
+    .gd-t th, .gd-t td { text-align: left; padding: 9px 12px; border: 1px solid var(--border-color, #334155); vertical-align: top; }
+    .gd-t th { background: var(--inner-bg, #0F172A); color: var(--text-color, #F8FAFC); font-size: 12.5px; }
+    .gd-t td { color: var(--text-muted, #94A3B8); }
+    .gd-t td:first-child { font-family: 'DM Mono', monospace; color: var(--primary, #38BDF8); white-space: nowrap; }
+
+    .gd-code { font-family: 'DM Mono', monospace; font-size: 14px; color: var(--text-color, #F8FAFC);
+        background: var(--inner-bg, #0F172A); border: 1px solid var(--border-color, #334155);
+        border-radius: 10px; padding: 13px 16px; overflow-x: auto; margin: 12px 0 8px;
+        white-space: pre-wrap; word-break: break-word; }
+    .gd-code b { color: var(--primary, #38BDF8); font-weight: 500; }
+    .gd-trad { font-size: 12.5px; color: var(--text-muted, #94A3B8); margin: 0 0 20px; line-height: 1.7; }
+
+    .gd-tip { border-left: 3px solid var(--primary, #38BDF8); background: rgba(56, 189, 248, .07);
+        padding: 10px 14px; border-radius: 0 10px 10px 0; font-size: 13px; line-height: 1.7;
+        margin: 14px 0 22px; color: var(--text-color, #F8FAFC); }
+
+    .gd-faq dt { font-weight: 700; color: var(--text-color, #F8FAFC); font-size: 14px; margin-top: 18px; }
+    .gd-faq dd { margin: 5px 0 0; color: var(--text-muted, #94A3B8); font-size: 13px; line-height: 1.7; }
+
+    .gd-also { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0 0; }
+    .gd-also a { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 10px;
+        text-decoration: none; font-size: 13px; font-weight: 600;
+        background: var(--inner-bg, #0F172A); border: 1px solid var(--border-color, #334155);
+        color: var(--text-muted, #94A3B8); transition: border-color .15s, color .15s; }
+    .gd-also a:hover { border-color: var(--primary, #38BDF8); color: var(--primary, #38BDF8); }
+
+    .acc-final { margin-top: 40px; text-align: center; padding: 30px 20px; border-radius: 14px;
+        background: radial-gradient(60% 120% at 50% 0%, rgba(56, 189, 248, .12), transparent 75%), var(--inner-bg, #0F172A);
+        border: 1px solid var(--border-color, #334155); }
+    .acc-final h2 { margin: 0 0 6px; font-size: 19px; }
+    .acc-final p { margin: 0 0 18px; color: var(--text-muted, #94A3B8); font-size: 13px; }
+    .acc-go { display: inline-flex; align-items: center; gap: 10px; padding: 13px 28px; border-radius: 11px;
+        text-decoration: none; font-weight: 700; font-size: 15px;
+        background: rgba(56, 189, 248, .16); color: var(--primary, #38BDF8); border: 1px solid var(--primary, #38BDF8); }
+    .acc-go:hover { background: rgba(56, 189, 248, .30); }
+    .acc-foot { margin-top: 28px; text-align: center; font-size: 11px; color: var(--text-muted, #94A3B8); line-height: 1.7; }
+    .acc-foot a { color: var(--primary, #38BDF8); text-decoration: none; }
+    .acc-foot .warning { color: #FBBF24; }
+
+    @media (max-width: 760px) {
+        .gd-hero { padding-top: 36px; }
+        .gd-hero h1 { font-size: 27px; }
+        .acc-page { padding: 0 14px 40px; }
+        .gd-t { font-size: 12px; }
+        .gd-t th, .gd-t td { padding: 7px 8px; }
+    }
+</style>
+</head>
+<body>
+<div class="acc-page">
+
+    <div class="gd-hero">
+        <img class="gd-hero-bg" src="assets/accueil/hero.jpg" alt="" decoding="async" fetchpriority="high">
+        <a class="gd-brand" href="accueil.html"><i data-lucide="plane" style="width:14px;height:14px;"></i> Prévol — Guides météo</a>
+        <h1>Comment décoder un TAF</h1>
+        <p>Le TAF est la prévision météo de l'aérodrome sur 24 à 30 heures. Si vous savez
+           <a href="guide-metar.html">lire un METAR</a>, vous savez déjà lire l'essentiel d'un TAF —
+           il ne reste que les groupes d'évolution. C'est précisément eux qu'on décode ici.</p>
+    </div>
+
+    <div class="gd-body">
+
+        <h2>Qu'est-ce qu'un TAF ?</h2>
+        <p>Le <strong>TAF</strong> (<em>Terminal Aerodrome Forecast</em>) est la prévision officielle
+           d'aérodrome. En France, il est émis <strong>quatre fois par jour</strong> (à 00, 06, 12 et
+           18 UTC) et couvre une période de <strong>24 à 30 heures</strong>. Entre deux émissions, un
+           TAF <strong>AMD</strong> (amendé) ou <strong>COR</strong> (corrigé) peut remplacer le
+           précédent dès que la prévision bascule — d'où l'importance de vérifier l'heure d'émission
+           avant le vol, comme sur tout message météo.</p>
+
+        <h2>Le message, groupe par groupe</h2>
+        <div class="gd-code">LFPB 201100Z 2012/2118 24010KT 9999 SCT030 TEMPO 2012/2016 6000 -SHRA BKN018=</div>
+        <table class="gd-t">
+            <tr><th>Groupe</th><th>Signification</th></tr>
+            <tr><td>LFPB</td><td>Code OACI du terrain — Paris-Le Bourget</td></tr>
+            <tr><td>201100Z</td><td>Émis le 20 à 11 h 00 UTC</td></tr>
+            <tr><td>2012/2118</td><td>Valide du 20 à 12 h UTC au 21 à 18 h UTC (30 heures)</td></tr>
+            <tr><td>24010KT</td><td>Vent dominant : du 240° à 10 nœuds</td></tr>
+            <tr><td>9999 SCT030</td><td>Visibilité ≥ 10 km, nuages fragmentés à 3 000 ft — conditions dominantes</td></tr>
+            <tr><td>TEMPO 2012/2016 6000 -SHRA BKN018</td><td>Par instants, entre 12 h et 16 h UTC le 20 : visi 6 km, averses faibles, plafond 1 800 ft</td></tr>
+        </table>
+        <p>Tout le vocabulaire du <a href="guide-metar.html">METAR</a> (vent, visibilité, temps
+           significatifs, nuages, QNH) se retrouve dans le corps du TAF. La nouveauté, ce sont les
+           <strong>groupes d'évolution</strong>.</p>
+
+        <h2>Les groupes d'évolution : le cœur du TAF</h2>
+        <p>Le corps du message décrit les conditions <strong>dominantes</strong> ; chaque groupe
+           d'évolution les modifie pendant une fenêtre horaire précise. Quatre opérateurs à connaître
+           par cœur :</p>
+        <table class="gd-t">
+            <tr><th>Opérateur</th><th>Effet</th><th>Comment le lire au briefing</th></tr>
+            <tr><td>FM</td><td><em>From</em> — à partir de l'heure indiquée, les conditions changent rapidement et remplacent tout ce qui précède.</td><td>Le scénario bascule net. Après un FM, oubliez le corps initial : c'est le nouveau référentiel.</td></tr>
+            <tr><td>BECMG</td><td><em>Becoming</em> — évolution progressive dans la fenêtre ; au terme, elle est durable.</td><td>Le temps se dégrade (ou s'améliore) de façon certaine. Prévoyez la fin de fenêtre comme situation réelle.</td></tr>
+            <tr><td>TEMPO</td><td>Fluctuations temporaires : chaque épisode &lt; 1 h, au total &lt; la moitié de la fenêtre.</td><td>Des passages dégradés possibles, jamais installés. Préparez les deux scénarios, ne subissez pas le pire.</td></tr>
+            <tr><td>PROB30 / PROB40</td><td>Risque à 30 % ou 40 %, appliqué à la visibilité, au temps, au vent ou aux nuages.</td><td>Une alarme probabiliste : moins de une chance sur deux, mais l'impact peut être majeur — à surveiller.</td></tr>
+        </table>
+        <p>Deux abréviations de fin de groupe : <strong>NSW</strong> (<em>no significant weather</em>,
+           plus de phénomène significatif) et <strong>NSC</strong> (<em>no significant clouds</em>,
+           plus de nuage significatif sous 5 000 ft).</p>
+
+        <div class="gd-tip">La règle d'or du briefing : dans un TAF, ce n'est pas la ligne la plus longue
+           qui compte, c'est <strong>la plus défavorable pendant votre créneau horaire</strong>. Un plafond
+           à 1 800 ft « TEMPO » reste un plafond à 1 800 ft pour le retour prévu à 15 h.</div>
+
+        <h2>Un exemple complet décodé</h2>
+        <div class="gd-code">LFRB 200500Z 2006/2112 25015G25KT 6000 -RA BKN012
+     TEMPO 2006/2010 1500 RA BKN004
+     FM201200 27012KT 9999 NSW SCT025
+     PROB40 TEMPO 2018/2106 3000 TSRA BKN010CB=</div>
+        <p class="gd-trad">Brest, émis le 20 à 05 h UTC, valide jusqu'au 21 à 12 h UTC.
+           <strong>Conditions dominantes</strong> : vent d'ouest 15 kt rafales 25 kt, visi 6 km sous
+           pluie faible, plafond à 1 200 ft — vol VFR au-dessus impossible au-dessus de la couche, serré
+           en dessous. <strong>TEMPO 06-10 UTC</strong> : par instants 1 500 m de visi, pluie, plafond
+           400 ft — franchement dégradé en début de période. <strong>À partir de 12 h (FM)</strong> :
+           bascule nette — vent tournant à l'ouest 12 kt, visi ≥ 10 km, plus de phénomène, nuages éparpillés
+           à 2 500 ft : l'amélioration est durable et rapide. <strong>PROB40 TEMPO 18-06 UTC</strong> :
+           quatre chances sur dix de passages orageux avec visi 3 km et cumulonimbus plafonnant à 1 000 ft.
+           Le briefing se construit autour du FM de midi — et du risque orageux du soir.</p>
+
+        <h2>METAR ou TAF : qui dit quoi ?</h2>
+        <table class="gd-t">
+            <tr><th></th><th>METAR</th><th>TAF</th></tr>
+            <tr><td>Nature</td><td>Observation — le temps réel</td><td>Prévision — le temps attendu</td></tr>
+            <tr><td>Horizon</td><td>L'instant présent</td><td>24 à 30 heures</td></tr>
+            <tr><td>Émission</td><td>Toutes les 30 min ou 1 h (+ SPECI)</td><td>4 fois par jour (+ AMD, COR)</td></tr>
+            <tr><td>Usage</td><td>Le GO/NO-GO du départ</td><td>La fenêtre horaire et le retour</td></tr>
+        </table>
+
+        <h2>Pour aller plus loin</h2>
+        <p>Un TAF se lit toujours avec son METAR de référence, et se traduit en décision via la
+           fenêtre VFR :</p>
+        <div class="gd-also">
+            <a href="guide-metar.html"><i data-lucide="radio" style="width:15px;height:15px;"></i> Comment lire un METAR</a>
+            <a href="guide-fenetre-vfr.html"><i data-lucide="sun" style="width:15px;height:15px;"></i> La fenêtre VFR</a>
+            <a href="notice-fr.html"><i data-lucide="book-open" style="width:15px;height:15px;"></i> Notice de Prévol</a>
+        </div>
+    </div>
+
+    <div class="acc-final">
+        <h2>Le TAF, traduit et horodaté</h2>
+        <p>Prévol décode chaque TAF en français, l'aligne sur votre créneau de vol (badge d'âge des
+           données à l'appui) et alimente le GO/NO-GO argumenté du terrain.</p>
+        <a class="acc-go" href="index.html"><i data-lucide="arrow-right-circle" style="width:19px;height:19px;"></i> Ouvrir l'application</a>
+    </div>
+
+    <div class="acc-foot">
+        <div style="font-weight:600;color:var(--text-color,#F8FAFC);">© 2026 PapaBear — Prévol · Guides météo aéronautique</div>
+        <div>Sources : AviationWeather.gov · OACI Annexe 3 · Service de l'Information Aéronautique (SIA)</div>
+        <div class="warning">Avertissement : ce guide est fourni à titre pédagogique et ne remplace ni le briefing officiel, ni la documentation réglementaire.</div>
+    </div>
+
+</div>
+<script>
+    if (window.lucide) window.lucide.createIcons();
+    else document.addEventListener('DOMContentLoaded', () => window.lucide && window.lucide.createIcons());
+</script>
+</body>
+</html>
