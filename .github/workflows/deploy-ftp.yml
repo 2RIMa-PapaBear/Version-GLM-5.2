@@ -67,8 +67,8 @@ jobs:
         with:
           node-version: 20
 
-      - name: Dépendances (basic-ftp pour l'upload)
-        run: npm install --no-save basic-ftp
+      - name: Dépendances (basic-ftp pour l'upload, esbuild pour la minification)
+        run: npm install --no-save basic-ftp esbuild
 
       - name: Déploiement FTP + bump versions
         env:

@@ -7,6 +7,8 @@
 //   npm run deploy -- --dry-run        → liste ce qui partirait, sans toucher au FTP
 //   npm run deploy -- --since=<ref>    → base de comparaison explicite (sha, HEAD~2…)
 //   npm run deploy -- --all            → (re)envoie TOUS les fichiers autorisés
+//   npm run deploy -- --minify-sync    → (re)envoie tous les js/css, minifiés
+//   npm run deploy -- --no-minify      → désactive la minification esbuild à l'upload
 //
 // Principe : git diff --name-status <dernier déployé>..HEAD, filtré sur les
 // chemins « prod » (index.html, sw.js, js/, css/, vendor/, data/…). Les A/M
@@ -21,6 +23,7 @@
 import { Client } from 'basic-ftp';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bumpVersions } from './bump-version.mjs';
@@ -52,6 +55,36 @@ const DRY = process.argv.includes('--dry-run');
 const sinceArg = process.argv.find(a => a.startsWith('--since='));
 const ALL = process.argv.includes('--all');
 const BUMP = process.argv.includes('--bump');
+const MINIFY_SYNC = process.argv.includes('--minify-sync');
+const NO_MINIFY = process.argv.includes('--no-minify');
+
+// ---- Minification esbuild à l'upload (perf : −60 % sur js/ + css/) -----------
+// Les modules js/ et les css/ sont minifiés AU MOMENT DE L'UPLOAD : le dépôt
+// garde les sources lisibles, la prod sert du minifié. vendor/ est déjà
+// minifié (on n'y touche pas), data/ n'est pas concerné. esbuild est
+// optionnel : s'il manque (npm install esbuild), on envoie la source telle
+// quelle — dégradation gracieuse.
+let esbuild = null;
+try { esbuild = (await import('esbuild')).default; } catch { }
+
+const minifiable = (f) =>
+    !NO_MINIFY && !!esbuild
+    && ((/^js\/.+\.js$/.test(f) && !/\.min\.js$/.test(f)) || /^css\/.+\.css$/.test(f));
+
+const minifyToTemp = async (f) => {
+    const source = fs.readFileSync(path.join(ROOT, f), 'utf8');
+    const { code } = await esbuild.transform(source, {
+        loader: f.endsWith('.css') ? 'css' : 'js',
+        minify: true,
+        legalComments: 'none',
+        target: 'es2020',
+    });
+    // Extension conservée : basic-ftp s'en sert pour choisir BINARY/ASCII.
+    const tmp = path.join(os.tmpdir(), 'prevol-min', f.replace(/[\\/]/g, '__'));
+    fs.mkdirSync(path.dirname(tmp), { recursive: true });
+    fs.writeFileSync(tmp, code);
+    return tmp;
+};
 
 const log = (m) => console.log(m);
 const ok = (m) => console.log('  ✓ ' + m);
@@ -73,6 +106,13 @@ function lastDeployMarker() {
 
 // ---- 1. Liste des fichiers à traiter --------------------------------------
 function collectFiles() {
+    if (MINIFY_SYNC) {
+        // Resynchronisation ponctuelle : (re)envoie TOUS les js/css minifiables,
+        // indépendamment du diff — utile à l'activation de la minification, les
+        // fichiers inchangés côté git restant sinon non minifiés sur le serveur.
+        const uploads = git('git ls-files').split('\n').filter(Boolean).filter(isAllowed).filter(minifiable);
+        return { uploads, deletes: [], headSha: git('git rev-parse HEAD') };
+    }
     if (ALL) {
         const files = git('git ls-files').split('\n').filter(Boolean).filter(isAllowed);
         return { uploads: files, deletes: [] };
@@ -161,17 +201,18 @@ async function deploy(uploads, deletes, headSha) {
             const remote = (cfg.remoteRoot || '/') + f;
             const dir = path.posix.dirname(remote);
             if (!madeDirs.has(dir)) { await client.ensureDir(dir); madeDirs.add(dir); }
+            const localPath = minifiable(f) ? await minifyToTemp(f) : path.join(ROOT, f);
             let done = false;
             for (let attempt = 1; attempt <= 3 && !done; attempt++) {
                 try {
-                    await client.uploadFrom(path.join(ROOT, f), remote);
+                    await client.uploadFrom(localPath, remote);
                     done = true;
                 } catch (e) {
                     if (attempt === 3) throw e;
                     warn(`${f} : tentative ${attempt} échouée (${e.message}) — nouvelle essai`);
                 }
             }
-            ok(`upload ${f}`);
+            ok(`upload ${f}${minifiable(f) ? ' (minifié)' : ''}`);
         }
         for (const f of deletes) {
             const remote = (cfg.remoteRoot || '/') + f;
