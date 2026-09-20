@@ -785,13 +785,56 @@ const _omCache = new Map();
 const _omPending = new Map();
 const _OM_DELAY = 1500;
 const _OM_RETRY_BASE = 3000;
+const _OM_FRESH_MS = 5 * 60 * 1000;        // cache mémoire : 5 min (fraîcheur)
+const _OM_STALE_MS = 60 * 60 * 1000;       // rétention persistante : 1 h (20/09)
+const _OM_IDB = 'openmeteo:v1';            // cache IndexedDB (par IP, survit au rechargement)
+
+/** Cache persistant des réponses Open-Meteo (20/09, consigne pilote « option 1 ») :
+ *  réduit fortement le nombre d'appels (le quota est par IP et par jour) et
+ *  fournit un DERNIER RELEVÉ CONNU en cas d'échec réseau/429. Écriture
+ *  best-effort, jamais bloquante. */
+async function _omIdbGet(url) {
+    try {
+        const db = await new Promise((res, rej) => {
+            const r = indexedDB.open(_OM_IDB, 1);
+            r.onupgradeneeded = () => r.result.createObjectStore('cache', { keyPath: 'url' });
+            r.onsuccess = () => res(r.result);
+            r.onerror = () => rej(r.error);
+        });
+        return await new Promise((res, rej) => {
+            const t = db.transaction('cache').objectStore('cache').get(url);
+            t.onsuccess = () => res(t.result || null);
+            t.onerror = () => rej(t.error);
+        });
+    } catch { return null; }
+}
+async function _omIdbPut(url, data) {
+    try {
+        const db = await new Promise((res, rej) => {
+            const r = indexedDB.open(_OM_IDB, 1);
+            r.onupgradeneeded = () => r.result.createObjectStore('cache', { keyPath: 'url' });
+            r.onsuccess = () => res(r.result);
+            r.onerror = () => rej(r.error);
+        });
+        const tx = db.transaction('cache', 'readwrite');
+        tx.objectStore('cache').put({ url, data, ts: Date.now() });
+    } catch { /* quota ou navigateur sans IDB : mémoire seule */ }
+}
 
 export async function fetchOpenMeteo(url) {
 
     const cached = _omCache.get(url);
-    if (cached && Date.now() - cached.ts < 5 * 60 * 1000) return cached.data;
+    if (cached && Date.now() - cached.ts < _OM_FRESH_MS) return cached.data;
 
     if (_omPending.has(url)) return _omPending.get(url);
+
+    // Cache persistant : une réponse de moins d'une heure évite LA requête
+    // (l'appel réseau ne part que si rien n'est connu côté IP).
+    const persisted = await _omIdbGet(url);
+    if (persisted && Date.now() - persisted.ts < _OM_STALE_MS) {
+        _omCache.set(url, { data: persisted.data, ts: persisted.ts });
+        return persisted.data;
+    }
 
     const promise = _omFetchQueued(url);
     _omPending.set(url, promise);
@@ -813,7 +856,7 @@ async function _omFetchQueued(url) {
     try {
 
         const cached = _omCache.get(url);
-        if (cached && Date.now() - cached.ts < 5 * 60 * 1000) return cached.data;
+        if (cached && Date.now() - cached.ts < _OM_FRESH_MS) return cached.data;
 
         for (let attempt = 0; attempt < 3; attempt++) {
             try {
@@ -830,13 +873,22 @@ async function _omFetchQueued(url) {
                 }
                 const data = await res.json();
                 _omCache.set(url, { data, ts: Date.now() });
+                _omIdbPut(url, data);
                 return data;
             } catch (e) {
                 console.warn('Open-Meteo fetch error:', e.message);
                 return null;
             }
         }
-        console.warn('Open-Meteo: 3 retries épuisés pour', url.slice(0, 60));
+        // 429 persistant après 3 essais : DERNIER RELEVÉ CONNU (même > 1 h)
+        // plutôt que rien — les consommateurs affichent des données cohérentes
+        // et le rafraîchissement suivra à la prochaine fenêtre de quota.
+        console.warn('Open-Meteo: 3 retries épuisés pour', url.slice(0, 60), '— dernier relevé connu si disponible');
+        const stale = await _omIdbGet(url);
+        if (stale?.data) {
+            _omCache.set(url, { data: stale.data, ts: Date.now() });
+            return stale.data;
+        }
         return null;
     } finally {
 
