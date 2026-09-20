@@ -269,6 +269,11 @@ function _render(body, ac, isFr) {
         durEl.addEventListener('input', placeUnit);
         placeUnit();
         if (document.fonts?.ready) document.fonts.ready.then(placeUnit).catch(() => { });
+        // Widget replié au rendu → champ mesuré 0 px et « Min » figé au centre,
+        // superposé au chiffre à l'expansion (retour pilote 20/09). Le
+        // ResizeObserver repositionne dès que la taille du champ change
+        // (dépliage, bascule responsive) — 0 → 622 px compris.
+        if (window.ResizeObserver) new ResizeObserver(placeUnit).observe(durEl);
     }
     // Sliders : pilotent le champ numérique associé (même data-key). La
     // valeur posée par programme n'émet PAS d'événement input — on le
