@@ -219,6 +219,7 @@ export function genererGraphique() {
     // lieu de LFRT demandé) : traiterSucces a déjà mis le bon code.
     if (res.code && /^[A-Z][A-Z0-9]{3}$/.test(res.code) && !state.requestedIcao) {
         state.requestedIcao = res.code;
+        document.dispatchEvent(new CustomEvent('airport-changed', { detail: { icao: res.code } }));
     }
 
     state.isMetar = res.isMetar;
@@ -383,7 +384,8 @@ export function telechargerMessage(typeMessage) {
     state.forcedRunway = null;
     state.manualTargetHour = null;
     state.requestedIcao = icao;
-    
+    document.dispatchEvent(new CustomEvent('airport-changed', { detail: { icao } }));
+
     textarea.value = tr.searchInProgress;
     if(activeBtn) activeBtn.classList.add('btn-loading');
     
@@ -411,6 +413,7 @@ export function telechargerMessage(typeMessage) {
         // celles du terrain d'atterrissage réel (LFEA), même si la météo vient
         // du terrain le plus proche (LFRH).
         state.requestedIcao = codeDemandeInitial || codeOaciFinal;
+        document.dispatchEvent(new CustomEvent('airport-changed', { detail: { icao: state.requestedIcao } }));
 
         // On conserve le code demandé (LFEA) dans le champ de recherche quand la
         // météo vient d'un autre terrain (LFRH). Sinon, on affiche le code trouvé.
