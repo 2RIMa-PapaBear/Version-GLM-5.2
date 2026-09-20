@@ -339,7 +339,11 @@ async function _generateNavLogPdfInto(tab, { file = false, local = false } = {})
     }
     if (!stash?.plan) return;
     const { plan, tas } = stash;
-    if (!window.jspdf?.jsPDF) { console.warn('jsPDF indisponible (vendor/jspdf.umd.min.js)'); return; }
+    if (!window.jspdf?.jsPDF) {
+        // jsPDF chargé à la demande (perf : −356 Ko au démarrage de l'app).
+        try { await window.__chargerLib('vendor/jspdf.umd.min.js'); }
+        catch { console.warn('jsPDF indisponible (vendor/jspdf.umd.min.js)'); return; }
+    }
 
     // Cartes VAC rendues (option ②=B) : déclarées ICI — collectées dans le
     // bloc garde (avant son dessin, pour une attestation exacte), posées en

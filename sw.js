@@ -48,7 +48,6 @@ const PRECACHE = [
     'js/gps.js',
     'js/data-age.js',
     'js/notam.js',
-    'vendor/leaflet-rotate.js',
     'css/style.css',
 ];
 

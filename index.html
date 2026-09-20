@@ -291,9 +291,34 @@
 
     <script type="module" src="js/app.js?v=1.342"></script>
     <script type="module" src="js/gps.js?v=1.342"></script>
-    <script src="vendor/jspdf.umd.min.js?v=1.342" defer></script>
-    <link rel="stylesheet" href="vendor/leaflet.min.css?v=1.342">
-    <script src="vendor/leaflet.min.js?v=1.342" defer></script>
-    <script src="vendor/leaflet-rotate.js?v=1.342" defer></script>
+    <script>
+        // Libs lourdes chargées À LA DEMANDE (perf : −521 Ko au démarrage de l'app).
+        // Leaflet (+ CSS + plugin rotate) : à l'ouverture de la carte régionale
+        // (js/regional-map.js). jsPDF : à la première génération de PDF
+        // (js/flight-planner-ui.js). Sans ?v= : le réseau-first du SW garantit
+        // la fraîcheur, le CACHE bumpé par déploiement purge les entrées vieilles.
+        // async=false → les scripts s'exécutent dans l'ordre de la liste.
+        window.__libPromises = {};
+        window.__chargerLib = function (urls) {
+            return Promise.all((Array.isArray(urls) ? urls : [urls]).map(function (u) {
+                if (!window.__libPromises[u]) {
+                    window.__libPromises[u] = new Promise(function (resolve, reject) {
+                        var el;
+                        if (u.endsWith('.css')) {
+                            el = document.createElement('link');
+                            el.rel = 'stylesheet'; el.href = u;
+                        } else {
+                            el = document.createElement('script');
+                            el.src = u; el.async = false;
+                        }
+                        el.onload = function () { resolve(u); };
+                        el.onerror = function () { delete window.__libPromises[u]; reject(new Error('chargement impossible : ' + u)); };
+                        document.head.appendChild(el);
+                    });
+                }
+                return window.__libPromises[u];
+            }));
+        };
+    </script>
 </body>
 </html>
