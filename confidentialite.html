@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Politique de confidentialité | Prévol</title>
+<meta name="robots" content="noindex, follow">
+<link rel="canonical" href="https://papabear56.pages-perso.free.fr/confidentialite.html">
+<link rel="icon" href="favicon.ico" type="image/x-icon">
+<link rel="stylesheet" href="css/fonts.css?v=1.0">
+<link rel="stylesheet" href="css/style.css?v=1.342">
+<script src="vendor/lucide.min.js?v=1.342" defer></script>
+<style>
+    /* Pages légales — même gabarit que les guides (classes .gd-). */
+    body { margin: 0; background: var(--bg-color, #020617); color: var(--text-color, #F8FAFC);
+           font-family: 'DM Sans', 'Segoe UI', sans-serif; }
+    .acc-page { max-width: 900px; margin: 0 auto; padding: 0 20px 50px; }
+    .gd-hero { text-align: center; padding: 44px 10px 10px; }
+    .gd-hero h1 { margin: 0 0 8px; font-size: 30px; font-weight: 700; letter-spacing: -0.5px; }
+    .gd-hero p { margin: 0 auto; max-width: 660px; color: var(--text-muted, #94A3B8); font-size: 14px; line-height: 1.65; }
+    .gd-body h2 { margin: 34px 0 10px; font-size: 18px; }
+    .gd-body h3 { margin: 22px 0 8px; font-size: 14.5px; color: var(--text-color, #F8FAFC); }
+    .gd-body p, .gd-body li { color: var(--text-muted, #94A3B8); font-size: 13.5px; line-height: 1.75; }
+    .gd-body strong { color: var(--text-color, #F8FAFC); }
+    .gd-body a { color: var(--primary, #38BDF8); text-decoration: none; }
+    .gd-body a:hover { text-decoration: underline; }
+    .gd-body ul { padding-left: 20px; margin: 8px 0 16px; }
+    table.gd-t { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 12.5px; }
+    .gd-t th, .gd-t td { text-align: left; padding: 8px 11px; border: 1px solid var(--border-color, #334155); vertical-align: top; }
+    .gd-t th { background: var(--inner-bg, #0F172A); color: var(--text-color, #F8FAFC); }
+    .gd-t td { color: var(--text-muted, #94A3B8); }
+    .acc-foot { margin-top: 28px; text-align: center; font-size: 11px; color: var(--text-muted, #94A3B8); line-height: 1.7; }
+    @media (max-width: 760px) { .acc-page { padding: 0 14px 40px; } }
+</style>
+</head>
+<body>
+<div class="acc-page">
+
+    <div class="gd-hero">
+        <h1>Politique de confidentialité</h1>
+        <p>Prévol n'a ni compte utilisateur, ni publicité, ni traceur. Cette page décrit simplement
+           ce qui est stocké sur votre appareil et ce qui circule sur le réseau.</p>
+    </div>
+
+    <div class="gd-body">
+
+        <h2>En résumé</h2>
+        <ul>
+            <li><strong>Aucune donnée personnelle n'est envoyée à un serveur</strong> par Prévol : pas de compte,
+                pas d'inscription, pas de publicité, pas d'outil de mesure d'audience.</li>
+            <li>Vos réglages et favoris restent <strong>sur votre appareil</strong> uniquement.</li>
+            <li>Si la géolocalisation est utilisée, <strong>votre position ne quitte jamais l'appareil</strong> :
+                la recherche du terrain le plus proche est calculée localement.</li>
+        </ul>
+
+        <h2>Ce qui est stocké sur votre appareil</h2>
+        <p>L'application enregistre dans le stockage de votre navigateur (localStorage et IndexedDB),
+           uniquement pour votre confort :</p>
+        <table class="gd-t">
+            <tr><th>Élément</th><th>Contenu</th></tr>
+            <tr><td>Favoris et favori de démarrage</td><td>Codes OACI des terrains que vous suivez</td></tr>
+            <tr><td>Historique de recherche</td><td>Derniers terrains consultés</td></tr>
+            <tr><td>Dernier terrain, fond de carte, rayon NOTAM, thème</td><td>Vos préférences d'affichage</td></tr>
+            <tr><td>Flotte (masses, bras, carburant)</td><td>Les caractéristiques des avions que vous saisissez</td></tr>
+            <tr><td>Caches (IndexedDB)</td><td>Base des terrains, données météo récentes (30 min max), Sup AIP (24 h), profils de relief — pour le fonctionnement hors ligne</td></tr>
+            <tr><td>Vol en cours (si suivi GPS activé)</td><td>Trace et points de vos navigations, stockés localement</td></tr>
+        </table>
+        <p>Pour tout effacer : paramètres de votre navigateur → « Données de site » pour
+           papabear56.pages-perso.free.fr → supprimer.</p>
+
+        <h2>Ce qui circule sur le réseau</h2>
+        <p>L'application interroge des sources publiques avec des paramètres <strong>anonymes</strong>
+           (codes OACI, coordonnées de terrains, niveaux de vol) — jamais votre position, jamais
+           d'identifiant. Comme pour tout site web, votre adresse IP transite par l'hébergeur (Free)
+           et, pour certains flux (météo aéronautique, NOTAM, TEMSI), par un relais technique
+           (Cloudflare Workers) géré par l'éditeur, qui ne conserve pas vos données. Les polices de
+           caractères sont auto-hébergées : <strong>aucune requête n'est envoyée à Google</strong> ou à un
+           autre tiers à votre insu.</p>
+
+        <h2>Géolocalisation</h2>
+        <p>La géolocalisation n'est utilisée que si vous avez accordé la permission à votre navigateur,
+           et uniquement pour afficher le terrain le plus proche et votre position sur la carte.
+           Le calcul est effectué localement ; les coordonnées ne sont transmises à aucun service.</p>
+
+        <h2>Vos droits</h2>
+        <p>Ne pouvant accéder aux données stockées sur votre appareil, l'éditeur n'a rien à supprimer :
+           vous gardez le contrôle total (effacement du stockage du navigateur, désactivation de la
+           géolocalisation dans les réglages du site). Pour toute question :
+           contact — <span id="leg-mail"></span>.</p>
+    </div>
+
+    <div class="acc-foot">
+        <div style="font-weight:600;color:var(--text-color,#F8FAFC);">© 2026 PapaBear — Prévol</div>
+        <div><a href="mentions-legales.html">Mentions légales</a> · <a href="accueil.html">Présentation</a></div>
+    </div>
+
+</div>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const m = ['papa', 'bear', 'wibox', 'fr'];
+        const addr = m[0] + m[1] + String.fromCharCode(64) + m[2] + '.' + m[3];
+        const a = document.getElementById('leg-mail');
+        if (a) { a.innerHTML = '<a href="ma' + 'ilto:' + addr + '">' + addr + '</a>'; }
+        if (window.lucide) window.lucide.createIcons();
+    });
+</script>
+</body>
+</html>
