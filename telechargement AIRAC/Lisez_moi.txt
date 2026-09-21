@@ -23,6 +23,9 @@ Les nouveautés précisées ci-après concernent des changements importants de donné
 Ces nouveautés ont un caractère informatif et ne traduisent pas l'exhaustivité des Mises à Jour (MAJ) AIP incluses dans ce BMJ. 
 L'ensemble de ces MAJ sont contenues dans l'AMDT du cycle AIRAC concerné et accessible dans la rubrique "Mises à jour contenues dans cet eAIP" du site Internet du SIA.
 
+****BMJ 10/2026****
+La nouvelle version export_xml_bd_SIA_2026-10-01-v02.zip contient l'obstacle 74011 qui en raison d'un problème technique, n'était pas présent dans la version précédentes de ce BMJ.
+
 ****BMJ 09/2026****
 La nouvelle version export_xml_bd_SIA_2026-09-03-v04.zip contient l'obstacle 74011 qui en raison d'un problème technique, n'était pas présent dans les versions précédentes de ce BMJ.
 
