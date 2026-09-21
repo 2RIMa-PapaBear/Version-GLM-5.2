@@ -1,0 +1,299 @@
+/* ============================================================================
+   CHART.CSS — thème « Carte OACI 1/500 000 » de la vitrine Prévol
+   (accueil.html + guides + pages légales). Thème AUTONOME : il ne dépend pas
+   de style.css. L'application (index.html) garde son thème sombre.
+   Généré à la main —palette et composants inspirés des cartes 1/500 000.
+   ============================================================================ */
+
+:root {
+    --papier: #F4EEDB;          /* fond ocre clair de la carte */
+    --papier-2: #EFE7CE;        /* bande de terrain plus soutenue */
+    --papier-bloc: #FAF6E9;     /* fond des cartouches */
+    --encre: #24221B;           /* encre principale */
+    --encre-2: #55503F;         /* encre secondaire */
+    --muet: #77705D;            /* texte atténué */
+    --filet: #9A9280;           /* filet ordinaire */
+    --filet-fin: #CDC4A8;       /* filet léger */
+    --hydro: #6E9CBE;           /* bleu hydrographique */
+    --hydro-clair: #D9E6EF;
+    --magenta: #A8448F;         /* zones à contour magenta */
+    --magenta-clair: rgba(168, 68, 143, .10);
+    --foret: #DCE3C4;           /* taches de végétation */
+    --route: #C9744A;
+    --ok: #3E7C4F;
+    --alerte: #A97715;
+    --danger: #A93B2A;
+
+    /* variables partagées avec les composants existants */
+    --bg-color: var(--papier);
+    --panel-bg: var(--papier-bloc);
+    --inner-bg: var(--papier-bloc);
+    --border-color: var(--filet);
+    --text-color: var(--encre);
+    --text-muted: var(--muet);
+    --primary: #1F5FA8;
+    --danger: var(--danger);
+    --radius-sm: 2px;
+}
+
+body {
+    margin: 0;
+    background:
+        repeating-linear-gradient(0deg, transparent 0 47px, rgba(122, 113, 88, .10) 47px 48px),
+        repeating-linear-gradient(90deg, transparent 0 47px, rgba(122, 113, 88, .10) 47px 48px),
+        var(--papier);
+    color: var(--encre);
+    font-family: 'DM Sans', 'Segoe UI', sans-serif;
+}
+
+.sr-only, .skip-link { display: none; }
+
+/* ---- Cadre « marge de carte » (double filet) autour de chaque page ------- */
+.acc-page, .gd-page {
+    max-width: 1020px;
+    margin: 18px auto 40px;
+    padding: 0 26px 40px;
+    border: 1.5px solid var(--encre);
+    outline: 1px solid var(--encre);
+    outline-offset: 4px;
+    background: var(--papier);
+    box-shadow: 0 1px 0 var(--papier);
+}
+
+/* ---- Cartouche de titre (hero) -------------------------------------------- */
+.gd-hero, .acc-hero {
+    position: relative;
+    text-align: center;
+    padding: 40px 22px 22px;
+    margin-bottom: 8px;
+    border: 1px solid var(--filet);
+    background:
+        repeating-linear-gradient(0deg, transparent 0 27px, rgba(122, 113, 88, .08) 27px 28px),
+        repeating-linear-gradient(90deg, transparent 0 27px, rgba(122, 113, 88, .08) 27px 28px),
+        var(--papier-2);
+    overflow: hidden;
+}
+.gd-hero h1, .acc-hero h1 {
+    margin: 0 0 8px;
+    font-size: 34px;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+}
+.gd-hero p, .acc-hero p {
+    margin: 0 auto;
+    max-width: 640px;
+    color: var(--encre-2);
+    font-size: 14px;
+    line-height: 1.65;
+}
+.gd-hero .gd-brand, .acc-hero .gd-brand {
+    display: inline-flex; align-items: center; gap: 8px;
+    margin-bottom: 16px; padding: 5px 12px;
+    border: 1px solid var(--encre); border-radius: 0;
+    background: var(--papier-bloc); color: var(--encre);
+    font-size: 11.5px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; text-decoration: none;
+}
+.gd-hero .gd-brand:hover { background: var(--encre); color: var(--papier); }
+.gd-hero .gd-brand svg { width: 14px; height: 14px; }
+
+/* ---- Boutons : tampons rectangulaires ------------------------------------- */
+.acc-go, .acc-cta a, .gd-also a, .gd-cta-link {
+    display: inline-flex; align-items: center; gap: 9px;
+    padding: 11px 24px; border-radius: 0; cursor: pointer;
+    text-decoration: none; font-weight: 700; font-size: 14px;
+    font-family: 'DM Mono', monospace; letter-spacing: .5px;
+    transition: background .12s, color .12s;
+}
+.acc-go, .acc-cta .acc-go, .acc-final .acc-go {
+    background: var(--encre); color: var(--papier); border: 1px solid var(--encre);
+}
+.acc-go:hover { background: var(--primary); border-color: var(--primary); }
+.acc-cta .acc-ghost {
+    background: transparent; color: var(--encre-2); border: 1px solid var(--filet);
+}
+.acc-cta .acc-ghost:hover { color: var(--encre); border-color: var(--encre); }
+.acc-cta a svg, .acc-final a svg, .gd-also a svg { width: 15px; height: 15px; }
+
+/* ---- Statistiques en bloc « légende de carte » ----------------------------- */
+.acc-stats {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 30px;
+    margin: 20px auto 0; padding: 11px 18px; max-width: 720px;
+    border: 1px solid var(--encre);
+    background: var(--papier-bloc);
+    font-size: 12.5px; color: var(--encre-2);
+}
+.acc-stats b { color: var(--encre); font-family: 'DM Mono', monospace; font-size: 13.5px; }
+
+/* ---- Captures réelles : encarts à filet double ------------------------------ */
+.acc-shots { display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; margin-top: 30px; align-items: start; }
+.acc-shot { position: relative; border: 1px solid var(--encre); background: var(--papier-bloc); }
+.acc-shot::after { content: ''; position: absolute; inset: 3px; border: 1px solid var(--filet-fin); pointer-events: none; }
+.acc-shot img { display: block; width: 100%; height: auto; }
+.acc-shot .acc-shot-bar {
+    display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+    border-bottom: 1px solid var(--filet-fin); background: var(--papier-bloc);
+}
+.acc-shot .acc-shot-bar i { width: 8px; height: 8px; border-radius: 50%; background: var(--filet); }
+.acc-shot .acc-shot-bar span { margin-left: 6px; font-size: 10.5px; color: var(--muet); font-family: 'DM Mono', monospace; letter-spacing: .5px; }
+.acc-shots .acc-col { display: flex; flex-direction: column; gap: 14px; }
+
+/* ---- Sections --------------------------------------------------------------- */
+.acc-h2, .gd-body h2, .leg-h2 {
+    margin: 40px 0 4px; font-size: 19px; letter-spacing: 1.2px; text-transform: uppercase;
+}
+.acc-h2::after, .gd-body h2::after {
+    content: ''; display: block; width: 64px; height: 3px;
+    margin-top: 7px; background: var(--encre);
+}
+.acc-h2sub { margin: 0 0 18px; color: var(--muet); font-size: 13px; }
+
+/* ---- Cartes : cartouches papier à filet fin --------------------------------- */
+.acc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.acc-card {
+    background: var(--papier-bloc);
+    border: 1px solid var(--filet);
+    border-radius: 0;
+    padding: 17px 16px 13px;
+    transition: border-color .12s, transform .12s;
+}
+a.acc-card { text-decoration: none; color: inherit; }
+.acc-card:hover { border-color: var(--encre); transform: translateY(-2px); }
+.acc-card h2 { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; font-size: 14px; letter-spacing: .3px; }
+.acc-ic {
+    width: 30px; height: 30px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--papier); color: var(--encre);
+    border: 1px solid var(--encre); border-radius: 0;
+}
+.acc-ic svg { width: 16px; height: 16px; }
+.acc-card p { margin: 0; color: var(--encre-2); font-size: 12.5px; line-height: 1.66; }
+.acc-card .acc-more { display: inline-block; margin-top: 8px; font-size: 12px; color: var(--primary); font-weight: 600; }
+
+/* ---- Bandeau photo : encart papier ------------------------------------------ */
+.acc-band { position: relative; margin: 26px 0 0; border: 1px solid var(--encre); overflow: hidden; }
+.acc-band img { display: block; width: 100%; height: 300px; object-fit: cover; }
+
+/* ---- Étapes : style carnet de nav ------------------------------------------- */
+.acc-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin-top: 14px; }
+.acc-step {
+    display: flex; gap: 12px; align-items: flex-start; padding: 13px 15px;
+    background: var(--papier-bloc); border: 1px solid var(--filet);
+}
+.acc-step b {
+    display: flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+    font-family: 'DM Mono', monospace; font-size: 12.5px;
+    color: var(--papier); background: var(--encre);
+}
+.acc-step div span { display: block; font-weight: 700; font-size: 12.5px; margin-bottom: 3px; }
+.acc-step div p { margin: 0; font-size: 12px; color: var(--muet); line-height: 1.6; }
+
+/* ---- CTA final --------------------------------------------------------------- */
+.acc-final {
+    margin-top: 40px; text-align: center; padding: 28px 20px;
+    border: 1px solid var(--encre);
+    background: var(--papier-2);
+}
+.acc-final h2 { margin: 0 0 6px; font-size: 18px; letter-spacing: 1px; text-transform: uppercase; }
+.acc-final p { margin: 0 0 16px; color: var(--encre-2); font-size: 13px; }
+
+/* ---- Pied de page : cartouche d'édition -------------------------------------- */
+.acc-foot {
+    margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--encre);
+    text-align: center; font-size: 11px; color: var(--muet); line-height: 1.75;
+}
+.acc-foot a { color: var(--encre-2); text-decoration: none; border-bottom: 1px dotted var(--filet); }
+.acc-foot a:hover { color: var(--encre); border-bottom-color: var(--encre); }
+.acc-foot .warning { color: var(--danger); }
+.acc-foot > div { margin: 2px 0; }
+
+/* ============================================================================
+   GUIDES (.gd-*) — mêmes principes, contenus longs
+   ============================================================================ */
+.gd-body { margin-top: 6px; }
+.gd-body h2 { margin: 34px 0 10px; font-size: 18px; }
+.gd-body h3 { margin: 22px 0 8px; font-size: 14.5px; color: var(--encre); }
+.gd-body p, .gd-body li { color: var(--encre-2); font-size: 13.5px; line-height: 1.75; }
+.gd-body strong { color: var(--encre); }
+.gd-body a { color: var(--primary); text-decoration: none; }
+.gd-body a:hover { text-decoration: underline; }
+.gd-body ul, .gd-body ol { padding-left: 22px; margin: 8px 0 16px; }
+
+table.gd-t { width: 100%; border-collapse: collapse; margin: 14px 0 20px; font-size: 12.5px; }
+.gd-t th, .gd-t td { text-align: left; padding: 8px 11px; border: 1px solid var(--encre); vertical-align: top; }
+.gd-t th { background: var(--papier-2); color: var(--encre); font-size: 12px; letter-spacing: .4px; text-transform: uppercase; }
+.gd-t td { color: var(--encre-2); }
+.gd-t td:first-child { font-family: 'DM Mono', monospace; color: var(--encre); white-space: nowrap; }
+
+.gd-code {
+    font-family: 'DM Mono', monospace; font-size: 14px; color: var(--encre);
+    background: var(--papier-2); border: 1px solid var(--encre);
+    padding: 12px 15px; overflow-x: auto; margin: 12px 0 8px;
+    white-space: pre-wrap; word-break: break-word;
+}
+.gd-code b { color: var(--primary); font-weight: 500; }
+.gd-trad { font-size: 12.5px; color: var(--muet); margin: 0 0 18px; line-height: 1.7; }
+
+.gd-tip { border-left: 3px solid var(--magenta); background: var(--magenta-clair);
+    padding: 10px 14px; font-size: 13px; line-height: 1.7; margin: 14px 0 20px; color: var(--encre); }
+
+.gd-faq dt { font-weight: 700; color: var(--encre); font-size: 13.5px; margin-top: 16px; }
+.gd-faq dd { margin: 4px 0 0; color: var(--encre-2); font-size: 13px; line-height: 1.7; }
+
+.gd-also { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 0; }
+.gd-also a {
+    display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px;
+    text-decoration: none; font-size: 12.5px; font-weight: 700; letter-spacing: .3px;
+    background: var(--papier-bloc); border: 1px solid var(--encre); color: var(--encre);
+}
+.gd-also a:hover { background: var(--encre); color: var(--papier); }
+.gd-also a svg { width: 14px; height: 14px; }
+
+.gd-faq dt + dd { margin-bottom: 2px; }
+
+/* ---- Pages légales (.leg-*) --------------------------------------------------- */
+.leg-body h2 { margin: 30px 0 8px; font-size: 16px; letter-spacing: .8px; text-transform: uppercase; }
+.leg-body p, .leg-body li { color: var(--encre-2); font-size: 13px; line-height: 1.75; }
+.leg-body strong { color: var(--encre); }
+.leg-body a { color: var(--primary); text-decoration: none; border-bottom: 1px dotted var(--filet); }
+.leg-body a:hover { border-bottom-color: var(--primary); }
+
+/* ---- Accueil : logo, piste et sous-titre (cartouche) ------------------------ */
+.acc-cta { margin: 24px 0 4px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.acc-logo {
+    width: 54px; height: 54px; margin: 0 auto 14px;
+    border: 1px solid var(--encre); background: var(--papier-bloc);
+    display: flex; align-items: center; justify-content: center; color: var(--encre);
+}
+.acc-logo svg { width: 30px; height: 30px; }
+.acc-hero .runway {
+    display: inline-flex; align-items: stretch; gap: 22px;
+    padding: 16px 26px; margin: 0 0 12px;
+    background: var(--encre); border: 1px solid var(--encre);
+}
+.acc-hero .runway .thr { display: flex; gap: 4px; align-items: center; }
+.acc-hero .runway .thr i { display: block; width: 4px; height: 32px; background: var(--papier); opacity: .92; }
+.acc-hero .runway .mid { display: flex; flex-direction: column; align-items: center; }
+.acc-hero .runway .mid h1 {
+    margin: 0 0 8px; color: var(--papier);
+    font-size: 30px; font-weight: 700; letter-spacing: 4px;
+}
+.acc-hero .runway .axe {
+    width: 100%; height: 3px;
+    background: repeating-linear-gradient(90deg, var(--papier) 0 16px, transparent 16px 28px);
+}
+.acc-sub { margin: 0 auto 6px; max-width: 660px; color: var(--encre); font-weight: 700; font-size: 15.5px; }
+.acc-hero > p { color: var(--encre-2); }
+
+/* ---- Responsive ---------------------------------------------------------------- */
+@media (max-width: 760px) {
+    .acc-page, .gd-page { margin: 10px auto 30px; padding: 0 14px 30px; }
+    .gd-hero, .acc-hero { padding: 28px 14px 16px; }
+    .gd-hero h1, .acc-hero h1 { font-size: 25px; letter-spacing: 1.5px; }
+    .acc-shots { grid-template-columns: 1fr; }
+    .acc-band img { height: 190px; }
+    .gd-t { font-size: 11.5px; }
+    .gd-t th, .gd-t td { padding: 6px 7px; }
+}
