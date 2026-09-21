@@ -94,6 +94,22 @@ export function supMatches(sup, icaos) {
     return hits;
 }
 
+/** Terrains dont le NOM est cité dans l'objet — beaucoup de Sup désignent la
+ *  zone par le nom de l'AD (« région de FIGARI (2A) ») sans code OACI.
+ *  Mots de ≥ 4 lettres du nom, insensibles à la casse (accents compris) ;
+ *  retourne les ICAO des candidats dont le nom est cité. */
+export function supMatchesNames(sup, candidats) {
+    const s = String(sup.subject || '').toUpperCase();
+    const out = [];
+    for (const c of candidats || []) {
+        if (!c?.icao || out.includes(c.icao)) continue;
+        const mots = String(c.name || '').toUpperCase()
+            .split(/[^A-ZÀ-ÖØ-Þ]+/).filter(w => w.length >= 4);
+        if (mots.some(w => s.includes(w))) out.push(c.icao);
+    }
+    return out;
+}
+
 // ---- Régions & zones cardinales : la plupart des Sup citent une RÉGION
 // (« région de Nîmes », « Sud-Est »), pas un code OACI. Boîtes englobantes
 // approximatives (régions administratives +.cardinaux) : elles SERVENT À
@@ -229,10 +245,16 @@ function _render(data) {
     // du trajet cités dans l'objet (« région de Nîmes », « Sud-Est ») —
     // les deux font remonter la Sup en tête (retour pilote 16/09 : le tri
     // sur le trajet ne s'exprimait pas car les Sup citent des régions).
+    // Noms des terrains candidats (base locale) pour le matching par nom.
+    const candidats = icaos.map(c => {
+        const a = getAirportByICAO(c);
+        return { icao: c, name: a?.name || '' };
+    });
     const relOf = (s) => {
-        const i = supMatches(s, icaos);
+        const iDirect = supMatches(s, icaos);
+        const iNom = supMatchesNames(s, candidats).filter(x => !iDirect.includes(x));
         const r = supRelevance(s, regs).regions;
-        return { i, r, n: i.length + r.length };
+        return { i: [...iDirect, ...iNom], r, n: iDirect.length + iNom.length + r.length };
     };
     const matched = rows.map(s => ({ s, rel: relOf(s) }));
     matched.sort((a, b) => (b.rel.n - a.rel.n) || (b.s.num > a.s.num ? 1 : -1));
