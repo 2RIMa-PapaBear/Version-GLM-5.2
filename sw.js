@@ -18,7 +18,7 @@
  * en network-first pour récupérer le nouveau index.html.
  * ================================================================ */
 
-const CACHE = 'mt-shell-v339';
+const CACHE = 'mt-shell-v340';
 
 // Hôtes de DONNÉES : jamais mis en cache (sécurité pilote).
 const NO_CACHE_HOSTS = [
