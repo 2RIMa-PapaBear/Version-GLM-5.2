@@ -105,6 +105,22 @@ export function initGeoDepart(icaoCharge, appliquer) {
     } catch { /* Permissions API indisponible : on garde le terrain initial */ }
 }
 
+// Recherche de terrains par code OACI ou nom (recherche multi-critères du
+// panneau Sup AIP) : sous-chaîne insensible à la casse, résultat plafonné.
+export function getAirportsByName(q, limit = 40) {
+    const s = String(q || '').trim().toUpperCase();
+    if (s.length < 2) return [];
+    const out = [];
+    for (const a of AIRPORTS) {
+        if (!a?.icao) continue;
+        if (a.icao.toUpperCase().includes(s) || String(a.name || '').toUpperCase().includes(s)) {
+            out.push({ icao: a.icao, name: a.name, lat: a.lat, lon: a.lon });
+            if (out.length >= limit) break;
+        }
+    }
+    return out;
+}
+
 export function enrichAirport(icao, enriched) {
     if (!icao || !enriched) return;
     const key = icao.toUpperCase();
