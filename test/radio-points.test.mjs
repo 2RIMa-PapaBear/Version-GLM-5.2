@@ -66,7 +66,10 @@ test('parseRadioPoints : VRP SIA avec description (5ᵉ élément)', () => {
 test('radio-points.json : navaids SIA France (VOR/VOR-DME/NDB + RadioNav)', async () => {
     const { readFile } = await import('node:fs/promises');
     const json = JSON.parse(await readFile(new URL('../data/radio-points.json', import.meta.url), 'utf8'));
-    ok(json.counts?.navaidsSia >= 115, `≥115 navaids officiels SIA (${json.counts?.navaidsSia})`);
+    // Plancher de non-régression du parse/merge. Cycle 2026-10-01 : 114
+    // navaids SIA officielles (MUT, PON et TW retirées — Lisez-moi BMJ
+    // 10/2026) ; marge pour les retraits AIRAC à venir.
+    ok(json.counts?.navaidsSia >= 110, `≥110 navaids officiels SIA (${json.counts?.navaidsSia})`);
     // Les 7 VOR-DME absents d'openAIP, avec leur fréquence officielle.
     const ATTENDUS = { BT: 116.1, CNM: 111.4, LSE: 114.75, MEN: 115.3, ROA: 110.4, TOU: 117.7, CAV: 111.65 };
     for (const [ident, freq] of Object.entries(ATTENDUS)) {
