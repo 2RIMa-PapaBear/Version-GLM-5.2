@@ -66,6 +66,24 @@ test('supMatches : ICAO du plan cités dans l objet (mise en avant « votre vol 
     deepEqual(supMatches({ subject: 'ZRT France entière' }, ['LFRV']), []);
 });
 
+test('supMatchesNames : nom du terrain cité sans code OACI (ex. « région de FIGARI (2A) »)', async () => {
+    const m = await import('../js/sup-sia.js');
+    const sup = { subject: 'Création de deux zones réglementées temporaires dans la région de FIGARI (2A)' };
+    const candidats = [
+        { icao: 'LFKF', name: 'Figari Sud Corse' },
+        { icao: 'LFRV', name: 'Vannes/Meucon' },
+    ];
+    deepEqual(m.supMatchesNames(sup, candidats), ['LFKF'], 'FIGARI cité → LFKF');
+    // Mots de moins de 4 lettres ne suffisent pas (« SUD » seul dans l objet).
+    deepEqual(m.supMatchesNames({ subject: 'zone au SUD de la zone' }, candidats), [],
+        'mot court ignoré');
+    // AccentInsensitive : « Bihoué » cité → LFRH.
+    deepEqual(m.supMatchesNames(
+        { subject: 'ZRT à proximité de Lann Bihoué' },
+        [{ icao: 'LFRH', name: 'Lann Bihoué' }]), ['LFRH']);
+    deepEqual(m.supMatchesNames(sup, []), [], 'aucun candidat → aucun match');
+});
+
 test('capture réelle : la base générée est conforme (si présente)', () => {
     const p = path.join(root, 'data', 'sup-sia.json');
     if (!fs.existsSync(p)) return;
