@@ -82,6 +82,19 @@ test('supMatchesNames : nom du terrain cité sans code OACI (ex. « région de F
         { subject: 'ZRT à proximité de Lann Bihoué' },
         [{ icao: 'LFRH', name: 'Lann Bihoué' }]), ['LFRH']);
     deepEqual(m.supMatchesNames(sup, []), [], 'aucun candidat → aucun match');
+    // Mots génériques : « Saint-Dizier » ne matche pas « Saint-Nazaire Montoir »
+    // via le seul mot SAINT (retour pilote 20/09 — Sup hors secteur en tête).
+    deepEqual(m.supMatchesNames(
+        { subject: 'création de zones réglementées à Saint-Dizier (LFSI)' },
+        [{ icao: 'LFRZ', name: 'Saint-Nazaire Montoir' }]), []);
+    // « Lyon Saint-Exupéry (LFLL) » ne matche pas un candidat voisin non lyonnais.
+    deepEqual(m.supMatchesNames(
+        { subject: 'travaux sur l AD Lyon Saint-Exupéry (LFLL)' },
+        [{ icao: 'LFRZ', name: 'Saint-Nazaire Montoir' }]), []);
+    // Le mot le plus long du nom suffit : « Montoir » cité → LFRZ.
+    deepEqual(m.supMatchesNames(
+        { subject: 'manœuvres autour de Montoir' },
+        [{ icao: 'LFRZ', name: 'Saint-Nazaire Montoir' }]), ['LFRZ']);
 });
 
 test('capture réelle : la base générée est conforme (si présente)', () => {

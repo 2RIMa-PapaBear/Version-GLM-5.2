@@ -96,16 +96,26 @@ export function supMatches(sup, icaos) {
 
 /** Terrains dont le NOM est cité dans l'objet — beaucoup de Sup désignent la
  *  zone par le nom de l'AD (« région de FIGARI (2A) ») sans code OACI.
- *  Mots de ≥ 4 lettres du nom, insensibles à la casse (accents compris) ;
- *  retourne les ICAO des candidats dont le nom est cité. */
+ *  Mots de ≥ 4 lettres du nom, hors mots génériques (SAINT, SUD… jamais
+ *  discriminants), et seul le MOT LE PLUS LONG doit être cité : « Saint-Nazaire »
+ *  ne matche pas une Sup de Saint-Dizier via le seul mot « SAINT » (retour
+ *  pilote 20/09). Retourne les ICAO des candidats dont le nom est cité. */
+const MOTS_GENERIQUES_NOM = new Set([
+    'SAINT', 'SAINTE', 'SUD', 'NORD', 'EST', 'OUEST', 'AD', 'AERODROME', 'AÉRODROME',
+    'BASE', 'TERRAIN', 'VILLE', 'AERONAUTIQUE', 'AÉRONAUTIQUE', 'AVIATION',
+]);
+
 export function supMatchesNames(sup, candidats) {
     const s = String(sup.subject || '').toUpperCase();
     const out = [];
     for (const c of candidats || []) {
         if (!c?.icao || out.includes(c.icao)) continue;
         const mots = String(c.name || '').toUpperCase()
-            .split(/[^A-ZÀ-ÖØ-Þ]+/).filter(w => w.length >= 4);
-        if (mots.some(w => s.includes(w))) out.push(c.icao);
+            .split(/[^A-ZÀ-ÖØ-Þ]+/)
+            .filter(w => w.length >= 4 && !MOTS_GENERIQUES_NOM.has(w));
+        if (!mots.length) continue;
+        const longest = Math.max(...mots.map(w => w.length));
+        if (mots.some(w => w.length === longest && s.includes(w))) out.push(c.icao);
     }
     return out;
 }
