@@ -102,7 +102,7 @@ export function supMatches(sup, icaos) {
  *  pilote 20/09). Retourne les ICAO des candidats dont le nom est cité. */
 const MOTS_GENERIQUES_NOM = new Set([
     'SAINT', 'SAINTE', 'SUD', 'NORD', 'EST', 'OUEST', 'AD', 'AERODROME', 'AÉRODROME',
-    'BASE', 'TERRAIN', 'VILLE', 'AERONAUTIQUE', 'AÉRONAUTIQUE', 'AVIATION',
+    'BASE', 'TERRAIN', 'VILLE', 'AERONAUTIQUE', 'AÉRONAUTIQUE', 'AVIATION', 'BELLE',
 ]);
 
 export function supMatchesNames(sup, candidats) {
@@ -114,8 +114,11 @@ export function supMatchesNames(sup, candidats) {
             .split(/[^A-ZÀ-ÖØ-Þ]+/)
             .filter(w => w.length >= 4 && !MOTS_GENERIQUES_NOM.has(w));
         if (!mots.length) continue;
-        const longest = Math.max(...mots.map(w => w.length));
-        if (mots.some(w => w.length === longest && s.includes(w))) out.push(c.icao);
+        // Règle stricte (retour pilote 20/09) : le PREMIER mot significatif du
+        // nom doit être cité dans l'objet. « Cintegabelle » ne matche pas
+        // « Belle Ile » via BELLE, « côte Atlantique » ne matche pas
+        // « Nantes Atlantique », « Saint-Dizier » ne matche pas « Nazaire ».
+        if (s.includes(mots[0])) out.push(c.icao);
     }
     return out;
 }
