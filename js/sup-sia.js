@@ -20,7 +20,7 @@ import { state } from './core.js';
 
 import { makeCollapsible } from './collapsible.js';
 
-import { getAirportByICAO, getAirportsInBbox } from './ui-module.js';
+import { getAirportByICAO, getAirportsInBbox, getAirportsByName } from './ui-module.js';
 
 // Chemin RELATIF au canal (PAS bigDataUrl : sa redirection racine-prod ne
 // vaut que pour les données volumineuses partagées cells/VAC — sur /test/,
@@ -235,12 +235,35 @@ function _render(data) {
             }
         }
     }
+    // Recherche multi-critères (retour pilote 20/09) : la requête peut être un
+    // numéro/mot de l'objet (texte libre), un code OACI, un nom d'AD ou une
+    // région/cardinal — « LFKF », « Figari », « 2A » et « Corse » pointent
+    // vers la même Sup même si l'objet ne cite pas le code.
     const q = _filters.q.trim().toLowerCase();
 
     let rows = items;
     if (_filters.todayOnly) rows = rows.filter(s => supActiveOn(s, dayIso));
     if (_filters.vfrOnly) rows = rows.filter(s => s.vfr);
-    if (q) rows = rows.filter(s => (s.num + ' ' + s.subject).toLowerCase().includes(q));
+    if (q && q.length >= 2) {
+        // Résolution de la requête vers des terrains (ICAO ou nom contient q).
+        const icaosQ = [];
+        const tokensQ = new Set();
+        for (const a of getAirportsByName(q, 40)) {
+            if (!icaosQ.includes(a.icao)) icaosQ.push(a.icao);
+            String(a.name || '').toUpperCase()
+                .split(/[^A-ZÀ-ÖØ-Þ]+/).filter(w => w.length >= 4)
+                .forEach(w => tokensQ.add(w));
+        }
+        const qU = q.toUpperCase();
+        rows = rows.filter(s => {
+            const subj = (s.num + ' ' + s.subject).toUpperCase();
+            if (subj.includes(qU)) return true;                                        // texte libre
+            if (icaosQ.length && supMatches(s, icaosQ).length) return true;             // code OACI résolu cité
+            if (tokensQ.size && [...tokensQ].some(t => subj.includes(t))) return true;  // nom d'AD cité
+            if (q.length >= 3 && supRelevance(s, [qU]).regions.length) return true;     // région/cardinal
+            return false;
+        });
+    }
     // Pertinence au TRAJET : ICAO du plan cités (fort) + régions/cardinaux
     // du trajet cités dans l'objet (« région de Nîmes », « Sud-Est ») —
     // les deux font remonter la Sup en tête (retour pilote 16/09 : le tri
