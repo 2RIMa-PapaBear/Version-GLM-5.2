@@ -91,9 +91,9 @@ test('supMatchesNames : nom du terrain cité sans code OACI (ex. « région de F
     deepEqual(m.supMatchesNames(
         { subject: 'travaux sur l AD Lyon Saint-Exupéry (LFLL)' },
         [{ icao: 'LFRZ', name: 'Saint-Nazaire Montoir' }]), []);
-    // Le mot le plus long du nom suffit : « Montoir » cité → LFRZ.
+    // Le premier mot significatif du nom suffit : « Saint-Nazaire Montoir » cité → LFRZ.
     deepEqual(m.supMatchesNames(
-        { subject: 'manœuvres autour de Montoir' },
+        { subject: 'manœuvres autour de Saint-Nazaire Montoir' },
         [{ icao: 'LFRZ', name: 'Saint-Nazaire Montoir' }]), ['LFRZ']);
 });
 
