@@ -1,0 +1,68 @@
+name: Bascule AIRAC 2026-10-01
+
+# ============================================================================
+# Bascule planifiée vers le cycle AIRAC 2026-10-01 (effectif le 1ᵉʳ octobre).
+#
+# Les fichiers 10-01 ont été commités trop tôt (20/09) puis retirés de la prod
+# — ce workflow les republie À LA DATE d'effet, via scripts/bascule-airac.mjs
+# (restauration depuis a937cce3 + garde-fous + test radio-points).
+#
+# ⚠️ Auto-neutralisé après usage : le script refuse si l'AIRAC en vigueur
+# n'est plus 2026-10-01 (donc en 2027, le cron tournera mais n'agira pas).
+# Désactivez ce workflow (Settings → Actions) une fois la bascule faite.
+#
+# Déclenchement manuel possible (workflow_dispatch) — le script garde sa
+# protection de date sauf si vous cochez/ajoutez --force.
+# ============================================================================
+
+on:
+  schedule:
+    - cron: '5 0 1 10 *'   # 1ᵉʳ octobre 00:05 UTC (02:05 heure de Paris)
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Forcer même si le cycle n est pas encore en vigueur'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bascule-airac
+  cancel-in-progress: false
+
+jobs:
+  bascule:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (historique pour le commit de référence a937cce3)
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: Version-2.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Bascule des fichiers (restauration + garde-fous + test)
+        run: node scripts/bascule-airac.mjs --cycle=2026-10-01 --ref=a937cce3 --no-commit --force=${{ github.event.inputs.force || 'false' }}
+
+      - name: Commit + push si changement
+        run: |
+          git config user.name "bascule-airac-bot"
+          git config user.email "bascule-airac-bot@users.noreply.github.com"
+          git add data/ test/radio-points.test.mjs
+          if git diff --cached --quiet; then
+            echo "Aucun changement — bascule déjà en place ?"
+          else
+            git commit -m "Bascule AIRAC 2026-10-01"
+            git push
+          fi
+
+  deploy:
+    needs: bascule
+    uses: ./.github/workflows/deploy-ftp.yml
+    secrets: inherit
