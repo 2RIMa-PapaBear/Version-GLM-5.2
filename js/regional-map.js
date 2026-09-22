@@ -193,6 +193,12 @@ async function _initOrRefresh() {
 
         _initLayerControls();
 
+        // Carte ET barre prêtes : les modules en attente (suivi GPS) peuvent
+        // se monter. Remplace leur sondage à expiration fixe (120 s) : ouvert
+        // plus tard dans la session, le paquet flottant GPS ne se montait
+        // jamais (retour pilote 20/09).
+        window.dispatchEvent(new CustomEvent('prevol:map-ready'));
+
         // Rejoue les repères libres reçus avant l'init (import d'un plan avec
         // panneau carte jamais ouvert) : leurs codes (noms) sont annoncés,
         // puis la route est retracée complète.
