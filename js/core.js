@@ -714,7 +714,7 @@ async function _viaRelais(url, type, ttlSec) {
                 throw new Error(`__PROXY_INDISPONIBLE__|HTTP ${res.status}`);
             }
             const rawData = await res.text();
-            if (rawData.startsWith('PROXY_ERROR:')) throw new Error(`Google n'a pas pu joindre la cible : ${rawData}`);
+            if (rawData.startsWith('PROXY_ERROR:')) throw new Error(`Le relais n'a pas pu joindre la cible : ${rawData}`);
             // Détecte une page HTML (AviationWeather renvoie parfois une 502/503 sous charge).
             if (rawData.trim().startsWith('<') && !rawData.toLowerCase().includes('<?xml')) {
                 throw new Error('__HTML_INATTENDU__');  // marqueur interne pour retry
@@ -769,6 +769,13 @@ async function _viaRelais(url, type, ttlSec) {
                     if (!await _sondeProxy()) throw new Error(I18N[state.lang].errNetwork);
                     lastErr = e;
                 } else if (e.message === '__HTML_INATTENDU__') {
+                    lastErr = e;
+                } else if (e.message?.includes('PROXY_ERROR:')) {
+                    // La cible du Worker a timeouté (504/502 — AviationWeather
+                    // sous charge) ou a renvoyé une 5xx : TRANSITOIRE, on
+                    // retente. Un 4xx net reste un échec sans retente.
+                    const code = parseInt((e.message.match(/HTTP (\d{3})/) || [])[1], 10);
+                    if (code && code < 500) throw e;
                     lastErr = e;
                 } else {
                     throw e;
