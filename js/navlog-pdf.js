@@ -987,7 +987,9 @@ function _drawPerfPage(doc, p) {
         const lvlL = ldg.level === 'danger' ? 'danger' : ((ldg.level === 'caution' || ldg.level === 'limitative') ? 'caution' : 'ok');
         const lvlColorL = lvlL === 'danger' ? REDTX : (lvlL === 'caution' ? AMBER : GREEN);
         const rwyTxtL = ldg.rwy ? ` · RWY ${ldg.rwy}${ldg.forecast ? ' ' + (fr ? '(prévue)' : '(exp.)') : ''}` : '';
-        y = section(fr ? `Atterrissage — ${p.fromIcao}${rwyTxtL}` : `Landing — ${p.fromIcao}${rwyTxtL}`, y);
+        const icaoL = ldg.icao || p.fromIcao;
+        const metaL = ldg.metarFrom ? (fr ? ` · METAR ${ldg.metarFrom}` : ` · METAR ${ldg.metarFrom}`) : '';
+        y = section(fr ? `Atterrissage — ${icaoL}${rwyTxtL}${metaL}` : `Landing — ${icaoL}${rwyTxtL}${metaL}`, y);
 
         const cw4l = (W - 3 * 7) / 4;
         // Ordre pilote (19/09 soir) : Franchissement 50 ft PUIS roulement.

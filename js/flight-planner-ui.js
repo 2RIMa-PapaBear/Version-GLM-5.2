@@ -516,6 +516,9 @@ async function _generateNavLogPdfInto(tab, { file = false, local = false } = {})
     // décollage sur le METAR frais récupéré ci-dessus — la coupe se dessine
     // sous celle de décollage (page Performances). Références POH atterrissage
     // de la flotte requises (ldgRoll/ldgFifty).
+    // Vol nav (20/09) : ATTERRISSAGE à la DESTINATION — METAR du terrain (ou
+    // de la station émettrice la plus proche) via evaluateLandingAtDestination
+    // (piste PRÉVUE au vent), coupe posée sous celle de décollage.
     let landing = null;
     if (local && qnh != null && oat != null) {
         const l = evaluateLandingFromRaw(fromIcao, {
@@ -527,6 +530,7 @@ async function _generateNavLogPdfInto(tab, { file = false, local = false } = {})
             // MAJORÉ +20 % avant LDA, marge = piste − franchissement majoré.
             const fiftyMarginedFt = Math.round(l.fiftyFt * 1.2);
             landing = {
+                icao: fromIcao,
                 da: l.da,
                 rollM: FT_TO_M(l.rollFt), fiftyM: FT_TO_M(fiftyMarginedFt),
                 runwayLengthM: l.runwayLength != null ? FT_TO_M(l.runwayLength) : null,
@@ -534,6 +538,23 @@ async function _generateNavLogPdfInto(tab, { file = false, local = false } = {})
                 level: l.level, message: l.message,
                 headwindKt: l.headwindKt, crosswindKt: l.crosswindKt ?? null, crosswindSide: l.crosswindSide ?? null,
                 rwy: l.runwayName, forecast: l.forecast,
+                refLabel: (ac.ldgRoll && ac.ldgFifty) ? `${FT_TO_M(ac.ldgRoll)}/${FT_TO_M(ac.ldgFifty)}` : '—',
+            };
+        }
+    } else if (!local && toIcao) {
+        const l = await evaluateLandingAtDestination(toIcao);
+        if (l) {
+            const fiftyMarginedFt = Math.round(l.fiftyFt * 1.2);
+            landing = {
+                icao: toIcao,
+                da: l.da,
+                rollM: FT_TO_M(l.rollFt), fiftyM: FT_TO_M(fiftyMarginedFt),
+                runwayLengthM: l.runwayLength != null ? FT_TO_M(l.runwayLength) : null,
+                marginM: l.margin != null ? FT_TO_M(l.margin) : null,
+                level: l.level, message: l.message,
+                headwindKt: l.headwindKt, crosswindKt: l.crosswindKt ?? null, crosswindSide: l.crosswindSide ?? null,
+                rwy: l.runwayName, forecast: l.forecast,
+                metarFrom: l.metarFrom || null, metarDistNm: l.metarDistNm ?? null,
                 refLabel: (ac.ldgRoll && ac.ldgFifty) ? `${FT_TO_M(ac.ldgRoll)}/${FT_TO_M(ac.ldgFifty)}` : '—',
             };
         }
