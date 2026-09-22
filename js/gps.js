@@ -703,10 +703,16 @@ function mount() {
 const api = { start, stop, get mode() { return mode; } };
 
 // La barre est créée à l'ouverture de la carte : on attend qu'elle existe.
-const poll = setInterval(() => {
-    if (document.getElementById('map-layers-bar') && getRegisteredMap()) {
-        clearInterval(poll);
-        mount();
-    }
-}, 300);
-setTimeout(() => clearInterval(poll), 120000);
+// Double mécanisme (retour pilote 20/09 : la carte ouverte plus de 2 min
+// après le chargement laissait l'ancien sondage expiré — paquet GPS jamais
+// monté, Cadrer/Plein cadre jamais promus) : événement 'prevol:map-ready'
+// émis par regional-map quand carte+barle prêtes, et sondage de repli SANS
+// expiration, arrêté dès le montage.
+function _tryMount() {
+    if (document.getElementById('map-layers-bar') && getRegisteredMap()) { mount(); return true; }
+    return false;
+}
+if (!_tryMount()) {
+    window.addEventListener('prevol:map-ready', () => _tryMount());
+    const poll = setInterval(() => { if (_tryMount()) clearInterval(poll); }, 1000);
+}
