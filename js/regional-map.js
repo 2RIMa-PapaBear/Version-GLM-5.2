@@ -2,6 +2,7 @@ import { state, I18N, fetchAvecRelais, memoGet, memoSet, surfaceLabel } from './
 import { getAirportByICAO, getAirportsInBbox, enrichAirport, forgetAirport } from './ui-module.js';
 import { parseWaypointsField, formatWaypointsField, registerFreeWpResolver, _wpDisplayName } from './flight-planner-ui.js';
 import { parseVisiToMeters, getCeiling } from './core.js';
+import { HAZARD_COLORS } from './sigmet.js';
 import { showRouteWeather, resetRouteFit, waypointLabelHtml } from './route-weather.js';
 import { greatCircleDistanceNm } from './flight-planner.js';
 import { createPrecipController } from './radar-layer.js';
@@ -18,6 +19,7 @@ let _map = null;
 let _precip = null;
 let _airspaces = null;
 let _radioPoints = null;   // couches VOR/NDB/points VFR (menu « Espaces »).
+let _sigmetLayer = null;   // polygones SIGMET/AIRMET (calque OFF par défaut — retour 20/09).
 let _currentBaseLayer = null;
 let _airportMarkers = [];
 let _neighborMarkers = [];
@@ -377,6 +379,17 @@ function _initLayerControls() {
     try { mountWindLayer(_map, row1); } catch (e) { console.error('wind layer failed:', e.message); }
     try { mountTemsiButton(row1); } catch (e) { console.error('temsi button failed:', e.message); }
     try { mountFrontsButton(row1); } catch (e) { console.error('fronts button failed:', e.message); }
+    try {
+        _sigmetLayer = createSigmetController(_map);
+        _sigmetLayer.mountControls(row1);
+    } catch (e) { console.error('sigmet layer failed:', e.message); }
+
+    // SIGMET réintégré à la carte (retour pilote 20/09) : calque OFF par
+    // défaut, alimenté par l'événement du GO/NO-GO (les données sont déjà
+    // fetchées pour le verdict — pas de requête supplémentaire).
+    document.addEventListener('sigmets-updated', (e) => {
+        if (_sigmetLayer && e.detail) _sigmetLayer.refresh(e.detail);
+    });
 
     try { _mountBasemapSwitcher(row2); } catch (e) { console.error('basemap switcher failed:', e.message); }
     _mountZoomAirfieldButton(row2);
@@ -413,6 +426,74 @@ function _initLayerControls() {
             showRouteWeather(_map, _currentIcao, toIcao, { skipMetars: true, skipIcao: _skipDisplayedIcao });
         }
     });
+}
+
+// Contrôleur SIGMET/AIRMET : trace les polygones de hazard sur la carte.
+function createSigmetController(map) {
+    let layer = null;
+    let visible = false;   // DÉSACTIVÉ par défaut (choix du pilote)
+    let sigmets = [];
+
+    function _redraw() {
+        if (layer) { map.removeLayer(layer); layer = null; }
+        if (!visible || !sigmets || !sigmets.length) return;
+
+        const markers = [];
+        for (const s of sigmets) {
+            const color = HAZARD_COLORS[s.hazard] || HAZARD_COLORS.OTHER;
+            const isAirmet = s.type === 'AIRMET';
+            const label = isAirmet ? `AIRMET ${s.hazard}` : `SIGMET ${s.hazard}`;
+            const popupHtml = `<div style="max-width:280px;"><b style="color:${color};">${label}</b><br>` +
+                              `<pre style="white-space:pre-wrap; font-family:'DM Mono',monospace; font-size:11px; margin-top:4px;">${_escapeHtml(s.raw)}</pre></div>`;
+
+            if (s.polygon && s.polygon.length >= 3) {
+                markers.push(L.polygon(s.polygon, {
+                    color, weight: 2, opacity: 0.9, fillColor: color, fillOpacity: 0.12,
+                    dashArray: isAirmet ? '4 4' : null, zIndex: 500,
+                }).bindPopup(popupHtml));
+            } else if (s.center) {
+                markers.push(L.circleMarker([s.center.lat, s.center.lon], {
+                    radius: 8, color, weight: 2, fillColor: color, fillOpacity: 0.25, zIndex: 500,
+                }).bindPopup(popupHtml));
+            }
+        }
+        if (markers.length) {
+            layer = L.layerGroup(markers).addTo(map);
+        }
+    }
+
+    return {
+        refresh(newSigmets) { sigmets = newSigmets || []; _redraw(); },
+        toggle(on) { visible = on; _redraw(); },
+        isVisible() { return visible; },
+        mountControls(bar) {
+            const isFr = state.lang === 'fr';
+            const group = document.createElement('div');
+            group.className = 'precip-control-group';
+            group.innerHTML = `
+                <button class="precip-toggle sigmet-toggle ${visible ? 'active' : ''}" aria-pressed="${String(visible)}" title="${isFr ? 'Afficher les SIGMET/AIRMET' : 'Show SIGMET/AIRMET'}">
+                    <i data-lucide="alert-triangle" style="width:14px;height:14px;"></i>
+                    <span>SIGMET</span>
+                </button>`;
+            bar.appendChild(group);
+            if (window.lucide) window.lucide.createIcons({ root: group });
+            group.querySelector('.sigmet-toggle')?.addEventListener('click', (ev) => {
+                visible = !visible;
+                ev.currentTarget.setAttribute('aria-pressed', String(visible));
+                ev.currentTarget.classList.toggle('active', visible);
+                _redraw();
+            });
+            // Replay : si des SIGMET ont déjà été fetchés avant l'init de la carte.
+            if (state._sigmets && state._sigmets.length) {
+                sigmets = state._sigmets;
+                _redraw();
+            }
+        },
+    };
+}
+
+function _escapeHtml(s) {
+    return String(s || '').replace(/[&<>]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch]));
 }
 
 // Contrôleur SIGMET/AIRMET retiré de la carte (retour pilote 05/09 :
