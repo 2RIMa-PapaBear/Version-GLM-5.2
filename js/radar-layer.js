@@ -116,6 +116,7 @@ export function createPrecipController(map) {
     let playTimer = null;
     let speedMs = DEFAULT_SPEED_MS;
     let controlsEl = null;       // conteneur des contrôles (pour rafraîchir l'UI)
+    let _mountedGroups = [];     // groupes DOM posés par mountControls (re-montage idempotent)
 
     // ---- Initialisation asynchrone (non bloquante) ----
     let _initPromise = null;
@@ -240,7 +241,15 @@ export function createPrecipController(map) {
         controlsEl = el;
         const isFr = state.lang === 'fr';
 
-        el.innerHTML = `
+        // Construit dans un conteneur temporaire puis TRANSFÈRE les groupes
+        // dans la rangée : un `el.innerHTML = …` direct effacerait les
+        // contrôles des couches montées avant le radar (Espaces/Vent/TEMSI/
+        // Fronts/SIGMET — ordre rangée 1 révisé 20/09). Un re-montage ne
+        // remplace que NOS groupes (référence gardée ci-dessous).
+        _mountedGroups.forEach(n => n.remove());
+        _mountedGroups = [];
+        const tmp = document.createElement('div');
+        tmp.innerHTML = `
             <div class="precip-control-group">
                 <button class="precip-toggle precip-toggle-radar" data-layer="radar" aria-pressed="false" title="${isFr ? 'Couches radar' : 'Radar layers'}">
                     <i data-lucide="cloud-rain" style="width:14px;height:14px;"></i>
@@ -255,6 +264,7 @@ export function createPrecipController(map) {
                 <span class="precip-time-label">—</span>
             </div>
         `;
+        while (tmp.firstChild) { _mountedGroups.push(tmp.firstChild); el.appendChild(tmp.firstChild); }
 
         if (window.lucide) window.lucide.createIcons({ root: el });
 

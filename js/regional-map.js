@@ -157,6 +157,162 @@ const BASEMAPS = {
     }),
 };
 
+let _mapReadyPromise = null;
+
+/** Création de la carte (UNE SEULE FOIS, sérialisée) + contrôles et
+ *  premiers branchements. Deux déclencheurs rapprochés arrivaient en
+ *  concurrence pendant le chargement paresseux de Leaflet : le second
+ *  plantait sur « Map container is already initialized » et coupait le
+ *  montage des contrôles (retour pilote 20/09). Retourne false si la
+ *  carte est impossible (conteneur absent, Leaflet indisponible). */
+function _ensureMapReady(lat, lon) {
+    if (_map) return Promise.resolve(true);
+    if (!_mapReadyPromise) {
+        _mapReadyPromise = (async () => {
+        const el = document.getElementById('regional-map');
+            if (!el) return;
+            if (typeof L === 'undefined') {
+                // Leaflet chargé à la demande (perf : −521 Ko au démarrage de l'app —
+                // CSS + lib + plugin rotate, dans cet ordre grâce à async=false).
+                try { await window.__chargerLib(['vendor/leaflet.min.css', 'vendor/leaflet.min.js', 'vendor/leaflet-rotate.js']); }
+                catch { console.warn('Leaflet indisponible (vendor/) — carte régionale inactive'); return; }
+            }
+
+            // rotate: true (plugin vendor/leaflet-rotate.js) : autorise la rotation
+            // « Route haut » du suivi GPS (js/gps.js). L'instance est déclarée au
+            // REGISTRE (js/map-registry.js) pour les modules montés après la carte.
+            // window.__regionalMap reste posé comme HOOK DE QA (qa-gps.mjs).
+            _map = L.map(el, { zoomControl: true, attributionControl: true, maxZoom: 19, rotate: true }).setView([lat, lon], 7);
+            registerMap(_map);
+            window.__regionalMap = _map;
+
+            // Fond de carte : mémorisé dans localStorage, satellite par défaut.
+            const savedBase = localStorage.getItem('mt-basemap');
+            const baseKey = (savedBase && BASEMAPS[savedBase]) ? savedBase : 'satellite';
+            _currentBaseLayer = BASEMAPS[baseKey]().addTo(_map);
+            el.dataset.baseLayer = baseKey;
+
+            _initLayerControls();
+
+            // Carte ET barre prêtes : les modules en attente (suivi GPS) peuvent
+            // se monter. Remplace leur sondage à expiration fixe (120 s) : ouvert
+            // plus tard dans la session, le paquet flottant GPS ne se montait
+            // jamais (retour pilote 20/09).
+            window.dispatchEvent(new CustomEvent('prevol:map-ready'));
+
+            // Rejoue les repères libres reçus avant l'init (import d'un plan avec
+            // panneau carte jamais ouvert) : leurs codes (noms) sont annoncés,
+            // puis la route est retracée complète.
+            if (_pendingFreeWps.length) {
+                const pending = _pendingFreeWps.splice(0);
+                for (const w of pending) {
+                    _createFreeWaypoint(w.lat, w.lon, String(w.name || 'WPT').slice(0, 24));
+                }
+                window.dispatchEvent(new CustomEvent('route-changed'));
+            }
+
+            _runwayLayer = L.layerGroup().addTo(_map);
+            _map.on('zoomend', _updateRunwayVisibility);
+
+            // Boutons des popups METAR : le contenu du popup est recréé à chaque
+            // ouverture, on binde les handlers sur l'évènement popupopen.
+            _map.on('popupopen', (e) => {
+                const el = e.popup?.getElement();
+                const btn = el?.querySelector('.mp-load-btn');
+                if (btn) {
+                    btn.addEventListener('click', () => {
+                        const icao = btn.dataset.icao;
+                        if (!icao) return;
+                        _map.closePopup();
+                        const input = document.getElementById('icaoInput');
+                        if (input) {
+                            input.value = icao;
+                            document.getElementById('btn-fetch-metar')?.click();
+                        }
+                    });
+                }
+                // « Définir comme destination » (mode Navigation uniquement) :
+                // app.js remplit la barre Départ → Destination et recalcule la nav.
+                const destBtn = el?.querySelector('.mp-dest-btn');
+                if (destBtn) {
+                    destBtn.addEventListener('click', () => {
+                        const icao = destBtn.dataset.icao;
+                        if (!icao) return;
+                        _map.closePopup();
+                        document.dispatchEvent(new CustomEvent('set-destination', { detail: { icao } }));
+                    });
+                }
+                // « + Waypoint » : app.js ajoute le terrain au champ Waypoints du
+                // planificateur et relance le calcul multi-tronçons.
+                const wpBtn = el?.querySelector('.mp-waypoint-btn');
+                if (wpBtn) {
+                    wpBtn.addEventListener('click', () => {
+                        const icao = wpBtn.dataset.icao;
+                        if (!icao) return;
+                        _map.closePopup();
+                        document.dispatchEvent(new CustomEvent('add-waypoint', { detail: { icao } }));
+                    });
+                }
+                // « Carte VAC » : visible uniquement si le terrain a une carte
+                // (liste asynchrone — le bouton est masqué par défaut et révélé
+                // à l'ouverture quand la liste est là).
+                const vacBtn = el?.querySelector('.mp-vac-btn');
+                if (vacBtn) {
+                    vacBtn.addEventListener('click', () => {
+                        const icao = vacBtn.dataset.icao;
+                        if (icao) openVac(icao);
+                    });
+                    hasVac(vacBtn.dataset.icao).then(ok => { if (ok && vacBtn.isConnected) vacBtn.style.display = ''; }).catch(() => {});
+                }
+                // Éditeur de waypoint libre : Valider (création) / Renommer.
+                const fwOk = el?.querySelector('.fw-ok-btn');
+                if (fwOk) {
+                    const readName = () => {
+                        const raw = el.querySelector('.fw-name-input')?.value?.trim() || '';
+                        return raw.slice(0, 24) || null;
+                    };
+                    const validate = () => {
+                        const code = fwOk.dataset.code;
+                        const lat = parseFloat(fwOk.dataset.lat);
+                        const lon = parseFloat(fwOk.dataset.lon);
+                        _map.closePopup();
+                        if (code) {
+                            const name = readName();
+                            if (name) _renameFreeWaypoint(code, name);
+                        } else if (isFinite(lat) && isFinite(lon)) {
+                            _createFreeWaypoint(lat, lon, readName() || _formatDmCoords(lat, lon));
+                        }
+                    };
+                    fwOk.addEventListener('click', validate);
+                    // Entrée = valider.
+                    el.querySelector('.fw-name-input')?.addEventListener('keydown', (ev) => {
+                        if (ev.key === 'Enter') { ev.preventDefault(); validate(); }
+                    });
+                    el.querySelector('.fw-name-input')?.focus();
+                    el.querySelector('.fw-name-input')?.select();
+                }
+                // « + Plan » : ajoute un repère existant à la navigation courante.
+                const fwAdd = el?.querySelector('.fw-add-btn');
+                if (fwAdd) {
+                    fwAdd.addEventListener('click', () => {
+                        const code = fwAdd.dataset.code;
+                        if (!code) return;
+                        _map.closePopup();
+                        document.dispatchEvent(new CustomEvent('add-waypoint', { detail: { icao: code } }));
+                    });
+                }
+            });
+
+            // Déplacement/zoom sur la carte : charge les aérodromes de la nouvelle zone
+            // visible avec leurs pastilles METAR (debounce 1.5 s + seuil de déplacement
+            // pour ne pas spammer le proxy à chaque pixel).
+            _map.on('moveend', _onMapMovedForNeighbors);
+            return true;
+        })();
+    }
+    return _mapReadyPromise;
+}
+
 async function _initOrRefresh() {
     if (!_currentIcao) return;
 
@@ -168,149 +324,11 @@ async function _initOrRefresh() {
 
     const myToken = ++_refreshToken;
 
-    const isFirstInit = !_map;
-    if (isFirstInit) {
-        const el = document.getElementById('regional-map');
-        if (!el) return;
-        if (typeof L === 'undefined') {
-            // Leaflet chargé à la demande (perf : −521 Ko au démarrage de l'app —
-            // CSS + lib + plugin rotate, dans cet ordre grâce à async=false).
-            try { await window.__chargerLib(['vendor/leaflet.min.css', 'vendor/leaflet.min.js', 'vendor/leaflet-rotate.js']); }
-            catch { console.warn('Leaflet indisponible (vendor/) — carte régionale inactive'); return; }
-        }
+    const etaitPremiereInit = !_map;
+    if (!(await _ensureMapReady(lat, lon))) return;
+    if (myToken !== _refreshToken) return;   // dépassé pendant la création
+    if (!etaitPremiereInit) _map.setView([lat, lon], 7);
 
-        // rotate: true (plugin vendor/leaflet-rotate.js) : autorise la rotation
-        // « Route haut » du suivi GPS (js/gps.js). L'instance est déclarée au
-        // REGISTRE (js/map-registry.js) pour les modules montés après la carte.
-        // window.__regionalMap reste posé comme HOOK DE QA (qa-gps.mjs).
-        _map = L.map(el, { zoomControl: true, attributionControl: true, maxZoom: 19, rotate: true }).setView([lat, lon], 7);
-        registerMap(_map);
-        window.__regionalMap = _map;
-
-        // Fond de carte : mémorisé dans localStorage, satellite par défaut.
-        const savedBase = localStorage.getItem('mt-basemap');
-        const baseKey = (savedBase && BASEMAPS[savedBase]) ? savedBase : 'satellite';
-        _currentBaseLayer = BASEMAPS[baseKey]().addTo(_map);
-        el.dataset.baseLayer = baseKey;
-
-        _initLayerControls();
-
-        // Carte ET barre prêtes : les modules en attente (suivi GPS) peuvent
-        // se monter. Remplace leur sondage à expiration fixe (120 s) : ouvert
-        // plus tard dans la session, le paquet flottant GPS ne se montait
-        // jamais (retour pilote 20/09).
-        window.dispatchEvent(new CustomEvent('prevol:map-ready'));
-
-        // Rejoue les repères libres reçus avant l'init (import d'un plan avec
-        // panneau carte jamais ouvert) : leurs codes (noms) sont annoncés,
-        // puis la route est retracée complète.
-        if (_pendingFreeWps.length) {
-            const pending = _pendingFreeWps.splice(0);
-            for (const w of pending) {
-                _createFreeWaypoint(w.lat, w.lon, String(w.name || 'WPT').slice(0, 24));
-            }
-            window.dispatchEvent(new CustomEvent('route-changed'));
-        }
-
-        _runwayLayer = L.layerGroup().addTo(_map);
-        _map.on('zoomend', _updateRunwayVisibility);
-
-        // Boutons des popups METAR : le contenu du popup est recréé à chaque
-        // ouverture, on binde les handlers sur l'évènement popupopen.
-        _map.on('popupopen', (e) => {
-            const el = e.popup?.getElement();
-            const btn = el?.querySelector('.mp-load-btn');
-            if (btn) {
-                btn.addEventListener('click', () => {
-                    const icao = btn.dataset.icao;
-                    if (!icao) return;
-                    _map.closePopup();
-                    const input = document.getElementById('icaoInput');
-                    if (input) {
-                        input.value = icao;
-                        document.getElementById('btn-fetch-metar')?.click();
-                    }
-                });
-            }
-            // « Définir comme destination » (mode Navigation uniquement) :
-            // app.js remplit la barre Départ → Destination et recalcule la nav.
-            const destBtn = el?.querySelector('.mp-dest-btn');
-            if (destBtn) {
-                destBtn.addEventListener('click', () => {
-                    const icao = destBtn.dataset.icao;
-                    if (!icao) return;
-                    _map.closePopup();
-                    document.dispatchEvent(new CustomEvent('set-destination', { detail: { icao } }));
-                });
-            }
-            // « + Waypoint » : app.js ajoute le terrain au champ Waypoints du
-            // planificateur et relance le calcul multi-tronçons.
-            const wpBtn = el?.querySelector('.mp-waypoint-btn');
-            if (wpBtn) {
-                wpBtn.addEventListener('click', () => {
-                    const icao = wpBtn.dataset.icao;
-                    if (!icao) return;
-                    _map.closePopup();
-                    document.dispatchEvent(new CustomEvent('add-waypoint', { detail: { icao } }));
-                });
-            }
-            // « Carte VAC » : visible uniquement si le terrain a une carte
-            // (liste asynchrone — le bouton est masqué par défaut et révélé
-            // à l'ouverture quand la liste est là).
-            const vacBtn = el?.querySelector('.mp-vac-btn');
-            if (vacBtn) {
-                vacBtn.addEventListener('click', () => {
-                    const icao = vacBtn.dataset.icao;
-                    if (icao) openVac(icao);
-                });
-                hasVac(vacBtn.dataset.icao).then(ok => { if (ok && vacBtn.isConnected) vacBtn.style.display = ''; }).catch(() => {});
-            }
-            // Éditeur de waypoint libre : Valider (création) / Renommer.
-            const fwOk = el?.querySelector('.fw-ok-btn');
-            if (fwOk) {
-                const readName = () => {
-                    const raw = el.querySelector('.fw-name-input')?.value?.trim() || '';
-                    return raw.slice(0, 24) || null;
-                };
-                const validate = () => {
-                    const code = fwOk.dataset.code;
-                    const lat = parseFloat(fwOk.dataset.lat);
-                    const lon = parseFloat(fwOk.dataset.lon);
-                    _map.closePopup();
-                    if (code) {
-                        const name = readName();
-                        if (name) _renameFreeWaypoint(code, name);
-                    } else if (isFinite(lat) && isFinite(lon)) {
-                        _createFreeWaypoint(lat, lon, readName() || _formatDmCoords(lat, lon));
-                    }
-                };
-                fwOk.addEventListener('click', validate);
-                // Entrée = valider.
-                el.querySelector('.fw-name-input')?.addEventListener('keydown', (ev) => {
-                    if (ev.key === 'Enter') { ev.preventDefault(); validate(); }
-                });
-                el.querySelector('.fw-name-input')?.focus();
-                el.querySelector('.fw-name-input')?.select();
-            }
-            // « + Plan » : ajoute un repère existant à la navigation courante.
-            const fwAdd = el?.querySelector('.fw-add-btn');
-            if (fwAdd) {
-                fwAdd.addEventListener('click', () => {
-                    const code = fwAdd.dataset.code;
-                    if (!code) return;
-                    _map.closePopup();
-                    document.dispatchEvent(new CustomEvent('add-waypoint', { detail: { icao: code } }));
-                });
-            }
-        });
-
-        // Déplacement/zoom sur la carte : charge les aérodromes de la nouvelle zone
-        // visible avec leurs pastilles METAR (debounce 1.5 s + seuil de déplacement
-        // pour ne pas spammer le proxy à chaque pixel).
-        _map.on('moveend', _onMapMovedForNeighbors);
-    } else {
-        _map.setView([lat, lon], 7);
-    }
 
     _clearAirportMarkers();
     _clearNeighborMarkers();
@@ -353,8 +371,10 @@ function _initLayerControls() {
     if (!row1) { row1 = document.createElement('div'); row1.className = 'map-layers-row map-layers-row-top'; bar.appendChild(row1); }
     if (!row2) { row2 = document.createElement('div'); row2.className = 'map-layers-row map-layers-row-bottom'; bar.appendChild(row2); }
 
+    // RADAR + GROUPE HORLOGE en FIN de rangée (retour pilote 20/09) :
+    // Espaces — Vent — TEMSI — Fronts — SIGMET d'abord, puis le lecteur
+    // radar dont le groupe horloge (élastique) absorbe l'espace restant.
     _precip = createPrecipController(_map);
-    _precip.mountControls(row1);
 
     _airspaces = createAirspaceController(_map);
     _airspaces.mountControls(row1);
@@ -371,11 +391,11 @@ function _initLayerControls() {
         _radioPoints.mountControls(row1);
     } catch (e) { console.error('radio points layer failed:', e.message); }
 
-    // Ordre — rangée 1 (couches) : Radar+lecture+horloge — Espaces — Vent
-    // — TEMSI. Rangée 2 (fond & cadrage) : Satellite — Terrain — Cadrer
-    // plan — Plein cadre. (Cadrer plan et Plein cadre sont ENSUITE promus
-    // dans le paquet d'icônes flottant sur la carte par gps.js, qui y ajoute
-    // aussi « Vols » en rangée 2.)
+    // Ordre — rangée 1 (couches) : Espaces — Vent — TEMSI — Fronts — SIGMET
+    // — Radar + horloge (FIN, élastique). Rangée 2 (fond & cadrage) :
+    // Satellite — Terrain — Vols. (Cadrer plan et Plein cadre sont ENSUITE
+    // promus dans le paquet d'icônes flottant sur la carte par gps.js, qui y
+    // ajoute aussi « Vols » en rangée 2.)
     try { mountWindLayer(_map, row1); } catch (e) { console.error('wind layer failed:', e.message); }
     try { mountTemsiButton(row1); } catch (e) { console.error('temsi button failed:', e.message); }
     try { mountFrontsButton(row1); } catch (e) { console.error('fronts button failed:', e.message); }
@@ -383,6 +403,7 @@ function _initLayerControls() {
         _sigmetLayer = createSigmetController(_map);
         _sigmetLayer.mountControls(row1);
     } catch (e) { console.error('sigmet layer failed:', e.message); }
+    _precip.mountControls(row1);
 
     // SIGMET réintégré à la carte (retour pilote 20/09) : calque OFF par
     // défaut, alimenté par l'événement du GO/NO-GO (les données sont déjà
