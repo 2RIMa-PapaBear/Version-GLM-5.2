@@ -1,20 +1,21 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+    <link rel="stylesheet" href="css/fonts.css?v=1.0">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Notice d'utilisation — Prévol</title>
     <style>
         :root {
-            --primary: #0288D1;
-            --text: #333;
-            --bg: #f9fafb;
+            --primary: #1E40AF;
+            --text: #0F172A;
+            --bg: #F1F4F8;
             --panel: #ffffff;
-            --border: #e0e0e0;
+            --border: rgba(15, 23, 42, 0.22);
         }
         * { box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-family: Verdana, "Segoe UI", sans-serif;
             line-height: 1.6;
             color: var(--text);
             background: var(--bg);
@@ -30,12 +31,13 @@
         }
         h1 {
             color: var(--primary);
-            border-bottom: 3px solid var(--primary);
+            border-bottom: 3px solid;
+            border-image: linear-gradient(90deg, #1E40AF 0%, #FFFFFF 50%, #D52B1E 100%) 1;
             padding-bottom: 10px;
             margin-top: 40px;
         }
         h2 {
-            color: #00695C;
+            color: #1E40AF;
             border-left: 4px solid var(--primary);
             padding-left: 12px;
             margin-top: 30px;
@@ -94,7 +96,7 @@
         .demo-flag-line { background: linear-gradient(to top left, transparent 49.5%, rgba(255,255,255,0.4) 49.5%, rgba(255,255,255,0.4) 50.5%, transparent 50.5%); }
         .demo-seg { display: inline-flex; border: 1px solid #cbd5e1; border-radius: 8px; padding: 2px; vertical-align: middle; background: #f8fafc; }
         .demo-seg span { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; color: #64748b; }
-        .demo-seg span.on { background: #0288D1; color: #fff; }
+        .demo-seg span.on { background: #1E40AF; color: #fff; }
 
         /* Reproductions des visuels de la carte régionale (mêmes couleurs,
          * mêmes symboles SIA que l'application). */
@@ -208,7 +210,7 @@
         .demo-flag-line { background: linear-gradient(to top left, transparent 49.5%, rgba(255,255,255,0.4) 49.5%, rgba(255,255,255,0.4) 50.5%, transparent 50.5%); }
         .demo-seg { display: inline-flex; border: 1px solid #cbd5e1; border-radius: 8px; padding: 2px; vertical-align: middle; background: #f8fafc; }
         .demo-seg span { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; color: #64748b; }
-        .demo-seg span.on { background: #0288D1; color: #fff; }
+        .demo-seg span.on { background: #1E40AF; color: #fff; }
 
         /* Reproductions des visuels de la carte régionale (mêmes couleurs,
          * mêmes symboles SIA que l'application). */
@@ -280,7 +282,7 @@
             background: rgba(0,0,0,0.35); border-radius: 8px; margin-left: auto;
         }
         .mck-gonogo-cat-lbl { font-size: 9px; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px; }
-        .mck-gonogo-cat-val { font-size: 18px; font-weight: 800; }
+        .mck-gonogo-cat-val { font-size: 18px; font-weight: 700; }
         .mck-reasons { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
         .mck-reason {
             display: flex; align-items: center; gap: 8px;
@@ -311,7 +313,7 @@
             display: flex; align-items: center; justify-content: center;
             font-size: 22px; border: 2px solid; flex-shrink: 0;
         }
-        .mck-w-status { font-weight: 800; font-size: 13px; letter-spacing: 0.5px; }
+        .mck-w-status { font-weight: 700; font-size: 13px; letter-spacing: 0.5px; }
         .mck-w-detail { font-size: 12px; color: #94A3B8; margin-top: 2px; }
         .mck-w-times { display: flex; gap: 16px; margin-left: auto; flex-wrap: wrap; }
         .mck-w-time { text-align: center; }
@@ -352,7 +354,7 @@
         }
         .mck-map-pin-lg { width: 22px; height: 22px; border-width: 3px; }
         .mck-pin-vfr { background: #4ADE80; }
-        .mck-pin-mvfr { background: #38BDF8; }
+        .mck-pin-mvfr { background: #1E40AF; }
         .mck-pin-ifr { background: #F87171; }
         .mck-pin-lifr { background: #D946EF; }
         .mck-pin-current { background: #FBBF24; }
@@ -372,7 +374,15 @@
         }
         .mck-ml-item { display: flex; align-items: center; gap: 5px; }
         .mck-ml-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; border: 1px solid rgba(255,255,255,0.3); }
-    </style>
+    
+        /* ---- Accord avec l'application « Patrouille » (22/09) : tailles, typos */
+        body { font-size: 14px; }
+        h1 { font-family: 'DM Sans', Verdana, sans-serif; font-size: 22px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+        h2 { font-family: 'DM Sans', Verdana, sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #0F172A; }
+        h3 { font-family: 'DM Sans', Verdana, sans-serif; font-size: 13.5px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+        code, pre { font-family: 'DM Mono', Consolas, monospace; }
+        .container { border: 1px solid var(--border); border-radius: 9px; box-shadow: 0 3px 12px rgba(15, 23, 42, 0.12); }
+</style>
 </head>
 <body>
     <div class="container">
@@ -554,7 +564,7 @@
 <tr><td><span class="demo-select">Satellite ▾</span></td><td><strong>Fond de carte</strong> : satellite, plan ou relief — sélecteur « Satellite » de la barre d'outils</td></tr>
 <tr><td><span class="demo-btn"><i data-lucide="cloud-rain"></i> Radar</span></td><td>Précipitations en temps réel — <strong>décoché par défaut</strong> ; bouton lecture/pause et curseur horloge une fois activé</td></tr>
 <tr><td><span class="pin" style="background:#FBBF24; width:15px; height:15px;"></span> <span class="rwy" style="background:#4ADE80"></span><span class="rwy" style="background:#94A3B8"></span><span class="rwy" style="background:#D6A24A"></span></td><td><strong>Terrain courant</strong> : pastille ambre au centre ; pistes tracées selon le revêtement (vert = herbe, gris = béton, ocre = terre)</td></tr>
-<tr><td><span class="pin" style="background:#4ADE80"></span> <span class="pin" style="background:#38BDF8"></span> <span class="pin" style="background:#F87171"></span> <span class="pin" style="background:#94A3B8"></span></td><td><strong>Terrains voisins</strong> : tous les terrains de la zone visible (jusqu'à l'échelle de la France, conservés quand vous vous déplacez) ; pastilles colorées VFR / MVFR / IFR / LIFR (vert, bleu, rouge, violet) pour les terrains qui émettent un METAR, <strong>pastilles grises</strong> pour les autres — dont le clic ouvre le METAR de la station la plus proche</td></tr>
+<tr><td><span class="pin" style="background:#4ADE80"></span> <span class="pin" style="background:#1E40AF"></span> <span class="pin" style="background:#F87171"></span> <span class="pin" style="background:#94A3B8"></span></td><td><strong>Terrains voisins</strong> : tous les terrains de la zone visible (jusqu'à l'échelle de la France, conservés quand vous vous déplacez) ; pastilles colorées VFR / MVFR / IFR / LIFR (vert, bleu, rouge, violet) pour les terrains qui émettent un METAR, <strong>pastilles grises</strong> pour les autres — dont le clic ouvre le METAR de la station la plus proche</td></tr>
 <tr><td><span class="demo-btn"><i data-lucide="hexagon"></i> Espaces</span></td><td><strong>Espaces aériens</strong> : données officielles françaises (SIA), complétées à l'international — CTR, TMA, SIV, ATZ, zones R·P·D… sous-cases par famille dans le menu « Espaces » ; cliquez une zone pour la surligner et lire secteur, altitudes et fréquence (décoché par défaut)</td></tr>
 <tr><td><span class="rp-sym"><svg width="18" height="18" viewBox="0 0 18 18" style="vertical-align:middle"><polygon points="9,1 16.5,5.3 16.5,13.7 9,18 1.5,13.7 1.5,5.3" fill="none" stroke="#60A5FA" stroke-width="1.8"/><circle cx="9" cy="9" r="1.4" fill="#60A5FA"/></svg> <svg width="18" height="18" viewBox="0 0 18 18" style="vertical-align:middle"><path d="M9 0.8 L9 6" stroke="#4ADE80" stroke-width="1.6"/><circle cx="9" cy="11" r="5.2" fill="none" stroke="#4ADE80" stroke-width="1.8"/><circle cx="9" cy="11" r="1.6" fill="#4ADE80"/></svg> <svg width="18" height="18" viewBox="0 0 18 18" style="vertical-align:middle"><path d="M9 1.5 L16 14 L2 14 Z" fill="none" stroke="#2563EB" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 5.2 L13.3 12.4 L4.7 12.4 Z" fill="#2563EB" opacity="0.5"/></svg></span></td><td><strong>Radiophares &amp; points VFR</strong> : VOR, NDB et points de repère VFR — symboles des cartes aéro, case par case dans le menu « Espaces » ; utilisables comme waypoints du plan</td></tr>
 <tr><td><span class="rp-sym"><svg width="18" height="18" viewBox="0 0 18 18" style="vertical-align:middle"><path d="M9 7.5 L9 16.5" stroke="#F87171" stroke-width="1.6"/><path d="M9 7 L9 1.5 M9 7 L4 10 M9 7 L14 10" stroke="#F87171" stroke-width="1.7" stroke-linecap="round"/><circle cx="9" cy="7" r="1.3" fill="#F87171"/></svg></span></td><td><strong>Obstacles</strong> : éoliennes, pylônes, mâts, châteaux d'eau, cheminées… partout en France et outre-mer — icône par type ; au clic : hauteur, altitude du sommet et balisage lumineux (visible à partir d'un zoom régional, décoché par défaut)</td></tr>
@@ -968,7 +978,7 @@
 - <i data-lucide="triangle-alert" class="li-ic"></i> Nuages épars dès 1200 ft
 - <i data-lucide="triangle-alert" class="li-ic"></i> Écart T-Td faible (2°C) → humidité élevée
 - <i data-lucide="triangle-alert" class="li-ic"></i> Pression en baisse (1008 hPa)</p>
-<p><strong>Verdict</strong> : <span class="pin" style="background:#38BDF8"></span> <strong>VFR MARGINAL</strong> - Vol local OK, navigation avec prudence</p>
+<p><strong>Verdict</strong> : <span class="pin" style="background:#1E40AF"></span> <strong>VFR MARGINAL</strong> - Vol local OK, navigation avec prudence</p>
 <hr />
 <h3>Exemple 3 : IFR (visibilité réduite)</h3>
 <pre><code>METAR LFRV 061200Z 00000KT 3000 BR SCT004 BKN010 10/09 Q1011
@@ -1008,17 +1018,17 @@
 - <span class="pin" style="background:#4ADE80"></span> <strong>VFR EXCELLENT</strong></p>
 <p><strong>06j 15h → 06j 17h</strong> (BECMG) :
 - Passage progressif à nuages fragmentés 2000 ft
-- <span class="pin" style="background:#38BDF8"></span> <strong>VFR MARGINAL</strong> en fin de période</p>
+- <span class="pin" style="background:#1E40AF"></span> <strong>VFR MARGINAL</strong> en fin de période</p>
 <p><strong>06j 17h → 06j 18h</strong> :
 - Nuages BKN 2000 ft
-- <span class="pin" style="background:#38BDF8"></span> <strong>VFR MARGINAL</strong></p>
+- <span class="pin" style="background:#1E40AF"></span> <strong>VFR MARGINAL</strong></p>
 <p><strong>06j 18h → 07j 00h</strong> (TEMPO) :
 - Temporairement : vis 5km, averses, BKN 1200 ft
 - <span class="pin" style="background:#F87171"></span> <strong>IFR temporaire</strong> (&lt; 1h à la fois)
 - Entre deux averses : retour VFR marginal</p>
 <p><strong>07j 00h → 07j 03h</strong> :
 - BKN 2000 ft (sans averses)
-- <span class="pin" style="background:#38BDF8"></span> <strong>VFR MARGINAL</strong></p>
+- <span class="pin" style="background:#1E40AF"></span> <strong>VFR MARGINAL</strong></p>
 <p><strong>07j 03h → 07j 05h</strong> (BECMG) :
 - Passage progressif vers CAVOK
 - Vent tourne 340° 10kt
@@ -1255,7 +1265,7 @@
 <h3>Interprétation graphique</h3>
 <p><strong>Bandes colorées</strong> :
 - <i data-lucide="check-circle" class="li-ic" style="color:#4ADE80"></i> <strong>Vert (VFR)</strong> : Vol confortable
-- <span class="pin" style="background:#38BDF8"></span> <strong>Bleu (MVFR)</strong> : Vigilance accrue, prévoir plan B
+- <span class="pin" style="background:#1E40AF"></span> <strong>Bleu (MVFR)</strong> : Vigilance accrue, prévoir plan B
 - <span class="pin" style="background:#F87171"></span> <strong>Rouge (IFR)</strong> : Vol VFR impossible
 - <span class="pin" style="background:#D946EF"></span> <strong>Magenta (LIFR)</strong> : Conditions très dégradées</p>
 <p><strong>Courbe solaire</strong> :

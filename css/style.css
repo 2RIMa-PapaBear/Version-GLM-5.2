@@ -2,31 +2,32 @@
  * VARIABLES GLOBALES & THEME UNIFIÉ (Flat Dark Dashboard)
  * ================================================================ */
 :root {
-    --primary: #38BDF8;      
-    --secondary: #2DD4BF;    
-    --danger: #EF4444;       
-    
-    --bg-color: #020617;     
-    --panel-bg: #0F172A;     
-    --inner-bg: #0F172A;     
-    --input-bg: #0F172A;     
-    
-    --text-color: #F8FAFC;   
-    --text-muted: #94A3B8;   
-    --text-dim: rgba(255,255,255,0.5); 
-    
-    --focus-ring: #38BDF8;
+    /* THÈME « PATROUILLE NUIT » (validated pilote 22/09) */
+    --primary: #5B8DEF;
+    --secondary: #E2554A;
+    --danger: #EF5350;
+
+    --bg-color: #0B1220;
+    --panel-bg: #111A2C;
+    --inner-bg: #16213A;
+    --input-bg: #0E1830;
+
+    --text-color: #F1F5FB;
+    --text-muted: #8FA0BC;
+    --text-dim: rgba(241, 245, 251, 0.5);
+
+    --focus-ring: #E2554A;
     --focus-ring-width: 3px;
-    
-    --border-color: rgba(255, 255, 255, 0.15); 
-    --border-hover: rgba(255, 255, 255, 0.25); 
-    
+
+    --border-color: rgba(125, 158, 212, 0.25);
+    --border-hover: rgba(125, 158, 212, 0.55);
+
     --shadow: rgba(0,0,0,0.5);
-    --hover-bg: rgba(56, 189, 248, 0.08); 
-    --hover-bg-strong: rgba(56, 189, 248, 0.15); 
-    --radius-sm: 6px;
-    --radius-md: 8px;
-    --radius-lg: 12px;
+    --hover-bg: rgba(91, 141, 239, 0.08);
+    --hover-bg-strong: rgba(91, 141, 239, 0.15);
+    --radius-sm: 5px;
+    --radius-md: 7px;
+    --radius-lg: 9px;
 }
 
 * { box-sizing: border-box; }
@@ -46,27 +47,28 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: var
 .icon-md { width: 20px; height: 20px; margin-right: 8px; }
 .alert-emoji { width: 18px; height: 18px; margin-right: 4px; flex-shrink: 0; }
 
-body { 
-    font-family: 'DM Sans', 'Segoe UI', sans-serif; 
-    color: var(--text-color); 
-    margin: 0; 
-    padding: 20px; 
-    display: flex; 
-    flex-direction: column; 
+body {
+    font-family: 'DM Sans', Verdana, sans-serif;
+    color: var(--text-color);
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
     height: 100vh;
-    background: 
-        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(56, 189, 248, 0.08) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 40% at 80% 100%, rgba(45, 212, 191, 0.04) 0%, transparent 50%),
+    background:
+        repeating-linear-gradient(135deg, transparent 0 34px, rgba(255,255,255,.012) 34px 35px),
+        radial-gradient(ellipse 75% 45% at 50% -10%, rgba(91,141,239,.08) 0%, transparent 60%),
         var(--bg-color);
     background-attachment: fixed;
 }
+button { font-family: 'DM Sans', Verdana, sans-serif; letter-spacing: .5px; }
 .container { max-width: 1200px; margin: 0 auto; width: 100%; display: grid; grid-template-columns: 180px 1fr 180px; gap: 20px; flex: 1; align-items: start; }
 .side-column { position: sticky; top: 10px; max-height: calc(100vh - 20px); overflow-y: auto; overflow-x: hidden; box-sizing: border-box; padding: 15px !important; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; }
 .side-column::-webkit-scrollbar { width: 5px; }
 .side-column::-webkit-scrollbar-track { background: transparent; }
 .side-column::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
 .side-column::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
-.side-column.card { background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(12px) saturate(140%); -webkit-backdrop-filter: blur(12px) saturate(140%); border: 1px solid var(--border-color); }
+.side-column.card { background: rgba(17, 26, 44, 0.75);  border: 1px solid var(--border-color); }
 .side-column h3 { font-size: 11px; margin: 0 0 15px 0; display: flex; align-items: center; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
 .center-column { display: flex; flex-direction: column; gap: 15px; min-width: 0; }
 
@@ -116,26 +118,32 @@ body {
     }
 }
 
-.card { 
-    background: rgba(15, 23, 42, 0.65); 
-    backdrop-filter: blur(12px) saturate(140%);
-    -webkit-backdrop-filter: blur(12px) saturate(140%);
-    border-radius: var(--radius-lg); 
-    box-shadow: 0 4px 20px var(--shadow), inset 0 1px 0 rgba(255,255,255,0.05); 
-    padding: 15px; 
-    border: 1px solid var(--border-color); 
+.card {
+    background: rgba(17, 26, 44, 0.82);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 4px 20px var(--shadow), inset 0 1px 0 rgba(255,255,255,0.05);
+    padding: 15px;
+    border: 1px solid var(--border-color);
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
+.card h2, .card h3 { letter-spacing: 1.5px; text-transform: uppercase; font-size: 0.95em; }
 .card:hover {
     border-color: var(--border-hover);
     box-shadow: 0 6px 28px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
-header.card { padding: 20px 24px 18px; position: relative; overflow: hidden; }
+header.card {
+    padding: 20px 24px 18px; position: relative; overflow: hidden;
+    /* Signature Patrouille : liseré tricolore dégradé bleu → blanc → rouge. */
+    background-image: linear-gradient(90deg, #5B8DEF 0%, #F1F5FB 50%, #E2554A 100%);
+    background-size: 100% 3px;
+    background-position: top;
+    background-repeat: no-repeat;
+}
 .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; position: relative; z-index: 1; }
 .header-title-block { display: flex; flex-direction: column; gap: 3px; }
-.header-row h1 { margin: 0; font-size: 1.35rem; font-weight: 700; color: #ffffff; letter-spacing: -0.3px; }
-.header-subtitle { font-size: 11px; font-weight: 500; color: var(--primary); letter-spacing: 1.5px; text-transform: uppercase; }
+.header-row h1 { margin: 0; font-size: 1.35rem; font-family: 'DM Sans', Verdana, sans-serif; font-weight: 700; color: #F1F5FB; letter-spacing: 2px; text-transform: uppercase; }
+.header-subtitle { font-size: 10px; font-weight: 500; color: var(--secondary); letter-spacing: 2.5px; text-transform: uppercase; }
 
 .lang-switcher { display: flex; gap: 10px; align-items: center; }
 .btn-lang-toggle { position: relative; width: 45px; height: 30px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); cursor: pointer; padding: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: all 0.2s; overflow: hidden; flex-shrink: 0; background: transparent; }
@@ -201,7 +209,7 @@ header.card { padding: 20px 24px 18px; position: relative; overflow: hidden; }
 .hpp-group.time-group-centered[data-local-time=""]:hover::after { display: none; }
 @keyframes fadeIn { to { opacity: 1; } }
 
-#lbl-info { font-weight: 400; color: #bae6fd; margin-top: 6px; display: block; font-size: 0.9rem; border-top: 1px solid var(--border-color); padding-top: 8px;}
+#lbl-info { font-weight: 400; color: #A9C4EE; margin-top: 6px; display: block; font-size: 0.9rem; border-top: 1px solid transparent; padding-top: 8px;}
 
 .metar-dashboard { display: none; grid-template-columns: 1fr 1.3fr 1fr; gap: 15px; width: 100%; margin-top: 15px; }
 .metar-dashboard.visible { display: grid; }
@@ -277,7 +285,7 @@ header.card { padding: 20px 24px 18px; position: relative; overflow: hidden; }
 
 .dash-alerts-ok { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; color: #FFFFFF; background: rgba(16, 185, 129, 0.12); border: 1px dashed rgba(16, 185, 129, 0.3); border-radius: var(--radius-md); font-size: 12px; font-weight: 600; margin-top: 5px; padding: 10px; text-align: center; }
 
-.graph-container { flex: 1; overflow-x: auto; overflow-y: hidden; position: relative; background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: flex-start; width: 100%; cursor: crosshair; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; }
+.graph-container { flex: 1; overflow-x: auto; overflow-y: hidden; position: relative; background: var(--panel-bg); border: 1px solid rgba(125, 158, 212, 0.18); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: flex-start; width: 100%; cursor: crosshair; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; }
 .graph-container::-webkit-scrollbar { height: 6px; }
 .graph-container::-webkit-scrollbar-track { background: transparent; }
 .graph-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
@@ -2867,33 +2875,48 @@ body.cockpit-mode header.card {
  * l'événement 'theme-changed'.
  * ================================================================ */
 html.theme-light {
-    --bg-color: #E2E8F0;
-    --panel-bg: #F8FAFC;
-    --inner-bg: #F1F5F9;
+    /* THÈME « PATROUILLE » CLAIR (validé pilote 22/09) */
+    --primary: #1E40AF;
+    --secondary: #D52B1E;
+    --danger: #B91C1C;
+
+    --bg-color: #F1F4F8;
+    --panel-bg: #FFFFFF;
+    --inner-bg: #EDF1F6;
     --input-bg: #FFFFFF;
 
     --text-color: #0F172A;
-    --text-muted: #475569;
+    --text-muted: #5B6774;
     --text-dim: rgba(15, 23, 42, 0.55);
 
-    --border-color: rgba(15, 23, 42, 0.15);
-    --border-hover: rgba(15, 23, 42, 0.30);
+    --border-color: rgba(15, 23, 42, 0.22);
+    --border-hover: rgba(30, 64, 175, 0.55);
 
     --shadow: rgba(15, 23, 42, 0.12);
-    --hover-bg: rgba(2, 132, 209, 0.07);
-    --hover-bg-strong: rgba(2, 132, 209, 0.13);
+    --hover-bg: rgba(30, 64, 175, 0.07);
+    --hover-bg-strong: rgba(30, 64, 175, 0.14);
 }
 html.theme-light body {
     background:
-        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(2, 132, 209, 0.06) 0%, transparent 60%),
+        repeating-linear-gradient(135deg, transparent 0 34px, rgba(30,64,175,.03) 34px 35px),
         var(--bg-color);
+    background-attachment: fixed;
 }
-/* Cartes translucides sombres en dur → claires. */
-html.theme-light .card { background: rgba(248, 250, 252, 0.9); }
-/* Champ OACI / ligne d'info (bleu clair codé) → encre sombre. */
+/* Cartes translucides sombres en dur → blanches Patrouille. */
+html.theme-light .card { background: rgba(255, 255, 255, 0.95); }
+/* Liseré tricolore clair + titre encre (le h1 de base est blanc). */
+html.theme-light header.card {
+    background-image: linear-gradient(90deg, #1E40AF 0%, #FFFFFF 50%, #D52B1E 100%);
+    background-size: 100% 3px;
+    background-position: top;
+    background-repeat: no-repeat;
+}
+html.theme-light .header-row h1 { color: #0F172A; }
+/* Champ OACI / ligne d'info / éditeur : encre sombre. */
 html.theme-light #icaoInput,
 html.theme-light #lbl-info { color: #0F172A; }
 html.theme-light .editor-textarea { color: #0F172A; }
+html.theme-light .graph-container { border-color: rgba(15, 23, 42, 0.12); }
 /* Barre d'outils de la carte + ses boutons (fonds sombres en dur). */
 html.theme-light .map-layers-bar { background: var(--panel-bg); }
 html.theme-light .precip-toggle,

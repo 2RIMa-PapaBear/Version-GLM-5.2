@@ -6,20 +6,20 @@
    ============================================================================ */
 
 :root {
-    --papier: #F4EEDB;          /* fond ocre clair de la carte */
-    --papier-2: #EFE7CE;        /* bande de terrain plus soutenue */
-    --papier-bloc: #FAF6E9;     /* fond des cartouches */
-    --encre: #24221B;           /* encre principale */
-    --encre-2: #55503F;         /* encre secondaire */
-    --muet: #77705D;            /* texte atténué */
-    --filet: #9A9280;           /* filet ordinaire */
-    --filet-fin: #CDC4A8;       /* filet léger */
-    --hydro: #6E9CBE;           /* bleu hydrographique */
-    --hydro-clair: #D9E6EF;
-    --magenta: #A8448F;         /* zones à contour magenta */
-    --magenta-clair: rgba(168, 68, 143, .10);
-    --foret: #DCE3C4;           /* taches de végétation */
-    --route: #C9744A;
+    --papier: #F1F4F8;          /* fond Patrouille clair */
+    --papier-2: #EDF1F8;        /* bande secondaire */
+    --papier-bloc: #FFFFFF;     /* fond des cartouches */
+    --encre: #0F172A;           /* encre principale */
+    --encre-2: #334155;         /* encre secondaire */
+    --muet: #5B6774;            /* texte atténué */
+    --filet: rgba(15, 23, 42, 0.28);   /* filet ordinaire */
+    --filet-fin: rgba(15, 23, 42, 0.12); /* filet léger */
+    --hydro: #1E40AF;           /* bleu roi */
+    --hydro-clair: #EDF1F8;
+    --magenta: #D52B1E;         /* rouge Patrouille */
+    --magenta-clair: rgba(213, 43, 30, .08);
+    --foret: #EDF1F8;           /* taches neutres */
+    --route: #D52B1E;
     --ok: #3E7C4F;
     --alerte: #A97715;
     --danger: #A93B2A;
@@ -31,7 +31,7 @@
     --border-color: var(--filet);
     --text-color: var(--encre);
     --text-muted: var(--muet);
-    --primary: #1F5FA8;
+    --primary: #1E40AF;
     --danger: var(--danger);
     --radius-sm: 2px;
 }
@@ -297,3 +297,81 @@ table.gd-t { width: 100%; border-collapse: collapse; margin: 14px 0 20px; font-s
     .gd-t { font-size: 11.5px; }
     .gd-t th, .gd-t td { padding: 6px 7px; }
 }
+
+/* ============================================================================
+   ACCORD AVEC L'APPLICATION (22/09, v1.369) — les pages vitrine adoptent le
+   langage visuel de l'app « Patrouille » : cartes blanches arrondies (rayons
+   5/7/9), Verdana/DM Mono, bleu roi + rouge, liseré tricolore sur le hero.
+   Placé EN FIN de feuille pour primer sur les règles d'origine.
+   ============================================================================ */
+body {
+    font-family: 'DM Sans', Verdana, sans-serif;
+    background:
+        repeating-linear-gradient(135deg, transparent 0 34px, rgba(30, 64, 175, .03) 34px 35px),
+        var(--papier);
+}
+/* Cadre « marge de carte » → grande carte app */
+.acc-page, .gd-page {
+    border: 1px solid var(--border-color);
+    outline: none;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 3px 12px rgba(15, 23, 42, 0.12);
+}
+/* Hero → en-tête app : liseré tricolore 3 px, fond blanc */
+.gd-hero, .acc-hero {
+    border: none;
+    border-bottom: 1px solid var(--filet-fin);
+    background:
+        linear-gradient(90deg, #1E40AF 0%, #FFFFFF 50%, #D52B1E 100%);
+    background-size: 100% 3px;
+    background-position: top;
+    background-repeat: no-repeat;
+    background-color: rgba(255, 255, 255, 0.55);
+    padding-top: 34px;
+}
+.gd-hero h1, .acc-hero h1 {
+    font-family: 'DM Sans', Verdana, sans-serif; font-weight: 700;
+    font-size: 22px; letter-spacing: 2px; color: #0F172A;
+}
+.gd-hero p, .acc-hero p { color: var(--muet); font-size: 13.5px; }
+.gd-hero .gd-brand, .acc-hero .gd-brand {
+    border-radius: 7px; border-color: var(--border-color); background: var(--papier-bloc);
+}
+.gd-hero .gd-brand:hover { background: var(--primary); border-color: var(--primary); color: #FFFFFF; }
+/* Boutons → style app */
+.acc-go, .acc-cta a, .gd-also a, .gd-cta-link {
+    border-radius: 7px; font-family: 'DM Sans', Verdana, sans-serif;
+    font-size: 13px; font-weight: 600; padding: 10px 20px; letter-spacing: .5px;
+}
+.acc-go, .acc-cta .acc-go, .acc-final .acc-go {
+    background: var(--primary); border: 1px solid var(--primary); color: #FFFFFF;
+}
+.acc-go:hover, .acc-cta .acc-go:hover, .acc-final .acc-go:hover {
+    background: #16338A; border-color: #16338A;
+}
+.acc-cta .acc-ghost { border-radius: 7px; }
+/* Cartes / encarts → cartes app */
+.acc-card { border-radius: 7px; border-color: var(--border-color); }
+.acc-card:hover { border-color: rgba(30, 64, 175, 0.55); box-shadow: 0 4px 14px rgba(15, 23, 42, 0.10); }
+.acc-ic { border-radius: 5px; border-color: var(--border-color); background: var(--papier-2); color: var(--primary); }
+.acc-stats { border-radius: 7px; border-color: var(--border-color); }
+.acc-step { border-radius: 7px; border-color: var(--border-color); }
+.acc-step b { background: var(--primary); }
+.acc-band { border-radius: 9px; border-color: var(--border-color); }
+.acc-shot { border-radius: 7px; border-color: var(--border-color); }
+.acc-shot::after { display: none; }
+.acc-final { border-radius: 9px; border-color: var(--border-color); background: var(--papier-2); }
+.acc-logo { border-radius: 7px; border-color: var(--border-color); }
+.acc-foot { border-top-color: var(--border-color); }
+/* Sections → titres app ; trait bicolore sous les h2 */
+.acc-h2, .gd-body h2, .leg-h2 { font-family: 'DM Sans', Verdana, sans-serif; }
+.acc-h2::after, .gd-body h2::after { background: linear-gradient(90deg, #1E40AF, #D52B1E); }
+.gd-body h3 { letter-spacing: 1.2px; text-transform: uppercase; font-size: 13px; }
+/* Tableaux / code / encarts → app */
+.gd-t th, .gd-t td { border-color: var(--filet-fin); }
+.gd-t th { background: var(--papier-2); }
+.gd-code { border-radius: 7px; border-color: var(--filet); background: var(--papier-2); font-size: 13px; }
+.gd-tip { border-left-color: var(--primary); background: rgba(30, 64, 175, .06); border-radius: 0 7px 7px 0; }
+.gd-also a { border-radius: 7px; border-color: var(--border-color); }
+.gd-also a:hover { background: var(--primary); border-color: var(--primary); color: #FFFFFF; }
