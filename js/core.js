@@ -625,6 +625,33 @@ export async function fetchAvecRelais(url, type = 'text', ttlSec = null) {
 // invoqué via la file de _fetchAvecRelais (jamais en parallèle d'un autre).
 async function _viaRelais(url, type, ttlSec) {
 
+    // Route NATIVE du relais (/sigmet, /temsi…) : JAMAIS emballée dans le
+    // proxy ?url= — le worker refuse son propre hôte sur sa liste blanche
+    // (403, retours pilote 20/09 : les SIGMET France basculaient en silence
+    // sur le repli NOAA). Appel direct, avec le cache/file/retries du couloir.
+    let _memeOrigine = false;
+    try {
+        _memeOrigine = !!config.PROXY_URL
+            && new URL(url).origin === new URL(config.PROXY_URL).origin;
+    } catch { _memeOrigine = false; }
+    if (_memeOrigine) {
+        let lastErr = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(15000) });
+                if (res.ok) {
+                    const raw = await res.text();
+                    return type === 'json' ? (raw.trim() === '' ? [] : JSON.parse(raw)) : raw;
+                }
+                // 5xx transitoires : retente ; 4xx : inutile.
+                if (res.status >= 400 && res.status < 500) break;
+                lastErr = new Error('HTTP ' + res.status);
+            } catch (e) { lastErr = e; }
+            await new Promise(r => setTimeout(r, 1200));
+        }
+        throw lastErr || new Error('relais injoignable');
+    }
+
     // Sans relais configuré (miroir public GitHub Pages) : appel DIRECT
     // — aviationweather.gov expose son API en CORS ouvert, seule la
     // mise en cache Google est perdue.
