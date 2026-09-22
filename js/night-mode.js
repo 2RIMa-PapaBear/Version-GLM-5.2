@@ -39,19 +39,19 @@ export function themeTokens() {
     return isLightTheme()
         ? {
             bg: '#FFFFFF',            // fond canvas
-            text: '#1E293B',          // texte principal
-            muted: '#64748B',         // texte secondaire
+            text: '#0F172A',          // texte principal
+            muted: '#5B6774',         // texte secondaire
             dim: 'rgba(15, 23, 42, 0.45)',
             grid: 'rgba(15, 23, 42, 0.10)',
             gridStrong: 'rgba(15, 23, 42, 0.22)',
         }
         : {
-            bg: '#0F172A',
-            text: '#E2E8F0',
-            muted: '#94A3B8',
-            dim: 'rgba(255, 255, 255, 0.35)',
-            grid: 'rgba(255, 255, 255, 0.08)',
-            gridStrong: 'rgba(255, 255, 255, 0.15)',
+            bg: '#111A2C',
+            text: '#F1F5FB',
+            muted: '#8FA0BC',
+            dim: 'rgba(241, 245, 251, 0.35)',
+            grid: 'rgba(241, 245, 251, 0.08)',
+            gridStrong: 'rgba(241, 245, 251, 0.15)',
         };
 }
 
