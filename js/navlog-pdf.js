@@ -1267,9 +1267,9 @@ function _drawLandingProfile(doc, l, L, R, yTop, fr) {
 
     // Descente (couleur verdict) du repère 50 ft au toucher, puis roulement
     // jusqu'à l'arrêt ; repère 50 ft en pointillés jusqu'à la piste.
-    doc.setDrawColor(...lvlColor); doc.setLineWidth(2.2);
+    doc.setDrawColor(...lvlColor); doc.setLineWidth(1.3);
     doc.line(fiftyX, TOP50 + 7, touchX, yBase - 3);
-    doc.setLineWidth(2.6);
+    doc.setLineWidth(2.4);
     doc.line(touchX, yBase - 2.5, stopX, yBase - 2.5);
     doc.setDrawColor(...LINE); doc.setLineWidth(0.4);
     doc.setLineDashPattern([2, 3], 0);
@@ -1297,18 +1297,19 @@ function _drawLandingProfile(doc, l, L, R, yTop, fr) {
     // Avions (comme l'écran) : en APPROCHE au repère 50 ft — assiette sur la
     // pente, nez bas (PLANE_TILT + pente ≈ compensation de l'inclinaison
     // native) — et posé-arrêté en fin de roulement, à plat sur la piste.
-    _planeIcon(doc, fiftyX + 10.5 * s, TOP50 - 2.1 * s, s, PLANE_TILT + descentAngle);
-    _planeIcon(doc, Math.max(stopX - 15 * s, touchX + 2), yBase - 0.35 - (PLANE_DROP + PLANE_LIFT) * s, s, PLANE_TILT);
+    // Icônes alignées sur le profil de décollage (retour pilote 20/09) :
+    // en approche 0,9 (comme l'avion en montée), posé 1 (comme au seuil).
+    _planeIcon(doc, fiftyX + 10.5 * s, TOP50 - 2.1 * s, 0.9, PLANE_TILT + descentAngle);
+    _planeIcon(doc, Math.max(stopX - 15 * s, touchX + 2), yBase - 0.35 - (PLANE_DROP + PLANE_LIFT), 1, PLANE_TILT);
 
     // Étiquettes (positions écran) : « 50 ft » AVANT le repère ; roulement
     // centré SOUS la piste ; « arrêt · X m » AU-DESSUS de l'avion posé.
-    doc.setFont('courier', 'bold'); doc.setFontSize(7); _setInk(doc, MUTED);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); _setInk(doc, INK);
     doc.text('50 ft', fiftyX - 6, TOP50 + 5, { align: 'right' });
     if (stopX - touchX > 44) {
         doc.text(`${rollM} m`, (touchX + stopX) / 2, yBase + 14, { align: 'center' });
     }
     if (stopTrueX <= R - 1) {
-        doc.setFont('courier', 'bold'); doc.setFontSize(8); _setInk(doc, lvlColor);
         doc.text(`${fr ? 'arrêt' : 'stop'} · ${l.fiftyM} m`, Math.min(stopX, R - 4), yBase - 28, { align: 'right' });
     }
 
