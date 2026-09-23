@@ -19,6 +19,7 @@ import {
 } from './airspaces.js';
 import { zoneActiveToday } from './azba.js';
 import { computeMapBounds, pickTileZoom, safeTileRange, mapArea } from './flight-map-pdf.js';
+import { loadZoneFreqServices, zoneFreqInfo, terrainFreqText } from './airspace-freq.js';
 
 // Palette IMPRESSION : les couleurs écran de la carte régionale (#3B82F6,
 // #FBBF24…) assombries d un cran pour rester lisibles sur papier blanc,
@@ -40,8 +41,12 @@ const PRINT_WEIGHT = {
 
 /** Items d espaces -> zones normalisées pour le PDF.
  *  notams : dossier NOTAM courant (vide = trait plein partout — pas
- *  d info ≠ inactive, même règle que la carte). */
-export function normalizeZones(items, { notams = [], now = Date.now() } = {}) {
+ *  d info ≠ inactive, même règle que la carte).
+ *  services : index des fréquences officielles par organisme
+ *  (loadZoneFreqServices) — les zones SIV/CTR/TMA/CTA reçoivent une
+ *  3e ligne « freq » pour leur étiquette (retour pilote 22/09) ;
+ *  null = résolution sautée, étiquettes à 2 lignes comme avant. */
+export function normalizeZones(items, { notams = [], now = Date.now(), services = null } = {}) {
     const out = [];
     for (const raw of items || []) {
         const as = raw && raw.geometry ? raw : _expandFileItem(raw);
@@ -63,6 +68,14 @@ export function normalizeZones(items, { notams = [], now = Date.now() } = {}) {
         const style = AIRSPACE_STYLE[kind] || AIRSPACE_STYLE.OTHER;
         const lo = _limitTxt(as.lowerLimit) || 'SFC';
         const up = _limitTxt(as.upperLimit);
+        // Fréquence radio (SIV/CTR/TMA/CTA uniquement, jamais inventée —
+        // airspace-freq.js : overrides > champ f SIA > services SIA >
+        // legs openAIP du dédoublonnage).
+        let freq = null;
+        if (services && (kind === 'CTR' || kind === 'TMA' || kind === 'CTA' || kind === 'SIV')) {
+            const fi = zoneFreqInfo(as, kind, services);
+            if (fi) freq = fi.tag ? `${fi.freq} ${fi.tag}` : fi.freq;
+        }
         out.push({
             rings,
             color, fill: color,
@@ -73,6 +86,7 @@ export function normalizeZones(items, { notams = [], now = Date.now() } = {}) {
             label: String(as.name || style.label || kind).trim(),
             sub: up ? `${lo} - ${up}` : lo,
             kind,
+            freq,
         });
     }
     return out;
@@ -181,13 +195,34 @@ export async function buildFlightMapData({
         items = await fetchAirspacesForBbox(bounds.minLat, bounds.minLon, bounds.maxLat, bounds.maxLon) || [];
     } catch { /* zones absentes : la route et les terrains restent */ }
 
-    const zones = normalizeZones(items, { notams, now: Date.now() });
+    // Fréquences officielles par organisme (65 Ko, cache session) —
+    // indisponibles (hors ligne) : étiquettes de zones à 2 lignes.
+    let services = null;
+    try { services = await loadZoneFreqServices(); } catch { /* neutre */ }
+
+    // Fréquences A/A-AFIS des terrains du plan (retour pilote 22/09) :
+    // ligne « 122.605 AFIS » sous le code, même chaîne officielle que
+    // le widget terrain (overrides > eAIP ⊕ XML > openAIP).
+    const withTerrainFreq = async (pts) => {
+        const out = [];
+        for (const p of pts || []) {
+            if (!p || !p.code) { out.push(p); continue; }
+            let t = null;
+            try { t = await terrainFreqText(p.code); } catch { /* neutre */ }
+            out.push(t ? { ...p, freq: t } : p);
+        }
+        return out;
+    };
+    const routeT = await withTerrainFreq(route);
+    const alternatesT = await withTerrainFreq(alternates);
+
+    const zones = normalizeZones(items, { notams, now: Date.now(), services });
     const legend = zoneLegend(zones, isFr);
     const hasAzbaDash = zones.some((zn) => zn.dashed && zn.kind !== 'SIV');
     return {
         isFr, generatedLabel, routeLabel,
         bounds, tiles,
-        route, alternates, zones, legend,
+        route: routeT, alternates: alternatesT, zones, legend,
         legendNote: hasAzbaDash
             ? (isFr ? 'Plein : active ou sans info · pointillé : non active ce jour (AZBA)'
                 : 'Solid: active or unknown · dashed: not active today (AZBA)')

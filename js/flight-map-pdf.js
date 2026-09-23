@@ -24,9 +24,12 @@
 //   isFr, routeLabel, generatedLabel        habillage
 //   bounds {minLat,minLon,maxLat,maxLon}    emprise DÉJÀ ajustée à la page
 //   tiles : null | { z, single:{data,fmt} | grid:{x0,y0,nx,ny,images:[{ix,iy,data,fmt}]} }
-//   route [{lat,lon,code,name?,role:'dep'|'wp'|'dest'}]
-//   alternates [{lat,lon,code,name?,diversion}]
-//   zones [{rings:[[lat,lon]…]…, color, fill, dashed, label, sub, kind}]
+//   route [{lat,lon,code,name?,role:'dep'|'wp'|'dest', freq?}]
+//   alternates [{lat,lon,code,name?,diversion, freq?}]   freq = A/A-AFIS
+//          du terrain (« 122.605 AFIS », 22/09, airspace-freq.js)
+//   zones [{rings:[[lat,lon]…]…, color, fill, dashed, label, sub, kind,
+//           freq?}]   freq = 3e ligne « 125.15 QUIMPER TWR » (22/09,
+//           SIV/CTR/TMA/CTA — airspace-freq.js, jamais inventée)
 //   legend [{label,color,dashed}], legendNote
 
 const PAGE = { w: 595.28, h: 419.53 };   // A5 paysage (miroir du log A5 portrait)
@@ -38,6 +41,7 @@ const TILE = 256;        // tuile Web Mercator
 
 const INK = [17, 24, 39];
 const MUTED = [100, 116, 139];
+const SUB_INK = [51, 65, 85];        // #334155 — bornes des zones : lisibles sur relief
 const LINE = [148, 163, 184];
 const ROUTE = [3, 105, 161];        // #0369A1 — la route domine les zones
 const AMBER = [180, 83, 9];         // #B45309 — waypoints / dégagement
@@ -314,7 +318,11 @@ export function drawFlightMapPage(doc, d) {
     }
 
     // ---- Terrains. Étiquettes réservées AVANT celles des zones (les
-    // terrains priment : c'est une carte de navigation).
+    // terrains priment : c'est une carte de navigation) — et le PLAN
+    // (départ/arrivée/étapes) réserve AVANT les alternates : deux
+    // terrains voisins (LTA à 2 NM de LFOO) se disputent la place, le
+    // plan doit gagner. Chaque terrain garde AU MOINS une protection
+    // dégradée (boîte marqueur) si sa réservation complète est refusée.
     // Un terrain HORS emprise (dégagement éloigné au-delà de la marge)
     // est RABATTU au bord de carte : direction visible, sans gonfler
     // l'échelle — la route définit seule le cadrage (« Cadrer plan »).
@@ -323,6 +331,59 @@ export function drawFlightMapPage(doc, d) {
         Math.min(Math.max(x, map.x + 8), map.x + map.w - 8),
         Math.min(Math.max(y, map.y + 8), map.y + map.h - 8),
     ];
+    for (let i = 0; i < rp.length; i++) {
+        const p = rp[i];
+        const [x, y] = rPts[i];
+        const isEnd = p.role === 'dep' || p.role === 'dest';
+        doc.setFillColor(...(isEnd ? ROUTE : AMBER));
+        doc.setDrawColor(255, 255, 255);
+        doc.setLineWidth(0.7);
+        doc.circle(x, y, isEnd ? 3.4 : 2.5, 'FD');
+        if (!p.code) continue;
+        _label(doc, p.code, x + 5, y - 1, { size: isEnd ? 8 : 7, bold: true, color: INK });
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(isEnd ? 8 : 7);
+        const w = doc.getTextWidth(p.code) + 2;
+        let fw = 0;
+        if (p.freq) {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(4.8);
+            fw = doc.getTextWidth(p.freq) + 2;
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(isEnd ? 8 : 7);
+        }
+        const hasName = !!(p.name && isEnd);
+        const h = hasName ? (p.freq ? 21 : 14) : (p.freq ? 15 : 9);
+        // Réservation unique marqueur+texte (cf. alternates) ; le nom du
+        // terrain d extrémité (5,5 pt, maxW 90) et la fréquence A/A-AFIS
+        // (22/09) sont couverts en largeur et en hauteur.
+        let ww = 9.5 + Math.max(w, fw);
+        let nameW = 0;
+        if (hasName) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(5.5);
+            nameW = Math.min(92, doc.getTextWidth(p.name) + 2);
+            ww = Math.max(ww, 9.5 + nameW);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(isEnd ? 8 : 7);
+        }
+        // Complet → sans la fréquence → boîte marqueur : jamais nu.
+        if (!place({ x: x - 4.5, y: y - 7, w: ww, h: Math.max(h, 10) })) {
+            if (!place({ x: x - 4.5, y: y - 7, w: 9.5 + Math.max(w, nameW), h: hasName ? 14 : 9 })) {
+                place({ x: x - 4.5, y: y - 4.5, w: 9, h: 9 });
+            }
+        }
+        if (hasName) {
+            // (retour pilote 22/09) nom d extrémité en ardoise foncée.
+            _label(doc, p.name, x + 5, y + 4.5, { size: 5.5, color: SUB_INK, maxW: 90 });
+        }
+        // Fréquence A/A-AFIS du terrain (retour pilote 22/09) : sous le
+        // code, ou sous le nom pour les extrémités.
+        if (p.freq) {
+            _label(doc, p.freq, x + 5, hasName ? y + 10.8 : y + 5, { size: 4.8, bold: true, color: INK });
+        }
+    }
+
     for (const a of d.alternates || []) {
         if (!Number.isFinite(a.lat) || !Number.isFinite(a.lon)) continue;
         let [x, y] = xy(a.lat, a.lon);
@@ -344,50 +405,124 @@ export function drawFlightMapPage(doc, d) {
             doc.setLineDashPattern([], 0);
         }
         const label = a.diversion ? `${a.code} ${isFr ? '(dégagement)' : '(alt.)'}` : a.code;
+        // (retour pilote 22/09, lisibilité sur relief) codes d alternates
+        // en ardoise foncée — le gris clair se fondait dans le fond topo.
         _label(doc, label, x + 5, y + 2, {
             size: 6, bold: !!a.diversion, italic: !a.diversion,
-            color: a.diversion ? AMBER : MUTED,
+            color: a.diversion ? AMBER : SUB_INK,
         });
         doc.setFont('helvetica', a.diversion ? 'bold' : 'italic');
         doc.setFontSize(6);
-        place({ x: x + 5, y: y - 5, w: doc.getTextWidth(label) + 2, h: 8 });
-    }
-
-    for (let i = 0; i < rp.length; i++) {
-        const p = rp[i];
-        const [x, y] = rPts[i];
-        const isEnd = p.role === 'dep' || p.role === 'dest';
-        doc.setFillColor(...(isEnd ? ROUTE : AMBER));
-        doc.setDrawColor(255, 255, 255);
-        doc.setLineWidth(0.7);
-        doc.circle(x, y, isEnd ? 3.4 : 2.5, 'FD');
-        if (!p.code) continue;
-        _label(doc, p.code, x + 5, y - 1, { size: isEnd ? 8 : 7, bold: true, color: INK });
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(isEnd ? 8 : 7);
-        const w = doc.getTextWidth(p.code) + 2;
-        const h = p.name && isEnd ? 14 : 9;
-        place({ x: x + 5, y: y - 7, w, h });
-        if (p.name && isEnd) {
-            _label(doc, p.name, x + 5, y + 4.5, { size: 5.5, color: MUTED, maxW: 90 });
+        const lw = doc.getTextWidth(label) + 2;
+        let fw = 0;
+        if (a.freq) {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(4.8);
+            fw = doc.getTextWidth(a.freq) + 2;
+        }
+        // UNE SEULE réservation marqueur+texte (retour juge 22/09) : deux
+        // rects adjacents se neutralisent — la tolérance d 1 pt du placer
+        // refuse l étiquette collée (0,5 pt) à sa propre boîte-marqueur,
+        // et le terrain restait alors SANS protection face aux zones.
+        // Complet → code seul → boîte marqueur (cf. waypoints).
+        if (!place({ x: x - 4.5, y: y - 5, w: 9.5 + Math.max(lw, fw), h: a.freq ? 15 : 10 })) {
+            if (!place({ x: x - 4.5, y: y - 5, w: 9.5 + lw, h: 10 })) {
+                place({ x: x - 4.5, y: y - 4.5, w: 9, h: 9 });
+            }
+        }
+        // Fréquence A/A-AFIS du terrain (retour pilote 22/09).
+        if (a.freq) {
+            _label(doc, a.freq, x + 5, y + 8, { size: 4.8, bold: true, color: INK });
         }
     }
 
     // ---- Étiquettes de zones (grandes d'abord, sans chevauchement).
-    labelCands.sort((a, b2) => b2.area - a.area);
+    // La mention de repli (sans fond) est RÉSERVÉE ICI, avant les zones —
+    // dessinée en dernier au centre-haut, elle sinon s'y superposait
+    // (retour juge 22/09).
+    if (!hasTiles) place({ x: map.x + map.w / 2 - 125, y: map.y + 4, w: 250, h: 12 });
+    // Zone avec fréquence (SIV/CTR/TMA/CTA, retour pilote 22/09) : 3e
+    // ligne « 125.15 QUIMPER TWR » sous les bornes, et positions de
+    // REPLI quand le centre exact est refusé — la fréquence est une
+    // info de vol, elle mérite un second essai. Les terrains et la
+    // route restent prioritaires (ordre d'ajout inchangé) ; les zones
+    // sans fréquence gardent le comportement d'avant, candidat unique.
+    // (retour juge 22/09) Le RECT ENTIER est rabattu dans la carte — la
+    // fréquence élargit le bloc, sans cela le clip du cadre la coupait
+    // net (« 120.130 NANTES A[PP] ») — et sa réservation est gonflée
+    // d 1 pt : plus de ligne de bornes collée au texte d un terrain.
+    // Ordre de pose : les zones À FRÉQUENCE priment (aire ×3) — sans
+    // cela le plafond de 42 étiquettes les coupe au profit de zones
+    // R/D/P plus petites (CTR LORIENT était la 1re victime, 22/09) ;
+    // à taille comparable l'ordre « grandes d'abord » est conservé.
+    labelCands.sort((a, b2) => (b2.zone.freq ? 3 : 1) * b2.area - (a.zone.freq ? 3 : 1) * a.area);
     let labeled = 0;
     for (const c of labelCands) {
         if (labeled >= 42) break;
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(6);
         const wl = doc.getTextWidth(c.zone.label || '?') + 2;
-        const hs = c.zone.sub ? 11 : 8;
-        if (!place({ x: c.cx - wl / 2, y: c.cy - 6, w: wl, h: hs })) continue;
-        _label(doc, c.zone.label, c.cx, c.cy, { size: 6, bold: true, color: _hex(c.zone.color), align: 'center' });
-        if (c.zone.sub) {
-            _label(doc, c.zone.sub, c.cx, c.cy + 5, { size: 4.8, color: MUTED, align: 'center' });
+        const freq = c.zone.freq || null;
+        let wf = 0, ws = 0;
+        if (freq) {
+            doc.setFontSize(5);
+            wf = doc.getTextWidth(freq) + 2;
         }
-        labeled++;
+        if (c.zone.sub) {
+            // (retour pilote 22/09) bornes en encre GRAS : leur largeur
+            // entre dans la réservation du bloc.
+            doc.setFontSize(4.8);
+            ws = doc.getTextWidth(c.zone.sub) + 2;
+        }
+        const w = Math.max(wl, wf, ws);
+        // Pose en deux modes : bloc complet (nom/bornes/fréquence), puis —
+        // si AUCUNE position ne passe et que la zone a une fréquence —
+        // bloc COMPACT nom+fréquence sans les bornes : dans les clusters
+        // denses (Lorient : CTR + 2 TMA + terrains) la fréquence prime
+        // sur les limites verticales (retour pilote 22/09).
+        const attempt = (compact) => {
+            const hs = compact ? 14
+                : freq ? (c.zone.sub ? 18.5 : 14) : (c.zone.sub ? 11 : 8);
+            // Grille de candidats, centre d'abord puis anneaux — une
+            // échelle fixe de décalages saute les créneaux intermédiaires
+            // (cluster Lorient, 22/09 : la case [+48,-21] était libre).
+            const tries = freq
+                ? [[0, 0],
+                    [0, -21], [0, 21], [-48, 0], [48, 0],
+                    [-48, -21], [-48, 21], [48, -21], [48, 21],
+                    [0, -42], [0, 42], [-95, 0], [95, 0],
+                    [-95, -21], [-95, 21], [95, -21], [95, 21]]
+                : [[0, 0]];
+            for (const [dx, dy] of tries) {
+                let cx = c.cx + dx, cy = c.cy + dy;
+                // Bloc ENTIER dans la carte : le candidat est rabattu, pas coupé.
+                cx = Math.min(Math.max(cx, map.x + w / 2 + 3), map.x + map.w - w / 2 - 3);
+                cy = Math.min(Math.max(cy, map.y + hs / 2 + 6), map.y + map.h - hs / 2 - 6);
+                if (cx < map.x + 8 || cx > map.x + map.w - 8
+                    || cy < map.y + 8 || cy > map.y + map.h - 8) continue;
+                const rect = freq
+                    ? { x: cx - w / 2 - 1, y: cy - (compact ? 6.5 : 7), w: w + 2, h: compact ? 14 : hs + 1 }
+                    : { x: cx - w / 2, y: cy - 6, w, h: hs };
+                if (!place(rect)) continue;
+                // (retour pilote 22/09 : couleurs « à peine lisibles » sur
+                // le fond relief) Noms en ENCRE FONCÉE — le code couleur
+                // des familles reste porté par les TRAITS de zones et la
+                // légende. Bornes et fréquence en encre, les bornes en
+                // gras (retour pilote 22/09).
+                _label(doc, c.zone.label, cx, cy, { size: 6, bold: true, color: INK, align: 'center' });
+                if (!compact && c.zone.sub) {
+                    _label(doc, c.zone.sub, cx, cy + 5, { size: 4.8, bold: true, color: INK, align: 'center' });
+                }
+                if (freq) {
+                    _label(doc, freq, cx, cy + (compact ? 5.5 : 11), { size: 5, bold: true, color: INK, align: 'center', maxW: 130 });
+                }
+                return true;
+            }
+            return false;
+        };
+        let done = attempt(false);
+        if (!done && freq && c.zone.sub) done = attempt(true);
+        if (done) labeled++;
     }
 
     // ---- Rose nord (coin haut droit) et échelle linéaire (bas gauche).
@@ -411,7 +546,8 @@ export function drawFlightMapPage(doc, d) {
     doc.rect(sx, sy, sc.pt / 2, 2.4, 'F');
     _label(doc, `${sc.nm} NM`, sx + sc.pt / 2, sy - 2.6, { size: 6, bold: true, align: 'center' });
 
-    // Mention de repli vectoriel (tuiles indisponibles).
+    // Mention de repli vectoriel (tuiles indisponibles) — emplacement
+    // réservé en tête de la boucle des zones (cf. ci-dessus).
     if (!hasTiles) {
         _label(doc, isFr ? 'Fond de carte indisponible (hors ligne) - carte vectorielle de secours'
             : 'Base map unavailable (offline) - vector backup map',

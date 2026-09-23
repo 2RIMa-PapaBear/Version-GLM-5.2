@@ -1,12 +1,14 @@
 // Contrôle géométrique B7 — carte de vol imprimable (maquette LFRV-LFOO).
 // Vérifie, sans jugement esthétique (Read n'affiche pas les images) :
 //   1. le CONTENU du PDF (textes jsPDF non compressés : titre, codes,
-//      échelle, légende) ;
+//      échelle, légende, FRÉQUENCES des zones 22/09) ;
 //   2. les PIXELS du PNG rendu à 2 px/pt (apercu_carte_vol.png) contre
-//      les positions ATTENDUES recalculées avec les mêmes formules que le
-//      tracé : marqueurs LFRV/LFOO, route échantillonnée, couleurs des
-//      familles de zones, rose nord, dégagement LFRD rabattu au bord,
-//      richesse du fond tuilé, repli blanc de la variante sans fond.
+//      les positions ATTENDUES lues dans le méta jeté par la maquette
+//      (test/apercu_flight_map_meta.json — mêmes bornes/alternates que
+//      le tracé, convention app « plan + alternates visibles ») :
+//      marqueurs LFRV/LFOO, route échantillonnée, couleurs des familles
+//      de zones, rose nord, dégagement LFRD, richesse du fond tuilé,
+//      repli blanc de la variante sans fond.
 // Usage : node test/check-flight-map-pdf.mjs   (après gen-apercu + _pdf2png-cdp)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -25,6 +27,7 @@ const ko = (m) => { failures++; console.log('KO  ' + m); };
 // ---------- 1. contenu PDF ----------
 const pdfMain = fs.readFileSync(path.join(root, 'Apercu_Carte_vol_LFRV-LFOO.pdf'), 'latin1');
 const pdfAlt = fs.readFileSync(path.join(root, 'Apercu_Carte_vol_LFRV-LFOO_sans-fond.pdf'), 'latin1');
+const pdfLoc = fs.readFileSync(path.join(root, 'Apercu_Carte_vol_local-LFRV.pdf'), 'latin1');
 for (const [name, raw, wantTiles] of [
     ['avec fond', pdfMain, true],
     ['sans fond', pdfAlt, false],
@@ -33,7 +36,7 @@ for (const [name, raw, wantTiles] of [
     for (const t of ['LFRV', 'LFOO', 'LFRD', 'dégagement']) {
         if (raw.includes(t)) ok(`${name} : texte « ${t} »`); else ko(`${name} : « ${t} » absent`);
     }
-    if (/1:1 \d{3} \d{3}/.test(raw)) ok(`${name} : échelle numérique`);
+    if (/1:\d[\d ]{3,}/.test(raw)) ok(`${name} : échelle numérique`);
     else ko(`${name} : échelle numérique introuvable`);
     // La maquette embarque les tuiles en PNG (FlateDecode) — le JPEG
     // (DCTDecode) n'apparaît qu'avec la recomposition canvas de l app.
@@ -47,10 +50,50 @@ for (const [name, raw, wantTiles] of [
     if (!wantTiles && !raw.includes('indisponible')) ko('sans fond : mention repli absente');
 }
 
-// ---------- 2. positions attendues (mêmes formules que le tracé) ----------
-const LFRV = { lat: 47.7192, lon: -2.7233 }, LFOO = { lat: 46.4756, lon: -1.725 }, LFRD = { lat: 48.5878, lon: -2.08 };
+// Fréquences des zones SIV/CTR/TMA/CTA (22/09) : un bouquet complet sur
+// LFRV-LFOO (TWR pour CTR, APP pour TMA, INFO pour SIV), et JAMAIS de
+// fréquence « Sol » ni d'UHF militaire.
+{
+    const labels = [...pdfMain.matchAll(/\((\d{3}\.\d{3}(?: [A-ZÉÈ .-]+)?)\) Tj/g)].map((m) => m[1]);
+    if (labels.length >= 20) ok(`fréquences posées : ${labels.length} étiquettes`);
+    else ko(`fréquences : ${labels.length} seulement (< 20)`);
+    for (const t of ['RENNES APP', 'LORIENT TWR', 'RENNES INFO', 'LA ROCHELLE INFO']) {
+        if (pdfMain.includes(t)) ok(`fréquence « ${t} » posée`);
+        else ko(`fréquence « ${t} » absente`);
+    }
+    for (const [bad, why] of [['121.730', 'fréquence Sol'], ['281.550', 'UHF'], ['231.875', 'UHF']]) {
+        if (pdfMain.includes(bad)) ko(`${why} ${bad} présente !`);
+        else ok(`aucune ${why} (${bad})`);
+    }
+    if (pdfLoc.includes('LORIENT TWR')) ok('vol local : fréquence LORIENT TWR posée');
+    else ko('vol local : fréquence absente');
+}
+
+// Fréquences A/A-AFIS des terrains du plan (retour pilote 22/09) :
+// ligne « 122.605 AFIS » sous le code du terrain, A/A seule quand
+// c'est la seule (LFOO), rien pour les terrains sans service.
+{
+    for (const [t, pdf] of [
+        ['122.605 AFIS', pdfMain],      // LFRV départ (A/A identique : une ligne)
+        ['123.355 A/A', pdfMain],       // LFOO arrivée
+        ['119.605 AFIS', pdfMain],      // LFEQ alternate
+        ['122.605 AFIS', pdfLoc],       // LFRV vol local
+    ]) {
+        if (pdf.includes(t)) ok(`terrain « ${t} » posé`);
+        else ko(`terrain « ${t} » absent`);
+    }
+    if (pdfMain.includes('121.405 AFIS')) ok('terrain LFRE « 121.405 AFIS » posé');
+    else ko('terrain LFRE absent');
+}
+
+// ---------- 2. positions attendues (mêmes bornes que le tracé) ----------
+// La maquette écrit test/apercu_flight_map_meta.json — la convention est
+// celle de l'app : l'emprise couvre la route ET les alternates (+15 %).
+const meta = JSON.parse(fs.readFileSync(path.join(root, 'test', 'apercu_flight_map_meta.json'), 'utf8'));
+const LFRV = meta.route[0], LFOO = meta.route[meta.route.length - 1];
+const LFRD = meta.alternates.find((a) => a.code === 'LFRD');
 const route = [LFRV, LFOO];
-const b = computeMapBounds(route, [], { aspect: mapArea().w / mapArea().h });
+const b = meta.bounds;
 const z = pickTileZoom(b);
 const map = mapArea();
 const bx0 = lonToPx(b.minLon, z), bx1 = lonToPx(b.maxLon, z);
@@ -180,13 +223,16 @@ for (const [code, p] of [['LFRV', LFRV], ['LFOO', LFOO]]) {
     else ko('rose nord introuvable');
 }
 
-// Dégagement LFRD Dinard RABATTU au bord nord (hors emprise).
+// Dégagement LFRD Dinard : losange ambre à sa position projetée, RABATTU
+// au bord le plus proche s'il sort de la zone carte (formule du tracé —
+// avec les alternates dans l'emprise, convention app, il est en général
+// à l'intérieur ; le clamp reste vérifié par les tests unitaires).
 {
     const [rx, ry] = toPt(LFRD.lat, LFRD.lon);
     const expX = Math.min(Math.max(rx, map.x + 8), map.x + map.w - 8) * S;
-    const expY = (map.y + 8) * S;
-    if (scanWindow(img, expX, expY, 24, AMBER, 55)) ok('dégagement LFRD rabattu au bord nord');
-    else ko(`dégagement LFRD introuvable au bord ((${expX.toFixed(0)},${expY.toFixed(0)}))`);
+    const expY = Math.min(Math.max(ry, map.y + 8), map.y + map.h - 8) * S;
+    if (scanWindow(img, expX, expY, 24, AMBER, 55)) ok('dégagement LFRD à sa position attendue');
+    else ko(`dégagement LFRD introuvable ((${expX.toFixed(0)},${expY.toFixed(0)}))`);
 }
 
 // Variante sans fond : la zone carte reste claire (repli blanc).
