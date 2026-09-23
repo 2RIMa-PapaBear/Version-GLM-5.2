@@ -438,7 +438,12 @@ export function _geomDuplicate(a, b) {
  *  « SARREBRUCK-PARTIE FRANCE » ne sont pas touchés), par désignateur
  *  R/D/P (LF-R278 ≡ R 278), OU PAR EMPREINTE GÉOMÉTRIQUE (20/09 : même
  *  forme + mêmes tranches verticales = même zone, noms incomparables
- *  compris). Les items SIA passent tel quel. Exporté pour les tests. */
+ *  compris). Les items SIA passent tel quel. Exporté pour les tests.
+ *  La copie openAIP écartée LÈGUE ses fréquences au jumeau SIA conservé
+ *  (champ _oaFreqs, 22/09) : l'export XML SIA n'en porte pas pour les
+ *  CTR/TMA — la carte imprimable (airspace-freq.js) les résout en
+ *  dernier recours ; le rendu écran, qui lit « frequencies », n'en
+ *  dépend pas. */
 export function _dropOpenAipDuplicates(items, sia) {
     const norm = (n) => String(n || '').toUpperCase()
         .replace(/\s+PARTIE\s+(?=[A-Z0-9.]+$)/, ' ')
@@ -459,12 +464,41 @@ export function _dropOpenAipDuplicates(items, sia) {
     const siaRdp = new Set(sia.map(z => _rdpKey(z.name)).filter(Boolean));
     // Empreintes SIA pour la passe géométrique (20/09) — seules les zones
     // à verticales et géométrie exploitables y participent.
-    const siaStats = sia.map(_geomStats).filter(Boolean);
+    const siaStats = sia.map(s => ({ stat: _geomStats(s), item: s })).filter(x => x.stat);
+    // Jumeau SIA d'une copie openAIP écartée (mêmes prédicats que le
+    // filtre) : le seul usage est le legs de fréquences ci-dessous.
+    const twinFor = (z) => {
+        const raw = String(z.name || '').toUpperCase(), n = norm(z.name), g = glued(z.name);
+        const rk = _rdpKey(z.name);
+        for (const s of sia) {
+            const sn = String(s.name || '').toUpperCase();
+            if (sn === raw || norm(s.name) === n || glued(s.name) === g) return s;
+            if (rk && _rdpKey(s.name) === rk) return s;
+        }
+        const st = siaStats.length ? _geomStats(z) : null;
+        if (st) for (const { stat, item } of siaStats) if (_geomDuplicate(st, stat)) return item;
+        return null;
+    };
     return items.filter(z => {
         if (sia.includes(z)) return true;
-        if (siaNames.has(String(z.name || '').toUpperCase()) || siaNames.has(norm(z.name)) || siaNames.has(glued(z.name)) || siaRdp.has(_rdpKey(z.name))) return false;
-        const st = siaStats.length ? _geomStats(z) : null;
-        return !(st && siaStats.some(s => _geomDuplicate(st, s)));
+        const dropped = siaNames.has(String(z.name || '').toUpperCase())
+            || siaNames.has(norm(z.name)) || siaNames.has(glued(z.name)) || siaRdp.has(_rdpKey(z.name))
+            || (() => {
+                const st = siaStats.length ? _geomStats(z) : null;
+                return !!(st && siaStats.some(({ stat }) => _geomDuplicate(st, stat)));
+            })();
+        if (!dropped) return true;
+        const freqs = (Array.isArray(z.frequencies) ? z.frequencies : []).filter(f => f && f.value);
+        if (freqs.length) {
+            const twin = twinFor(z);
+            if (twin) {
+                twin._oaFreqs ||= [];
+                for (const f of freqs) {
+                    if (!twin._oaFreqs.some(x => x.value === f.value)) twin._oaFreqs.push(f);
+                }
+            }
+        }
+        return false;
     });
 }
 

@@ -1237,7 +1237,7 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
         ${cl ? `
             <div class="fp-section" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color);">
                 <div class="fp-section-title">${isFr ? 'Relief sous la route' : 'Terrain clearance'}</div>
-                <div class="fp-grid" style="margin-top:6px;">
+                <div class="fp-grid fp-grid-3" style="margin-top:6px;">
                     <div class="fp-cell">
                         <div class="fp-label">${isFr ? 'Altitude max sol' : 'Max terrain'}</div>
                         <div class="fp-value">${plan.elevationProfile.maxFt} ft</div>

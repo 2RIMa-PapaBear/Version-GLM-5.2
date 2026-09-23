@@ -87,6 +87,7 @@ if (title !== 'RENDER_DONE') {
     const shot = await send('Page.captureScreenshot', {
         format: 'png',
         clip: { x: 0, y: 0, width: w, height: h, scale: 1 },
+        captureBeyondViewport: true,
     });
     fs.writeFileSync(pngAbs, Buffer.from(shot.result.data, 'base64'));
     console.log(`OK : ${pngAbs} (${(fs.statSync(pngAbs).size / 1024).toFixed(0)} Ko, ${w}x${h})`);

@@ -138,8 +138,14 @@ function _scheduleRouteAlternates() {
 }
 
 // Coordonnées d'un terrain (base locale enrichie + mémo), ou null.
+// PAS de garde-fou de forme ici : les repères libres ont des codes à
+// tirets ou courts (« BD-N », « LOR ») enrichis comme des terrains — un
+// filtre OACI strict les rejetait AVANT la recherche et faisait retomber
+// l'insertion intelligente (cheapestWaypointInsertion) sur « en fin de
+// plan » (bug pilote 23/09 : LFDK - BD-N - LFDU au lieu de LFDK - LFDU -
+// BD-N). La recherche elle-même renvoie null pour l'inconnu.
 function _icaoCoords(code) {
-    if (!code || !/^[A-Z][A-Z0-9]{3}$/.test(code)) return null;
+    if (!code || typeof code !== 'string') return null;
     const apt = getAirportByICAO(code);
     const memo = memoGet(code);
     const lat = memo?.lat ?? apt?.lat ?? null;

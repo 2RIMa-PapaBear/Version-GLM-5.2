@@ -2323,6 +2323,20 @@ body.map-overlay-open { overflow: hidden; }
     color: var(--text-color);
     font-size: 14px;
 }
+/* Cellules « étiquette + valeur » (carburant, durées…) : l'étiquette
+   reste en HAUT du cadre, la valeur est centrée horizontalement et CALÉE
+   EN BAS — une étiquette sur deux lignes ne fait plus descendre la
+   valeur, toutes les quantités partagent la même ligne de base basse
+   (retour pilote 23/09). Ciblé par :has pour épargner les cellules à
+   champs de saisie. */
+.fp-cell:has(> .fp-value) {
+    display: flex;
+    flex-direction: column;
+}
+.fp-cell:has(> .fp-value) > .fp-value {
+    margin-top: auto;
+    text-align: center;
+}
 .fp-section-title {
     font-size: 10px;
     text-transform: uppercase;

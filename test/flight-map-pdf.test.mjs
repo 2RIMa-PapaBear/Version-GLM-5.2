@@ -121,6 +121,24 @@ test('drawFlightMapPage : page ajoutée, contenus rendus, images embarquées', (
     ok(doc.output('arraybuffer').byteLength > 6000);
 });
 
+test('fréquences A/A-AFIS des terrains : ligne posée sous le code (22/09)', () => {
+    const doc = new jsPDF({ unit: 'pt', format: 'a5' });
+    const b = computeMapBounds([LFRV, LFOO]);
+    drawFlightMapPage(doc, {
+        isFr: true, routeLabel: 'LFRV - LFOO', bounds: b, tiles: null,
+        route: [
+            { ...LFRV, freq: '122.605 AFIS' },
+            { ...LFOO, freq: '123.355 A/A' },
+        ],
+        alternates: [{ lat: 47.35, lon: -2.2, code: 'LFEQ', freq: '119.605 AFIS' }],
+        zones: [],
+    });
+    const raw = Buffer.from(doc.output('arraybuffer')).toString('latin1');
+    ok(raw.includes('122.605 AFIS'), 'AFIS du départ posé');
+    ok(raw.includes('123.355 A/A'), 'A/A de l arrivée posée');
+    ok(raw.includes('119.605 AFIS'), 'AFIS de l alternate posé');
+});
+
 test('repli vectoriel : sans tuiles, la carte reste tracée et le mentionne', () => {
     const doc = new jsPDF({ unit: 'pt', format: 'a5' });
     const b = computeMapBounds([LFRV, LFOO]);
@@ -159,6 +177,47 @@ test('étiquettes de zones : anti-collision (la 2e zone au même endroit n est p
     const raw = Buffer.from(doc.output('arraybuffer')).toString('latin1');
     ok(raw.includes('ZZA'));
     ok(!raw.includes('ZZB'), 'ZZB chevauche ZZA : étiquette refusée');
+});
+
+test('étiquette 3 lignes : la fréquence est posée sous les bornes (22/09)', () => {
+    const doc = new jsPDF({ unit: 'pt', format: 'a5' });
+    const b = computeMapBounds([LFRV, LFOO]);
+    const ring = [[[47.6, -3.3], [47.6, -2.9], [47.25, -2.9], [47.25, -3.3]]];
+    drawFlightMapPage(doc, {
+        isFr: true, routeLabel: 'LFRV - LFOO', bounds: b, tiles: null,
+        route: [LFRV, LFOO], alternates: [],
+        zones: [{
+            rings: ring, color: [37, 99, 235], fill: [37, 99, 235],
+            label: 'CTR QUIMPER', sub: 'SFC - 1500 ft', kind: 'CTR',
+            freq: '118.625 QUIMPER TWR',
+        }],
+    });
+    const raw = Buffer.from(doc.output('arraybuffer')).toString('latin1');
+    ok(raw.includes('CTR QUIMPER'));
+    ok(raw.includes('SFC - 1500 ft'));
+    ok(raw.includes('118.625 QUIMPER TWR'), '3e ligne fréquence présente');
+});
+
+test('étiquette avec fréquence : position de REPLI quand le centre est pris', () => {
+    const doc = new jsPDF({ unit: 'pt', format: 'a5' });
+    const b = computeMapBounds([LFRV, LFOO]);
+    // Deux zones SUPERPOSÉES pourvues de fréquence : la 2e ne peut pas
+    // prendre le centre (réservation 3 lignes de la 1re) — elle doit
+    // trouver un décalage de repli au lieu de disparaître. Les deux
+    // fréquences finissent dans le PDF.
+    const ring = [[[47.45, -2.86], [47.45, -2.56], [47.15, -2.56], [47.15, -2.86]]];
+    drawFlightMapPage(doc, {
+        isFr: true, routeLabel: 'LFRV - LFOO', bounds: b, tiles: null,
+        route: [LFRV, LFOO], alternates: [],
+        zones: [
+            { rings: ring, color: [37, 99, 235], fill: [37, 99, 235], label: 'TMA ZFA', sub: '2500 - FL115', kind: 'TMA', freq: '134.200 RENNES APP' },
+            { rings: ring, color: [37, 99, 235], fill: [37, 99, 235], label: 'CTR ZFB', sub: 'SFC - 1500 ft', kind: 'CTR', freq: '118.625 QUIMPER TWR' },
+        ],
+    });
+    const raw = Buffer.from(doc.output('arraybuffer')).toString('latin1');
+    ok(raw.includes('TMA ZFA') && raw.includes('134.200 RENNES APP'));
+    ok(raw.includes('CTR ZFB') && raw.includes('118.625 QUIMPER TWR'),
+        'la 2e zone a trouvé une position de repli : fréquence visible');
 });
 
 test('garde-fou : sans emprise, aucune page ajoutée', () => {
