@@ -1020,10 +1020,19 @@ document.addEventListener('DOMContentLoaded', async function () {
         scheduleDragRender();
     }
 
-    canvas.addEventListener('mousedown', (e) => { 
+    // Tactile : aucun drag sur le graphique (retour pilote 24/09) — le doigt
+    // doit faire défiler la page. L'écoute passive ne sert qu'à ignorer les
+    // événements souris synthétiques générés par un toucher (un simple tap ne
+    // doit pas déplacer le curseur d'heure d'arrivée).
+    let touchGhostUntil = 0;
+    canvas.addEventListener('touchstart', () => { touchGhostUntil = Date.now() + 800; }, { passive: true });
+    const isTouchGhost = () => Date.now() < touchGhostUntil;
+
+    canvas.addEventListener('mousedown', (e) => {
+        if (isTouchGhost()) return;
         state.isDragging = true;
         tooltip.style.opacity = '1';
-        handleDrag(e); 
+        handleDrag(e);
     });
     
     canvas.addEventListener('mousemove', (e) => {
@@ -1042,26 +1051,6 @@ document.addEventListener('DOMContentLoaded', async function () {
             tooltip.style.opacity = '0';
             // Fin de drag : on annule tout redraw coalescé en attente, puis rendu final synchrone
             // pour figer la dernière valeur (sinon une frame intermédiaire pourrait la remplacer).
-            cancelDragRender();
-            state.lastRenderState = null; genererGraphique();
-        }
-    });
-
-    canvas.addEventListener('touchstart', (e) => { 
-        state.isDragging = true;
-        tooltip.style.opacity = '1';
-        handleDrag(e); 
-    }, {passive: true});
-    
-    canvas.addEventListener('touchmove', (e) => { 
-        if (state.isDragging) { handleDrag(e); e.preventDefault(); }
-    }, {passive: false});
-    
-    window.addEventListener('touchend', () => {
-        if(state.isDragging) {
-            state.isDragging = false;
-            tooltip.style.opacity = '0';
-            // Fin de drag : rendu final synchrone (cf. mouseup).
             cancelDragRender();
             state.lastRenderState = null; genererGraphique();
         }
