@@ -462,7 +462,6 @@ body.mode-nav .dep-dest-toggle { display: flex; }
 }
 .info-bar #lbl-info { display: inline; }
 .graph-container { position: relative; }
-.taf-canvas { touch-action: none; }
 .legend-bar-bottom { border-radius: 0 0 8px 8px; }
 .btn-add-favorite { margin-top: 10px; }
 .warning { color: var(--danger); font-weight: bold; margin-top: 5px;}
