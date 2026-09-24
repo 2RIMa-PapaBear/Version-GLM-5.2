@@ -17,7 +17,7 @@ import { state, escapeHtml } from './core.js';
 import { getAirportByICAO, initAirportsDB } from './ui-module.js';
 import { getVacLink } from './atc-info.js';
 import { makeCollapsible } from './collapsible.js';
-import { loadFreqSources, getAirportFreqs, getSiaAirac } from './freq-sia.js';
+import { loadFreqSources, getAirportFreqs, getSiaAirac, parseAtisTel } from './freq-sia.js';
 import { loadSiaAux, getSiaAirfield, getSiaRunways, getSiaAuxAirac } from './sia-data.js';
 import { hasVac, openVac } from './vac-viewer.js';
 import { getDeclinationForIcao } from './magvar.js';
@@ -223,7 +223,12 @@ function freqBlockHtml({ freqs, source, title }, isFr) {
         const freqStr = f.freq.toFixed(3);
         const hor = f.hor && HOR_CODES[f.hor] ? f.hor : null;
         const rem = f.rem ? String(f.rem).trim() : '';
-        const remShort = rem.length > 92 ? rem.slice(0, 92).replace(/\s+\S*$/, '') + '…' : rem;
+        // ATIS : numéro d'écoute téléphonique publié dans l'observation →
+        // lien tel: (appeler depuis un téléphone), rendu ENTIER donc
+        // insensible à la troncature de l'observation.
+        const atisTel = rem && f.type === 'ATIS' ? parseAtisTel(rem) : null;
+        const remText = atisTel?.rest || '';
+        const remShort = remText.length > 92 ? remText.slice(0, 92).replace(/\s+\S*$/, '') + '…' : remText;
         return `<div style="display:flex; flex-direction:column; gap:1px; padding:6px 12px; background:${isPrimary ? 'rgba(56,189,248,0.08)' : 'rgba(255,255,255,0.03)'}; border-radius:6px; border-left:3px solid ${isPrimary ? '#38BDF8' : 'rgba(148,163,184,0.3)'};">
             <div style="display:flex; align-items:center; gap:10px;">
                 <span style="font-family:'DM Mono',monospace; font-size:13.5px; font-weight:700; color:${isPrimary ? '#38BDF8' : 'var(--text-color)'}; min-width:70px;">${freqStr}</span>
@@ -231,7 +236,10 @@ function freqBlockHtml({ freqs, source, title }, isFr) {
                 <span style="font-size:12px; color:var(--text-muted); flex:1;">${escapeHtml(f.name || '')}</span>
                 ${hor ? `<span title="${escapeHtml(HOR_CODES[f.hor])}" style="font-size:10px; font-weight:700; font-family:'DM Mono',monospace; color:var(--text-dim); border:1px solid var(--border-color); border-radius:4px; padding:1px 6px;">${hor}</span>` : ''}
             </div>
-            ${rem ? `<div title="${escapeHtml(rem)}" style="font-size:11px; color:var(--text-muted); line-height:1.45; padding-left:80px;">${escapeHtml(remShort)}</div>` : ''}
+            ${(rem || atisTel) ? `<div title="${escapeHtml(rem)}" style="font-size:11px; color:var(--text-muted); line-height:1.45; padding-left:80px; display:flex; align-items:center; flex-wrap:wrap; gap:2px 8px;">${atisTel ? `<a href="tel:${escapeHtml(atisTel.href)}" title="${isFr ? 'Appeler l’ATIS' : 'Call ATIS'}" style="display:inline-flex; align-items:center; gap:4px; color:var(--primary); text-decoration:none;">
+                <i data-lucide="phone" style="width:10px;height:10px;"></i>
+                <span style="font-family:'DM Mono',monospace; font-size:12px; font-weight:600;">${escapeHtml(atisTel.display)}</span>
+            </a>` : ''}${remText ? `<span>${escapeHtml(remShort)}</span>` : ''}</div>` : ''}
         </div>`;
     };
 

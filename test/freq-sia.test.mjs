@@ -2,7 +2,7 @@
 // parseur eAIP (scripts/fetch-freq-sia.mjs, fonction pure exportée).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getAirportFreqs, getServiceFreq, getSiaAirac, _setSources, loadFreqSources } from '../js/freq-sia.js';
+import { getAirportFreqs, getServiceFreq, getSiaAirac, _setSources, loadFreqSources, parseAtisTel } from '../js/freq-sia.js';
 import { parseAdFrequencies } from '../scripts/fetch-freq-sia.mjs';
 
 const SIA = {
@@ -46,6 +46,58 @@ test('getServiceFreq : correction SIV par indicatif (insensible à la casse)', (
 
 test('getSiaAirac : cycle publié', () => {
     assert.equal(getSiaAirac(), '2026-07-09');
+});
+
+// ------------------------------------------ téléphone ATIS (lien tel:)
+// Remarques réelles de data/freq-sia.json (AIRAC 2026-08-06) : formats
+// hétérogènes tels que publiés dans l'eAIP.
+test('parseAtisTel : formats réels de l’eAIP', () => {
+    const cases = [
+        // [rem, {champs attendus}]
+        ['TEL 03 21 06 62 84', { href: '0321066284', display: '03 21 06 62 84', rest: '' }],            // LE TOUQUET
+        ['TEL : 05 53 63 53 55', { href: '0553635355', display: '05 53 63 53 55', rest: '' }],          // BERGERAC
+        ['TEL / PHONE : 05 25 67 00 03', { href: '0525670003' }],                                        // ANGOULEME
+        ['TEL ATIS : 04 67 13 11 70', { href: '0467131170' }],                                           // MONTPELLIER
+        ['TEL : +33 5 62 32 62 68', { href: '+33562326268', display: '+33 5 62 32 62 68', rest: '' }],   // LOURDES
+        ['TEL +33(0)4 67 90 88 88', { href: '+33467908888', display: '+33(0)4 67 90 88 88', rest: '' }], // BEZIERS
+        ['TEL: (0)4.68.10.23.56', { href: '468102356', display: '(0)4.68.10.23.56' }],                   // CARCASSONNE (début de rem)
+        ['Tél. 05 59 22 43 72', { href: '0559224372', display: '05 59 22 43 72', rest: '' }],            // BIARRITZ (abréviation accentuée)
+        ['TEL: 03 26 26 15 67.', { href: '0326261567', rest: '' }],                                      // VATRY (point final)
+        ['Diffusion des parametres DEP et ARR.TEL 0320161954.', { href: '0320161954', rest: 'Diffusion des parametres DEP et ARR' }], // LILLE
+    ];
+    for (const [rem, exp] of cases) {
+        const r = parseAtisTel(rem);
+        assert.ok(r, `devrait détecter un téléphone dans « ${rem} »`);
+        for (const [k, v] of Object.entries(exp)) assert.equal(r[k], v, `${k} pour « ${rem} »`);
+    }
+});
+
+test('parseAtisTel : TEL en fin d’observation longue, texte conservé', () => {
+    // SAINT YAN puis CARCASSONNE : le numéro arrive APRÈS le texte (au-delà
+    // de la troncature d'affichage 92 caractères), la partie texte reste.
+    const sy = parseAtisTel("Paramètres de DEP et ARR jusqu'au FL 100. TEL: 03 85 26 60 78");
+    assert.equal(sy.href, '0385266078');
+    assert.equal(sy.display, '03 85 26 60 78');
+    assert.equal(sy.rest, "Paramètres de DEP et ARR jusqu'au FL 100");
+    const cc = parseAtisTel('Diffusion des paramètres de DEP et ARR/DEP and ARR parameters broadcasting TEL: (0)4.68.10.23.56');
+    assert.equal(cc.href, '468102356');
+    assert.equal(cc.rest, 'Diffusion des paramètres de DEP et ARR/DEP and ARR parameters broadcasting');
+    // CLERMONT : numéro en TÊTE, texte après (point de phrase absorbé).
+    const cl = parseAtisTel("TEL 04 73 62 74 38. Aéronefs d'État non équipés en 8.33 : voir Ad 2.23");
+    assert.equal(cl.href, '0473627438');
+    assert.equal(cl.rest, "Aéronefs d'État non équipés en 8.33 : voir Ad 2.23");
+});
+
+test('parseAtisTel : cas négatifs', () => {
+    assert.equal(parseAtisTel(''), null);
+    assert.equal(parseAtisTel(null), null);
+    assert.equal(parseAtisTel(undefined), null);
+    assert.equal(parseAtisTel('NIL'), null);                                  // LFBY
+    assert.equal(parseAtisTel('ATIS/S'), null);                               // LFGA
+    assert.equal(parseAtisTel('Canal 8.33'), null);                           // pas de TEL
+    assert.equal(parseAtisTel('Diffusion des paramètres de DEP et ARR. DEP and ARR parameters broadcasting.'), null);  // LFLL
+    assert.equal(parseAtisTel('TEL 8.33'), null);                             // capture trop courte
+    assert.equal(parseAtisTel('VHF uniquement, annonce téléphonique non publiée'), null);  // « télé… » sans numéro
 });
 
 // ------------------------------------------------------------ parseur eAIP
