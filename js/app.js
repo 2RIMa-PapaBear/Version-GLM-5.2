@@ -1020,13 +1020,36 @@ document.addEventListener('DOMContentLoaded', async function () {
         scheduleDragRender();
     }
 
-    // Tactile : aucun drag sur le graphique (retour pilote 24/09) — le doigt
-    // doit faire défiler la page. L'écoute passive ne sert qu'à ignorer les
-    // événements souris synthétiques générés par un toucher (un simple tap ne
-    // doit pas déplacer le curseur d'heure d'arrivée).
+    // Tactile (retour pilote 24/09) : le drag tactile n'existe QUE sur un TAF,
+    // où il règle l'heure d'arrivée prévue. Sur un METAR il ne sert à rien :
+    // rien n'est capturé et le doigt fait défiler la page. L'écoute passive
+    // ignore en outre les événements souris synthétiques générés par un toucher
+    // (un tap sur un METAR ne déplace pas le curseur d'heure d'arrivée).
     let touchGhostUntil = 0;
     canvas.addEventListener('touchstart', () => { touchGhostUntil = Date.now() + 800; }, { passive: true });
     const isTouchGhost = () => Date.now() < touchGhostUntil;
+    const tafDisplayed = () => !!(state.lastParsed && !state.lastParsed.isMetar);
+
+    canvas.addEventListener('touchstart', (e) => {
+        if (!tafDisplayed()) return;
+        state.isDragging = true;
+        tooltip.style.opacity = '1';
+        handleDrag(e);
+    }, { passive: true });
+
+    canvas.addEventListener('touchmove', (e) => {
+        if (state.isDragging) { handleDrag(e); e.preventDefault(); }
+    }, { passive: false });
+
+    window.addEventListener('touchend', () => {
+        if (state.isDragging) {
+            state.isDragging = false;
+            tooltip.style.opacity = '0';
+            // Fin de drag : rendu final synchrone (cf. mouseup).
+            cancelDragRender();
+            state.lastRenderState = null; genererGraphique();
+        }
+    });
 
     canvas.addEventListener('mousedown', (e) => {
         if (isTouchGhost()) return;
