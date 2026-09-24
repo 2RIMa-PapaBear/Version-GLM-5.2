@@ -2081,6 +2081,32 @@ body.map-overlay-open { overflow: hidden; }
     border-color: #FBBF24;
     color: #FBBF24;
 }
+
+/* Vent : altitude COLLÉE au bouton en contrôle segmenté — le select est
+   un FRÈRE du bouton, jamais un descendant (interactif dans un button =
+   surface tactile non divisible de façon fiable, retour pilote 24/09 :
+   3 appuis sur 4 au téléphone ouvraient le sélecteur au lieu d'allumer
+   la couche, le libellé « Vent » étant masqué ≤ 700 px). */
+.wind-ctl-group { gap: 0; }
+.wind-ctl-group .wind-layer-btn {
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+.wind-alt-select {
+    box-sizing: border-box;
+    height: 26px;
+    padding: 0 7px;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-left: none;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    outline: none;
+}
+.wind-alt-select:hover { border-color: var(--border-hover); color: var(--text-color); }
 /* Sélecteur de fond de carte : couleur cyan distinctive. */
 .base-layer-btn.active {
     background: rgba(56, 189, 248, 0.18);
@@ -2933,6 +2959,7 @@ html.theme-light .graph-container { border-color: rgba(15, 23, 42, 0.12); }
 /* Barre d'outils de la carte + ses boutons (fonds sombres en dur). */
 html.theme-light .map-layers-bar { background: var(--panel-bg); }
 html.theme-light .precip-toggle,
+html.theme-light .wind-alt-select,
 html.theme-light .precip-play-btn { background: var(--panel-bg); color: var(--text-muted); }
 /* Le bandeau titre du PDF habillé reste sombre : ok dans les 2 thèmes. */
 
