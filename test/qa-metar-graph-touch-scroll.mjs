@@ -1,8 +1,9 @@
-// QA réelle (retour pilote 24/09 : « le cadre du graphique du METAR empêche
-// de faire glisser l'écran sur téléphone ») : le drag tactile a été retiré du
-// canvas — le doigt doit DÉFILER LA PAGE quand il part du graphique, et un
-// simple tap ne doit pas déplacer le curseur d'heure d'arrivée (gardes souris
-// fantômes). Le drag À LA SOURIS reste fonctionnel sur bureau.
+// QA réelle (retours pilote 24/09) : le drag tactile du graphique n'existe
+// QUE sur un TAF (il y règle l'heure d'arrivée prévue). Sur un METAR il est
+// inutile : rien n'est capturé et le doigt fait DÉFILER LA PAGE. Un tap sur
+// un METAR ne déplace pas le curseur d'arrivée (souris fantômes ignorées).
+// Le drag À LA SOURIS reste fonctionnel sur bureau. Le graphique de relief
+// (mode Navigation) est HORS PÉRIMÈTRE : ne pas le tester ni le modifier.
 // Usage : node test/qa-metar-graph-touch-scroll.mjs   (serveur 8651 requis)
 import puppeteer from 'puppeteer-core';
 import net from 'node:net';
@@ -26,6 +27,7 @@ if (portFree) {
     await new Promise((r) => setTimeout(r, 800));
 }
 
+const METAR_LFRV = 'LFRV 240800Z 32008KT 9999 FEW030 18/12 Q1019 NOSIG';
 const TAF_LFRV = 'TAF LFRV 240500Z 2406/2506 32010KT 9999 SCT030 TEMPO 2409/2412 4000 RA BKN020=';
 
 const browser = await puppeteer.launch({
@@ -42,12 +44,22 @@ async function openPage(opts) {
     return page;
 }
 
-// ---------- Téléphone : le doigt sur le graphique doit défiler la page ----------
+async function saisirMessage(page, msg) {
+    await page.evaluate((m) => {
+        const ta = document.getElementById('tafInput');
+        ta.value = m;
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+    }, msg);
+    await new Promise((r) => setTimeout(r, 600));
+}
+
+// ---------- Téléphone + METAR : le doigt sur le graphique doit défiler la page ----------
 const mob = await openPage({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+await saisirMessage(mob, METAR_LFRV);
 
 const css = await mob.evaluate(() => getComputedStyle(document.getElementById('tafCanvas')).touchAction);
-css !== 'none' ? ok(`touch-action ${css} (l'ancien 'none' bloquait le défilement)`)
-    : ko(`touch-action 'none' encore posé sur .taf-canvas`);
+css !== 'none' ? ok(`METAR : touch-action ${css} (aucun blocage CSS du défilement)`)
+    : ko(`METAR : touch-action 'none' encore posé sur .taf-canvas`);
 
 const prevented = await mob.evaluate(() => {
     const can = document.getElementById('tafCanvas');
@@ -56,10 +68,10 @@ const prevented = await mob.evaluate(() => {
     can.dispatchEvent(ev);
     return ev.defaultPrevented;
 });
-!prevented ? ok('touchmove sur le canvas non avalé (plus de preventDefault) — le navigateur peut défiler')
-    : ko('touchmove encore preventDefault par un écouteur');
+!prevented ? ok('METAR : touchmove non avalé — le navigateur peut défiler')
+    : ko('METAR : touchmove encore preventDefault par un écouteur');
 
-const tapGhost = await mob.evaluate(() => {
+const tapMetar = await mob.evaluate(() => {
     const can = document.getElementById('tafCanvas');
     const tip = document.getElementById('drag-tooltip');
     const t = new Touch({ identifier: 1, target: can, clientX: 100, clientY: 100 });
@@ -67,8 +79,8 @@ const tapGhost = await mob.evaluate(() => {
     can.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX: 100, clientY: 100 }));
     return tip?.style?.opacity || '0';
 });
-tapGhost !== '1' ? ok('tap tactile : pas de drag déclenché (souris fantôme ignorée)')
-    : ko('tap tactile déclenche le drag (garde souris fantôme absente)');
+tapMetar !== '1' ? ok('METAR : tap tactile inerte (pas de drag, souris fantôme ignorée)')
+    : ko('METAR : tap tactile déclenche le drag');
 
 // Geste réel CDP : doigt posé au centre du canvas, glissé vers le haut → la page doit descendre.
 await mob.evaluate(() => document.getElementById('tafCanvas').scrollIntoView({ block: 'center' }));
@@ -83,18 +95,43 @@ for (let i = 1; i <= 6; i++) await mob.touchscreen.touchMove(c.x, c.y - 25 * i);
 await mob.touchscreen.touchEnd();
 await new Promise((r) => setTimeout(r, 400));
 const y1 = await mob.evaluate(() => window.scrollY);
-y1 > y0 + 30 ? ok(`glisser vertical depuis le graphique : la page défile (${Math.round(y0)} → ${Math.round(y1)} px)`)
-    : ko(`glisser vertical depuis le graphique : page figée (${Math.round(y0)} → ${Math.round(y1)} px)`);
+y1 > y0 + 30 ? ok(`METAR : glisser vertical depuis le graphique → la page défile (${Math.round(y0)} → ${Math.round(y1)} px)`)
+    : ko(`METAR : glisser vertical depuis le graphique → page figée (${Math.round(y0)} → ${Math.round(y1)} px)`);
+
+// ---------- Téléphone + TAF : le drag tactile est actif (heure d'arrivée prévue) ----------
+await saisirMessage(mob, TAF_LFRV);
+
+const dragTaf = await mob.evaluate(() => {
+    const can = document.getElementById('tafCanvas');
+    const tip = document.getElementById('drag-tooltip');
+    const t = new Touch({ identifier: 1, target: can, clientX: 100, clientY: 100 });
+    can.dispatchEvent(new TouchEvent('touchstart', { touches: [t] }));
+    const armed = tip?.style?.opacity || '0';
+    const mv = new TouchEvent('touchmove', { cancelable: true, touches: [t] });
+    can.dispatchEvent(mv);
+    const captured = mv.defaultPrevented;
+    window.dispatchEvent(new Event('touchend'));
+    const closed = tip?.style?.opacity || '?';
+    return { armed, captured, closed };
+});
+dragTaf.armed === '1' ? ok('TAF : toucher le graphique arme le drag (infobulle heure d\'arrivée)') : ko('TAF : drag non armé au toucher');
+dragTaf.captured ? ok('TAF : touchmove capturé (preventDefault) — le doigt règle l\'heure, pas le défilement') : ko('TAF : touchmove non capturé');
+dragTaf.closed !== '1' ? ok('TAF : fin de toucher → drag terminé, infobulle masquée') : ko('TAF : drag jamais terminé');
+
+// Geste réel CDP sur un TAF : le graphique garde la main, la page ne défile pas.
+const y2 = await mob.evaluate(() => window.scrollY);
+await mob.touchscreen.touchStart(c.x, c.y);
+for (let i = 1; i <= 6; i++) await mob.touchscreen.touchMove(c.x - 15 * i, c.y - 25 * i);
+await mob.touchscreen.touchEnd();
+await new Promise((r) => setTimeout(r, 400));
+const y3 = await mob.evaluate(() => window.scrollY);
+Math.abs(y3 - y2) < 10 ? ok(`TAF : glisser réel capturé par le graphique (page figée ${Math.round(y2)} → ${Math.round(y3)} px)`)
+    : ko(`TAF : le glisser fait défiler la page (${Math.round(y2)} → ${Math.round(y3)} px) — drag tactile inactif`);
 await mob.close();
 
 // ---------- Bureau : le drag souris reste fonctionnel ----------
 const desk = await openPage({ width: 1280, height: 900 });
-await desk.evaluate((taf) => {
-    const ta = document.getElementById('tafInput');
-    ta.value = taf;
-    ta.dispatchEvent(new Event('input', { bubbles: true }));
-}, TAF_LFRV);
-await new Promise((r) => setTimeout(r, 600));
+await saisirMessage(desk, TAF_LFRV);
 const drag = await desk.evaluate(() => {
     const can = document.getElementById('tafCanvas');
     const r = can.getBoundingClientRect();
