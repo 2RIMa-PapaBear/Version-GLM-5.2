@@ -151,6 +151,33 @@ export function getServiceFreq(serviceName) {
     return s || null;
 }
 
+/** Numéro d'écoute téléphonique de l'ATIS, extrait de l'observation eAIP
+ *  (rem) quand le terrain en publie un — 36 terrains sur les 70 ATIS de
+ *  la base. Formats hétérogènes dans l'eAIP : « TEL : 02 40 05 12 74 »,
+ *  « TEL / PHONE : … », « TEL ATIS : … », « TEL +33(0)4 67 90 88 88 »,
+ *  « TEL: (0)4.68.10.23.56 », « …TEL 0320161954. », TEL en fin
+ *  d'observation longue… Retourne { href, display, rest } — href
+ *  normalisé pour un lien tel: (« 0240051274 », «+33467908888 »),
+ *  display = numéro tel qu'écrit, rest = observation sans la clause
+ *  TEL — ou null si l'observation ne cite aucun téléphone. */
+export function parseAtisTel(rem) {
+    const s = String(rem || '').trim();
+    // La clause « TEL … » précède le numéro ; l'intervalle tolère les
+    // libellés (« TEL ATIS : », « TEL / PHONE : ») mais jamais un autre
+    // chiffre — le « 8.33 » de « Canal 8.33 » ne peut pas être capté.
+    const m = s.match(/\bT[EÉ]L\b[^0-9+(]{0,24}?([+(]?\d[\d\s().\-]{6,})/i);
+    if (!m) return null;
+    const display = m[1].trim().replace(/[.\s()]+$/, '');
+    // « +33(0)4 … » → « +334… » ; « (0)4.… » → « 04… » ; séparateurs retirés.
+    const href = display.replace(/\(0\)/g, '').replace(/[\s.()\-]/g, '');
+    // Garde-fou : 9 chiffres significatifs (numéro français) à 13
+    // (international), sinon la capture n'est pas un téléphone.
+    if (!/^\+?\d{9,13}$/.test(href)) return null;
+    const rest = (s.slice(0, m.index) + s.slice(m.index + m[0].length))
+        .replace(/\s+/g, ' ').replace(/^[ .·\/,;:\-]+/, '').replace(/[ .·\/,;:\-]+$/, '').trim();
+    return { href, display, rest };
+}
+
 /** Dernier cycle AIRAC chargé (pour le pied de page du widget). */
 export function getSiaAirac() { return _sia?.airac || null; }
 
