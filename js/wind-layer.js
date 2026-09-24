@@ -146,16 +146,20 @@ export function mountWindLayer(map, bar) {
     const ALTS = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4500];
 
     const group = document.createElement('div');
-    group.className = 'precip-control-group';
+    group.className = 'precip-control-group wind-ctl-group';
+    // Altitude = contrôle FRÈRE du bouton, collé en « segmenté » — JAMAIS
+    // un select DANS un button (retour pilote 24/09 : imbriqué, le toucher
+    // du téléphone tombait 3 fois sur 4 sur le sélecteur — le libellé
+    // « Vent » est masqué ≤ 700 px, le sélecteur couvrait presque toute
+    // la surface du bouton).
     group.innerHTML = `
-        <button class="precip-toggle wind-layer-btn" aria-pressed="false" title="${isFr ? 'Vent — flèches à l\u2019altitude choisie (cliquez le nombre pour changer)' : 'Wind — arrows at chosen altitude (click number to change)'}">
+        <button class="precip-toggle wind-layer-btn" aria-pressed="false" title="${isFr ? 'Vent — flèches à l\u2019altitude affichée à droite (cliquez le nombre pour changer)' : 'Wind — arrows at the altitude shown on the right (click the number to change)'}">
             <i data-lucide="wind" style="width:14px;height:14px;"></i>
             <span class="wind-layer-label">${isFr ? 'Vent' : 'Wind'}</span>
-            <select class="wind-alt-select" title="${isFr ? 'Altitude (ft)' : 'Altitude (ft)'}" aria-label="${isFr ? 'Altitude des flèches' : 'Arrow altitude'}"
-                style="background:transparent; border:none; color:inherit; font:inherit; font-family:'DM Mono',monospace; cursor:pointer; outline:none; padding:0 2px;">
-                ${ALTS.map(a => `<option value="${a}">${a}</option>`).join('')}
-            </select>
-        </button>`;
+        </button>
+        <select class="wind-alt-select" title="${isFr ? 'Altitude (ft)' : 'Altitude (ft)'}" aria-label="${isFr ? 'Altitude des flèches' : 'Arrow altitude'}">
+            ${ALTS.map(a => `<option value="${a}">${a}</option>`).join('')}
+        </select>`;
     bar.appendChild(group);
     if (window.lucide) window.lucide.createIcons({ root: group });
 
@@ -208,8 +212,8 @@ export function mountWindLayer(map, bar) {
         }
     }
 
-    // Le sélecteur d'altitude ne doit PAS déclencher le toggle du bouton.
-    altSelect?.addEventListener('click', (e) => e.stopPropagation());
+    // Sélecteur d'altitude (contrôle frère du bouton : ses clics ne
+    // peuvent plus déclencher le toggle).
     altSelect?.addEventListener('change', () => {
         setWindLayerAltFt(parseInt(altSelect.value, 10), { rerender: refresh });
     });
