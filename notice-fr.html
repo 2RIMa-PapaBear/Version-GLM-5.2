@@ -702,7 +702,7 @@
 <tr><td><code>LFRV</code></td><td>Terrain</td><td>code OACI</td></tr>
 <tr><td><code>061230Z</code></td><td>Date-heure</td><td>le 6 du mois à 12 h 30 <strong>Z (UTC)</strong> — retranchez 1 h en hiver, 2 h en été, pour l'heure locale</td></tr>
 <tr><td><code>24012KT</code></td><td>Vent</td><td>240° à 12 kt — <code>24015G25</code> = rafales à 25 kt, <code>00000</code> = vent calme, <code>VRB</code> = variable</td></tr>
-<tr><td><code>9999</code></td><td>Visibilité</td><td>en mètres : <code>9999</code> = 10 km ou plus, <code>8000</code> = 8 km… <code>CAVOK</code> = visi ≥ 10 km, pas de nuage sous 5 000 ft, pas de temps significatif</td></tr>
+<tr><td><code>9999</code></td><td>Visibilité</td><td>en mètres : <code>9999</code> = 10 km ou plus, <code>8000</code> = 8 km… <code>CAVOK</code> = visi ≥ 10 km, pas de nuage sous 5 000 ft (ou l'altitude minimale de secteur si plus élevée), pas de CB ni TCU à quelque altitude que ce soit, pas de temps significatif</td></tr>
 <tr><td><code>-RA</code>, <code>TS</code>…</td><td>Temps présent</td><td>placé entre visi et nuages : <code>-RA</code> pluie faible, <code>RA</code> pluie, <code>TS</code> orage, <code>BR</code> brume, <code>FG</code> brouillard, <code>SN</code> neige (les plus courants)</td></tr>
 <tr><td><code>FEW035</code></td><td>Nuages</td><td>quantité + base en centaines de pieds : <code>FEW</code> peu, <code>SCT</code> épars, <code>BKN</code> fragmenté, <code>OVC</code> couvert — <code>FEW035</code> = base 3 500 ft ; <code>NSC</code> = rien de significatif</td></tr>
 <tr><td><code>18/12</code></td><td>Temp. / rosée</td><td>18 °C, point de rosée 12 °C — un écart faible signale brume et risque de givrage carburateur</td></tr>
@@ -1062,7 +1062,7 @@
 </tr>
 <tr>
 <td><strong>CAVOK</strong></td>
-<td>Ceiling And Visibility OK (vis ≥10km, pas nuages &lt;5000ft, pas temps significatif)</td>
+<td>Ceiling And Visibility OK (vis ≥10km, pas de nuage &lt;5000ft ni sous l'altitude minimale de secteur si plus élevée, pas de CB ni TCU à quelque altitude que ce soit, pas de temps significatif)</td>
 </tr>
 <tr>
 <td><strong>CB</strong></td>

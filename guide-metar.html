@@ -34,7 +34,7 @@
     { "@type": "Question", "name": "À quelle fréquence un METAR est-il publié ?",
       "acceptedAnswer": { "@type": "Answer", "text": "En France, la plupart des aérodromes publient un METAR toutes les 30 minutes ou toutes les heures, quelques minutes après l'heure d'observation. Un METAR spécial (SPECI) peut être émis à tout moment entre deux émissions régulières si les conditions changent de façon significative." } },
     { "@type": "Question", "name": "Que signifie CAVOK dans un METAR ?",
-      "acceptedAnswer": { "@type": "Answer", "text": "CAVOK (Ceiling And Visibility OK) remplace la visibilité, le temps significatif et les nuages lorsqu'ils sont tous favorables à la fois : visibilité de 10 km ou plus, aucun nuage en dessous de 5 000 pieds (ou sous la hauteur de section minimale), pas de cumulonimbus et aucun phénomène météo significatif." } },
+      "acceptedAnswer": { "@type": "Answer", "text": "CAVOK (Ceiling And Visibility OK) remplace la visibilité, le temps significatif et les nuages lorsque quatre conditions sont réunies à la fois : visibilité de 10 km ou plus, aucun nuage en dessous de 5 000 pieds (ou sous l'altitude minimale de secteur si elle est plus élevée), aucun cumulonimbus ni cumulus bourgeonnant (TCU) à quelque altitude que ce soit, et aucun phénomène météo significatif." } },
     { "@type": "Question", "name": "Que signifie le QNH, par exemple Q1015 ?",
       "acceptedAnswer": { "@type": "Answer", "text": "Q1015 indique un QNH de 1015 hPa : la pression ramenée au niveau de la mer, à caler sur l'altimètre au sol pour lire l'altitude de l'aérodrome. Si la valeur commence par un zéro (Q0994), la pression est inférieure à 1000 hPa." } },
     { "@type": "Question", "name": "Quelle différence entre METAR, SPECI et TAF ?",
@@ -125,9 +125,11 @@
 
         <h3>5. CAVOK : le groupe qui n'existe pas</h3>
         <p>Lorsque tout va bien à la fois, <strong>CAVOK</strong> (<em>Ceiling And Visibility OK</em>)
-           remplace d'un coup trois groupes : visibilité ≥ 10 km, aucun nuage sous 5 000 ft (ni
-           cumulonimbus), aucun phénomène significatif. Un METAR avec CAVOK est une bonne nouvelle
-           à lire très vite.</p>
+           remplace d'un coup trois groupes, à quatre conditions simultanées : visibilité ≥ 10 km ;
+           aucun nuage sous 5 000 ft (ou sous l'altitude minimale de secteur si elle est plus
+           élevée) ; <strong>aucun cumulonimbus ni cumulus bourgeonnant (TCU), à quelque altitude
+           que ce soit</strong> ; aucun phénomène significatif. Un METAR avec CAVOK est une bonne
+           nouvelle à lire très vite.</p>
 
         <h3>6. Le temps significatif : qu'est-ce qui tombe ?</h3>
         <p>Ce groupe n'apparaît que s'il se passe quelque chose. Il combine jusqu'à trois éléments :</p>
