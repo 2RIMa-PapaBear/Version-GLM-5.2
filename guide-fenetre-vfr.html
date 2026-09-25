@@ -32,9 +32,9 @@
   "@type": "FAQPage",
   "mainEntity": [
     { "@type": "Question", "name": "Quelle est la visibilité minimale pour voler en VFR en France ?",
-      "acceptedAnswer": { "@type": "Answer", "text": "Dans les espaces contrôlés de classe D comme en espace G, la visibilité minimale horizontale est de 5 km en dessous du FL195. En espace G à 3 000 ft AMSL ou en dessous (ou sous le sommet des nuages si plus bas), le pilote vole hors des nuages et en vue de la surface avec 5 km de visibilité." } },
+      "acceptedAnswer": { "@type": "Answer", "text": "Dans les espaces contrôlés de classe D comme en espace G, la visibilité minimale horizontale est de 5 km en dessous du FL100. En espace G à 3 000 ft AMSL ou en dessous (ou à 1 000 ft au-dessus du sol si ce seuil est plus élevé), le pilote vole hors des nuages et en vue de la surface avec 5 km de visibilité." } },
     { "@type": "Question", "name": "Quel plafond faut-il pour voler en VFR ?",
-      "acceptedAnswer": { "@type": "Answer", "text": "Aucun plafond minimum n'est imposé par la réglementation en tant que tel : ce qui compte, ce sont les distances aux nuages (1 500 m horizontalement et 1 000 ft verticalement en espace contrôlé et au-dessus de 3 000 ft). En pratique, un plafond d'au moins 1 500 ft associé à 5 km de visibilité définit une fenêtre VFR confortable pour un vol local." } },
+      "acceptedAnswer": { "@type": "Answer", "text": "Pour pénétrer dans une zone de contrôle (CTR), y décoller ou y atterrir sans clairance VFR spécial, la réglementation impose un plafond d'au moins 450 m (1 500 ft) et une visibilité au sol d'au moins 5 km. Hors zone de contrôle, aucun plafond minimum : ce sont les distances aux nuages qui s'appliquent (1 500 m horizontalement et 1 000 ft verticalement en espace contrôlé et au-dessus de 3 000 ft). En pratique, un plafond d'au moins 1 500 ft associé à 5 km de visibilité définit une fenêtre VFR confortable pour un vol local." } },
     { "@type": "Question", "name": "Peut-on voler VFR sous le plafond en espace G ?",
       "acceptedAnswer": { "@type": "Answer", "text": "Oui : en espace G à 3 000 ft AMSL ou en dessous, le vol s'effectue hors des nuages et en vue de la surface, avec 5 km de visibilité. Il faut alors disposer d'un plafond suffisant pour manœuvrer en sécurité, et rester vigilant aux bases nuageuses basses qui se referment." } },
     { "@type": "Question", "name": "La fenêtre VFR est-elle une notion réglementaire ?",
@@ -81,20 +81,20 @@
         <h2>Les minima réglementaires par espace (France)</h2>
         <table class="gd-t">
             <tr><th>Espace</th><th>Visibilité</th><th>Distance aux nuages</th></tr>
-            <tr><td>Classe D<br>(CTR, TMA)</td><td>5 km (8 km au-dessus du FL195)</td><td>1 500 m horizontalement<br>et 1 000 ft verticalement</td></tr>
+            <tr><td>Classe D<br>(CTR, TMA)</td><td>5 km (8 km au-dessus du FL100)</td><td>1 500 m horizontalement<br>et 1 000 ft verticalement</td></tr>
             <tr><td>Espace G<br>au-dessus de 3 000 ft AMSL*</td><td>5 km</td><td>1 500 m horizontalement<br>et 1 000 ft verticalement</td></tr>
-            <tr><td>Espace G<br>à 3 000 ft ou en dessous*</td><td>5 km</td><td>Hors des nuages,<br>en vue de la surface</td></tr>
+            <tr><td>Espace G<br>à 3 000 ft ou en dessous*</td><td>5 km<br>(1 500 m à Vi ≤ 140 kt)</td><td>Hors des nuages,<br>en vue de la surface</td></tr>
             <tr><td>Circulation d'aérodrome</td><td>5 km</td><td>Hors des nuages,<br>en vue de la surface</td></tr>
         </table>
-        <p>* Si le sommet des nuages (<strong>SNC</strong>) est plus bas : en dessous ou au-dessus de
-           ce sommet. Ce tableau présente les valeurs usuelles en France ; les zones à régime particulier
+        <p>* Ou à 1 000 ft au-dessus du sol lorsque ce seuil est plus élevé que 3 000 ft AMSL.
+           Ce tableau présente les valeurs usuelles en France ; les zones à régime particulier
            et les cas nocturnes ajoutent leurs propres conditions — la référence fait foi
            (SIA, ENR 1.4).</p>
 
         <div class="gd-tip">Le point qui piège : en espace D, la règle des « 1 500 m / 1 000 ft »
            s'applique <strong>même sous un plafond bas</strong>. Sous une couche à 1 200 ft dans une CTR,
            impossible de respecter les 1 000 ft verticaux : le survol VFR de l'espace contrôlé est
-           compromis, sauf à passer en espace G ou à bénéficier d'une dérogation.</div>
+           compromis, sauf à passer en espace G ou à obtenir une clairance VFR spécial.</div>
 
         <h2>La fenêtre du jour, en pratique</h2>
         <p>La réglementation donne le plancher ; le briefing cherche le <strong>confort</strong>. La
@@ -124,10 +124,11 @@
            400 ft. Fenêtre fermée — et l'évolution de la masse d'air ne l'ouvrira pas avant longtemps.</p>
 
         <h2>Le cas particulier du crépuscule et de la nuit</h2>
-        <p>La fenêtre se référence aussi dans le <strong>temps</strong> : le vol VFR jour doit s'achever
-           avant le crépuscule, dont l'heure dépend de la date et de la position. Un départ tardif
+        <p>La fenêtre se référence aussi dans le <strong>temps</strong> : le vol VFR de jour s'achève
+           au plus tard 30 minutes après le coucher du soleil — au-delà commence la nuit
+           aéronautique, réservée à la qualification de nuit. Un départ tardif
            transforme un plafond modeste en piège : la fin d'après-midi en automne rattrape vite.
-           D'où l'intérêt d'une app qui calcule les crépuscules du terrain et alerte avant que la
+           D'où l'intérêt d'une app qui calcule ces instants pour chaque terrain et alerte avant que la
            fenêtre horaire ne se referme.</p>
 
         <h2>Pour aller plus loin</h2>

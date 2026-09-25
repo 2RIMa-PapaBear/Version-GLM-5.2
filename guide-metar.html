@@ -86,7 +86,7 @@
             <tr><td>201330Z</td><td>Observation du 20 à 13 h 30 UTC</td></tr>
             <tr><td>24010G20KT</td><td>Vent du 240° à 10 nœuds, rafales à 20 nœuds</td></tr>
             <tr><td>9999</td><td>Visibilité supérieure ou égale à 10 km</td></tr>
-            <tr><td>FEW025</td><td>Nuages épars (1 à 2 octas) à 2 500 ft</td></tr>
+            <tr><td>FEW025</td><td>Nuages peu nombreux (1 à 2 octas) à 2 500 ft</td></tr>
             <tr><td>18/12</td><td>Température 18 °C, point de rosée 12 °C</td></tr>
             <tr><td>Q1015</td><td>QNH 1015 hPa</td></tr>
             <tr><td>NOSIG</td><td>Aucun changement significatif attendu</td></tr>
@@ -112,7 +112,7 @@
         <ul>
             <li><strong>VRB05KT</strong> : vent variable en direction, 5 kt (typique des anticyclones).</li>
             <li><strong>00000KT</strong> : vent calme.</li>
-            <li><strong>24010G20KT 300V280</strong> : la variation d'ambiance (de 300° à 280°) apparaît en fin de groupe.</li>
+            <li><strong>24010KT 210V270</strong> : la direction varie entre 210° et 270° — la variation (extremes croissants) apparaît en fin de groupe.</li>
         </ul>
         <div class="gd-tip">Comparez la direction et la force du vent à la piste en service :
            c'est le calcul vent de travers / vent arrière qui décide de la piste utilisable et des
@@ -141,7 +141,7 @@
             <tr><th>Code</th><th>Phénomène</th><th>Code</th><th>Phénomène</th></tr>
             <tr><td>RA</td><td>pluie</td><td>TS</td><td>orage</td></tr>
             <tr><td>SN</td><td>neige</td><td>SH</td><td>averses</td></tr>
-            <tr><td>DZ</td><td>bruine</td><td>FZ</td><td>surliquéfaction (givrage)</td></tr>
+            <tr><td>DZ</td><td>bruine</td><td>FZ</td><td>surfondue — givrage (FZRA = pluie surfondue)</td></tr>
             <tr><td>BR</td><td>brume (visi 1-5 km)</td><td>FG</td><td>brouillard (visi &lt; 1 km)</td></tr>
             <tr><td>HZ</td><td>brume sèche</td><td>GR</td><td>grêle</td></tr>
         </table>
@@ -153,14 +153,14 @@
            <strong>altitude en centaines de pieds</strong> au-dessus de l'aérodrome.</p>
         <table class="gd-t">
             <tr><th>Code</th><th>Quantité</th><th>Exemple</th><th>Lecture</th></tr>
-            <tr><td>FEW</td><td>1-2 octas</td><td>FEW025</td><td>épars à 2 500 ft</td></tr>
-            <tr><td>SCT</td><td>3-4 octas</td><td>SCT035</td><td>fragmentés à 3 500 ft</td></tr>
-            <tr><td>BKN</td><td>5-7 octas</td><td>BKN012</td><td>couvert par endroits à 1 200 ft — c'est le plafond</td></tr>
+            <tr><td>FEW</td><td>1-2 octas</td><td>FEW025</td><td>peu nombreux à 2 500 ft</td></tr>
+            <tr><td>SCT</td><td>3-4 octas</td><td>SCT035</td><td>épars à 3 500 ft</td></tr>
+            <tr><td>BKN</td><td>5-7 octas</td><td>BKN012</td><td>fragmentés à 1 200 ft — c'est le plafond</td></tr>
             <tr><td>OVC</td><td>8 octas</td><td>OVC008</td><td>couvert à 800 ft — plafond</td></tr>
             <tr><td>NSC</td><td colspan="3">aucun nuage significatif sous 5 000 ft</td></tr>
         </table>
         <p>Les suffixes <strong>CB</strong> (cumulonimbus) et <strong>TCU</strong> (towering cumulus)
-           signalent les nuages dangereux : <strong>TSRA CB015</strong> est un message à prendre
+           signalent les nuages dangereux : <strong>+TSRA BKN015CB</strong> est un message à prendre
            très au sérieux. Le premier groupe <strong>BKN</strong> ou <strong>OVC</strong> définit
            le <strong>plafond</strong>, clé de la <a href="guide-fenetre-vfr.html">fenêtre VFR</a>.</p>
 
@@ -190,7 +190,7 @@
         <h3>Belle journée d'été</h3>
         <div class="gd-code">LFPO 121130Z 20008KT 9999 SCT035 21/11 Q1021 NOSIG=</div>
         <p class="gd-trad">Orly, le 12 à 11 h 30 UTC. Vent du 200° à 8 kt. Visibilité ≥ 10 km.
-           Nuages fragmentés à 3 500 ft. 21 °C, point de rosée 11 °C (air sec, pas d'inquiétude).
+           Nuages épars à 3 500 ft. 21 °C, point de rosée 11 °C (air sec, pas d'inquiétude).
            QNH 1021. Rien de significatif à venir : journée de vol paisible.</p>
         <h3>Journée plus musclée</h3>
         <div class="gd-code">LFRB 041530Z 30025G40KT 2500 -RA BKN008 OVC015 09/08 Q0988 TEMPO 1500 RA BKN004=</div>
