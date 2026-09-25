@@ -2427,6 +2427,15 @@ body.map-overlay-open { overflow: hidden; }
     gap: 6px 16px;
     font-size: 12px;
 }
+/* Résultats de navigation sur UNE ligne (retour pilote 25/09) : la place
+   de chaque cadre s'adapte à son texte (flex-basis auto), et le tout
+   repasse à la ligne sur écran étroit. */
+.fp-grid-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+}
+.fp-grid-line .fp-cell { flex: 1 1 auto; min-width: 0; }
 .fp-grid-3 {
     grid-template-columns: 1fr 1fr 1fr;
     gap: 6px 12px;
@@ -3000,6 +3009,43 @@ html.theme-light .neighbors-loading { background: rgba(255, 255, 255, 0.9); colo
 /* Zone de clic des pastilles de la carte régionale : disque transparent
  * superposé au cercle SVG (clic gauche = panneau, clic droit = waypoint). */
 .pin-hit { background: transparent; border-radius: 50%; }
+/* Tactile (retour pilote 25/09 — repères libres déplaçables par appui
+   long) : 16 px est trop petit sous un doigt ; la cible passe à 26 px
+   (recentrée via les marges — Leaflet pose les siennes en inline), pour
+   le hit des repères libres ET des points de route. */
+@media (pointer: coarse) {
+    .pin-hit { width: 26px !important; height: 26px !important; margin: -13px 0 0 -13px !important; }
+}
+/* Indice posé au bas de la carte pendant le déplacement d'un repère. */
+.wp-move-hint {
+    position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
+    z-index: 1000; pointer-events: none;
+    padding: 6px 14px; border-radius: 14px; white-space: nowrap;
+    background: rgba(15, 23, 42, 0.92); color: #F8FAFC;
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    font: 600 12px 'DM Sans', sans-serif;
+    letter-spacing: 0.3px;
+}
+
+/* « Inverser » le sens des points de passage (retour pilote 25/09) :
+   bouton discret en fin du titre « Détail des waypoints ». */
+.fp-invert-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 4px; cursor: pointer;
+    background: transparent; border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    font: 700 9px 'DM Sans', sans-serif;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+}
+.fp-invert-btn:hover {
+    border-color: var(--border-hover); color: var(--text-color);
+    background: rgba(255, 255, 255, 0.05);
+}
+/* À côté du champ Waypoints, le bouton prend la HAUTEUR de l'input
+   (harmonie de la ligne — le bouton du titre « Détail » reste compact). */
+.fp-input-label .fp-invert-btn { align-self: stretch; }
 
 /* Zones aériennes (SVG Leaflet interactifs) : le focus au 2e clic dessinait
    un CADRE NOIR autour de la zone (rectangle de focus navigateur — retour

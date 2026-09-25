@@ -346,9 +346,9 @@ export function restorePlan(planOrPoints, settings = null) {
             .filter(Boolean);
         return [plan.dep, ...codes, plan.dest];
     };
-    state.route = buildSeq();
+    state.route = buildSeq(); state.routePoses = [];
     _setDestination(plan.dest);
-    state.route = buildSeq();
+    state.route = buildSeq(); state.routePoses = [];
 
     // Trace la route immédiatement si la carte est affichée (sinon elle sera
     // tracée à l'ouverture du panneau, qui lit state.route).
@@ -368,7 +368,7 @@ export function restorePlan(planOrPoints, settings = null) {
         if (!head.includes(plan.dep) || !head.includes(plan.dest)) { retry(); return; }
 
         const ordered = buildSeq().slice(1, -1);
-        state.route = buildSeq();
+        state.route = buildSeq(); state.routePoses = [];
         wpInput.value = formatWaypointsField([...new Set(ordered)]);
         if (settings?.cruiseAltFt != null) { const el = document.getElementById('fp-cruise-alt'); if (el) el.value = settings.cruiseAltFt; }
         if (settings?.tasKt != null) { const el = document.getElementById('fp-tas'); if (el) el.value = settings.tasKt; }
