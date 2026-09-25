@@ -563,7 +563,7 @@
 <tbody>
 <tr><td><span class="demo-select">Satellite ▾</span></td><td><strong>Fond de carte</strong> : satellite, plan ou relief — sélecteur « Satellite » de la barre d'outils</td></tr>
 <tr><td><span class="demo-btn"><i data-lucide="cloud-rain"></i> Radar</span></td><td>Précipitations en temps réel — <strong>décoché par défaut</strong> ; bouton lecture/pause et curseur horloge une fois activé</td></tr>
-<tr><td><span class="pin" style="background:#FBBF24; width:15px; height:15px;"></span> <span class="rwy" style="background:#4ADE80"></span><span class="rwy" style="background:#94A3B8"></span><span class="rwy" style="background:#D6A24A"></span></td><td><strong>Terrain courant</strong> : pastille ambre au centre ; pistes tracées selon le revêtement (vert = herbe, gris = béton, ocre = terre)</td></tr>
+<tr><td><span class="pin" style="background:#FBBF24; width:15px; height:15px;"></span> <span class="rwy" style="background:#4ADE80"></span><span class="rwy" style="background:#94A3B8"></span><span class="rwy" style="background:#D6A24A"></span></td><td><strong>Terrain courant</strong> : pastille ambre au centre ; pistes tracées selon le revêtement (vert = herbe, gris = revêtu, ocre = terre)</td></tr>
 <tr><td><span class="pin" style="background:#4ADE80"></span> <span class="pin" style="background:#1E40AF"></span> <span class="pin" style="background:#F87171"></span> <span class="pin" style="background:#94A3B8"></span></td><td><strong>Terrains voisins</strong> : tous les terrains de la zone visible (jusqu'à l'échelle de la France, conservés quand vous vous déplacez) ; pastilles colorées VFR / MVFR / IFR / LIFR (vert, bleu, rouge, violet) pour les terrains qui émettent un METAR, <strong>pastilles grises</strong> pour les autres — dont le clic ouvre le METAR de la station la plus proche</td></tr>
 <tr><td><span class="demo-btn"><i data-lucide="hexagon"></i> Espaces</span></td><td><strong>Espaces aériens</strong> : données officielles françaises (SIA), complétées à l'international — CTR, TMA, SIV, ATZ, zones R·P·D… sous-cases par famille dans le menu « Espaces » ; cliquez une zone pour la surligner et lire secteur, altitudes et fréquence (décoché par défaut)</td></tr>
 <tr><td><span class="rp-sym"><svg width="18" height="18" viewBox="0 0 18 18" style="vertical-align:middle"><polygon points="9,1 16.5,5.3 16.5,13.7 9,18 1.5,13.7 1.5,5.3" fill="none" stroke="#60A5FA" stroke-width="1.8"/><circle cx="9" cy="9" r="1.4" fill="#60A5FA"/></svg> <svg width="18" height="18" viewBox="0 0 18 18" style="vertical-align:middle"><path d="M9 0.8 L9 6" stroke="#4ADE80" stroke-width="1.6"/><circle cx="9" cy="11" r="5.2" fill="none" stroke="#4ADE80" stroke-width="1.8"/><circle cx="9" cy="11" r="1.6" fill="#4ADE80"/></svg> <svg width="18" height="18" viewBox="0 0 18 18" style="vertical-align:middle"><path d="M9 1.5 L16 14 L2 14 Z" fill="none" stroke="#2563EB" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 5.2 L13.3 12.4 L4.7 12.4 Z" fill="#2563EB" opacity="0.5"/></svg></span></td><td><strong>Radiophares &amp; points VFR</strong> : VOR, NDB et points de repère VFR — symboles des cartes aéro, case par case dans le menu « Espaces » ; utilisables comme waypoints du plan</td></tr>
@@ -811,7 +811,7 @@
 → <i data-lucide="x" class="li-ic"></i> <strong>IFR</strong> (plafond &lt; 1500 ft + vis &lt; 5km + orages)</p>
 <p><strong>06j 18h → 07j 02h</strong> : Retour BKN 2000 ft (pas d'averses)<br />
 → <i data-lucide="triangle-alert" class="li-ic"></i> <strong>VFR marginal</strong></p>
-<p><strong>07j 02h → 07j 04h</strong> : Changement vent 340° 10kt, vis 8km, BKN 1500 ft<br />
+<p><strong>07j 02h → 07j 04h</strong> : Changement vent 340° 10kt, vis 8km, BKN 1400 ft<br />
 → <i data-lucide="x" class="li-ic"></i> <strong>IFR</strong> (plafond &lt; 1500 ft)</p>
 <p><strong>07j 04h → 07j 12h</strong> : Maintien de ces conditions<br />
 → <i data-lucide="x" class="li-ic"></i> <strong>IFR</strong></p>
@@ -862,7 +862,7 @@
 <tbody>
 <tr>
 <td><strong>Visibilité</strong></td>
-<td>≥ 1500 m (sinon ≥ 5000 m au-dessus de 140 kt)</td>
+<td>≥ 1500 m (et ≥ 5000 m au-delà de 140 kt)</td>
 </tr>
 <tr>
 <td><strong>Distance des nuages</strong></td>
@@ -877,12 +877,12 @@
 <div class="success">
 <p><strong>À retenir</strong> : proche du sol, la hauteur minimale de 500 ft impose un <strong>plafond minimum déduit &gt; 500 ft</strong>. Sous la surface « S » à Vi ≤ 140 kt : <strong>visibilité ≥ 1500 m et plafond &gt; 500 ft</strong>.</p>
 </div>
-<p>Au-dessus de la surface « S » et sous FL100 : <strong>visibilité ≥ 5 km</strong>, nuages à 1500 m horizontalement et 300 m (1000 ft) verticalement, vitesse limitée à 250 kt.</p>
+<p>Au-dessus de la surface « S » et sous FL100 : <strong>visibilité ≥ 5 km</strong>, nuages à 1500 m horizontalement et 300 m (1000 ft) verticalement.</p>
 <h3>VFR spécial (SVFR)</h3>
 <p>Le VFR spécial permet de décoller, atterrir ou transiter dans un espace contrôlé en <strong>abaissant momentanément ses minima météo</strong> : il existe des conditions où le vol est autorisé en espace non contrôlé mais interdit en espace contrôlé (par exemple 10 km / 1000 ft) — la clairance de VFR spécial fait la « transition » entre les deux.</p>
-<p><strong>Côté pilote</strong> (SERA.5010b) :
+<p><strong>Côté pilote</strong> (SERA.5010a) :
 - Clairance ATC obligatoire — le contrôleur n'est pas tenu de la délivrer (densité du trafic, météo du terrain, points de passage imposés)
-- Interdit de nuit pour les avions (SERA.5010a)
+- Interdit de nuit pour les avions (seuls les hélicoptères bénéficient d'une dérogation française)
 - Visibilité en vol ≥ 1500 m sur le trajet prévu (Vi ≤ 140 kt), hors des nuages et en vue du sol</p>
 <p><strong>Côté contrôleur</strong> (SERA.5010c) : la clairance ne peut être délivrée pour un décollage, un atterrissage ou une pénétration dans la zone de circulation ou le circuit de piste que si la météo rapportée sur l'aérodrome est <strong>visibilité ≥ 1500 m et plafond ≥ 600 ft</strong> (le transit n'est pas concerné). Des consignes particulières peuvent s'appliquer (carte VAC).</p>
 <div class="warning">
@@ -1249,20 +1249,10 @@
 <li>Si TEMPO/PROB → planifier arrivée hors période critique</li>
 </ol>
 <h3>Pendant le vol</h3>
-<ol>
-<li><strong>Mettez à jour régulièrement</strong> :</li>
-<li>ATIS (Automatic Terminal Information Service)</li>
-<li>Nouveau METAR toutes les 30 min</li>
-<li>
-<p>Contacts radio avec les stations</p>
-</li>
-<li>
-<p><strong>Soyez prudent</strong> :</p>
-</li>
-<li>Si conditions se dégradent → demi-tour ou dégagement</li>
-<li>Ne jamais pénétrer dans les nuages en VFR</li>
-<li>Garder une marge de sécurité (fuel, visibilité, plafond)</li>
-</ol>
+<ul>
+<li><strong>Mettez à jour régulièrement</strong> : ATIS (Automatic Terminal Information Service), nouveau METAR toutes les 30 min à 1 h selon les terrains, contacts radio avec les stations.</li>
+<li><strong>Soyez prudent</strong> : si les conditions se dégradent → demi-tour ou dégagement ; ne jamais pénétrer dans les nuages en VFR ; garder une marge de sécurité (fuel, visibilité, plafond).</li>
+</ul>
 <h3>Interprétation graphique</h3>
 <p><strong>Bandes colorées</strong> :
 - <i data-lucide="check-circle" class="li-ic" style="color:#4ADE80"></i> <strong>Vert (VFR)</strong> : Vol confortable
@@ -1289,8 +1279,7 @@
 <p><strong>Ce que l'outil ne fait PAS (encore)</strong> :
 - <i data-lucide="x" class="li-ic"></i> Ne remplace pas le briefing météo officiel
 - <i data-lucide="x" class="li-ic"></i> Ne prend pas de décision à votre place (le verdict est une aide, pas un ordre)
-- <i data-lucide="x" class="li-ic"></i> N'intègre pas encore les NOTAMs (à venir)
-- <i data-lucide="x" class="li-ic"></i> Les SIGMET/AIRMET couvrent principalement les États-Unis pour l'instant</p>
+- <i data-lucide="x" class="li-ic"></i> SIGMET couverts en France et aux États-Unis ; AIRMET : États-Unis uniquement pour l'instant</p>
 <p><strong>La décision finale</strong> reste celle du <strong>commandant de bord</strong> !</p>
 <hr />
 <h2><i data-lucide="phone"></i> RESSOURCES COMPLÉMENTAIRES</h2>

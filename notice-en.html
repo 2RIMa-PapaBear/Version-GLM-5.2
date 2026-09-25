@@ -446,6 +446,16 @@
 <li><strong>Persistence</strong>: your fleet is stored in your browser.</li>
 </ul>
 
+<h3>Weight &amp; balance / centre of gravity</h3>
+<p>Every aircraft in the fleet can hold its own <strong>weight &amp; balance</strong> configuration (from the weighing sheet and the Pilot Operating Handbook), used by a dedicated dashboard widget and by a page of the PDF nav log:</p>
+<ul>
+<li><strong>Configuration (Fleet window)</strong>: expand the "Weight &amp; balance" section of the aircraft sheet. Choose the aircraft's <strong>input units</strong> (mass kg/lbs, arm mm/m/ft/in — those of its weighing sheet), enter the <strong>empty mass</strong> and its <strong>CG</strong>, the MTOW, the <strong>fuel density</strong> (default 0.72 kg/L — avgas), the <strong>loading stations</strong> (pilot, passengers 1/2/3, baggage, fuel… each with its arm and a maximum: <strong>kg for the stations, litres for the fuel station</strong> — capacity) and the points of the <strong>CG envelope</strong> (mass × arm polygon, down to the lowest documented mass). A live preview of the centre-of-gravity chart updates as you type.</li>
+<li><strong>"Balance" dashboard widget</strong>: below "Takeoff performance", for the configured active aircraft. Enter the day's loading; <strong>fuel on board</strong> and <strong>fuel used</strong> are pre-filled from the navigation plan (editable). The chart shows the <strong style="color:#34D399;">Take-off</strong> (full loading), <strong style="color:#FBBF24;">Arrival</strong> (fuel minus consumption) and <strong style="color:#F87171;">ZFW</strong> (zero fuel) points, with the empty point in grey, the MTOW line and the envelope. A verdict banner tells whether everything sits inside the envelope (with forward/aft margins) or out of limits.</li>
+<li><strong>PDF nav log</strong>: a configured aircraft adds a "Weight &amp; balance" page (loading table with moments + centre-of-gravity chart + CG at the three points). Unconfigured aircraft keep a 3-page log.</li>
+<li><strong>Units</strong>: input and display use the aircraft's own units; internal storage is single-unit (kg and mm) to prevent any mixing error.</li>
+<li><em>The centre-of-gravity chart is a preparation aid: the weighing sheet and the POH remain the legal reference.</em></li>
+</ul>
+
 <!-- ====================== DECISION SUPPORT ====================== -->
 <h2 id="decision"><i data-lucide="circle-check"></i> DECISION SUPPORT</h2>
 
@@ -484,7 +494,7 @@
 <p><em>Example: 14 h Q1018 → 15 h Q1015 → 16 h Q1011 = −7 hPa in 2 h (≈ 3.5 hPa/h): "fast fall" alert.</em> A valuable clue, not a certainty — the decision remains the pilot's.</p>
 
 <h3>Takeoff Performance Widget</h3>
-<p>Estimates your <strong>corrected takeoff distances</strong> (ground roll + 50 ft obstacle) based on density altitude, surface type and your active aircraft. Compares the result to the <strong>available runway length</strong> with a visual margin bar.</p>
+<p>Estimates your <strong>corrected takeoff distances</strong> (ground roll + 50 ft obstacle) based on density altitude, surface type and your active aircraft. Compares the result to the <strong>available runway length</strong> with a runway cross-section diagram (aircraft at the threshold, ground roll, climb to 50 ft, margin or shortfall).</p>
 <ul>
 <li>Runway length detected automatically (editable manually).</li>
 <li>Applies your personal safety margin.</li>
@@ -658,7 +668,7 @@
 <thead><tr><th>Group</th><th>Meaning</th><th>Key points</th></tr></thead>
 <tbody>
 <tr><td><code>LFRV</code></td><td>Airfield</td><td>ICAO code</td></tr>
-<tr><td><code>061230Z</code></td><td>Date-time</td><td>6th of the month at 12:30 <strong>Z (UTC)</strong></td></tr>
+<tr><td><code>061230Z</code></td><td>Date-time</td><td>6th of the month at 12:30 <strong>Z (UTC)</strong> — for French local time, subtract 1 h in winter, 2 h in summer</td></tr>
 <tr><td><code>24012KT</code></td><td>Wind</td><td>240° at 12 kt — <code>24015G25</code> = gusts 25 kt, <code>00000</code> = calm, <code>VRB</code> = variable</td></tr>
 <tr><td><code>9999</code></td><td>Visibility</td><td>in metres: <code>9999</code> = 10 km or more, <code>8000</code> = 8 km… <code>CAVOK</code> = vis ≥ 10 km, no cloud below 5 000 ft, no significant weather</td></tr>
 <tr><td><code>-RA</code>, <code>TS</code>…</td><td>Present weather</td><td>between visibility and clouds: <code>-RA</code> light rain, <code>RA</code> rain, <code>TS</code> thunderstorm, <code>BR</code> mist, <code>FG</code> fog, <code>SN</code> snow (most common)</td></tr>
@@ -769,7 +779,7 @@
 → <i data-lucide="x" class="li-ic"></i> <strong>IFR</strong> (ceiling &lt; 1500 ft + vis &lt; 5km + thunderstorms)</p>
 <p><strong>Day 06 18h → Day 07 02h</strong> : Return to BKN 2000 ft (no showers)<br />
 → <i data-lucide="triangle-alert" class="li-ic"></i> <strong>Marginal VFR</strong></p>
-<p><strong>Day 07 02h → Day 07 04h</strong> : Change: wind 340° 10kt, vis 8km, BKN 1500 ft<br />
+<p><strong>Day 07 02h → Day 07 04h</strong> : Change: wind 340° 10kt, vis 8km, BKN 1400 ft<br />
 → <i data-lucide="x" class="li-ic"></i> <strong>IFR</strong> (ceiling &lt; 1500 ft)</p>
 <p><strong>Day 07 04h → Day 07 12h</strong> : These conditions maintained<br />
 → <i data-lucide="x" class="li-ic"></i> <strong>IFR</strong></p>
@@ -820,7 +830,7 @@
 <tbody>
 <tr>
 <td><strong>Visibility</strong></td>
-<td>≥ 1500 m (otherwise ≥ 5000 m above 140 kt)</td>
+<td>≥ 1500 m (and ≥ 5000 m beyond 140 kt)</td>
 </tr>
 <tr>
 <td><strong>Cloud distance</strong></td>
@@ -835,12 +845,12 @@
 <div class="success">
 <p><strong>Remember</strong>: near the ground, the 500 ft minimum height implies a <strong>deduced minimum ceiling &gt; 500 ft</strong>. Below the "S" surface at IAS ≤ 140 kt: <strong>visibility ≥ 1500 m and ceiling &gt; 500 ft</strong>.</p>
 </div>
-<p>Above the "S" surface and below FL100: <strong>visibility ≥ 5 km</strong>, clouds at 1500 m horizontally and 300 m (1000 ft) vertically, speed limited to 250 kt.</p>
+<p>Above the "S" surface and below FL100: <strong>visibility ≥ 5 km</strong>, clouds at 1500 m horizontally and 300 m (1000 ft) vertically.</p>
 <h3>Special VFR (SVFR)</h3>
 <p>Special VFR lets you take off, land or transit through controlled airspace by <strong>momentarily lowering its weather minima</strong>: conditions can make a flight legal in uncontrolled airspace yet forbidden in controlled airspace (e.g. 10 km / 1000 ft) — the special VFR clearance bridges the two.</p>
-<p><strong>Pilot side</strong> (SERA.5010b):
+<p><strong>Pilot side</strong> (SERA.5010a):
 - ATC clearance mandatory — the controller is not required to issue it (traffic density, aerodrome weather, mandatory reporting points)
-- Forbidden at night for aeroplanes (SERA.5010a)
+- Forbidden at night for aeroplanes (only helicopters benefit from a French derogation)
 - In-flight visibility ≥ 1500 m along the intended route (IAS ≤ 140 kt), clear of clouds and in sight of the ground</p>
 <p><strong>Controller side</strong> (SERA.5010c): the clearance may only be issued for take-off, landing or entry into the manoeuvring or circuit area if the weather reported on the aerodrome is <strong>visibility ≥ 1500 m and ceiling ≥ 600 ft</strong> (transit is not concerned). Special instructions may apply (see the VAC chart).</p>
 <div class="warning">
@@ -1207,20 +1217,10 @@
 <li>If TEMPO/PROB → plan arrival outside the critical period</li>
 </ol>
 <h3>During the flight</h3>
-<ol>
-<li><strong>Update regularly</strong> :</li>
-<li>ATIS (Automatic Terminal Information Service)</li>
-<li>New METAR every 30 min</li>
-<li>
-<p>Radio contacts with the stations</p>
-</li>
-<li>
-<p><strong>Be cautious</strong> :</p>
-</li>
-<li>If conditions degrade → turn back or divert</li>
-<li>Never enter clouds in VFR</li>
-<li>Keep a safety margin (fuel, visibility, ceiling)</li>
-</ol>
+<ul>
+<li><strong>Update regularly</strong>: ATIS (Automatic Terminal Information Service), a new METAR every 30 min to 1 h depending on the airfield, radio contacts with the stations.</li>
+<li><strong>Be cautious</strong>: if conditions degrade → turn back or divert; never enter clouds in VFR; keep a safety margin (fuel, visibility, ceiling).</li>
+</ul>
 <h3>Chart interpretation</h3>
 <p><strong>Colored bands</strong> :
 - <span class="pin" style="background:#4ADE80"></span> <strong>VFR (Green)</strong> : Comfortable flight
@@ -1247,8 +1247,7 @@
 <p><strong>What the tool does NOT do (yet)</strong> :
 - <i data-lucide="x" class="li-ic"></i> Does not replace the official weather briefing
 - <i data-lucide="x" class="li-ic"></i> Does not make decisions for you (the verdict is an aid, not an order)
-- <i data-lucide="x" class="li-ic"></i> Does not yet integrate NOTAMs (coming soon)
-- <i data-lucide="x" class="li-ic"></i> SIGMET/AIRMET mainly cover the United States for now</p>
+- <i data-lucide="x" class="li-ic"></i> SIGMET covered in France and the United States; AIRMET: United States only for now</p>
 <p><strong>The final decision</strong> remains that of the <strong>pilot in command</strong>!</p>
 <hr />
 <h2><i data-lucide="phone"></i> ADDITIONAL RESOURCES</h2>

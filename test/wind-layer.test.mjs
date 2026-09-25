@@ -39,7 +39,10 @@ describe('buildWindGrid (grille flèches de vent — pas adaptatif)', () => {
         assert.ok(Array.isArray(r) && r.length >= 4, `${r?.length} flèches`);
         for (const w of r.slice(0, 3)) {
             assert.ok(Number.isFinite(w.speedKt) && w.speedKt >= 0 && w.speedKt < 250, `speed ${w.speedKt}`);
-            assert.ok(Number.isFinite(w.dir) && w.dir >= 0 && w.dir < 360, `dir ${w.dir}`);
+            // 360 = 0 = nord : Open-Meteo renvoie l'un ou l'autre selon le
+            // point (donnée RÉELLE — la garde doit accepter les deux, le
+            // rotate (dir+180)%360 de l'app les traite pareil).
+            assert.ok(Number.isFinite(w.dir) && w.dir >= 0 && w.dir <= 360, `dir ${w.dir}`);
         }
     });
 
