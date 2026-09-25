@@ -949,6 +949,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
 
     initPlanIo();
+    // Écran maintenu allumé pendant l'utilisation (retour pilote 25/09) —
+    // verrou relâché quand l'app passe derrière, ré-acquis au retour.
+    { const { initWakeLock } = await import('./wake-lock.js'); initWakeLock(); }
     initDataAge();   // badge d'âge des données (06/09… piloté par dataAgeUpdate)
     { const { initSupPanel } = await import('./sup-sia.js'); initSupPanel().catch(() => {}); }   // Sup AIP SIA (B4)
     initAutocomplete('icaoInput', (icao) => { document.getElementById('icaoInput').value = icao; telechargerMessage('metar'); });

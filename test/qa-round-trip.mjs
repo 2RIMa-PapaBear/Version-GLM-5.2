@@ -175,6 +175,15 @@ absorbe.requis ? console.log('OK  bloc 2ᵉ étape : carburant conservé (requis
         return { pts: d ? (d.match(/[ML]/g) || []).length : 0, wp: document.getElementById('fp-waypoints')?.value || '' };
     });
     c9.pts === 4 ? console.log('OK  2ᵉ point ajouté : boucle à 4 points (' + c9.wp + ')') : console.log('KO  2ᵉ point : ' + JSON.stringify(c9));
+    // Bouton « Imprimer le dossier de vol » ACTIF sur la boucle (retour
+    // pilote 25/09 : inactif malgré les tuiles au vert — 8ᵉ verreur
+    // destination≠départ, dans flight-file.js).
+    await new Promise(r => setTimeout(r, 2500));
+    const ff = await p2.evaluate(() => {
+        const b = document.getElementById('ff-print');
+        return { present: !!b, disabled: b ? b.disabled : null };
+    });
+    ff.present && ff.disabled === false ? console.log('OK  bouton « Imprimer le dossier de vol » ACTIF sur la boucle') : console.log('KO  bouton dossier : ' + JSON.stringify(ff));
     // ⑨ bis (règle pilote 25/09) : les points ajoutés par ailleurs
     // (aérodromes « + Waypoint », repères perso, points VFR) restent des
     // points TOURNANTS/de passage SANS ARRÊT — seules les étapes nées du

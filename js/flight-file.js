@@ -126,7 +126,14 @@ export async function collectFileInputs() {
     const ac = getActiveAircraft();
     const icao = String(state.requestedIcao || state.lastParsed?.code || '').toUpperCase();
     const destInput = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
-    const hasDest = mode === 'nav' && /^[A-Z][A-Z0-9]{3}$/.test(destInput) && destInput !== icao;
+    // ALLER-RETOUR (retour pilote 25/09) : destination = départ autorisée
+    // dès qu'une vraie boucle existe dans state.route (≥ 3 étapes,
+    // extrémités = départ/arrivée) — sinon un nu A→A n'est pas une nav.
+    const seqL = Array.isArray(state.route) ? state.route : [];
+    const boucle = destInput === icao && seqL.length >= 3
+        && String(seqL[0]).toUpperCase() === icao
+        && String(seqL[seqL.length - 1]).toUpperCase() === destInput;
+    const hasDest = mode === 'nav' && /^[A-Z][A-Z0-9]{3}$/.test(destInput) && (destInput !== icao || boucle);
 
     // Météo : METAR courant + TAF + (nav) météo de l'arrivée / atterrissage.
     const metarAgeMin = _metarAgeMin();
