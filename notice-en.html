@@ -670,7 +670,7 @@
 <tr><td><code>LFRV</code></td><td>Airfield</td><td>ICAO code</td></tr>
 <tr><td><code>061230Z</code></td><td>Date-time</td><td>6th of the month at 12:30 <strong>Z (UTC)</strong> — for French local time, subtract 1 h in winter, 2 h in summer</td></tr>
 <tr><td><code>24012KT</code></td><td>Wind</td><td>240° at 12 kt — <code>24015G25</code> = gusts 25 kt, <code>00000</code> = calm, <code>VRB</code> = variable</td></tr>
-<tr><td><code>9999</code></td><td>Visibility</td><td>in metres: <code>9999</code> = 10 km or more, <code>8000</code> = 8 km… <code>CAVOK</code> = vis ≥ 10 km, no cloud below 5 000 ft, no significant weather</td></tr>
+<tr><td><code>9999</code></td><td>Visibility</td><td>in metres: <code>9999</code> = 10 km or more, <code>8000</code> = 8 km… <code>CAVOK</code> = vis ≥ 10 km, no cloud below 5 000 ft (or the minimum sector altitude if higher), no CB or TCU at any altitude, no significant weather</td></tr>
 <tr><td><code>-RA</code>, <code>TS</code>…</td><td>Present weather</td><td>between visibility and clouds: <code>-RA</code> light rain, <code>RA</code> rain, <code>TS</code> thunderstorm, <code>BR</code> mist, <code>FG</code> fog, <code>SN</code> snow (most common)</td></tr>
 <tr><td><code>FEW035</code></td><td>Clouds</td><td>amount + base in hundreds of feet: <code>FEW</code> few, <code>SCT</code> scattered, <code>BKN</code> broken, <code>OVC</code> overcast — <code>FEW035</code> = base 3 500 ft; <code>NSC</code> = nothing significant</td></tr>
 <tr><td><code>18/12</code></td><td>Temp / dew</td><td>18 °C, dew point 12 °C — a small spread means mist and carb-icing risk</td></tr>
@@ -1030,7 +1030,7 @@
 </tr>
 <tr>
 <td><strong>CAVOK</strong></td>
-<td>Ceiling And Visibility OK (vis ≥10km, no clouds &lt;5000ft, no significant weather)</td>
+<td>Ceiling And Visibility OK (vis ≥10km, no cloud &lt;5000ft or below the minimum sector altitude if higher, no CB or TCU at any altitude, no significant weather)</td>
 </tr>
 <tr>
 <td><strong>CB</strong></td>
