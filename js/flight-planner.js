@@ -528,9 +528,16 @@ export async function computeMultiLegFlightPlan(route, params) {
     const routeAirspaces = await loadRouteAirspaces(elevProfile, params.cruiseAltFt);
 
     const totalReserveL = (reserveMin / 60) * params.fuelBurnLph;
-    // Forfaits au sol (roulage ×2 + intégration) : une seule fois pour toute
-    // la navigation, pas par tronçon.
-    const groundL = (GROUND_MIN / 60) * params.fuelBurnLph;
+    // Forfaits au sol (roulage ×2 + intégration) : UN CYCLE PAR VOL, c.-à-d.
+    // par POSEÉ — uniquement les étapes issues du champ « 2ᵉ ÉTAPE » du
+    // planificateur (state.routePoses, alimenté par sa transformation ;
+    // retour pilote 25/09). Tout autre point — aérodrome ajouté, repère
+    // perso, point VFR — est un point TOURNANT/de passage SANS ARRÊT :
+    // aucun cycle.
+    const poses = Array.isArray(params.poses) ? params.poses.map(c => String(c).toUpperCase()) : [];
+    const nbPosees = waypoints.slice(1, -1).filter(w => poses.includes(String(w.icao).toUpperCase())).length;
+    const groundMin = GROUND_MIN * (1 + nbPosees);
+    const groundL = (groundMin / 60) * params.fuelBurnLph;
     // Branche dégagement : depuis la DESTINATION (dernier waypoint), à la GS
     // moyenne réelle du plan (totalDistance / temps total — vent intégré).
     const dest = waypoints[waypoints.length - 1];
@@ -539,7 +546,7 @@ export async function computeMultiLegFlightPlan(route, params) {
     const fuel = withUnusableFuel(_withDiversion({
         tripFuelL: Math.round(totalTripFuelL * 10) / 10,
         reserveL: Math.round(totalReserveL * 10) / 10,
-        groundMin: GROUND_MIN,
+        groundMin,
         groundL: Math.round(groundL * 10) / 10,
         totalL: Math.round((totalTripFuelL + totalReserveL + groundL) * 10) / 10,
         reserveMin,

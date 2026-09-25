@@ -42,7 +42,15 @@ if (typeof document !== 'undefined') {
 }
 
 export async function showRouteWeather(map, fromIcao, toIcao, opts = {}) {
-    if (!map || !fromIcao || !toIcao || fromIcao === toIcao) {
+    // ALLER-RETOUR (retour pilote 25/09) : départ = arrivée autorisé dès
+    // qu'une vraie boucle existe dans state.route (≥ 3 étapes, extrémités
+    // = départ/arrivée) — un nu A→A n'a rien à tracer.
+    const seqLoop = Array.isArray(state.route) ? state.route : [];
+    const boucle = String(fromIcao || '').toUpperCase() === String(toIcao || '').toUpperCase()
+        && seqLoop.length >= 3
+        && String(seqLoop[0]).toUpperCase() === String(fromIcao).toUpperCase()
+        && String(seqLoop[seqLoop.length - 1]).toUpperCase() === String(toIcao).toUpperCase();
+    if (!map || !fromIcao || !toIcao || (fromIcao === toIcao && !boucle)) {
         _clearRoute(map);
         return;
     }
@@ -93,8 +101,12 @@ export async function showRouteWeather(map, fromIcao, toIcao, opts = {}) {
         dashArray: '8, 6',
     }).addTo(map);
 
+    // Aller-retour (départ = arrivée, retour pilote 25/09) : l'arrivée se
+    // dessine en ANNEAU autour du départ, étiquette à gauche — les deux
+    // extrémités restent lisibles au même point.
+    const isBoucle = fromIcao.toUpperCase() === toIcao.toUpperCase();
     _addRouteEndpoint(map, fromLat, fromLon, fromIcao, true);
-    _addRouteEndpoint(map, toLat, toLon, toIcao, false);
+    _addRouteEndpoint(map, toLat, toLon, toIcao, false, isBoucle);
     // Marqueurs intermédiaires pour les waypoints (cercles ambre) — ajoutés directement
     // à la map (pas à la polyline, qui n'accepte pas addTo).
     // Étiquette permanente du CODE OACI + « × » de suppression pour les
@@ -141,7 +153,7 @@ export async function showRouteWeather(map, fromIcao, toIcao, opts = {}) {
     }
 
     if (!opts.skipMetars) {
-        await _loadCorridorMetars(map, fromLat, fromLon, toLat, toLon, fromIcao, toIcao, opts);
+        await _loadCorridorMetars(map, routePoints, opts);
     }
 }
 
@@ -163,17 +175,34 @@ if (typeof document !== 'undefined') {
     });
 }
 
-async function _loadCorridorMetars(map, fromLat, fromLon, toLat, toLon, fromIcao, toIcao, opts = {}) {
-    try {
-        // Anti-doublon : pas de seconde pastille sur un aérodrome déjà affiché
-        // comme voisin, ni sur le départ/destination (points verts/rouges de la
-        // route) — sinon deux points décalés par terrain (ARP vs station).
-        const skip = opts.skipIcao || (() => false);
+// Pastilles météo du COULOIR : suivent TOUS les tronçons du plan (étapes
+// comprises — et l'aller-retour, dont la « ligne directe » départ→arrivée
+// serait de longueur nulle). routePoints = [lat, lon, icao] de chaque étape.
+function _distToRoute(lat, lon, routePoints) {
+    let best = Infinity;
+    for (let i = 1; i < routePoints.length; i++) {
+        const d = _pointToSegmentDist(lat, lon, routePoints[i - 1][0], routePoints[i - 1][1], routePoints[i][0], routePoints[i][1]);
+        if (d < best) best = d;
+    }
+    return best;
+}
 
-        const minLat = Math.min(fromLat, toLat) - 1;
-        const maxLat = Math.max(fromLat, toLat) + 1;
-        const minLon = Math.min(fromLon, toLon) - 1;
-        const maxLon = Math.max(fromLon, toLon) + 1;
+async function _loadCorridorMetars(map, routePoints, opts = {}) {
+    try {
+        if (!Array.isArray(routePoints) || routePoints.length < 2) return;
+        // Anti-doublon : pas de seconde pastille sur un aérodrome déjà affiché
+        // comme voisin, ni sur les terrains de la route (départ/arrivée verts
+        // et rouges, étapes ambre) — sinon deux points décalés par terrain
+        // (ARP vs station).
+        const skip = opts.skipIcao || (() => false);
+        const routeCodes = new Set(routePoints.map(p => String(p[2]).toUpperCase()));
+
+        let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+        for (const p of routePoints) {
+            minLat = Math.min(minLat, p[0]); maxLat = Math.max(maxLat, p[0]);
+            minLon = Math.min(minLon, p[1]); maxLon = Math.max(maxLon, p[1]);
+        }
+        minLat -= 1; maxLat += 1; minLon -= 1; maxLon += 1;
 
         const stationsUrl = `https://aviationweather.gov/api/data/stationinfo?bbox=${minLat},${minLon},${maxLat},${maxLon}&format=json`;
         const stations = await fetchAvecRelais(stationsUrl, 'json', 3600);
@@ -183,12 +212,11 @@ async function _loadCorridorMetars(map, fromLat, fromLon, toLat, toLon, fromIcao
             .filter(s => {
                 if (!s.icaoId || !/^[A-Z][A-Z0-9]{3}$/.test(s.icaoId)) return false;
                 const code = s.icaoId.toUpperCase();
-                if (code === fromIcao.toUpperCase() || code === toIcao.toUpperCase()) return false;
+                if (routeCodes.has(code)) return false;
                 if (skip(code)) return false;
-                const d = _pointToSegmentDist(s.lat, s.lon, fromLat, fromLon, toLat, toLon);
-                return d < 0.8;
+                return _distToRoute(s.lat, s.lon, routePoints) < 0.8;
             })
-            .sort((a, b) => _pointToSegmentDist(a.lat, a.lon, fromLat, fromLon, toLat, toLon) - _pointToSegmentDist(b.lat, b.lon, fromLat, fromLon, toLat, toLon))
+            .sort((a, b) => _distToRoute(a.lat, a.lon, routePoints) - _distToRoute(b.lat, b.lon, routePoints))
             .slice(0, 10);
 
         if (corridorStations.length === 0) return;
@@ -247,20 +275,23 @@ function _mountWaypointPopupActions(map) {
     });
 }
 
-function _addRouteEndpoint(map, lat, lon, icao, isStart) {    const marker = L.circleMarker([lat, lon], {
-        radius: 11,
+function _addRouteEndpoint(map, lat, lon, icao, isStart, ring = false) {
+    const marker = L.circleMarker([lat, lon], {
+        radius: ring ? 15 : 11,
         fillColor: isStart ? '#4ADE80' : '#EF4444',
         color: '#fff',
         weight: 3,
         opacity: 1,
-        fillOpacity: 0.9,
+        fillOpacity: ring ? 0.25 : 0.9,
     }).addTo(map);
     // Étiquette permanente du code OACI (vert départ / rouge arrivée), même
     // principe que les étapes intermédiaires. Remplace l'ancien tooltip de
-    // survol : l'information est désormais toujours visible.
+    // survol : l'information est désormais toujours visible. En aller-retour
+    // (ring), l'étiquette d'arrivée passe à GAUCHE pour ne pas couvrir
+    // celle du départ.
     marker.bindTooltip(escapeHtml(icao), {
         permanent: true,
-        direction: 'right',
+        direction: ring ? 'left' : 'right',
         className: isStart ? 'route-dep-label' : 'route-arr-label',
     });
     _routeMarkers.push(marker);

@@ -116,6 +116,7 @@ export function setFlightMode(mode) {
         // du planificateur) : sans reset, un retour en nav ressuscitait le
         // plan effacé. Le champ (masqué) du planificateur est vidé aussi.
         state.route = null;
+        state.routePoses = [];
         const wpInput = document.getElementById('fp-waypoints');
         if (wpInput) wpInput.value = '';
         clearElevationChart('elevation-profile-container');

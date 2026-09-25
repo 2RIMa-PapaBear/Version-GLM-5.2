@@ -169,6 +169,24 @@ export async function collectVfrMinima(plan) {
 
     const pts = [];
     if (dep?.lat != null) pts.push({ role: 'dep', icao: dep.icao, lat: dep.lat, lon: dep.lon, when: Date.now(), kind: 'metar' });
+    // ÉTAPES-POSÉES (retour pilote 25/09 : « LFEQ reste un point où je me
+    // pose, il doit être dans le cadre minima VFR ») : SEULES les étapes
+    // issues du champ « 2ᵉ ÉTAPE » du planificateur (state.routePoses) sont
+    // des posées — TAF à l'heure de passage estimée (arrivée puis nouveau
+    // départ dans la même fenêtre, le temps sol n'étant pas modélisé). Tout
+    // autre point (aérodrome ajouté, repère perso, point VFR) est un point
+    // tournant/de passage sans arrêt : pas de minima.
+    const posesIcao = new Set((state.routePoses || []).map(c => String(c).toUpperCase()));
+    if (wps && wps.length > 2 && Array.isArray(plan.legs)) {
+        let cum = 0;
+        for (let i = 0; i + 1 < wps.length && i < plan.legs.length; i++) {
+            cum += plan.legs[i].legTimeMin ?? 0;
+            const w = wps[i + 1];
+            if (i + 1 < wps.length - 1 && w?.lat != null && posesIcao.has(String(w.icao).toUpperCase())) {
+                pts.push({ role: 'etape', icao: w.icao, lat: w.lat, lon: w.lon, when: Date.now() + cum * 60000, kind: 'taf' });
+            }
+        }
+    }
     if (arr?.lat != null) pts.push({ role: 'dest', icao: arr.icao, lat: arr.lat, lon: arr.lon, when: etaMs, kind: 'taf' });
     const divIcao = String(state?.diversionIcao || '').toUpperCase();
     if (/^[A-Z][A-Z0-9]{3}$/.test(divIcao) && divIcao !== String(arr?.icao || '').toUpperCase()) {

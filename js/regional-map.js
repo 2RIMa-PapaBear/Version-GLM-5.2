@@ -130,6 +130,19 @@ export function openRegionalMap() {
     setTimeout(() => _initOrRefresh(), 100);
 }
 
+
+// Destination dessinable : différente du terrain affiché (départ) — SAUF
+// aller-retour (retour pilote 25/09) : une boucle réelle (≥ 3 étapes dans
+// state.route, départ = arrivée) se trace aussi.
+function _routeDrawable(toIcao) {
+    if (!toIcao || !/^[A-Z][A-Z0-9]{3}$/.test(toIcao)) return false;
+    if (toIcao !== _currentIcao.toUpperCase()) return true;
+    const seq = Array.isArray(state.route) ? state.route : [];
+    return seq.length >= 3
+        && String(seq[0]).toUpperCase() === _currentIcao.toUpperCase()
+        && String(seq[seq.length - 1]).toUpperCase() === toIcao.toUpperCase();
+}
+
 export function showRegionalMapFor(icao, force = false) {
     _currentIcao = icao;
     const panel = document.getElementById('regional-map-panel');
@@ -347,7 +360,7 @@ async function _initOrRefresh() {
 
     const toInput = document.getElementById('route-to-input');
     const toIcao = toInput?.value?.trim().toUpperCase();
-    if (toIcao && /^[A-Z][A-Z0-9]{3}$/.test(toIcao) && toIcao !== _currentIcao.toUpperCase()) {
+    if (_routeDrawable(toIcao)) {
         await showRouteWeather(_map, _currentIcao, toIcao, { skipIcao: _skipDisplayedIcao });
         if (myToken !== _refreshToken) return;
     }
@@ -430,7 +443,7 @@ function _initLayerControls() {
         if (!_map || !_currentIcao) return;
         const toInput = document.getElementById('route-to-input');
         const toIcao = toInput?.value?.trim().toUpperCase();
-        if (toIcao && /^[A-Z][A-Z0-9]{3}$/.test(toIcao) && toIcao !== _currentIcao.toUpperCase()) {
+        if (_routeDrawable(toIcao)) {
             showRouteWeather(_map, _currentIcao, toIcao, { skipMetars: true, skipIcao: _skipDisplayedIcao });
         }
     });
@@ -443,7 +456,7 @@ function _initLayerControls() {
         if (!_map || !_currentIcao) return;
         const toInput = document.getElementById('route-to-input');
         const toIcao = toInput?.value?.trim().toUpperCase();
-        if (toIcao && /^[A-Z][A-Z0-9]{3}$/.test(toIcao) && toIcao !== _currentIcao.toUpperCase()) {
+        if (_routeDrawable(toIcao)) {
             showRouteWeather(_map, _currentIcao, toIcao, { skipMetars: true, skipIcao: _skipDisplayedIcao });
         }
     });
@@ -703,6 +716,11 @@ function _mountFreeWpLayers(code, wp) {
     marker.bindTooltip(
         waypointLabelHtml(wp.name, { 'data-code': code }, state.lang === 'fr' ? 'Supprimer le repère' : 'Delete waypoint'),
         { permanent: true, direction: 'right', className: 'free-wp-label', interactive: true });
+    // Déplacement du repère (retour pilote 25/09) : glisser direct à la
+    // souris (pointeur fin) ; au doigt, appui long PUIS glissé (un toucher
+    // bref garde le popup, un glissé immédiat panne la carte — rien ne se
+    // déplace par accident).
+    const coarse = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
     // Marqueur DOM superposé au cercle SVG — même remède que les pastilles
     // (da0feda1) : le clic sur un path SVG recouvert par les couches et le
     // point d'étape de la route n'est pas fiable, c'est le HIT qui porte le
@@ -710,6 +728,7 @@ function _mountFreeWpLayers(code, wp) {
     const hit = L.marker([wp.lat, wp.lon], {
         interactive: true,
         keyboard: false,
+        draggable: !coarse,
         icon: L.divIcon({ className: 'pin-hit', iconSize: [16, 16], iconAnchor: [8, 8] }),
     }).addTo(_map);
     hit.bindPopup(() => _freeWpPopupHtml(code), { maxWidth: 250, keepInView: true });
@@ -722,6 +741,17 @@ function _mountFreeWpLayers(code, wp) {
     });
     wp.marker = marker;
     wp.hit = hit;
+    if (coarse) {
+        _wireFreeWpLongPress(code, wp, hit);
+    } else {
+        // Le cercle suit le glisser en direct ; au relâcher, la fiche du
+        // repère est réécrite et le plan recalculé.
+        hit.on('drag', () => wp.marker.setLatLng(hit.getLatLng()));
+        hit.on('dragend', () => {
+            const ll = hit.getLatLng();
+            _moveFreeWaypoint(code, ll.lat, ll.lng);
+        });
+    }
 }
 
 function _createFreeWaypoint(lat, lon, name, freq, kind) {
@@ -789,6 +819,94 @@ function _renameFreeWaypoint(code, name) {
         wpInput.value = formatWaypointsField(codes);
         wpInput.dispatchEvent(new Event('change'));
     }
+}
+
+// Déplacement d'un repère libre (glisser souris ou appui long + doigt) :
+// la base locale porte la position — plan, insertion, magvar, PDF et exports
+// se relisent à chaque recalcul, il suffit de réécrire la fiche puis de
+// relancer le plan (même chaîne que « Retirer du plan »).
+function _moveFreeWaypoint(code, lat, lon) {
+    const wp = _freeWaypoints.get(code);
+    if (!wp || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    const prev = getAirportByICAO(code) || {};
+    // Nom par défaut = coordonnées du point d'origine : il suit le
+    // déplacement (un nom saisi reste intact ; le code ne bouge jamais —
+    // identifiant stable du champ Waypoints et des exports).
+    const coordName = _formatDmCoords(wp.lat, wp.lon);
+    wp.lat = lat; wp.lon = lon;
+    if (wp.name === coordName) {
+        wp.name = _formatDmCoords(lat, lon);
+        wp.marker.setTooltipContent(waypointLabelHtml(wp.name, { 'data-code': code }, state.lang === 'fr' ? 'Supprimer le repère' : 'Delete waypoint'));
+    }
+    const extras = prev.frequencies?.length ? { frequencies: prev.frequencies } : {};
+    enrichAirport(code, { lat, lon, name: wp.name, freeWp: true, ...extras });
+    memoSet(code, { name: wp.name, lat, lon, freeWp: true, ...extras });
+    // Recalcul du plan si le repère en fait partie (les positions se
+    // relisent depuis la base) ; sinon le prochain calcul le prendra tel quel.
+    const wpInput = document.getElementById('fp-waypoints');
+    if (wpInput && _freeWpInPlan(code)) wpInput.dispatchEvent(new Event('change'));
+}
+
+// Appui long tactile (450 ms) puis glissé : le repère suit le doigt, la
+// carte reste immobile (dragging désactivé pendant le geste). Un toucher
+// bref garde le popup ; un glissé immédiat (< seuil) panne la carte.
+const _WP_HOLD_MS = 450;
+let _wpHintEl = null;
+function _wpMoveHint(show) {
+    if (!show) { _wpHintEl?.remove(); _wpHintEl = null; return; }
+    if (_wpHintEl || !_map) return;
+    _wpHintEl = L.DomUtil.create('div', 'wp-move-hint', _map.getContainer());
+    _wpHintEl.textContent = state.lang === 'fr' ? 'Relâchez pour poser le repère' : 'Release to drop the waypoint';
+}
+function _wireFreeWpLongPress(code, wp, hit) {
+    const el = hit.getElement?.();
+    if (!el) return;
+    let hold = null, moving = false, moved = false, x0 = 0, y0 = 0;
+    L.DomEvent.on(el, 'touchstart', (e) => {
+        if (e.touches?.length !== 1) { clearTimeout(hold); hold = null; moving = false; return; }
+        const t = e.touches[0];
+        x0 = t.clientX; y0 = t.clientY; moving = false; moved = false;
+        hold = setTimeout(() => {
+            hold = null; moving = true;
+            _map?.dragging.disable();
+            wp.marker.setStyle({ radius: 10, weight: 3, fillColor: '#FDE68A' });
+            _wpMoveHint(true);
+            try { navigator.vibrate?.(30); } catch {   /* absence d'API : silencieux */ }
+        }, _WP_HOLD_MS);
+    });
+    L.DomEvent.on(el, 'touchmove', (e) => {
+        if (!moving) {
+            // Le doigt glisse avant l'activation : le chrono est annulé, la
+            // carte panne normalement.
+            const t = e.touches[0];
+            if (hold && Math.hypot(t.clientX - x0, t.clientY - y0) > 12) { clearTimeout(hold); hold = null; }
+            return;
+        }
+        L.DomEvent.stop(e);   // ni carte ni page : le doigt déplace le repère
+        const t = e.touches[0];
+        const ll = _map.containerPointToLatLng(_map.mouseEventToContainerPoint({ clientX: t.clientX, clientY: t.clientY }));
+        hit.setLatLng(ll);
+        wp.marker.setLatLng(ll);
+        moved = true;
+    });
+    const fin = (e) => {
+        clearTimeout(hold); hold = null;
+        if (!moving) return;
+        moving = false;
+        // preventDefault SANS stopPropagation : il tue le click synthétisé
+        // (le popup reste fermé) mais laisse l'événement atteindre les
+        // écouteurs de document de Leaflet, qui nettoient leur geste.
+        if (e.cancelable) L.DomEvent.preventDefault(e);
+        _map?.dragging.enable();
+        wp.marker.setStyle({ radius: 7, weight: 2, fillColor: '#FBBF24' });
+        _wpMoveHint(false);
+        if (moved) {
+            const ll = hit.getLatLng();
+            _moveFreeWaypoint(code, ll.lat, ll.lng);
+        }
+    };
+    L.DomEvent.on(el, 'touchend', fin);
+    L.DomEvent.on(el, 'touchcancel', fin);
 }
 
 function _deleteFreeWaypoint(code) {

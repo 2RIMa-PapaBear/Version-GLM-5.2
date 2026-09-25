@@ -69,6 +69,7 @@ function _resetRouteOnDepartureChange(dep) {
     const wpInput = document.getElementById('fp-waypoints');
     if (wpInput && wpInput.value.trim()) wpInput.value = '';
     state.route = null;
+    state.routePoses = [];
 }
 
 // Applique un changement de destination : nom du terrain, route sur la carte
@@ -92,15 +93,30 @@ export function handleDestinationChange() {
     const depForNav = _navDepRef();
     // Destination valide : 4 lettres, ≠ départ, connue de la base locale.
     const destApt = /^[A-Z][A-Z0-9]{3}$/.test(toIcao) ? getAirportByICAO(toIcao) : null;
-    const validDest = !!(destApt && depForNav && toIcao !== depForNav.toUpperCase());
+    const validDest = !!(destApt && depForNav);
 
-    // NOUVELLE destination : le plan repart à zéro — les waypoints saisis pour
-    // la route précédente n'ont pas de sens vers une autre arrivée (les repères
+    // NOUVELLE destination : le plan repart à zéro — les waypoints saisis pour la
+    // route précédente n'ont pas de sens vers une autre arrivée (les repères
     // libres restent posés sur la carte, réutilisables via leur popup « + Plan »).
+    // EXCEPTION aller-retour (retour pilote 25/09) : destination = départ →
+    // les étapes déjà posées jalonnent toujours la boucle, on les GARDE.
     if (validDest && toIcao !== _lastPlannedDest) {
-        const wpInput = document.getElementById('fp-waypoints');
-        if (wpInput && wpInput.value.trim()) wpInput.value = '';
-        state.route = null;
+        const boucle = toIcao === depForNav.toUpperCase();
+        if (!boucle) {
+            const wpInput = document.getElementById('fp-waypoints');
+            if (wpInput && wpInput.value.trim()) wpInput.value = '';
+            state.route = null;
+            state.routePoses = [];
+        } else {
+            // Boucle : les étapes restent, mais la séquence doit être
+            // reconstruite vers la NOUVELLE arrivée (l'ancienne se
+            // terminait par la destination précédente — le champ
+            // n'émettra un recalcul que s'il est retouché).
+            const wpInput = document.getElementById('fp-waypoints');
+            const wps = wpInput?.value.trim() ? parseWaypointsField(wpInput.value) : [];
+            state.route = wps.length ? [depForNav, ...wps, toIcao] : null;
+            state.routePoses = (state.routePoses || []).filter(c => wps.includes(c));
+        }
         _lastPlannedDest = toIcao;
     } else if (validDest) {
         _lastPlannedDest = toIcao;
@@ -497,7 +513,7 @@ export function telechargerMessage(typeMessage) {
             showAlternates(depForNav);
             // Flight planner : visible si une destination est saisie.
             const toIcao = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
-            if (toIcao && /^[A-Z][A-Z0-9]{3}$/.test(toIcao) && toIcao !== depForNav.toUpperCase()) {
+            if (toIcao && /^[A-Z][A-Z0-9]{3}$/.test(toIcao)) {
                 showFlightPlanner(depForNav, toIcao);
                 // Tout chemin qui calcule un plan mémorise sa destination :
                 // le reset des waypoints ne jouera que sur un VRAI changement.
@@ -763,7 +779,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                 if (depForNav) {
                     showAlternates(depForNav);
                     const toIcao = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
-                    if (toIcao && /^[A-Z][A-Z0-9]{3}$/.test(toIcao) && toIcao !== depForNav.toUpperCase()) {
+                    if (toIcao && /^[A-Z][A-Z0-9]{3}$/.test(toIcao)) {
                         showFlightPlanner(depForNav, toIcao);
                     }
                 }
@@ -908,15 +924,28 @@ document.addEventListener('DOMContentLoaded', async function () {
         const icao = e.detail?.icao;
         if (!icao) return;
         const wpInput = document.getElementById('fp-waypoints');
-        if (!wpInput) return;   // pas de plan affiché : rien à ajouter
-        const wps = parseWaypointsField(wpInput.value);
+        const wps = wpInput ? parseWaypointsField(wpInput.value) : [];
         if (wps.includes(icao)) return;   // déjà dans la liste : rien à faire
         const toIcao = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
+        if (!toIcao) return;   // pas de destination : rien à construire
+        // Extrémités du plan (départ / arrivée — aller-retour compris) :
+        // déjà aux bouts de la route, aucun sens en étape intermédiaire.
+        const depRef = (_navDepRef() || '').toUpperCase();
+        if (icao === depRef || icao === toIcao) return;
         const idx = cheapestWaypointInsertion(_navDepRef(), wps, toIcao, icao, _icaoCoords);
         const at = (idx == null) ? wps.length : idx;   // coords manquantes → en fin
         const next = [...wps.slice(0, at), icao, ...wps.slice(at)];
-        wpInput.value = formatWaypointsField(next);
-        wpInput.dispatchEvent(new Event('change'));
+        if (wpInput) {
+            wpInput.value = formatWaypointsField(next);
+            wpInput.dispatchEvent(new Event('change'));
+        } else {
+            // Plan jamais rendu (boucle sans étape, panneau masqué avant
+            // tout rendu — retour pilote 25/09) : la séquence part
+            // directement dans state.route et le panneau se construit.
+            state.route = [depRef, ...next, toIcao];
+            showFlightPlanner(depRef, toIcao);
+            setTimeout(() => window.dispatchEvent(new CustomEvent('route-changed')), 0);
+        }
     });
 
     initPlanIo();
@@ -1104,8 +1133,8 @@ document.addEventListener('DOMContentLoaded', async function () {
             if (link.mode === 'nav') setFlightMode('nav');
             // Destination transportée par le lien : pré-remplie AVANT le
             // chargement — le plan se créera dès le METAR du départ arrivé.
-            const destVal = (/^[A-Z][A-Z0-9]{3}$/.test(link.dest || '') && link.dest !== link.icao.toUpperCase())
-                ? link.dest : null;
+            // Égale au départ = ALLER-RETOUR (autorisé, retour pilote 25/09).
+            const destVal = /^[A-Z][A-Z0-9]{3}$/.test(link.dest || '') ? link.dest : null;
             if (destVal) {
                 const toInput = document.getElementById('route-to-input');
                 if (toInput) toInput.value = destVal;

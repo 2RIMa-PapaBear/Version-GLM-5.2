@@ -1,5 +1,23 @@
 import { state, escapeHtml, fetchAvecRelais, memoGet } from './core.js';
 import { getAirportByICAO, enrichAirport } from './ui-module.js';
+
+// « Inverser » le sens des points de passage (retour pilote 25/09) : le
+// bouton vit dans le titre du « Détail des waypoints » — délégation document
+// (le panneau est recréé à chaque recalcul). Inverse le champ Waypoints puis
+// relance le calcul : plan, carte, minima et carburant suivent ; les posées
+// gardent leur statut (le marqueur suit les codes, pas l'ordre).
+if (typeof document !== 'undefined') {
+    document.addEventListener('click', (e) => {
+        const btn = e.target?.closest?.('.fp-invert-btn');
+        if (!btn) return;
+        const wpInput = document.getElementById('fp-waypoints');
+        if (!wpInput) return;
+        const wps = parseWaypointsField(wpInput.value);
+        if (wps.length < 2) return;
+        wpInput.value = formatWaypointsField([...wps].reverse());
+        wpInput.dispatchEvent(new Event('change'));
+    });
+}
 import { getActiveAircraftId, getActiveAircraft, getFleet, updateAircraft, usableFuelOf } from './aircraft-fleet.js';
 import { getActiveRunwayNameForIcao, evaluateTakeoffFromRaw, evaluateLandingFromRaw, evaluateLandingAtDestination, fetchTafWithFallback, getAircraftRef } from './takeoff-performance.js';
 import { showTakeoffWidget } from './takeoff-ui.js';
@@ -146,7 +164,15 @@ export async function showFlightPlanner(fromIcao, toIcao) {
     if (!container) return;
     loadFreqSources();   // SIA + overrides : fréquences réelles des étapes
 
-    if (!fromIcao || !toIcao || fromIcao === toIcao) {
+    // ALLER-RETOUR autorisé (retour pilote 25/09) : départ = arrivée dès
+    // qu'au moins une étape intermédiaire existe dans state.route — sans
+    // étape, un nu A→A n'a rien à calculer.
+    const seq0 = Array.isArray(state.route) ? state.route : [];
+    const boucle = String(fromIcao || '').toUpperCase() === String(toIcao || '').toUpperCase()
+        && seq0.length >= 3
+        && String(seq0[0]).toUpperCase() === String(fromIcao).toUpperCase()
+        && String(seq0[seq0.length - 1]).toUpperCase() === String(toIcao).toUpperCase();
+    if (!fromIcao || !toIcao || (fromIcao === toIcao && !boucle)) {
         container.style.display = 'none';
         return;
     }
@@ -180,7 +206,7 @@ export async function showFlightPlanner(fromIcao, toIcao) {
         && String(seq[seq.length - 1]).toUpperCase() === toIcao.toUpperCase())
         ? seq : [fromIcao, toIcao];
     const plan = route.length >= 3
-        ? await computeMultiLegFlightPlan(route, { cruiseAltFt: cruiseAlt, tasKt, fuelBurnLph: burn, isNight, diversionIcao: state.diversionIcao || null, reserveExtraMin: perf.reserveExtraMin ?? 0, unusableFuelL: perf.unusableFuelL ?? 0 })
+        ? await computeMultiLegFlightPlan(route, { cruiseAltFt: cruiseAlt, tasKt, fuelBurnLph: burn, isNight, diversionIcao: state.diversionIcao || null, reserveExtraMin: perf.reserveExtraMin ?? 0, unusableFuelL: perf.unusableFuelL ?? 0, poses: state.routePoses || [] })
         : await computeFlightPlan(fromIcao, toIcao, { cruiseAltFt: cruiseAlt, tasKt, fuelBurnLph: burn, isNight, diversionIcao: state.diversionIcao || null, reserveExtraMin: perf.reserveExtraMin ?? 0, unusableFuelL: perf.unusableFuelL ?? 0 });
 
     // Un calcul plus récent a pris la main (changement de départ/destination
@@ -943,7 +969,31 @@ function _leg2InnerHtml(plan, isFr, isNight, tas, burn) {
     const c = _leg2Compute(plan, isNight, tas, burn);
     const t = (fr, en) => (isFr ? fr : en);
     let res = '';
-    if (c.leg2) {
+    // 2ᵉ étape DÉJÀ intégrée au plan (c'est la destination courante —
+    // retour pilote 25/09 : saisie → vraie étape) : tracé, étapes et
+    // carburant du plan la couvrent, plus besoin d'estimation.
+    const wpsL = Array.isArray(plan.waypoints) && plan.waypoints.length ? plan.waypoints : null;
+    const finalIcao = String((wpsL ? wpsL[wpsL.length - 1].icao : plan.to?.icao) || '').toUpperCase();
+    if (c.icao && c.icao === finalIcao) {
+        // Étape intégrée : le REQUIS du plan (toutes étapes, AVEC vent —
+        // mieux que l'ancienne estimation sans vent) reste confronté à
+        // l'embarqué utilisable, avec le même verdict (retour pilote 25/09 :
+        // « prendre en compte le carburant et le calcul comme avant »).
+        const reqAbs = Math.round((plan.fuel?.totalL ?? 0) * 10) / 10;
+        const manqueAbs = c.onBoard != null ? Math.round((reqAbs - c.onBoard) * 10) / 10 : null;
+        res += `<div class="fp-leg2-line">${t('Requis (étapes intégrées, avec vent)', 'Required (legs included, with wind)')} : <b style="color:var(--primary);">${reqAbs} L</b>`
+            + ` · ${t('à bord (utilisable)', 'on board (usable)')} : ${c.onBoard != null ? c.onBoard + ' L' : '—'}</div>`;
+        if (manqueAbs != null && manqueAbs > 0) {
+            res += `<div class="fp-leg2-verdict warn"><i data-lucide="fuel" style="width:13px;height:13px;"></i> ${t(`Manque ${manqueAbs} L — <b>avitaillement à prévoir</b> (pompe, moyen de paiement).`,
+                `Short by ${manqueAbs} L — <b>refuelling stop required</b> (pump, payment).`)}</div>`;
+        } else if (c.onBoard != null) {
+            res += `<div class="fp-leg2-verdict ok"><i data-lucide="check" style="width:13px;height:13px;"></i> ${t('Toutes les étapes sont possibles sans complément de plein.', 'All legs are achievable without refuelling.')}</div>`;
+        } else {
+            res += `<div class="fp-leg2-verdict" >${t('Renseignez le carburant embarqué dans le widget Centrage pour le verdict.', 'Fill the fuel on board in the Balance widget to get the verdict.')}</div>`;
+        }
+        res += `<div class="fp-leg2-verdict ok"><i data-lucide="check" style="width:13px;height:13px;"></i> ${t('Intégrée au plan : tracée sur la carte, étapes et carburant couvrent les deux vols.',
+            'Included in the plan: drawn on the map, waypoints and fuel cover both legs.')}</div>`;
+    } else if (c.leg2) {
         const l = c.leg2;
         res += `<div class="fp-leg2-line">${t('Étape 2', 'Leg 2')} : <b>${c.info ? `${escapeHtml(c.info.icao)}${c.info.name ? ' · ' + escapeHtml(c.info.name) : ''}` : t('vol local', 'local flight')}</b>`
             + ` — ${l.navTimeMin} min ${t('sans vent', 'no wind')} · ${l.navL} L + ${t('roulage', 'taxi')} ${l.groundL} L + ${t('réserve', 'reserve')} ${l.reserveL} L (${l.reserveMin} min)`
@@ -969,7 +1019,7 @@ function _leg2InnerHtml(plan, isFr, isNight, tas, burn) {
         <div class="fp-section" style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--border-color);">
             <div class="fp-section-title">${t('Deuxième étape (sans plein)', 'Second leg (no refuel)')}</div>
             <div class="fp-leg2-inputs">
-                <label class="fp-input-label" title="${t('Code OACI de la 2ᵉ destination, au départ de l’arrivée de l’étape 1 — prime sur la durée', 'ICAO of the 2nd destination, departing from leg 1 arrival — takes precedence over duration')}">
+                <label class="fp-input-label" title="${t('La 2ᵉ destination devient une VRAIE étape du plan : ancienne destination à l’étape, tracé complet et points ajoutables sur la carte ; sans terrain saisi, la durée locale sert au carburant.', 'The 2nd destination becomes a REAL plan leg: former destination becomes a stop, full route drawn with addable waypoints on the map; without a terrain, the local duration feeds the fuel estimate.')}">
                     <span>${t('2ᵉ étape (OACI)', '2nd leg (ICAO)')}</span>
                     <input type="text" id="fp-leg2-icao" value="${escapeHtml(c.saved.icao || '')}" placeholder="LFRD" class="fp-input" style="font-family:'DM Mono',monospace; text-transform:uppercase;" maxlength="8">
                 </label>
@@ -998,6 +1048,38 @@ function _wireLeg2(container, ctx) {
         s.icao = (icaoEl?.value || '').trim().toUpperCase();
         s.min = minEl?.value ?? '';
         _leg2Mem = s;
+        // 2ᵉ étape = VRAIE étape du plan (retour pilote 25/09 : « le tracé
+        // LFEQ-LFRV n'apparaissait pas »). Le code saisi devient la
+        // NOUVELLE destination, l'ancienne devient étape intermédiaire :
+        // tracé complet sur la carte, points ajoutables (aérodromes,
+        // repères, points VFR), plan et carburant sur tout le voyage.
+        const dest2 = s.icao;
+        if (/^[A-Z][A-Z0-9]{3}$/.test(dest2) && getAirportByICAO(dest2)) {
+            const toInput = document.getElementById('route-to-input');
+            const cur = (toInput?.value || '').trim().toUpperCase();
+            if (dest2 !== cur) {
+                if (cur && /^[A-Z][A-Z0-9]{3}$/.test(cur)) {
+                    const wpInput = document.getElementById('fp-waypoints');
+                    const wps = parseWaypointsField(wpInput?.value || '');
+                    if (!wps.includes(cur)) {
+                        wpInput.value = formatWaypointsField([...wps, cur]);
+                    }
+                }
+                // La mémoire étape 2 est indexée par plan (départ>arrivée) :
+                // on la pré-inscrit pour la NOUVELLE clé afin que le champ
+                // garde son code et affiche l'accusé « intégrée au plan ».
+                const dep0 = (Array.isArray(ctx.plan.waypoints) && ctx.plan.waypoints.length
+                    ? ctx.plan.waypoints[0].icao : ctx.plan.from?.icao) || '';
+                _leg2Mem = { planKey: `${String(dep0).toUpperCase()}>${dest2}`, icao: dest2, min: '' };
+                // L'ancienne destination devient une POSEÉ (retour pilote
+                // 25/09 : seule une étape née du champ « 2ᵉ ÉTAPE » est une
+                // posée — les autres points restent de passage).
+                state.routePoses = [...new Set([...(state.routePoses || []).map(c => String(c).toUpperCase()), cur])];
+                toInput.value = dest2;
+                toInput.dispatchEvent(new Event('input', { bubbles: true }));
+                return;   // plan recalculé de bout en bout — le bloc se re-rendra
+            }
+        }
         rerender();
     };
     block.querySelector('#fp-leg2-icao')?.addEventListener('change', persist);
@@ -1045,7 +1127,9 @@ const _MINIMA_DOT = { ok: 'ok', caution: 'warn', danger: 'bad', unknown: 'dim' }
 
 function _minimaRowHtml(r, isFr) {
     const t = (fr, en) => (isFr ? fr : en);
-    const role = r.role === 'dep' ? t('Départ', 'Departure') : r.role === 'div' ? t('Dégagement', 'Alternate') : t('Arrivée', 'Arrival');
+    const role = r.role === 'dep' ? t('Départ', 'Departure')
+        : r.role === 'etape' ? t('Étape (posée)', 'Stopover')
+        : r.role === 'div' ? t('Dégagement', 'Alternate') : t('Arrivée', 'Arrival');
     const espace = r.zone
         ? `${escapeHtml(r.zone)}${r.classe ? ' · ' + escapeHtml(r.classe) : ''} — ${r.controlled ? t('contrôlé', 'controlled') : t('non contrôlé', 'uncontrolled')}`
         : t('non contrôlé (aucune zone au sol)', 'uncontrolled (no ground airspace)');
@@ -1148,7 +1232,7 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
         <div style="font-size:11px; color:var(--text-muted); font-family:'DM Mono',monospace; margin-bottom:8px;">${escapeHtml(from)} → ${escapeHtml(to)}</div>
         ${_renderInputs(from, to, fromName, toName, alt, tas, burn, isNight, isFr)}
 
-        <div class="fp-grid" style="gap:8px 16px; margin-top:10px;">
+        <div class="fp-grid fp-grid-line" style="margin-top:10px;">
             <div class="fp-cell">
                 <div class="fp-label">${isFr ? 'Distance' : 'Distance'}</div>
                 <div class="fp-value">${distanceNm} NM <span style="color:var(--text-muted); font-size:10px;">(${distanceKm} km)</span></div>
@@ -1169,8 +1253,9 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
 
         <div class="fp-section" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color);">
             <div class="fp-section-title">${isFr ? 'Vent à ' + cruiseAltFt + ' ft' : 'Wind at ' + cruiseAltFt + ' ft'}</div>
-            ${wind ? `
-                <div class="fp-grid" style="margin-top:6px;">
+            ${wind ? '' : `<div style="font-size:11px; color:var(--text-muted); margin-top:4px;">${isFr ? 'Vent indisponible' : 'Wind unavailable'}</div>`}
+            <div class="fp-grid fp-grid-line" style="margin-top:6px;">
+                ${wind ? `
                     <div class="fp-cell">
                         <div class="fp-label">${isFr ? 'Vent' : 'Wind'}</div>
                         <div class="fp-value">${String(wind.dir).padStart(3, '0')}° / ${wind.speedKt} kt</div>
@@ -1181,12 +1266,7 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
                             ${wc.driftDeg > 0 ? '+' : ''}${wc.driftDeg}°
                         </div>
                     </div>
-                </div>
-            ` : `<div style="font-size:11px; color:var(--text-muted); margin-top:4px;">${isFr ? 'Vent indisponible' : 'Wind unavailable'}</div>`}
-        </div>
-
-        <div class="fp-section" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color);">
-            <div class="fp-grid">
+                ` : ''}
                 <div class="fp-cell">
                     <div class="fp-label">${isFr ? 'Vitesse sol (GS)' : 'Ground speed'}</div>
                     <div class="fp-value">${groundSpeed} kt</div>
@@ -1275,7 +1355,13 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
 
         ${plan.isMultiLeg && plan.legs?.length ? `
             <div class="fp-section" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color);">
-                <div class="fp-section-title">${isFr ? 'Détail des waypoints (' + plan.legs.length + ')' : 'Leg details (' + plan.legs.length + ')'}</div>
+                <div class="fp-section-title" style="display:flex; align-items:center; gap:8px;">
+                    <span style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${isFr ? 'Détail des waypoints (' + plan.legs.length + ')' : 'Leg details (' + plan.legs.length + ')'}</span>
+                    ${plan.legs.length >= 3 ? `<button type="button" class="fp-invert-btn" title="${isFr ? 'Inverser complètement le sens des points de passage' : 'Completely reverse the waypoint order'}">
+                        <i data-lucide="arrow-down-up" style="width:11px;height:11px;"></i>
+                        <span>${isFr ? 'Inverser' : 'Reverse'}</span>
+                    </button>` : ''}
+                </div>
                 <table class="fp-navlog" style="margin-top:6px;">
                     <thead>
                         <tr>
@@ -1561,7 +1647,13 @@ function _renderInputs(from, to, fromName, toName, alt, tas, burn, isNight, isFr
         <div class="fp-inputs">
             <label class="fp-input-label" style="grid-column: 1 / -1;" title="${isFr ? 'Waypoints intermédiaires (codes OACI séparés par espaces)' : 'Intermediate waypoints (ICAO codes, space-separated)'}">
                 <span>${isFr ? 'Waypoints (optionnel)' : 'Waypoints (optional)'}</span>
-                <input type="text" id="fp-waypoints" value="${escapeHtml(waypointsValue)}" placeholder="${isFr ? 'LFPB LFOB puis Tab' : 'LFPB LFOB then Tab'}" class="fp-input" style="font-family:'DM Mono',monospace; text-transform:uppercase;">
+                <span style="display:flex; align-items:center; gap:8px; min-width:0;">
+                    <input type="text" id="fp-waypoints" value="${escapeHtml(waypointsValue)}" placeholder="${isFr ? 'LFPB LFOB puis Tab' : 'LFPB LFOB then Tab'}" class="fp-input" style="font-family:'DM Mono',monospace; text-transform:uppercase; flex:1 1 auto; min-width:0;">
+                    ${waypointsValue.trim().split(/\s+/).filter(Boolean).length >= 2 ? `<button type="button" class="fp-invert-btn" title="${isFr ? 'Inverser complètement le sens des points de passage' : 'Completely reverse the waypoint order'}">
+                        <i data-lucide="arrow-down-up" style="width:11px;height:11px;"></i>
+                        <span>${isFr ? 'Inverser' : 'Reverse'}</span>
+                    </button>` : ''}
+                </span>
             </label>
             <label class="fp-input-label">
                 <span>${isFr ? 'Alt. croisière (ft)' : 'Cruise alt (ft)'}</span>
@@ -1594,12 +1686,19 @@ function _wireInputs(container, from, to) {
         try {
             // Lit les waypoints saisis (codes OACI ou noms de repères libres
             // affichés dans le champ) et peuple state.route pour le multi-leg.
+            // Destination LUE EN DIRECT : ce câblage peut dater d'un rendu
+            // précédent (destination changée depuis — typiquement la boucle
+            // sans étape, dont le panneau est masqué avant tout rendu).
+            const toLive = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase() || to;
             const wpInput = container.querySelector('#fp-waypoints');
             if (wpInput) {
                 const wps = parseWaypointsField(wpInput.value);
-                state.route = wps.length ? [from, ...wps, to] : null;
+                state.route = wps.length ? [from, ...wps, toLive] : null;
+                // Les posées suivent le champ : une étape retirée n'en est
+                // plus une.
+                state.routePoses = (state.routePoses || []).filter(c => wps.includes(c));
             }
-            showFlightPlanner(from, to);
+            showFlightPlanner(from, toLive);
             // Notifie la carte régionale de redessiner la route avec les waypoints.
             // setTimeout(0) : attend que le DOM du panneau soit recréé avant de notifier,
             // pour éviter que le re-render ne détruise le champ waypoints en cours de saisie.
