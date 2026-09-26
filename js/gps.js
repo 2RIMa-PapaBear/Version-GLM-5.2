@@ -71,7 +71,8 @@ const T = () => isFr() ? {
     volSuppr: 'Supprimer ce vol',
     volTrace: 'Afficher ou masquer la trace de ce vol sur la carte',
     volCsvTitle: 'CSV format G1000 (Garmin) — le mieux reconnu par les analyseurs de vols',
-    volShareTitle: 'Partager GPX + KML + CSV par les applis de l\'appareil (mail, WhatsApp, Drive…) — sans partage natif : télécharge les trois fichiers',
+    volShareTitle: 'Partager le vol par mail/WhatsApp/Drive… (Android : CSV G1000 ; iPhone : les 3 formats) — sans partage possible : télécharge le CSV',
+    volShareFallback: 'Partage natif indisponible ici — CSV G1000 téléchargé (boutons GPX/KML pour les autres formats)',
     routePrevue: '(prévu)',
     dureeVol: 'vol',
     dureeSuivi: 'suivi',
@@ -101,7 +102,8 @@ const T = () => isFr() ? {
     volSuppr: 'Delete this flight',
     volTrace: 'Show or hide this flight\'s track on the map',
     volCsvTitle: 'G1000 (Garmin) CSV — best recognized by flight analyzers',
-    volShareTitle: 'Share GPX + KML + CSV via your device\'s apps (mail, WhatsApp, Drive…) — without native sharing: downloads all three files',
+    volShareTitle: 'Share the flight via mail/WhatsApp/Drive… (Android: G1000 CSV; iPhone: all three files) — if sharing is unavailable: downloads the CSV',
+    volShareFallback: 'Native sharing unavailable here — G1000 CSV downloaded (GPX/KML buttons for the other formats)',
     routePrevue: '(planned)',
     dureeVol: 'flight',
     dureeSuivi: 'tracking',
@@ -538,11 +540,16 @@ async function openPanel() {
         row.querySelector('[data-x="gpx"]').addEventListener('click', () => download(volName(v) + '.gpx', toGpx(v, routeAtClick()), 'application/gpx+xml'));
         row.querySelector('[data-x="kml"]').addEventListener('click', () => download(volName(v) + '.kml', toKml(v, routeAtClick(), t.routePrevue), 'application/vnd.google-earth.kml+xml'));
         row.querySelector('[data-x="csv"]').addEventListener('click', () => download(volName(v) + '.csv', toG1000Csv(v), 'text/csv'));
-        // Partage natif (menu du téléphone) des trois formats d'un coup ;
-        // appareil sans partage de fichiers (PC) : téléchargement des trois.
+        // Partage natif (menu du téléphone) ; sans partage possible (PC,
+        // vieux navigateurs) : CSV SEUL téléchargé + message visible —
+        // jamais une rafale de téléchargements bloqués en silence.
         row.querySelector('[data-x="share"]').addEventListener('click', async () => {
             const files = volFiles(v, routeAtClick(), t.routePrevue);
-            if (!(await shareFiles(files, volName(v)))) files.forEach(f => download(f.name, f.content, f.mime));
+            if (!(await shareFiles(files, volName(v)))) {
+                const csv = files.find(f => f.name.endsWith('.csv')) || files[0];
+                download(csv.name, csv.content, csv.mime);
+                showErr(t.volShareFallback);
+            }
         });
         row.querySelector('[data-x="del"]').addEventListener('click', async () => {
             if (replayVolId === v.id) resetReplay();
