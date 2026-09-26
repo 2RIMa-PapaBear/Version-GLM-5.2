@@ -12,6 +12,14 @@ import assert from 'node:assert/strict';
 
 // Le module importe core.js/ui-module.js (DOM-free au chargement grâce aux
 // gardes), on peut donc l'importer ici pour les fonctions pures.
+// Stub localStorage AVANT tout import : la flotte (aircraft-fleet.js) y est
+// lue PAR APPEL (mention avion des exports GPX/KML).
+const _lsStore = new Map();
+globalThis.localStorage = {
+    getItem: (k) => (_lsStore.has(k) ? _lsStore.get(k) : null),
+    setItem: (k, v) => _lsStore.set(k, String(v)),
+    removeItem: (k) => _lsStore.delete(k),
+};
 import { parseGpx, parseKml, buildGpx, buildKml, parsePlanJson } from '../js/flight-plan-io.js';
 
 describe('parseGpx', () => {
@@ -100,6 +108,31 @@ describe('buildGpx / buildKml (round-trip)', () => {
         assert.ok(gpx.includes('A&amp;B&lt;C&gt;'));
         const pts = parseGpx(gpx);
         assert.equal(pts[0].name, 'A&B<C>');
+    });
+
+    // Mention AVION dans les exports (retour pilote 26/09) : type +
+    // immatriculation de l'avion ACTIF — testés via le stub localStorage
+    // du tête de fichier + les vraies APIs de la flotte (comme
+    // fleet.test.mjs). La flotte ne peut jamais être vide (C172 par
+    // défaut recréé par getFleet) : le cas « sans mention » correspond à
+    // un avion actif sans type ni immatriculation.
+    test('GPX/KML portent le type + immatriculation de l avion actif', async () => {
+        const fleetMod = await import('../js/aircraft-fleet.js');
+        const ac = fleetMod.addAircraft({ name: 'QA Machine', registration: 'F-QA01', type: 'WT9-LSA', groundRoll: 150, fiftyFt: 400, safetyMargin: 10 });
+        fleetMod.setActiveAircraft(ac.id);
+        const gpx = buildGpx(planRep);
+        assert.ok(gpx.includes('<desc>WT9-LSA · F-QA01</desc>'), 'desc GPX');
+        assert.ok(gpx.includes('<metadata><name>WT9-LSA · F-QA01</name></metadata>'), 'metadata GPX');
+        const kml = buildKml(planRep);
+        assert.ok(kml.includes('<description>WT9-LSA · F-QA01</description>'), 'description KML');
+        // Les parseurs restent insensibles aux nouveaux blocs.
+        assert.equal(parseGpx(gpx).length, 2);
+        assert.equal(parseKml(kml).length, 2);
+        // Avion actif sans type ni immatriculation → aucune mention.
+        fleetMod.updateAircraft(ac.id, { type: '', registration: '' });
+        const gpx2 = buildGpx(planRep);
+        assert.ok(!gpx2.includes('<desc>'), 'pas de desc sans type/immat');
+        assert.equal(parseGpx(gpx2).length, 2);
     });
 });
 
