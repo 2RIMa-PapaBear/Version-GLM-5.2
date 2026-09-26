@@ -186,7 +186,7 @@ function coordsOf(code) {
     return (lat != null && lon != null) ? { lat, lon } : null;
 }
 
-function planPoints(plan) {
+export function planPoints(plan) {
     const seq = [plan.dep, ...(Array.isArray(plan.wps) ? plan.wps : []), plan.dest];
     const pts = [];
     for (const w of seq) {

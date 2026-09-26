@@ -20,14 +20,17 @@
 //     première vitesse > 35 kt (FT_START_MS). Vitesse/cap calculés entre
 //     fixations quand le téléphone ne les fournit pas.
 //   - HISTORIQUE IndexedDB (« mt-gps-test/vols », 50 derniers) + panneau
-//     « Vols » : revoir les vols passés, exporter .GPX (1.1) ou .KML,
-//     supprimer. Vitesse/altitude/temps de vol ne sont PAS affichés à
-//     l'écran (souhait pilote) : ils vivent dans les exports.
+//     « Vols » : revoir les vols passés, exporter .GPX (1.1), .KML ou .CSV
+//     (G1000), supprimer. La route PRÉVUE du plan courant accompagne la
+//     trace réelle (waypoints GPX / ligne KML). Vitesse/altitude/temps de
+//     vol ne sont PAS affichés à l'écran (souhait pilote) : ils vivent dans
+//     les exports, avec précision GPS et vario dérivé par point.
 // ============================================================================
 import { state } from './core.js';
 import { vrForType, chronoThresholdKt } from './aircraft-database.js';
 import { getActiveAircraft } from './aircraft-fleet.js';
-import { volSave, volAll, volDel, volDurMs, volName, toGpx, toKml, download } from './gps-vols.js';
+import { volSave, volAll, volDel, volDurMs, volName, toGpx, toKml, toG1000Csv, download } from './gps-vols.js';
+import { readCurrentPlan, planPoints } from './flight-plan-io.js';
 import { getRegisteredMap } from './map-registry.js';
 
 const ROT_OFFSET = -45;          // glyphe Lucide orienté NE → rotation = cap − 45°
@@ -62,11 +65,13 @@ const T = () => isFr() ? {
     rotTitleRoute: 'Route en haut : la carte tourne avec ton cap — cliquer pour revenir Nord en haut',
     rotIndispo: 'Rotation non disponible',
     vols: 'Vols',
-    volsTitle: 'Vols enregistrés sur ce portable (export GPX/KML)',
+    volsTitle: 'Vols enregistrés sur ce portable (export GPX/KML/CSV G1000)',
     volsAucun: 'Aucun vol enregistré. Chaque session de suivi GPS est enregistrée automatiquement.',
     volsFermer: 'Fermer',
     volSuppr: 'Supprimer ce vol',
     volTrace: 'Afficher ou masquer la trace de ce vol sur la carte',
+    volCsvTitle: 'CSV format G1000 (Garmin) — le mieux reconnu par les analyseurs de vols',
+    routePrevue: '(prévu)',
     dureeVol: 'vol',
     dureeSuivi: 'suivi',
 } : {
@@ -89,11 +94,13 @@ const T = () => isFr() ? {
     rotTitleRoute: 'Track-up: the map rotates with your heading — click to go back to North-up',
     rotIndispo: 'Rotation unavailable',
     vols: 'Flights',
-    volsTitle: 'Flights recorded on this device (GPX/KML export)',
+    volsTitle: 'Flights recorded on this device (GPX/KML/G1000 CSV export)',
     volsAucun: 'No recorded flight yet. Each GPS tracking session is recorded automatically.',
     volsFermer: 'Close',
     volSuppr: 'Delete this flight',
     volTrace: 'Show or hide this flight\'s track on the map',
+    volCsvTitle: 'G1000 (Garmin) CSV — best recognized by flight analyzers',
+    routePrevue: '(planned)',
     dureeVol: 'flight',
     dureeSuivi: 'tracking',
 };
@@ -394,6 +401,7 @@ function onFix(pos) {
             alt: Number.isFinite(c.altitude) ? c.altitude : null,
             spd: Number.isFinite(spd) ? spd : null,
             hdg: haveHdg ? Math.round(lastHdg * 10) / 10 : null,
+            acc: Number.isFinite(c.accuracy) ? c.accuracy : null,   // précision GPS (m), pour l'export
         });
         // Chrono de vol : première vitesse au-dessus du seuil décollage (VR − 5 kt)
         if (!curVol.flightStartT && Number.isFinite(spd) && spd >= ftStartMs) curVol.flightStartT = t;
@@ -497,6 +505,7 @@ async function openPanel() {
             <button class="gps-vol-btn${replayVolId === v.id ? ' active' : ''}" data-x="see" title="${t.volTrace}">Trace</button>
             <button class="gps-vol-btn" data-x="gpx">GPX</button>
             <button class="gps-vol-btn" data-x="kml">KML</button>
+            <button class="gps-vol-btn" data-x="csv" title="${t.volCsvTitle || 'CSV G1000'}">CSV</button>
             <button class="gps-vol-del" data-x="del" title="${t.volSuppr}"><i data-lucide="trash-2" style="width:13px;height:13px;"></i></button>
         </div>`;
     }).join('') : `<div class="gps-vols-empty">${t.volsAucun}</div>`;
@@ -509,8 +518,20 @@ async function openPanel() {
         const v = all.find(x => String(x.id) === row.dataset.id);
         if (!v) return;
         row.querySelector('[data-x="see"]').addEventListener('click', () => { toggleReplay(v); openPanel(); });
-        row.querySelector('[data-x="gpx"]').addEventListener('click', () => download(volName(v) + '.gpx', toGpx(v), 'application/gpx+xml'));
-        row.querySelector('[data-x="kml"]').addEventListener('click', () => download(volName(v) + '.kml', toKml(v), 'application/vnd.google-earth.kml+xml'));
+        // Route prévue du plan courant (départ → étapes → arrivée), résolue en
+        // coordonnées au clic : tracée en waypoints GPX / ligne KML à côté de
+        // la trace réelle (comparaison prévu/volé). Sans plan → rien.
+        const routeAtClick = () => {
+            try {
+                const plan = readCurrentPlan();
+                if (!plan.dep || !plan.dest) return null;
+                const pts = planPoints(plan);
+                return pts.length >= 2 ? pts : null;
+            } catch (e) { return null; }
+        };
+        row.querySelector('[data-x="gpx"]').addEventListener('click', () => download(volName(v) + '.gpx', toGpx(v, routeAtClick()), 'application/gpx+xml'));
+        row.querySelector('[data-x="kml"]').addEventListener('click', () => download(volName(v) + '.kml', toKml(v, routeAtClick(), t.routePrevue), 'application/vnd.google-earth.kml+xml'));
+        row.querySelector('[data-x="csv"]').addEventListener('click', () => download(volName(v) + '.csv', toG1000Csv(v), 'text/csv'));
         row.querySelector('[data-x="del"]').addEventListener('click', async () => {
             if (replayVolId === v.id) resetReplay();
             await volDel(v.id, updateVolsCount); openPanel();
