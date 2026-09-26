@@ -110,6 +110,20 @@ describe('buildGpx / buildKml (round-trip)', () => {
         assert.equal(pts[0].name, 'A&B<C>');
     });
 
+    // Altitude de croisière sur chaque point (retour pilote 26/09) : <ele>
+    // en mètres côté GPX, coordonnées + altitudeMode côté KML.
+    test('GPX/KML plan portent l altitude de croisière', () => {
+        const gpx = buildGpx({ ...planRep, cruiseAltFt: 3500 });
+        assert.ok(gpx.includes('<ele>1067</ele>'), 'ele = 3500 ft en mètres');
+        assert.equal(parseGpx(gpx).length, 2, 'le parseur ignore ele sans broncher');
+        const kml = buildKml({ ...planRep, cruiseAltFt: 3500 });
+        assert.ok(kml.includes('<altitudeMode>absolute</altitudeMode><coordinates>2.500000,1.500000,1067</coordinates>'), 'Point KML à 1067 m');
+        assert.equal(parseKml(kml).length, 2, 'round-trip KML intact');
+        // Sans altitude prévue : pas d'ele, coordonnées à 0 comme avant.
+        assert.ok(!buildGpx(planRep).includes('<ele>'));
+        assert.ok(buildKml(planRep).includes('<coordinates>2.500000,1.500000,0</coordinates>'));
+    });
+
     // Mention AVION dans les exports (retour pilote 26/09) : type +
     // immatriculation de l'avion ACTIF — testés via le stub localStorage
     // du tête de fichier + les vraies APIs de la flotte (comme

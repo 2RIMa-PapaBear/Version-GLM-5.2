@@ -100,7 +100,11 @@ function aircraftMention() {
 export function buildGpx(plan) {
     const pts = planPoints(plan);
     const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    const rtepts = pts.map(p => `    <rtept lat="${p.lat.toFixed(6)}" lon="${p.lon.toFixed(6)}"><name>${esc(p.name)}</name></rtept>`).join('\n');
+    // Altitude de croisière sur chaque point (<ele> en mètres, spec GPX) —
+    // les logiciels de nav (SkyDemon…) affichent la route à son altitude.
+    // La vitesse n'a pas de sens sur une route (pas de temps par point).
+    const altM = plan?.cruiseAltFt ? Math.round(plan.cruiseAltFt * 0.3048) : null;
+    const rtepts = pts.map(p => `    <rtept lat="${p.lat.toFixed(6)}" lon="${p.lon.toFixed(6)}">${altM != null ? `<ele>${altM}</ele>` : ''}<name>${esc(p.name)}</name></rtept>`).join('\n');
     const avion = aircraftMention();
     const desc = avion ? `\n    <desc>${esc(avion)}</desc>` : '';
     const meta = avion ? `\n  <metadata><name>${esc(avion)}</name></metadata>` : '';
@@ -134,10 +138,12 @@ export function parseGpx(text) {
 export function buildKml(plan) {
     const pts = planPoints(plan);
     const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // Altitude de croisière (mètres) sur les points et la ligne de route.
+    const altM = plan?.cruiseAltFt ? Math.round(plan.cruiseAltFt * 0.3048) : null;
     const marks = pts.map(p =>
-        `    <Placemark><name>${esc(p.name)}</name><Point><coordinates>${p.lon.toFixed(6)},${p.lat.toFixed(6)},0</coordinates></Point></Placemark>`
+        `    <Placemark><name>${esc(p.name)}</name><Point>${altM != null ? '<altitudeMode>absolute</altitudeMode>' : ''}<coordinates>${p.lon.toFixed(6)},${p.lat.toFixed(6)},${altM != null ? altM : 0}</coordinates></Point></Placemark>`
     ).join('\n');
-    const line = pts.map(p => `${p.lon.toFixed(6)},${p.lat.toFixed(6)},0`).join(' ');
+    const line = pts.map(p => `${p.lon.toFixed(6)},${p.lat.toFixed(6)},${altM != null ? altM : 0}`).join(' ');
     const avion = aircraftMention();
     const desc = avion ? `\n    <description>${esc(avion)}</description>` : '';
     return `<?xml version="1.0" encoding="UTF-8"?>
@@ -145,7 +151,7 @@ export function buildKml(plan) {
   <Document>
     <name>${esc(plan.dep)}-${esc(plan.dest)}</name>${desc}
 ${marks}
-    <Placemark><name>Route</name><LineString><coordinates>${line}</coordinates></LineString></Placemark>
+    <Placemark><name>Route</name><LineString>${altM != null ? '<altitudeMode>absolute</altitudeMode>' : ''}<coordinates>${line}</coordinates></LineString></Placemark>
   </Document>
 </kml>`;
 }
