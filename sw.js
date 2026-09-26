@@ -30,7 +30,7 @@
  * en network-first pour récupérer le nouveau index.html.
  * ================================================================ */
 
-const CACHE = 'mt-shell-v405';
+const CACHE = 'mt-shell-v406';
 const TILES_CACHE = 'mt-tiles-v1';   // tuiles + cells airspaces (borné)
 const PDF_CACHE = 'mt-pdf-v1';       // cartes VAC consultées (borné)
 const TILES_MAX = 1500;              // entrées ; au-delà : cache vidé (rebuildable)
