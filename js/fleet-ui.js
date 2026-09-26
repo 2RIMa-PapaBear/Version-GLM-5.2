@@ -14,7 +14,7 @@
  * atmosphère standard (ISA).
  * ================================================================ */
 
-import { state } from './core.js';
+import { state, escapeHtml as _esc } from './core.js';
 import {
     getFleet, getActiveAircraftId, setActiveAircraft,
     addAircraft, updateAircraft, deleteAircraft,
@@ -885,8 +885,7 @@ function _doDelete(id) {
     _render();
 }
 
-function _esc(text) {
-    const el = document.createElement('div');
-    el.textContent = String(text || '');
-    return el.innerHTML;
-}
+// _esc = escapeHtml de core.js (ré-audit 26/09 : la copie locale
+// div/innerHTML n'échappait pas les guillemets — usage en value="…" des
+// noms de poste W&B).
+

@@ -43,7 +43,6 @@ const NO_CACHE_HOSTS = [
     'nominatim.openstreetmap.org',
     'script.google.com',          // proxy Apps Script (relai CORS météo, historique)
     'workers.dev',                // relais Cloudflare (METAR/TAF/NOTAM/SIGMET/PIB)
-    'workers.dev',                // relais Cloudflare (METAR/TAF/NOTAM/SIGMET/PIB)
     'corsproxy.io',               // relais de repli
     'rainviewer.com',             // radar temps réel — périmé = dangereux
 ];

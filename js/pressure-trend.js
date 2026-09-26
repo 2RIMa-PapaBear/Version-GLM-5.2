@@ -55,8 +55,15 @@ export async function fetchPressureTrend(icao) {
                     const timeMatch = raw.match(/\b(\d{2})(\d{2})(\d{2})Z\b/);
                     if (timeMatch) {
                         const now = new Date();
-                        obsTime = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(),
-                            parseInt(timeMatch[1], 10), parseInt(timeMatch[2], 10), parseInt(timeMatch[3], 10)));
+                        // Recul/avance JOUR PAR JOUR (même correctif que
+                        // data-age 26/09 — ré-audit : le 1er du mois, un
+                        // message de la veille (31) devenait ~30 j dans le
+                        // futur → hoursSpan faussé, tendance ≈ 0 silencieuse).
+                        let t = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(),
+                            parseInt(timeMatch[1], 10), parseInt(timeMatch[2], 10), parseInt(timeMatch[3], 10));
+                        while (t - now.getTime() > 12 * 3600e3) t -= 24 * 3600e3;
+                        while (now.getTime() - t > 36 * 3600e3) t += 24 * 3600e3;
+                        obsTime = new Date(t);
                     }
                 }
                 return qnh !== null && obsTime && !isNaN(obsTime) ? { qnh, time: obsTime.getTime() } : null;

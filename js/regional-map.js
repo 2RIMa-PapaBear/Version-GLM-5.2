@@ -1,4 +1,4 @@
-import { state, I18N, fetchAvecRelais, memoGet, memoSet, surfaceLabel, escapeHtml as _escapeHtml } from './core.js';
+import { state, I18N, fetchAvecRelais, memoGet, memoSet, surfaceLabel, escapeHtml } from './core.js';
 import { getAirportByICAO, getAirportsInBbox, enrichAirport, forgetAirport } from './ui-module.js';
 import { parseWaypointsField, formatWaypointsField, registerFreeWpResolver, _wpDisplayName } from './flight-planner-ui.js';
 import { parseVisiToMeters, getCeiling } from './core.js';
@@ -478,7 +478,7 @@ function createSigmetController(map) {
             const isAirmet = s.type === 'AIRMET';
             const label = isAirmet ? `AIRMET ${s.hazard}` : `SIGMET ${s.hazard}`;
             const popupHtml = `<div style="max-width:280px;"><b style="color:${color};">${label}</b><br>` +
-                              `<pre style="white-space:pre-wrap; font-family:'DM Mono',monospace; font-size:11px; margin-top:4px;">${_escapeHtml(s.raw)}</pre></div>`;
+                              `<pre style="white-space:pre-wrap; font-family:'DM Mono',monospace; font-size:11px; margin-top:4px;">${escapeHtml(s.raw)}</pre></div>`;
 
             if (s.polygon && s.polygon.length >= 3) {
                 markers.push(L.polygon(s.polygon, {
@@ -1577,8 +1577,6 @@ function _updateRunwayVisibility() {
     else if (!show && _map.hasLayer(_runwayLayer)) _map.removeLayer(_runwayLayer);
 }
 
-function escapeHtml(text) {
-    const el = document.createElement('div');
-    el.textContent = text;
-    return el.innerHTML;
-}
+// escapeHtml (18 usages, CONTEXTES ATTRIBUT compris) vient de core.js —
+// la copie locale div/innerHTML (guillemets non échappés) laissait sortir
+// un attribut par un nom de repère contenant " (ré-audit 26/09).
