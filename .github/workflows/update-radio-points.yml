@@ -36,7 +36,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Crawl mondial des espaces aériens (cellules 1°, budget 4 h)
         env:
@@ -94,7 +94,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Fraîcheur obstacles SIA vs cycle AIRAC
         run: node scripts/check-obstacles-airac.mjs
@@ -116,7 +116,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Fraîcheur base XML SIA vs cycle AIRAC
         run: node scripts/check-sia-airac.mjs

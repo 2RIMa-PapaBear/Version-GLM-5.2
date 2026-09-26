@@ -45,7 +45,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Bascule des fichiers (restauration + garde-fous + test)
         run: node scripts/bascule-airac.mjs --cycle=2026-10-01 --ref=a937cce3 --no-commit --force=${{ github.event.inputs.force || 'false' }}
