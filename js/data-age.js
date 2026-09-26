@@ -128,9 +128,13 @@ export function dataAgeUpdate(metarText, opts = {}) {
             const now = new Date();
             const d = parseInt(m[1], 10), h = parseInt(m[2], 10), mn = parseInt(m[3], 10);
             // Jour du mois observé : hier possible (message émis à 23:50 lu à 00:10).
+            // Recul/avance JOUR PAR JOUR (audit 26/09) : le saut de mois par
+            // arithmétique produisait des dates impossibles (29/02 non
+            // bissextile → roulé au 01/03, badge « frais » ~24 h sur un
+            // message de la veille).
             let t = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), d, h, mn);
-            if (t - now.getTime() > 12 * 3600e3) t = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, d, h, mn);
-            if (now.getTime() - t > 36 * 3600e3) t = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, d, h, mn);
+            while (t - now.getTime() > 12 * 3600e3) t -= 24 * 3600e3;
+            while (now.getTime() - t > 36 * 3600e3) t += 24 * 3600e3;
             obsTimeMs = t;
         }
     }

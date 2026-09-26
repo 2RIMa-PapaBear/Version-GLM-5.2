@@ -70,6 +70,11 @@ jobs:
       - name: Dépendances (basic-ftp pour l'upload, esbuild pour la minification)
         run: npm install --no-save basic-ftp esbuild
 
+      # Audit 26/09 : la prod partait SANS aucun test — un test rouge
+      # n'empêchait jamais le déploiement. On bloque ici, avant l'upload.
+      - name: Tests (bloquants — aucun déploiement sur rouge)
+        run: npm test
+
       - name: Déploiement FTP + bump versions
         env:
           FTP_HOST: ${{ secrets.FTP_SERVER }}

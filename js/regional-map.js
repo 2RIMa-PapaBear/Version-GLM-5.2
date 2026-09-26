@@ -1,4 +1,4 @@
-import { state, I18N, fetchAvecRelais, memoGet, memoSet, surfaceLabel } from './core.js';
+import { state, I18N, fetchAvecRelais, memoGet, memoSet, surfaceLabel, escapeHtml as _escapeHtml } from './core.js';
 import { getAirportByICAO, getAirportsInBbox, enrichAirport, forgetAirport } from './ui-module.js';
 import { parseWaypointsField, formatWaypointsField, registerFreeWpResolver, _wpDisplayName } from './flight-planner-ui.js';
 import { parseVisiToMeters, getCeiling } from './core.js';
@@ -526,9 +526,8 @@ function createSigmetController(map) {
     };
 }
 
-function _escapeHtml(s) {
-    return String(s || '').replace(/[&<>]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch]));
-}
+// _escapeHtml vient de core.js (dédupliqué 26/09 — échappe aussi les
+// guillemets, sûr en attribut).
 
 // Contrôleur SIGMET/AIRMET retiré de la carte (retour pilote 05/09 :
 // « peu utile en VFR ») — les polygones n'étaient plus activables depuis

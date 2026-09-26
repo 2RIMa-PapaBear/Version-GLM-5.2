@@ -55,8 +55,16 @@
            d'identifiant. Comme pour tout site web, votre adresse IP transite par l'hébergeur (Free)
            et, pour certains flux (météo aéronautique, NOTAM, TEMSI), par un relais technique
            (Cloudflare Workers) géré par l'éditeur, qui ne conserve pas vos données. Les polices de
-           caractères sont auto-hébergées : <strong>aucune requête n'est envoyée à Google</strong> ou à un
-           autre tiers à votre insu.</p>
+           caractères sont auto-hébergées : <strong>aucune requête n'est envoyée à Google</strong>.
+           Autres services tiers contactés, uniquement lors des fonctionnalités concernées :
+           <strong>openAIP</strong> (données d'aérodromes, api.core.openaip.net),
+           <strong>RainViewer</strong> (image radar temps réel),
+           <strong>Open-Meteo</strong> (vents en altitude et isotherme 0 °C),
+           <strong>goQR</strong> (api.qrserver.com — génération du QR code du lien de partage :
+           ce service reçoit l'URL du partage, c'est-à-dire les terrains de votre plan),
+           <strong>OpenStreetMap / OpenTopoMap / AWS / Esri</strong> (fonds de carte et terrain),
+           et <strong>cdnjs</strong> (cdnjs.cloudflare.com, bibliothèque de calcul solaire).
+           Aucun de ces services ne reçoit d'identifiant vous concernant.</p>
 
         <h2>Géolocalisation</h2>
         <p>La géolocalisation n'est utilisée que si vous avez accordé la permission à votre navigateur,

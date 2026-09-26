@@ -43,9 +43,29 @@ import { mergePibChunks } from './fusion-pib.mjs';
 
 const TTL_PDF_SEC = 7 * 86400;   // cartes AIRAC : URL par cycle, jamais périmée
 
+// ---- Garde d'origine (audit 26/09) -------------------------------------------
+// Les routes consommant le COMPTE AEROWEB/SOFIA du pilote (/notam, /temsi,
+// /fronts, /sigmet) étaient appelables depuis N'IMPORTE QUEL site (CORS *)
+// → n'importe qui pouvait scripter des appels et faire bannir le compte.
+// Refus si l'Origin est un site tiers ; Origin ABSENTE = appel non-navigateur
+// (health-check, curl, scripts du repo) → autorisée.
+const ROUTES_A_COMPTE = /^\/(notam|temsi|fronts|sigmet)$/;
+function origineAutorisee(request) {
+    const o = request.headers.get('origin');
+    if (!o) return true;
+    let u; try { u = new URL(o); } catch { return false; }
+    if (u.protocol === 'https:' && u.host === 'papabear56.pages-perso.free.fr') return true;   // PWA officielle
+    if (u.protocol === 'http:' && u.host === 'papabear56.free.fr') return true;                // miroir HTTP historique
+    if (/^https?:$/.test(u.protocol) && /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(u.host)) return true;  // dév/QA locale
+    return false;
+}
+
 export default {
     async fetch(request, env, ctx) {
         const url = new URL(request.url);
+        if (ROUTES_A_COMPTE.test(url.pathname) && !origineAutorisee(request)) {
+            return reponse(403, JSON.stringify({ error: 'Origin non autorisee' }), 'application/json');
+        }
         if (request.method === 'POST' && url.pathname === '/notam') {
             try {
                 return await pibNotam(request);

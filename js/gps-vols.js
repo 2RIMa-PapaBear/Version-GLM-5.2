@@ -38,28 +38,48 @@ export function volDurMs(v) {
     return (v.pts.length ? v.pts[v.pts.length - 1].t : v.id) - v.id;
 }
 
-/** Écrit/met à jour un vol ; purge au-delà de VOLS_MAX ; onChange = compteur UI. */
+/** Écrit/met à jour un vol ; purge au-delà de VOLS_MAX — par CLÉS seules
+ *  (getAllKeys, audit 26/09 : l'ancien volAll() relisait les ~50 vols
+ *  COMPLETS à chaque sauvegarde, soit toutes les 3 min en vol).
+ *  Retourne false si l'écriture échoue (quota, IndexedDB indisponible) :
+ *  l'appelant peut avertir le pilote — le vol reste exportable de la
+ *  session courante. */
 export async function volSave(vol, onChange) {
     try {
         const db = await idb();
-        const st = db.transaction(VDB_STORE, 'readwrite').objectStore(VDB_STORE);
+        const tx = db.transaction(VDB_STORE, 'readwrite');
+        const st = tx.objectStore(VDB_STORE);
         st.put(vol);
-        const all = await volAll();
-        for (const old of all.slice(VOLS_MAX)) st.delete(old.id);
-        onChange?.();
-    } catch (e) { /* stockage indisponible : le vol reste exportable de la session */ }
-}
-
-export async function volAll() {
-    try {
-        const db = await idb();
-        const all = await new Promise((res, rej) => {
-            const rq = db.transaction(VDB_STORE).objectStore(VDB_STORE).getAll();
+        // Purge par clés seules : les ids sont des horodatages (tri numérique
+        // = tri chronologique), nul besoin de désérialiser les vols.
+        const keys = await new Promise((res, rej) => {
+            const rq = st.getAllKeys();
             rq.onsuccess = () => res(rq.result || []);
             rq.onerror = () => rej(rq.error);
         });
-        return all.sort((a, b) => b.id - a.id);
-    } catch (e) { return []; }
+        for (const k of keys.sort((a, b) => b - a).slice(VOLS_MAX)) st.delete(k);
+        await new Promise((res, rej) => {
+            tx.oncomplete = () => res();
+            tx.onerror = () => rej(tx.error);
+            tx.onabort = () => rej(tx.error);
+        });
+        onChange?.();
+        return true;
+    } catch (e) { return false; /* le vol reste exportable de la session */ }
+}
+
+/** Tous les vols, du plus récent au plus ancien. LÈVE en cas de stockage
+ *  indisponible (l'appelant distingue « aucun vol » de « stockage HS » —
+ *  audit 26/09 : l'ancien catch silencieux affichait « Aucun vol
+ *  enregistré » alors que l'IndexedDB était simplement inaccessible). */
+export async function volAll() {
+    const db = await idb();
+    const all = await new Promise((res, rej) => {
+        const rq = db.transaction(VDB_STORE).objectStore(VDB_STORE).getAll();
+        rq.onsuccess = () => res(rq.result || []);
+        rq.onerror = () => rej(rq.error);
+    });
+    return all.sort((a, b) => b.id - a.id);
 }
 
 export async function volDel(id, onChange) {

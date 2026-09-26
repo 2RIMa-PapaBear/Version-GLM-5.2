@@ -3,7 +3,8 @@
 // sur la distance totale, vent axial conservé (atterrissage).
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { correctedTakeoffDistance, correctedLandingDistance , runwayLevel } from '../js/takeoff-performance.js';
+import { correctedTakeoffDistance, correctedLandingDistance , runwayLevel, _calcRunwaySlopePct } from '../js/takeoff-performance.js';
+import { _importForTests as _siaForTests } from '../js/sia-data.js';
 
 // Stub localStorage — lu PAR APPEL par la flotte (getFleet), pas au chargement.
 const _ls = new Map();
@@ -130,5 +131,31 @@ describe('runwayLevel (niveaux du verdict piste)', () => {
         assert.deepEqual(
             [1500, 1100, 950, 850].map(r => runwayLevel(900, 1080, r)),
             ['ok', 'caution', 'limitative', 'danger']);
+    });
+});
+
+// ② (26/09, audit) — PENTE DE PISTE DEPUIS LES SEUILS SIA : bug de
+// précédence `!x != null` (toujours vrai) → la fonction retournait TOUJOURS
+// null : le facteur ×1,05/1 % de la méthode de référence ne s'appliquait
+// jamais. LFRV 04/22 : seuil 04 à 429 ft, seuil 22 à 437 ft, 1530 m
+// → décollage 04 (montante) ≈ +0,2 %, décollage 22 (descendante) ≈ −0,2 %.
+describe('_calcRunwaySlopePct (seuils SIA)', () => {
+    test('LFRV 04 montante / 22 descendante (≈ ±0,2 %)', () => {
+        _siaForTests({ LFRV: [{ d: '04/22', len: 1530, main: true, t1: { id: '04', altFt: 429 }, t2: { id: '22', altFt: 437 } }] });
+        assert.equal(_calcRunwaySlopePct('LFRV', '04'), 0.2);
+        assert.equal(_calcRunwaySlopePct('LFRV', '22'), -0.2);
+        assert.equal(_calcRunwaySlopePct('LFRV', '04/22'), 0.2, 'paire donnée = sens t1→t2');
+    });
+    test('pente marquée : +50 ft sur 1000 ft = 5 %', () => {
+        _siaForTests({ LFTST: [{ d: '18/36', len: 305, main: true, t1: { id: '18', altFt: 500 }, t2: { id: '36', altFt: 550 } }] });
+        assert.equal(_calcRunwaySlopePct('LFTST', '18'), 5);
+        assert.equal(_calcRunwaySlopePct('LFTST', '36'), -5);
+    });
+    test('sans données de seuils ou terrain inconnu → null', () => {
+        _siaForTests({ LFNS: [{ d: '09/27', len: 800, main: true }] });   // pas de t1/t2
+        assert.equal(_calcRunwaySlopePct('LFNS', '09'), null);
+        assert.equal(_calcRunwaySlopePct('LZZZ', '04'), null);
+        assert.equal(_calcRunwaySlopePct('', '04'), null);
+        _siaForTests({});   // vide le registre pour les autres tests
     });
 });

@@ -71,6 +71,8 @@ const T = () => isFr() ? {
     volSuppr: 'Supprimer ce vol',
     volTrace: 'Afficher ou masquer la trace de ce vol sur la carte',
     volCsvTitle: 'CSV format G1000 (Garmin) — le mieux reconnu par les analyseurs de vols',
+    volSaveErr: 'Impossible d\'enregistrer le vol (stockage indisponible) — il reste exportable depuis cette page ouverte',
+    volsStoreErr: 'Stockage des vols indisponible (navigation privée ?) — impossible de lire l\'historique',
     routePrevue: '(prévu)',
     dureeVol: 'vol',
     dureeSuivi: 'suivi',
@@ -100,6 +102,8 @@ const T = () => isFr() ? {
     volSuppr: 'Delete this flight',
     volTrace: 'Show or hide this flight\'s track on the map',
     volCsvTitle: 'G1000 (Garmin) CSV — best recognized by flight analyzers',
+    volSaveErr: 'Flight cannot be saved (storage unavailable) — it remains exportable from this open page',
+    volsStoreErr: 'Flight storage unavailable (private browsing?) — history cannot be read',
     routePrevue: '(planned)',
     dureeVol: 'flight',
     dureeSuivi: 'tracking',
@@ -270,8 +274,22 @@ function appendTrace(ll) {
 
 async function updateVolsCount() {
     if (!volsCount) return;
-    const all = await volAll();
-    volsCount.textContent = all.length ? String(all.length) : '';
+    try {
+        const all = await volAll();
+        volsCount.textContent = all.length ? String(all.length) : '';
+    } catch { volsCount.textContent = ''; }
+}
+
+// volSave + avertissement pilote UNIQUE par session si le stockage est HS
+// (audit 26/09 : l'échec était silencieux — vol perdu sans le savoir).
+let volsSaveWarned = false;
+async function saveVol(vol) {
+    const ok = await volSave(vol, updateVolsCount);
+    if (!ok && !volsSaveWarned) {
+        volsSaveWarned = true;
+        showErr(T().volSaveErr);
+    }
+    return ok;
 }
 
 // ---- Rotation « Route haut » (restaurées après le découpage ⑥) ---------------
@@ -374,10 +392,10 @@ function updateVoyant() {
 }
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && mode !== 'off') requestWakeLock();
-    if (document.visibilityState === 'hidden' && curVol) volSave(curVol, updateVolsCount);   // arrière-plan/fermeture
+    if (document.visibilityState === 'hidden' && curVol) saveVol(curVol);   // arrière-plan/fermeture
 });
 // Fermeture de la page (swipe de fermeture, changement de page…) : dernier état sauvegardé
-window.addEventListener('pagehide', () => { if (curVol) volSave(curVol, updateVolsCount); });
+window.addEventListener('pagehide', () => { if (curVol) saveVol(curVol); });
 
 // ---- Suivi + enregistrement --------------------------------------------------
 function onFix(pos) {
@@ -444,8 +462,8 @@ function start() {
         const vr = vrForType(getActiveAircraft()?.type);
         ftStartMs = chronoThresholdKt(vr) / 1.94384;
     } catch (e) { /* flotte indisponible : seuil par défaut */ }
-    volSave(curVol, updateVolsCount);
-    gpsSaveTimer = setInterval(() => { if (curVol) volSave(curVol, updateVolsCount); }, 180000);   // 3 min (réglage pilote)
+    saveVol(curVol);
+    gpsSaveTimer = setInterval(() => { if (curVol) saveVol(curVol); }, 180000);   // 3 min (réglage pilote)
     mode = 'follow';
     render();
     requestWakeLock();
@@ -468,7 +486,7 @@ function stop() {
         curVol.endedAt = new Date().toISOString();
         // Durée en horloge murale (id = départ de session) : les timestamps
         // des fixations peuvent être identiques (cache géoloc, injecteurs).
-        if (curVol.pts.length >= 2 && (Date.now() - curVol.id) >= VOL_MIN_MS) volSave(curVol, updateVolsCount);
+        if (curVol.pts.length >= 2 && (Date.now() - curVol.id) >= VOL_MIN_MS) saveVol(curVol);
         else volDel(curVol.id, updateVolsCount);   // vol trop court : pas enregistré
         curVol = null;
     }
@@ -491,8 +509,11 @@ async function openPanel() {
     const t = T();
     panelOpen = true;
     volsPanel.classList.add('on');
-    const all = await volAll();
-    const rows = all.length ? all.map(v => {
+    // Stockage HS ≠ aucun vol : message dédié plutôt que « Aucun vol
+    // enregistré » (audit 26/09).
+    let all = null;
+    try { all = await volAll(); } catch (e) { /* all reste null */ }
+    const rows = all === null ? `<div class="gps-vols-empty">${t.volsStoreErr}</div>` : all.length ? all.map(v => {
         const d = new Date(v.id);
         const p = n => String(n).padStart(2, '0');
         const date = `${p(d.getDate())}/${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
@@ -701,12 +722,13 @@ function mount() {
     // Orphelins d'une fermeture brutale (endedAt nul, plus rien qui arrive) :
     // finalisés si ≥ durée minimale, sinon supprimés — même règle qu'à l'arrêt.
     (async () => {
-        const all = await volAll();
+        let all;
+        try { all = await volAll(); } catch { return; }   // stockage HS : rien à finaliser
         for (const v of all) {
             if (v.endedAt) continue;
             const lastT = v.pts.length ? v.pts[v.pts.length - 1].t : v.id;
             if (Date.now() - lastT < 60000) continue;   // session peut-être encore active
-            if (volDurMs(v) >= VOL_MIN_MS) { v.endedAt = new Date(lastT).toISOString(); volSave(v); }
+            if (volDurMs(v) >= VOL_MIN_MS) { v.endedAt = new Date(lastT).toISOString(); saveVol(v); }
             else volDel(v.id, updateVolsCount);
         }
         updateVolsCount();

@@ -310,7 +310,7 @@ function _render(data) {
                 <span class="sup-dates">${s.start || '?'} → ${s.end || '?'}</span>
                 <span class="sup-chips">${s.vfr ? '<i>VFR</i>' : ''}${s.ifr ? '<i>IFR</i>' : ''}${s.airac ? '<i>AIRAC</i>' : ''}</span>
                 ${rel.n ? `<span class="sup-plan">${isFr ? 'votre vol' : 'your flight'} · ${[...m, ...rg].join(' ')}</span>` : ''}
-                <a class="sup-pdf" href="${s.url}" target="_blank" rel="noopener" title="${isFr ? 'PDF officiel SIA (nouvel onglet)' : 'Official SIA PDF (new tab)'}">PDF ↗</a>
+                ${/^https:\/\/www\.sia\.aviation-civile\.gouv\.fr\//.test(s.url || '') ? `<a class="sup-pdf" href="${_esc(s.url)}" target="_blank" rel="noopener" title="${isFr ? 'PDF officiel SIA (nouvel onglet)' : 'Official SIA PDF (new tab)'}">PDF ↗</a>` : ''}
             </div>
             <div class="sup-subject">${_esc(s.subject)}</div>
         </div>`;

@@ -10,6 +10,7 @@ import { fetchSigmetAirmet } from './sigmet.js';
 import { getDeclinationForIcao } from './magvar.js';
 import { evaluateIcingRisk, fetchFreezingLevel } from './freezing-level.js';
 import { evaluateTakeoffPerformance } from './takeoff-performance.js';
+import { getLastMetarObsMs, metarAgeMin, ageLevel, fmtAge } from './data-age.js';
 import { getActiveAircraft } from './aircraft-fleet.js';
 
 function _currentCategory() {
@@ -35,6 +36,34 @@ export function evaluateGoNoGo() {
     let verdict = 'GO';
 
     const catObj = _currentCategory();
+
+    // Âge du METAR observé (audit 26/09) : le badge d'âge existait déjà mais
+    // le verdict l'ignorait — un « GO » sur une observation de 2 h devait
+    // rester visible comme tel. OLD (≥ ~2 cycles) → NO-GO ; AGING → CAUTION.
+    if (parsed.isMetar) {
+        const obsMs = getLastMetarObsMs();
+        const ageMin = obsMs != null ? metarAgeMin(obsMs) : null;
+        const lvl = ageLevel(ageMin);
+        if (lvl === 'old') {
+            verdict = 'NO-GO';
+            reasons.push({
+                level: 'danger',
+                icon: 'clock-alert',
+                text: isFr
+                    ? `METAR de ${fmtAge(ageMin)} — actualisez avant toute décision`
+                    : `METAR ${fmtAge(ageMin)} old — refresh before deciding`,
+            });
+        } else if (lvl === 'aging') {
+            if (verdict === 'GO') verdict = 'CAUTION';
+            reasons.push({
+                level: 'caution',
+                icon: 'clock-alert',
+                text: isFr
+                    ? `METAR de ${fmtAge(ageMin)} — pensez à actualiser`
+                    : `METAR ${fmtAge(ageMin)} old — consider refreshing`,
+            });
+        }
+    }
 
     if (catObj.cat === 'LIFR' || catObj.cat === 'IFR') {
         verdict = 'NO-GO';

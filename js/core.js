@@ -520,11 +520,17 @@ export function traduireCode(codeBrut) {
     }).filter(Boolean).join(' ');
 }
 
-const _escapeEl = typeof document !== 'undefined' ? document.createElement('div') : null;
+// Pur (testé sous Node, sans DOM) et complet pour un usage EN ATTRIBUT :
+// les guillemets sont échappés aussi — un nom contenant « a"onmouseover=… »
+// ne peut plus sortir de l'attribut data-*/value (audit sécurité 26/09 ;
+// l'ancienne version textContent→innerHTML laissait passer " et ').
 export function escapeHtml(text) {
-    if (!_escapeEl) return text;
-    _escapeEl.textContent = text;
-    return _escapeEl.innerHTML;
+    return String(text ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 export const SURFACE_LABELS = {

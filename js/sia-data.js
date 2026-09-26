@@ -131,6 +131,20 @@ export function getSiaAuxAirac() {
     return _auxAirac;
 }
 
+/** Un cycle AIRAC dure 28 jours : au-delà, la base est PÉRIMÉE (zones,
+ *  minima CTR, pistes/élévations d'un cycle précédent). Pur — testé sous
+ *  Node (audit 26/09 : rien ne comparait cette date au cycle en vigueur).
+ *  @param {string} airacDateStr « AAAA-MM-JJ » d'entrée en vigueur.
+ *  @param {number} [nowMs]
+ *  @returns {{effectiveMs:number, nextMs:number, expired:boolean}|null} */
+export function airacCycleInfo(airacDateStr, nowMs = Date.now()) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(airacDateStr || ''));
+    if (!m) return null;
+    const effectiveMs = Date.UTC(+m[1], +m[2] - 1, +m[3]);
+    const nextMs = effectiveMs + 28 * 86400e3;
+    return { effectiveMs, nextMs, expired: nowMs >= nextMs };
+}
+
 /** Terrain officiel (France) : {code, elevFt, magVar, magVarYear, …} ou null. */
 export function getSiaAirfield(icao) {
     if (!icao || !_byCode) return null;

@@ -26,7 +26,6 @@ import { collectFileInputs, computeFileTiles, showFlightFile } from './flight-fi
 import { getVacIndexInfo, getVacConsultedTs } from './vac-viewer.js';
 import { getLastMetarObsMs } from './data-age.js';
 import { getLastNotamFetchTs } from './notam.js';
-import { drawNavLogPdf, drawNotamAnnex, drawFileCover, drawWeatherPage, drawVacPages, drawElevationProfilePage } from './navlog-pdf.js';
 import { getSelectedNotams, getCurrentNotams } from './notam.js';
 import { computeWb, resolveLoads, normalizeEnvelope } from './wb-core.js';
 import { makeCollapsible } from './collapsible.js';
@@ -34,8 +33,6 @@ import { computeFlightPlan, computeMultiLegFlightPlan, getDefaultAircraftPerf, g
 import { evaluateVfrMinima, collectVfrMinima } from './vfr-minima.js';
 import { getActiveRunwaySurfaceInfo, isSoftSurface } from './runway-surface.js';
 import { getEnRouteAlternates } from './alternates.js';
-import { drawFlightMapPage } from './flight-map-pdf.js';
-import { buildFlightMapData } from './flight-map-collect.js';
 import { renderElevationChart, clearElevationChart } from './elevation-chart.js';
 import { fetchAirportByIcao } from './openaip.js';
 import { loadFreqSources, getAirportFreqs } from './freq-sia.js';
@@ -319,6 +316,13 @@ export function printFlightFile() {
 }
 
 async function _generateNavLogPdfInto(tab, { file = false, local = false } = {}) {
+    // Générateurs PDF chargés À LA DEMANDE (audit 26/09) : navlog-pdf +
+    // carte + collecte = ~200 Ko de JS (jsPDF chargé lui aussi à la volée
+    // par l'app) inutiles au démarrage — le boot passe de 69 modules à
+    // l'essentiel.
+    const { drawNavLogPdf, drawNotamAnnex, drawFileCover, drawWeatherPage, drawVacPages, drawElevationProfilePage } = await import('./navlog-pdf.js');
+    const { drawFlightMapPage } = await import('./flight-map-pdf.js');
+    const { buildFlightMapData } = await import('./flight-map-collect.js');
     let stash = state._lastNavPlan;
     if (local) {
         // VOL LOCAL : plan synthétique terrain → terrain. Le dossier garde
@@ -1110,7 +1114,9 @@ function _wireLeg2(container, ctx) {
 // ----------------------------------------------------------------
 const _MINIMA_MSG = {
     ctrl_ok:    { fr: 'Conditions VFR OK (zone contrôlée)', en: 'VFR conditions OK (controlled airspace)',
-                  tipFr: 'Visi ≥ 5 km et plafond ≥ 1500 ft (espace contrôlé sous FL100)', tipEn: 'Vis ≥ 5 km and ceiling ≥ 1500 ft (controlled below FL100)' },
+                  tipFr: 'Visi ≥ 5 km et base ≥ 2500 ft — 1000 ft de marge sous la couche à 1500 ft', tipEn: 'Vis ≥ 5 km and base ≥ 2500 ft — 1000 ft below-cloud margin at 1500 ft' },
+    ctrl_clearance: { fr: 'Conforme mais marge sous couche < 1000 ft', en: 'Legal but < 1000 ft below-cloud margin',
+                  tipFr: 'Plafond 1500–2500 ft : minima réglementaire tenu, mais pas 1000 ft de marge sous la couche à 1500 ft — VFR spécial possible en dessous', tipEn: 'Ceiling 1500–2500 ft: legal minima met, but no 1000 ft margin below cloud at 1500 ft — special VFR possible below' },
     sp_needed:  { fr: 'Météo insuffisante pour le VFR — clairance VFR spécial requise', en: 'Below VFR minima — special VFR clearance required',
                   tipFr: 'Sous 5 km ou 1500 ft, mais ≥ 1500 m et ≥ 600 ft : possible sur clairance du contrôleur', tipEn: 'Below 5 km or 1500 ft, but ≥ 1500 m and ≥ 600 ft: possible on controller clearance' },
     sp_night:   { fr: 'Conditions VFR spécial mais NUIT — interdit', en: 'Special-VFR conditions but NIGHT — not allowed',

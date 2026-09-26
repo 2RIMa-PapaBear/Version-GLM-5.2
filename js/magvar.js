@@ -4,10 +4,16 @@ import { getOfficialDeclination } from './sia-data.js';
 const _sessionCache = new Map();
 
 const LS_KEY = 'magvar-cache';
+const LS_TTL_MS = 30 * 86400e3;   // audit 26/09 : sans TTL, une valeur de 2024 servait indéfiniment
 
 function _readLs() {
     try {
-        return JSON.parse(localStorage.getItem(LS_KEY)) || {};
+        const cache = JSON.parse(localStorage.getItem(LS_KEY)) || {};
+        // Cache global daté : périmé (ou ancien format sans date) → ignoré,
+        // réécrit au prochain calcul.
+        const ts = Number(cache.__ts);
+        if (!Number.isFinite(ts) || Date.now() - ts > LS_TTL_MS) return {};
+        return cache;
     } catch {
         return {};
     }
@@ -17,6 +23,7 @@ function _writeLs(icao, dec) {
     try {
         const cache = _readLs();
         cache[icao.toUpperCase()] = dec;
+        cache.__ts = Date.now();
         localStorage.setItem(LS_KEY, JSON.stringify(cache));
     } catch {
 

@@ -8,6 +8,10 @@
  *
  * Règles évaluées (Vi ≤ 140 kt, aviation légère, sous FL100) :
  *  - espace CONTRÔLÉ (classe A-E) : visi ≥ 5 km et plafond ≥ 1500 ft ;
+ *    règle pilote 26/09 (clearance D) : le « OK » plein exige en plus
+ *    1000 ft de marge SOUS la couche à 1500 ft, soit base ≥ 2500 ft —
+ *    entre 1500 et 2500 ft : conforme au réglementaire mais prudence
+ *    (marge sous couche < 1000 ft, VFR spécial possible en dessous) ;
  *  - en dessous, VFR SPÉCIAL possible sur clairance : visi ≥ 1500 m et
  *    plafond ≥ 600 ft — INTERDIT DE NUIT ;
  *  - espace NON CONTRÔLÉ (F-G, sous la surface S) : visi ≥ 1500 m et
@@ -27,6 +31,7 @@ import { state, memoGet, parseVisiToMeters, getCeiling, findActiveValueAtHour } 
 export const VFR_MINIMA = {
     CTRL_VISI_M: 5000,     // espace contrôlé sous FL100
     CTRL_CEIL_FT: 1500,
+    CTRL_CLEARANCE_FT: 2500,   // règle pilote : base − 1000 ≥ 1500 (clearance D)
     SP_VISI_M: 1500,       // VFR spécial (clairance, hors nuit)
     SP_CEIL_FT: 600,
     UNCTRL_VISI_M: 1500,   // non contrôlé sous surface S à Vi ≤ 140 kt
@@ -44,8 +49,15 @@ export function evaluateVfrMinima({ controlled, visiM, ceilingFt, isNight = fals
         return { level: 'unknown', key: 'unknown' };
     }
     if (controlled) {
-        if (visiM >= VFR_MINIMA.CTRL_VISI_M && ceilingFt >= VFR_MINIMA.CTRL_CEIL_FT) {
+        // OK plein : minima réglementaire + règle pilote « clearance D »
+        // (1000 ft sous la couche à 1500 ft → base ≥ 2500 ft).
+        if (visiM >= VFR_MINIMA.CTRL_VISI_M && ceilingFt >= VFR_MINIMA.CTRL_CLEARANCE_FT) {
             return { level: 'ok', key: 'ctrl_ok' };
+        }
+        // Conforme au réglementaire mais < 1000 ft de marge sous couche :
+        // prudence, jamais une suggestion de passer AU-DESSUS (règle BKN).
+        if (visiM >= VFR_MINIMA.CTRL_VISI_M && ceilingFt >= VFR_MINIMA.CTRL_CEIL_FT) {
+            return { level: 'caution', key: 'ctrl_clearance' };
         }
         if (visiM >= VFR_MINIMA.SP_VISI_M && ceilingFt >= VFR_MINIMA.SP_CEIL_FT) {
             return isNight ? { level: 'danger', key: 'sp_night' } : { level: 'caution', key: 'sp_needed' };
