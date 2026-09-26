@@ -142,6 +142,11 @@ test('toG1000Csv : structure authentique (prologue + 70 colonnes, unités G1000)
     assert.equal(at(lines[3], 'HSIS'), 'GPS');
     assert.equal(at(lines[3], 'GPSfix'), '3D');
     assert.equal(at(lines[3], 'E1 RPM'), '', 'colonne moteur vide');
+    // CSV = points BRUTS : les phases immobiles (parking → roulage) restent,
+    // c'est elles qui portent « brakes off » chez les analyseurs (retour
+    // pilote 27/09 : version filtrée → aucune phase détectée).
+    const vPark = { id: VOL.id, pts: [...VOL.pts, { t: VOL.pts[1].t + 60000, lat: 48.800, lon: 2.160, alt: 350, spd: 0.0 }] };
+    assert.equal(toG1000Csv(vPark).trimEnd().split('\n').length, 6, 'stationnaire final conservé (3+3)');
 });
 
 // Mention AVION dans les exports de trace (retour pilote 26/09) : type +
