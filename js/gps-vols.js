@@ -71,6 +71,36 @@ export async function volDel(id, onChange) {
 }
 
 // ---- Exports GPX / KML ---------------------------------------------------------
+
+// Allègement à l'export (retour pilote 27/09) : le suivi démarre souvent
+// bien avant le roulage et s'arrête une fois au parking — les phases
+// immobiles empilent des points quasi superposés (GPS 1 Hz). On ne garde à
+// l'export que les points en mouvement ; le PREMIER et le DERNIER points
+// sont toujours conservés (postes de départ et d'arrivée). L'historique
+// IndexedDB reste brut — un futur filtrage meilleur pourra être rejoué.
+const EXPORT_SPEED_MS = 1.0;   // ≈ 2 kt : en dessous, l'avion est arrêté
+const EXPORT_DIST_M = 20;      // garde-fou sans capteur vitesse : écart au dernier point gardé
+
+function _distM(a, b) {
+    const R = 6371000, rad = Math.PI / 180;
+    const dLat = (b[0] - a[0]) * rad, dLon = (b[1] - a[1]) * rad;
+    const s = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * rad) * Math.cos(b[0] * rad) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(s));
+}
+
+export function exportPts(pts) {
+    const out = [];
+    let ref = null;
+    for (const p of pts) {
+        const moving = p.spd != null && p.spd >= EXPORT_SPEED_MS;
+        const far = !ref || _distM(ref, [p.lat, p.lon]) >= EXPORT_DIST_M;
+        if (moving || far) { out.push(p); ref = [p.lat, p.lon]; }
+    }
+    const last = pts[pts.length - 1];
+    if (last && out[out.length - 1] !== last) out.push(last);
+    return out;
+}
+
 export function volName(v) {
     const d = new Date(v.id);
     const p = n => String(n).padStart(2, '0');
@@ -87,7 +117,7 @@ function aircraftMention() {
 }
 
 export function toGpx(v) {
-    const pts = v.pts.map(p => {
+    const pts = exportPts(v.pts).map(p => {
         let s = `      <trkpt lat="${p.lat.toFixed(6)}" lon="${p.lon.toFixed(6)}">`;
         if (p.alt != null) s += `<ele>${p.alt.toFixed(1)}</ele>`;
         s += `<time>${new Date(p.t).toISOString()}</time>`;
@@ -118,23 +148,33 @@ ${pts}
 }
 
 export function toKml(v) {
-    const coords = v.pts.map(p => `${p.lon.toFixed(6)},${p.lat.toFixed(6)},${p.alt != null ? p.alt.toFixed(1) : 0}`).join(' ');
+    // gx:Track (extension Google Earth, reprise par tous les lecteurs de
+    // traces KML) : porte l'heure, l'altitude ET la vitesse de chaque point
+    // — parité avec le GPX (retour pilote 26/09, format le mieux récolté
+    // par les analyseurs de vols).
+    const vpts = exportPts(v.pts);
+    const pairs = vpts.map(p =>
+        `        <when>${new Date(p.t).toISOString()}</when>\n        <gx:coord>${p.lon.toFixed(6)} ${p.lat.toFixed(6)} ${p.alt != null ? p.alt.toFixed(1) : 0}</gx:coord>`).join('\n');
+    const speeds = vpts.some(p => p.spd != null) ? `\n        <ExtendedData>
+          <gx:SimpleArrayData name="speed">
+${vpts.map(p => `            <gx:value>${p.spd != null ? p.spd.toFixed(1) : ''}</gx:value>`).join('\n')}
+          </gx:SimpleArrayData>
+        </ExtendedData>` : '';
     const { avion, reg } = aircraftMention();
     const escK = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const desc = avion ? `\n    <description>${escK(avion)}</description>` : '';
     const nom = reg ? `${reg} · ${volName(v)}` : volName(v);
     return `<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2">
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
   <Document>
     <name>${escK(nom)}</name>${desc}
     <Placemark>
       <name>${escK(nom)}</name>
       <Style><LineStyle><color>ffef46d9</color><width>3</width></LineStyle></Style>
-      <LineString>
-        <tessellate>1</tessellate>
-        <altitudeMode>absolute</altitudeMode>
-        <coordinates>${coords}</coordinates>
-      </LineString>
+      <gx:Track>
+        <altitudeMode>absolute</altitudeMode>${speeds}
+${pairs}
+      </gx:Track>
     </Placemark>
   </Document>
 </kml>

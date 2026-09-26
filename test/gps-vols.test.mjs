@@ -1,7 +1,7 @@
 // GPS-VOLS — exports et utilitaires purs (extrait de gps.js, item ⑥ 09/09).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { volName, toGpx, toKml, volDurMs } from '../js/gps-vols.js';
+import { volName, toGpx, toKml, volDurMs, exportPts } from '../js/gps-vols.js';
 
 const VOL = {
     id: Date.UTC(2026, 8, 9, 14, 30),
@@ -29,17 +29,48 @@ test('toGpx : trkpts avec ele/time/speed/course', () => {
     assert.equal((g.match(/<trkpt /g) || []).length, 2);
 });
 
-test('toKml : LineString absolu, lon,lat,alt', () => {
+test('toKml : gx:Track absolu, heure + altitude + vitesse par point', () => {
     const k = toKml(VOL);
     assert.ok(k.includes('<kml'));
+    assert.ok(k.includes('xmlns:gx="http://www.google.com/kml/ext/2.2"'));
+    assert.ok(k.includes('<gx:Track>'));
     assert.ok(k.includes('<altitudeMode>absolute</altitudeMode>'));
-    assert.ok(k.includes('2.105000,48.769000,200.0'));
-    assert.ok(k.includes('2.160000,48.800000,350.0'));
+    assert.ok(k.includes('<gx:coord>2.105000 48.769000 200.0</gx:coord>'));
+    assert.ok(k.includes('<gx:coord>2.160000 48.800000 350.0</gx:coord>'));
+    assert.ok(k.includes('<when>2026-09-09T14:30:00.000Z</when>'));
+    assert.ok(k.includes('<gx:SimpleArrayData name="speed">'));
+    assert.ok(k.includes('<gx:value>12.5</gx:value>'));
+    assert.ok(k.includes('<gx:value>51.4</gx:value>'));
 });
 
 test('volDurMs : dernier point − départ de session', () => {
     assert.equal(volDurMs(VOL), 60000);
     assert.equal(volDurMs({ id: 5, pts: [] }), 0);
+});
+
+// Allègement à l'export (retour pilote 27/09) : le suivi tourne au parking
+// avant le roulage et après l'arrivée — les points immobiles sont retirés,
+// le premier (poste de départ) et le dernier (poste d'arrivée) restent.
+test('exportPts : retire les points immobiles, garde premier + dernier', () => {
+    const pts = [
+        { t: 0, lat: 47.60, lon: -2.77, alt: 100, spd: 0.1 },   // parking départ → gardé (1er)
+        { t: 1000, lat: 47.60, lon: -2.77, alt: 100, spd: 0.2 }, // immobile → VIRÉ
+        { t: 2000, lat: 47.605, lon: -2.775, alt: 100, spd: null }, // ~700 m, sans capteur → gardé (distance)
+        { t: 3000, lat: 47.610, lon: -2.780, alt: 900, spd: 45 },   // en vol → gardé
+        { t: 4000, lat: 47.6101, lon: -2.7801, alt: 100, spd: 0.0 }, // s'arrête à ~15 m → VIRÉ
+        { t: 5000, lat: 47.6101, lon: -2.7801, alt: 100, spd: 0.1 }, // parking fin → gardé (dernier)
+    ];
+    const f = exportPts(pts);
+    assert.equal(f.length, 4);
+    assert.equal(f[0], pts[0], 'premier point conservé');
+    assert.equal(f[f.length - 1], pts[pts.length - 1], 'dernier point conservé');
+    assert.ok(!f.includes(pts[1]) && !f.includes(pts[4]), 'points immobiles retirés');
+    // Les exports GPX/KML branchent le même filtre (compteurs alignés).
+    assert.equal((toGpx({ id: VOL.id, pts }).match(/<trkpt /g) || []).length, 4);
+    assert.equal((toKml({ id: VOL.id, pts }).match(/<gx:coord>/g) || []).length, 4);
+    assert.equal((toKml({ id: VOL.id, pts }).match(/<gx:value>/g) || []).length, 4, 'vitesses alignées point à point');
+    // Vol vide : rien n'explose.
+    assert.deepEqual(exportPts([]), []);
 });
 
 // Mention AVION dans les exports de trace (retour pilote 26/09) : type +
