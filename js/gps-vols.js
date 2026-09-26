@@ -250,7 +250,11 @@ export function toG1000Csv(v) {
     const prologue = `#airframe_info, log_version="1.00", airframe_name="${escQ(type)}", unit_software_part_number="", unit_software_version="", system_software_part_number="", system_id="${sysId}", mode=NORMAL, `;
     const cols = G1000_HDR.split(',').map(s => s.trim());
     const idx = {}; cols.forEach((c, i) => idx[c] = i);
-    const vpts = exportPts(v.pts);
+    // Points BRUTS (pas d'allègement) : un vrai G1000 enregistre tout le sol
+    // au parking à 1 Hz — c'est la transition arrêt → roulage qui permet aux
+    // analyseurs de détecter « brakes off » (retour pilote 27/09 : la version
+    // filtrée démarrait en roulage → aucune phase détectée).
+    const vpts = v.pts;
     const vs = varioMs(vpts);
     const rows = [prologue, G1000_UNITS, G1000_HDR];
     vpts.forEach((p, i) => {
