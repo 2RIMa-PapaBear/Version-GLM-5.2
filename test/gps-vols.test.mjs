@@ -106,28 +106,42 @@ test('toGpx/toKml : vario dérivé, précision GPS, route prévue', () => {
     assert.ok(k.includes('<LineString><coordinates>-2.700000,47.600000,0 -4.280000,48.550000,0'), 'coordonnées route');
 });
 
-test('toG1000Csv : en-tête 63 colonnes, unites converties, alignement', () => {
+test('toG1000Csv : structure authentique (prologue + 70 colonnes, unités G1000)', async () => {
+    // Avion actif identifiable : le system_id du prologue en dépend (stub
+    // localStorage local au test — la flotte y est lue à chaque appel).
+    const stub = new Map();
+    globalThis.localStorage = {
+        getItem: k => (stub.has(k) ? stub.get(k) : null),
+        setItem: (k, v) => stub.set(k, String(v)),
+        removeItem: k => stub.delete(k),
+    };
+    const fleetMod = await import('../js/aircraft-fleet.js');
+    const ac = fleetMod.addAircraft({ name: 'QA2', registration: 'F-QA02', type: 'WT9-LSA', groundRoll: 150, fiftyFt: 400, safetyMargin: 10 });
+    fleetMod.setActiveAircraft(ac.id);
     const c = toG1000Csv(VOL);
+    assert.ok(c.includes('airframe_name="WT9-LSA"'), 'nom avion actif dans le prologue');
     const lines = c.trimEnd().split('\n');
-    assert.equal(lines.length, 3, 'en-tête + 2 points');
-    const hdr = lines[0].split(',').map(s => s.trim());
-    assert.equal(hdr.length, 63, 'largeur G1000');
-    const l1 = lines[1].split(',').map(s => s.trim());
-    const l2 = lines[2].split(',').map(s => s.trim());
-    assert.equal(l1.length, 63); assert.equal(l2.length, 63);
-    const at = (l, n) => l[hdr.indexOf(n)];
-    assert.equal(at(l1, 'Lcl Date'), '2026-09-09');
-    assert.equal(at(l1, 'Lcl Time'), '14:30:00');
-    assert.equal(at(l1, 'UTCOfst'), '00:00');
-    assert.equal(at(l1, 'Latitude'), '48.769000');
-    assert.equal(at(l1, 'Longitude'), '2.105000');
-    assert.equal(at(l1, 'AltMSL'), '656', '200 m → pieds');
-    assert.equal(at(l2, 'AltMSL'), '1148', '350 m → pieds');
-    assert.equal(at(l1, 'GndSpd'), '24', '12,5 m/s → nœuds');
-    assert.equal(at(l1, 'VSpd'), '492', 'vario 2,5 m/s → pieds/min');
-    assert.equal(at(l1, 'VSpdG'), '492', 'vario GPS aussi en VSpdG');
-    assert.equal(at(l1, 'TRK'), '90');
-    assert.equal(at(l1, 'E1 RPM'), '', 'colonne moteur vide');
+    assert.equal(lines.length, 5, 'prologue×3 + 2 points');
+    assert.ok(lines[0].startsWith('#airframe_info,'), 'ligne airframe');
+    assert.ok(/system_id="[0-9]{1,9}"/.test(lines[0]), 'system_id présent (exigé par flysto)');
+    assert.ok(lines[1].startsWith('#yyy-mm-dd,'), 'ligne unités');
+    assert.ok(lines[2].startsWith('  Lcl Date,'), 'en-tête 70 colonnes');
+    const hdr = lines[2].split(',').map(s => s.trim());
+    assert.equal(hdr.length, 70, 'largeur G1000 réelle');
+    assert.ok(hdr.includes('E1 CHT6') && hdr.includes('E1 TIT1'), 'colonnes moteur réelles');
+    for (const l of lines.slice(3)) assert.equal(l.split(',').length, 70, 'lignes alignées');
+    const at = (l, n) => l.split(',').map(s => s.trim())[hdr.indexOf(n)];
+    assert.equal(at(lines[3], 'Lcl Date'), new Date(VOL.pts[0].t).toISOString().slice(0, 10));
+    assert.match(at(lines[3], 'UTCOfst'), /^[+-]\d{2}:\d{2}$/, 'décalage UTC signé');
+    assert.equal(at(lines[3], 'Latitude'), '48.7690000', '7 décimales');
+    assert.equal(at(lines[3], 'AltMSL'), '656.2', '200 m → pieds');
+    assert.equal(at(lines[3], 'GndSpd'), '24.30', '12,5 m/s → nœuds');
+    assert.equal(at(lines[3], 'VSpd'), '492.13', 'vario 2,5 m/s → pieds/min');
+    assert.equal(at(lines[3], 'VSpdG'), '492.13');
+    assert.equal(at(lines[3], 'TRK'), '90.0');
+    assert.equal(at(lines[3], 'HSIS'), 'GPS');
+    assert.equal(at(lines[3], 'GPSfix'), '3D');
+    assert.equal(at(lines[3], 'E1 RPM'), '', 'colonne moteur vide');
 });
 
 // Mention AVION dans les exports de trace (retour pilote 26/09) : type +

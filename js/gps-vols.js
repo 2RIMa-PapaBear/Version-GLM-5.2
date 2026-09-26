@@ -129,7 +129,7 @@ function aircraftMention() {
     const parts = [];
     if (ac?.type) parts.push(ac.type);
     if (ac?.registration) parts.push(ac.registration);
-    return { avion: parts.join(' · '), reg: ac?.registration || '' };
+    return { avion: parts.join(' · '), reg: ac?.registration || '', type: ac?.type || '' };
 }
 
 export function toGpx(v, routePts) {
@@ -229,37 +229,53 @@ export function download(name, content, mime) {
 }
 
 // ---- Export CSV « G1000 » -------------------------------------------------------
-// Format des journaux de traces Garmin G1000 (SD card) — le mieux digéré par
-// les analyseurs de vols (flysto le liste en source native ; ForeFlight
-// l'importe aussi). En-tête exact repris du convertisseur communautaire de
-// référence (FlightawareToForeflight, validé par des importations réelles).
-// Colonnes remplies depuis notre GPS : date/heure UTC, latitude, longitude,
-// AltMSL (pieds), GndSpd (nœuds), VSpd (pieds/min, vario dérivé), TRK.
-// Les colonnes moteur/instruments restent vides (pas de sondes à bord).
-const G1000_HDR = 'Lcl Date, Lcl Time, UTCOfst, AtvWpt,     Latitude,    Longitude,    AltB, BaroA,  AltMSL,   OAT,    IAS, GndSpd,    VSpd,  Pitch,   Roll,  LatAc, NormAc,   HDG,   TRK, volt1,  FQtyL,  FQtyR, E1 FFlow, E1 FPres, E1 OilT, E1 OilP, E1 MAP, E1 RPM, E1 CHT1, E1 CHT2, E1 CHT3, E1 CHT4, E1 EGT1, E1 EGT2, E1 EGT3, E1 EGT4,  AltGPS, TAS, HSIS,    CRS,   NAV1,   NAV2,    COM1,    COM2,   HCDI,   VCDI, WndSpd, WndDr, WptDst, WptBrg, MagVar, AfcsOn, RollM, PitchM, RollC, PichC, VSpdG, GPSfix,  HAL,   VAL, HPLwas, HPLfd, VPLwas';
+// Structure AUTHENTIQUE des journaux Garmin G1000 (carte SD) — fidèle au
+// fichier de référence de GPSBabel (reference/track/garmin_g1000.csv) :
+// 3 lignes de prologue (#airframe_info avec system_id, ligne d'unités,
+// en-tête 70 colonnes) PUIS une ligne par seconde. Le premier import d'essai
+// (en-tête communautaire 63 colonnes, sans prologue) avait été rejeté par
+// flysto (« Unrecognized log format ») : leur parseur exige le system_id.
+// Colonnes remplies depuis notre GPS : date/heure LOCALES + décalage UTC,
+// lat/lon (7 déc.), AltMSL/AltGPS (pieds), GndSpd (kt), VSpd/VSpdG
+// (pieds/min, vario dérivé), TRK, HSIS/GPSfix, HAL (précision GPS, m).
+const G1000_UNITS = '#yyy-mm-dd, hh:mm:ss,   hh:mm,  ident,      degrees,      degrees, ft Baro,  inch,  ft msl, deg C,     kt,     kt,     fpm,    deg,    deg,      G,      G,   deg,   deg, volts, volts,  amps,  amps,   gals,   gals,      gph,   deg F,     psi,     Hg,    rpm,   deg F,   deg F,   deg F,   deg F,   deg F,   deg F,   deg F,   deg F,   deg F,   deg F,   deg F,   deg F,   deg F,  ft wgs,  kt, enum,    deg,    MHz,    MHz,     MHz,     MHz,    fsd,    fsd,     kt,   deg,     nm,    deg,    deg,   bool,  enum,   enum,   deg,   deg,   fpm,   enum,   mt,    mt,     mt,     mt,     mt';
+const G1000_HDR = '  Lcl Date, Lcl Time, UTCOfst, AtvWpt,     Latitude,    Longitude,    AltB, BaroA,  AltMSL,   OAT,    IAS, GndSpd,    VSpd,  Pitch,   Roll,  LatAc, NormAc,   HDG,   TRK, volt1, volt2,  amp1,  amp2,  FQtyL,  FQtyR, E1 FFlow, E1 OilT, E1 OilP, E1 MAP, E1 RPM, E1 CHT1, E1 CHT2, E1 CHT3, E1 CHT4, E1 CHT5, E1 CHT6, E1 EGT1, E1 EGT2, E1 EGT3, E1 EGT4, E1 EGT5, E1 EGT6, E1 TIT1,  AltGPS, TAS, HSIS,    CRS,   NAV1,   NAV2,    COM1,    COM2,   HCDI,   VCDI, WndSpd, WndDr, WptDst, WptBrg, MagVar, AfcsOn, RollM, PitchM, RollC, PichC, VSpdG, GPSfix,  HAL,   VAL, HPLwas, HPLfd, VPLwas';
 
 export function toG1000Csv(v) {
+    const { type, reg } = aircraftMention();
+    // system_id stable par avion (dérivé de l'immatriculation) — exigé par
+    // les analyseurs pour rattacher les vols à l'appareil.
+    const sysId = reg ? [...reg.replace(/[^A-Z0-9]/gi, '')].map(c => String(c.charCodeAt(0))).join('').slice(0, 9) : '';
+    const escQ = (s) => String(s).replace(/"/g, '""');
+    const prologue = `#airframe_info, log_version="1.00", airframe_name="${escQ(type)}", unit_software_part_number="", unit_software_version="", system_software_part_number="", system_id="${sysId}", mode=NORMAL, `;
     const cols = G1000_HDR.split(',').map(s => s.trim());
     const idx = {}; cols.forEach((c, i) => idx[c] = i);
     const vpts = exportPts(v.pts);
     const vs = varioMs(vpts);
-    const rows = [G1000_HDR];
+    const rows = [prologue, G1000_UNITS, G1000_HDR];
     vpts.forEach((p, i) => {
         const r = new Array(cols.length).fill('');
-        const iso = new Date(p.t).toISOString();
-        r[idx['Lcl Date']] = iso.slice(0, 10);
-        r[idx['Lcl Time']] = iso.slice(11, 19);
-        r[idx['UTCOfst']] = '00:00';
-        r[idx['Latitude']] = p.lat.toFixed(6);
-        r[idx['Longitude']] = p.lon.toFixed(6);
-        if (p.alt != null) r[idx['AltMSL']] = String(Math.round(p.alt * 3.28084));
-        if (p.spd != null) r[idx['GndSpd']] = String(Math.round(p.spd * 1.94384));
-        if (vs[i] != null) {
-            const fpm = String(Math.round(vs[i] * 196.85));
-            r[idx['VSpd']] = fpm;    // vario (baro côté G1000, ici dérivé GPS)
-            r[idx['VSpdG']] = fpm;   // vario GPS — sa colonne sémantique
+        const d = new Date(p.t);
+        const p2 = n => String(n).padStart(2, '0');
+        r[idx['Lcl Date']] = d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
+        r[idx['Lcl Time']] = p2(d.getHours()) + ':' + p2(d.getMinutes()) + ':' + p2(d.getSeconds());
+        const ofs = -d.getTimezoneOffset(), sgn = ofs >= 0 ? '+' : '-', a = Math.abs(ofs);
+        r[idx['UTCOfst']] = ' ' + sgn + p2(Math.floor(a / 60)) + ':' + p2(a % 60);
+        r[idx['Latitude']] = p.lat.toFixed(7);
+        r[idx['Longitude']] = p.lon.toFixed(7);
+        if (p.alt != null) {
+            r[idx['AltMSL']] = (p.alt * 3.28084).toFixed(1);
+            r[idx['AltGPS']] = (p.alt * 3.28084).toFixed(1);
         }
-        if (p.hdg != null) r[idx['TRK']] = String(Math.round(p.hdg));
+        if (p.spd != null) r[idx['GndSpd']] = (p.spd * 1.94384).toFixed(2);
+        if (vs[i] != null) {
+            r[idx['VSpd']] = (vs[i] * 196.85).toFixed(2);
+            r[idx['VSpdG']] = (vs[i] * 196.85).toFixed(2);
+        }
+        if (p.hdg != null) r[idx['TRK']] = p.hdg.toFixed(1);
+        r[idx['HSIS']] = 'GPS';
+        r[idx['GPSfix']] = '3D';
+        if (p.acc != null) r[idx['HAL']] = String(Math.round(p.acc));
         rows.push(r.join(', '));
     });
     return rows.join('\n') + '\n';
