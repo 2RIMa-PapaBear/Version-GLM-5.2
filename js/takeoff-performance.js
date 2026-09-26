@@ -435,7 +435,11 @@ export function evaluateTakeoffPerformance(icao) {
 
     // ---- Masse (W&B) et pente (seuils SIA) — méthode de référence 15/09 ----
     const ac = getActiveAircraft();
-    const activeRwy = state.activeRunwayName
+    // Piste active de la rose DES VENTS : ne sert QUE si elle appartient au
+    // terrain calculé (ré-audit 26/09 : une piste d'un autre terrain matchait
+    // une paire secondaire du terrain visé → pente/longueur désynchronisées).
+    const roseRwy = state.activeRunwayName;
+    const activeRwy = (roseRwy && runwayBelongsToAirport(getAirportByICAO(icao), roseRwy) ? roseRwy : null)
         || getActiveRunwayNameForIcao(icao, null, getDeclinationForIcao(icao));
     const extra = { surfaceCode, wet, contaminated, ..._massAndSlope(ac, icao, activeRwy) };
 
@@ -461,7 +465,11 @@ export function evaluateTakeoffFromRaw(icao, metar) {
     const surfaceCode = getRunwaySurface(icao);
     const { wet, contaminated } = _wetFromTokens(metar.raw || '');
     const ac = getActiveAircraft();
-    const activeRwy = state.activeRunwayName || getActiveRunwayNameForIcao(icao, null, getDeclinationForIcao(icao));
+    // Piste de la rose : seulement si elle appartient au terrain calculé
+    // (même garde que _getActiveRunwayName — ré-audit 26/09).
+    const roseRwy = state.activeRunwayName;
+    const activeRwy = (roseRwy && runwayBelongsToAirport(getAirportByICAO(icao), roseRwy) ? roseRwy : null)
+        || getActiveRunwayNameForIcao(icao, null, getDeclinationForIcao(icao));
     const corr = correctedTakeoffDistance(daResult.pa, daResult.oat,
         { surfaceCode, wet, contaminated, ..._massAndSlope(ac, icao, activeRwy) });
     return _takeoffVerdict(icao, daResult, corr, surfaceCode);

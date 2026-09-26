@@ -18,11 +18,14 @@ function _currentCategory() {
     if (!parsed) return null;
     const visiStr = parsed.base?.visi?.[0]?.val;
     const nuageStr = parsed.base?.nuage?.[0]?.val;
-    const visiM = parseVisiToMeters(visiStr || '');
+    // Visi ABSENTE = null (ré-audit 26/09, même règle que le watchdog) :
+    // ne pas supposer 10 km — seul le plafond juge alors, jamais de faux GO
+    // optimiste sur une donnée manquante.
+    const visiM = visiStr ? parseVisiToMeters(visiStr) : null;
     const ceilHund = getCeiling(nuageStr || '');
-    if (ceilHund < 5 || visiM < 1600) return { cat: 'LIFR' };
-    if (ceilHund < 10 || visiM < 4800) return { cat: 'IFR' };
-    if (ceilHund <= 30 || visiM <= 8000) return { cat: 'MVFR' };
+    if (ceilHund < 5 || (visiM != null && visiM < 1600)) return { cat: 'LIFR' };
+    if (ceilHund < 10 || (visiM != null && visiM < 4800)) return { cat: 'IFR' };
+    if (ceilHund <= 30 || (visiM != null && visiM <= 8000)) return { cat: 'MVFR' };
     return { cat: 'VFR' };
 }
 

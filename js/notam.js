@@ -357,8 +357,8 @@ function _notamHtml(n) {
     return `<li style="margin:0 0 10px 0;">
         <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;">
             <input type="checkbox" checked class="notam-ckb" data-nid="${escapeHtml(n.id)}" title="${isFr() ? 'Inclure dans le log de nav PDF' : 'Include in the nav log PDF'}" style="accent-color:#38BDF8;">
-            <b style="font-family:'DM Mono',monospace;font-size:12px;">${notamTitle(n)}</b>${loc}
-            <span style="color:#94A3B8;font-size:11px;">${notamPeriod(n)}</span>
+            <b style="font-family:'DM Mono',monospace;font-size:12px;">${escapeHtml(notamTitle(n))}</b>${loc}
+            <span style="color:#94A3B8;font-size:11px;">${escapeHtml(notamPeriod(n))}</span>
         </div>
         <div style="white-space:pre-wrap;font-size:12px;margin-top:2px;">${body}</div>
     </li>`;
