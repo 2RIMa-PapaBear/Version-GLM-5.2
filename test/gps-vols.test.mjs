@@ -229,6 +229,27 @@ test('shareFiles : repli download sur PC, partage natif avec des File sinon', as
             },
         });
         assert.equal(await shareFiles(files, 'vol'), true);
+
+        // Android/Chromium : liste fermée d'extensions partageables
+        // (webshare/FILE_TYPES.md — csv OUI, gpx/kml NON) → le jeu complet
+        // est refusé, le menu part avec le CSV SEUL.
+        const trois = [
+            { name: 'a.gpx', content: '<gpx/>', mime: 'application/gpx+xml' },
+            { name: 'a.kml', content: '<kml/>', mime: 'application/vnd.google-earth.kml+xml' },
+            { name: 'a.csv', content: '1,2', mime: 'text/csv' },
+        ];
+        const partagesCsv = [];
+        Object.defineProperty(globalThis, 'navigator', {
+            configurable: true,
+            value: {
+                canShare: ({ files: fs }) => fs.every(f => /\.csv$/i.test(f.name)),
+                share: async (d) => { partagesCsv.push(d); },
+            },
+        });
+        assert.equal(await shareFiles(trois, 'vol'), true);
+        assert.equal(partagesCsv.length, 1);
+        assert.deepEqual(partagesCsv[0].files.map(f => f.name), ['a.csv'],
+            'Android : CSV seul partagé (GPX/KML hors liste Chromium)');
     } finally {
         if (desc) Object.defineProperty(globalThis, 'navigator', desc);
     }

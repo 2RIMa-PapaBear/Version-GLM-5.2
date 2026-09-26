@@ -245,16 +245,26 @@ export function volFiles(v, routePts, routeLabel) {
  *  sans détour par le dossier Téléchargements. false si l'appareil ne sait
  *  pas partager de fichiers (PC) : l'appelant retombe sur download().
  *  AbortError = feuille de partage fermée par le pilote : ni erreur, ni
- *  téléchargement en rafale en compensation. */
+ *  téléchargement en rafale en compensation.
+ *  Piège Android/Chromium : liste fermée d'extensions partageables
+ *  (third_party/blink/renderer/modules/webshare/FILE_TYPES.md) — le CSV y
+ *  est, PAS le GPX ni le KML → jeu complet refusé = on partage le CSV SEUL
+ *  (le mieux reconnu par les analyseurs de vols) ; iOS, sans liste, part
+ *  avec les 3 formats. */
 export async function shareFiles(files, title) {
     if (typeof navigator === 'undefined' || !navigator.share || !navigator.canShare) return false;
     let fs;
     try {
         fs = files.map(f => new File([f.content], f.name, { type: f.mime }));
     } catch (e) { return false; }
-    if (!navigator.canShare({ files: fs })) return false;
+    let ensemble = fs;
+    if (!navigator.canShare({ files: fs })) {
+        if (fs.length <= 1) return false;
+        ensemble = fs.filter(f => /\.csv$/i.test(f.name));
+        if (!ensemble.length || !navigator.canShare({ files: ensemble })) return false;
+    }
     try {
-        await navigator.share({ files: fs, title });
+        await navigator.share({ files: ensemble, title });
         return true;
     } catch (e) {
         return e?.name === 'AbortError';
