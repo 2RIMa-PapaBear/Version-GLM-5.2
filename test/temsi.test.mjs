@@ -49,8 +49,12 @@ test('temsiLabels : UTC + heure locale', () => {
     const l = temsiLabels('20260916150000');
     equal(l.utc, '15h00 UTC');
     ok(/^\d{2}h\d{2}$/.test(l.loc), 'heure locale formatée : ' + l.loc);
-    // Heure locale ≠ UTC (la France est à UTC+1 minimum toute l'année).
-    ok(l.loc !== '15h00', 'l heure locale est bien convertie');
+    // Heure locale = rendu LOCAL de 15:00Z (indépendant du fuseau de la
+    // machine — CI en UTC, dev en UTC+2 ; avant : assertion « ≠ 15h00 »
+    // qui échouait sur un runner UTC).
+    const d = new Date(Date.UTC(2026, 8, 16, 15, 0, 0));
+    const p = (n) => String(n).padStart(2, '0');
+    equal(l.loc, `${p(d.getHours())}h${p(d.getMinutes())}`, 'conversion locale exacte');
     equal(temsiLabels('xx').utc, '?', 'date invalide → ?');
 });
 
