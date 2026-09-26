@@ -65,7 +65,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Dépendances (basic-ftp pour l'upload, esbuild pour la minification)
         run: npm install --no-save basic-ftp esbuild
