@@ -1,7 +1,7 @@
 // GPS-VOLS — exports et utilitaires purs (extrait de gps.js, item ⑥ 09/09).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { volName, toGpx, toKml, volDurMs, exportPts } from '../js/gps-vols.js';
+import { volName, toGpx, toKml, toG1000Csv, volDurMs, exportPts } from '../js/gps-vols.js';
 
 const VOL = {
     id: Date.UTC(2026, 8, 9, 14, 30),
@@ -67,10 +67,67 @@ test('exportPts : retire les points immobiles, garde premier + dernier', () => {
     assert.ok(!f.includes(pts[1]) && !f.includes(pts[4]), 'points immobiles retirés');
     // Les exports GPX/KML branchent le même filtre (compteurs alignés).
     assert.equal((toGpx({ id: VOL.id, pts }).match(/<trkpt /g) || []).length, 4);
-    assert.equal((toKml({ id: VOL.id, pts }).match(/<gx:coord>/g) || []).length, 4);
-    assert.equal((toKml({ id: VOL.id, pts }).match(/<gx:value>/g) || []).length, 4, 'vitesses alignées point à point');
+    const kml4 = toKml({ id: VOL.id, pts });
+    assert.equal((kml4.match(/<gx:coord>/g) || []).length, 4);
+    const arr = (n) => (kml4.split(`<gx:SimpleArrayData name="${n}">`)[1] || '').split('</gx:SimpleArrayData>')[0];
+    assert.equal((arr('speed').match(/<gx:value>/g) || []).length, 4, 'vitesses alignées point à point');
+    assert.equal((arr('vs').match(/<gx:value>/g) || []).length, 4, 'varios alignés point à point');
     // Vol vide : rien n'explose.
     assert.deepEqual(exportPts([]), []);
+});
+
+// Vario dérivé + précision GPS + route prévue (retour pilote 27/09).
+test('toGpx/toKml : vario dérivé, précision GPS, route prévue', () => {
+    const vol = {
+        id: VOL.id,
+        pts: [
+            { t: VOL.pts[0].t, lat: 48.769, lon: 2.105, alt: 200, spd: 12.5, hdg: 90, acc: 12 },
+            { t: VOL.pts[1].t, lat: 48.800, lon: 2.160, alt: 350, spd: 51.4, hdg: 78.3, acc: 9 },
+        ],
+    };
+    const route = [
+        { name: 'LFRV', lat: 47.60, lon: -2.70 },
+        { name: 'LFEQ', lat: 48.55, lon: -4.28 },
+    ];
+    const g = toGpx(vol, route);
+    // Vario : 150 m en 60 s = 2,5 m/s — extension maison par point.
+    assert.ok(g.includes('<mfr:vs>2.5</mfr:vs>'), 'vario dérivé');
+    assert.ok(g.includes('<mfr:accuracy>12</mfr:accuracy>'), 'précision GPS');
+    // Route prévue en waypoints, avant la trace.
+    assert.ok(g.includes('<wpt lat="47.600000" lon="-2.700000"><name>LFRV</name></wpt>'));
+    assert.ok(g.includes('<wpt lat="48.550000" lon="-4.280000"><name>LFEQ</name></wpt>'));
+    assert.ok(g.indexOf('<wpt ') < g.indexOf('<trk>'), 'wpt avant trk (schéma GPX)');
+    // Sans précision enregistrée (anciens vols) : pas d'extension accuracy.
+    assert.ok(!toGpx(VOL).includes('mfr:accuracy'));
+    const k = toKml(vol, route, '(prévu)');
+    assert.ok(k.includes('<gx:SimpleArrayData name="vs">'), 'vario en tableau KML');
+    assert.ok(k.includes('(prévu)'), 'libellé route prévue');
+    assert.ok(k.includes('fff8bd38'), 'ligne bleue route');
+    assert.ok(k.includes('<LineString><coordinates>-2.700000,47.600000,0 -4.280000,48.550000,0'), 'coordonnées route');
+});
+
+test('toG1000Csv : en-tête 63 colonnes, unites converties, alignement', () => {
+    const c = toG1000Csv(VOL);
+    const lines = c.trimEnd().split('\n');
+    assert.equal(lines.length, 3, 'en-tête + 2 points');
+    const hdr = lines[0].split(',').map(s => s.trim());
+    assert.equal(hdr.length, 63, 'largeur G1000');
+    const l1 = lines[1].split(',').map(s => s.trim());
+    const l2 = lines[2].split(',').map(s => s.trim());
+    assert.equal(l1.length, 63); assert.equal(l2.length, 63);
+    const at = (l, n) => l[hdr.indexOf(n)];
+    assert.equal(at(l1, 'Lcl Date'), '2026-09-09');
+    assert.equal(at(l1, 'Lcl Time'), '14:30:00');
+    assert.equal(at(l1, 'UTCOfst'), '00:00');
+    assert.equal(at(l1, 'Latitude'), '48.769000');
+    assert.equal(at(l1, 'Longitude'), '2.105000');
+    assert.equal(at(l1, 'AltMSL'), '656', '200 m → pieds');
+    assert.equal(at(l2, 'AltMSL'), '1148', '350 m → pieds');
+    assert.equal(at(l1, 'GndSpd'), '24', '12,5 m/s → nœuds');
+    assert.equal(at(l1, 'VSpd'), '492', 'vario 2,5 m/s → pieds/min');
+    assert.equal(at(l1, 'VSpdG'), '492', 'vario GPS aussi en VSpdG');
+    assert.equal(at(l1, 'TRK'), '90');
+    assert.equal(at(l1, 'E1 RPM'), '', 'colonne moteur vide');
 });
 
 // Mention AVION dans les exports de trace (retour pilote 26/09) : type +
