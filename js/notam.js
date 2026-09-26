@@ -368,9 +368,19 @@ function _renderPib(pib, planRoute = [], opts = {}) {
     const local = !!opts.local;
     const t = isFr();
     const aucun = t ? 'aucun NOTAM VFR' : 'no VFR NOTAM';
+    // En-tête du dossier : dates LISIBLES « jj-mm-aaaa à hh:mm » (retour
+    // pilote 26/09 — l'ISO brut 2026-09-26T05:52:01.000Z était illisible).
+    // UTC, comme les périodes de chaque NOTAM (convention aéronautique).
+    const fmtPibDate = (iso, sep) => {
+        if (!iso) return '';
+        const d = new Date(iso);
+        if (isNaN(d)) return String(iso);
+        const p = (x) => String(x).padStart(2, '0');
+        return `${p(d.getUTCDate())}-${p(d.getUTCMonth() + 1)}-${d.getUTCFullYear()} ${sep} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
+    };
     let html = `<p style="font-size:11px;color:var(--text-muted);margin:4px 0 8px;">
         ${t ? 'Dossier généré par SOFIA-Briefing (SIA)' : 'Bulletin from SOFIA-Briefing (SIA)'} ·
-        ${pib.nbNotams ?? '?'} NOTAM · ${t ? 'valide de' : 'valid'} ${pib.validFrom || ''} ${t ? 'à' : 'to'} ${pib.validTo || ''}
+        ${pib.nbNotams ?? '?'} NOTAM · ${t ? 'valide du' : 'valid from'} ${fmtPibDate(pib.validFrom, t ? 'à' : 'at')} ${t ? 'au' : 'to'} ${fmtPibDate(pib.validTo, t ? 'à' : 'at')} (UTC)
     </p>`;
     if (!local && opts.excludedDetails?.length) {
         html += `<p style="font-size:11px;color:var(--text-muted);margin:0 0 6px;">${t
