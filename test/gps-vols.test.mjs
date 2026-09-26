@@ -41,3 +41,27 @@ test('volDurMs : dernier point − départ de session', () => {
     assert.equal(volDurMs(VOL), 60000);
     assert.equal(volDurMs({ id: 5, pts: [] }), 0);
 });
+
+// Mention AVION dans les exports de trace (retour pilote 26/09) : type +
+// immatriculation de l'avion ACTIF — stub localStorage puis vraies APIs
+// de la flotte (le GPX porte metadata+desc, le KML la description).
+test('toGpx/toKml portent le type + immatriculation de l avion actif', async () => {
+    const stub = new Map();
+    globalThis.localStorage = {
+        getItem: (k) => (stub.has(k) ? stub.get(k) : null),
+        setItem: (k, v) => stub.set(k, String(v)),
+        removeItem: (k) => stub.delete(k),
+    };
+    const fleetMod = await import('../js/aircraft-fleet.js');
+    const ac = fleetMod.addAircraft({ name: 'QA', registration: 'F-QA01', type: 'WT9-LSA', groundRoll: 150, fiftyFt: 400, safetyMargin: 10 });
+    fleetMod.setActiveAircraft(ac.id);
+    const g = toGpx(VOL), k = toKml(VOL);
+    assert.ok(g.includes('<metadata><name>WT9-LSA · F-QA01</name></metadata>'), 'metadata GPX');
+    assert.ok(g.includes('<desc>WT9-LSA · F-QA01</desc>'), 'desc GPX');
+    // flysto.net scanne l'immat dans le NOM de la trace (convention ForeFlight).
+    assert.ok(/<name>F-QA01 · vol-\d{8}-\d{4}<\/name>/.test(g), 'nom de trace préfixé immat');
+    assert.ok(/<name>F-QA01 · vol-\d{8}-\d{4}<\/name>/.test(k), 'nom KML préfixé immat');
+    assert.ok(k.includes('<description>WT9-LSA · F-QA01</description>'), 'description KML');
+    // Les trkpts restent intacts (2 points, time/ele inchangés).
+    assert.equal((g.match(/<trkpt /g) || []).length, 2);
+});

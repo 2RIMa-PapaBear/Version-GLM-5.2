@@ -22,6 +22,7 @@
 
 import { state, memoGet } from './core.js';
 import { getAirportByICAO } from './ui-module.js';
+import { getActiveAircraft } from './aircraft-fleet.js';
 import { parseWaypointsField, formatWaypointsField } from './flight-planner-ui.js';
 
 const DB_NAME = 'mt-plan-io';
@@ -86,13 +87,26 @@ function _xmlDecode(s) {
 
 // ---------- GPX ----------
 
+// Mention de l'avion (type + immatriculation) dans les exports GPX/KML
+// (retour pilote 26/09) — « (aucun) » si pas d'avion actif.
+function aircraftMention() {
+    const ac = getActiveAircraft();
+    const parts = [];
+    if (ac?.type) parts.push(ac.type);
+    if (ac?.registration) parts.push(ac.registration);
+    return parts.join(' · ');
+}
+
 export function buildGpx(plan) {
     const pts = planPoints(plan);
     const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const rtepts = pts.map(p => `    <rtept lat="${p.lat.toFixed(6)}" lon="${p.lon.toFixed(6)}"><name>${esc(p.name)}</name></rtept>`).join('\n');
+    const avion = aircraftMention();
+    const desc = avion ? `\n    <desc>${esc(avion)}</desc>` : '';
+    const meta = avion ? `\n  <metadata><name>${esc(avion)}</name></metadata>` : '';
     return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="metar-taf-visualiseur" xmlns="http://www.topografix.com/GPX/1/1">
-  <rte>
+<gpx version="1.1" creator="metar-taf-visualiseur" xmlns="http://www.topografix.com/GPX/1/1">${meta}
+  <rte>${desc}
     <name>${esc(plan.dep)}-${esc(plan.dest)}</name>
 ${rtepts}
   </rte>
@@ -124,10 +138,12 @@ export function buildKml(plan) {
         `    <Placemark><name>${esc(p.name)}</name><Point><coordinates>${p.lon.toFixed(6)},${p.lat.toFixed(6)},0</coordinates></Point></Placemark>`
     ).join('\n');
     const line = pts.map(p => `${p.lon.toFixed(6)},${p.lat.toFixed(6)},0`).join(' ');
+    const avion = aircraftMention();
+    const desc = avion ? `\n    <description>${esc(avion)}</description>` : '';
     return `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>${esc(plan.dep)}-${esc(plan.dest)}</name>
+    <name>${esc(plan.dep)}-${esc(plan.dest)}</name>${desc}
 ${marks}
     <Placemark><name>Route</name><LineString><coordinates>${line}</coordinates></LineString></Placemark>
   </Document>
