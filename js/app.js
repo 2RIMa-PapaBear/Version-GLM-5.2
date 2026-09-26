@@ -35,7 +35,7 @@ import { initWatchdog, openWatchdogPanel, getWatchdogSettings } from './watchdog
 import { fetchAirportByIcao } from './openaip.js';
 import { initPlanIo } from './flight-plan-io.js';
 import { loadFreqSources, getSiaAirac } from './freq-sia.js';
-import { getSiaAuxAirac } from './sia-data.js';
+import { getSiaAuxAirac, airacCycleInfo } from './sia-data.js';
 import { config, applyLocalOverride } from './config.js';
 import { loadSiaAux } from './sia-data.js';
 
@@ -697,7 +697,17 @@ document.addEventListener('DOMContentLoaded', async function () {
         const dates = [getSiaAirac(), getSiaAuxAirac()].filter(Boolean).sort();
         const airac = dates[dates.length - 1];
         const el = document.getElementById('sia-airac');
-        if (el && airac) el.textContent = `, mise à jour du ${airac.split('-').reverse().join('/')}`;
+        if (el && airac) {
+            el.textContent = `, mise à jour du ${airac.split('-').reverse().join('/')}`;
+            // Cycle expiré (> 28 j — audit 26/09) : la pilote vole potentiellement
+            // sur des zones/minima d'un cycle précédent → avertissement visible.
+            const info = airacCycleInfo(airac);
+            if (info?.expired) {
+                el.textContent += ` — CYCLE PÉRIMÉ (le ${new Date(info.nextMs).toLocaleDateString()}), mettez les données à jour`;
+                el.style.color = '#F87171';
+                el.title = 'Les données SIA (espaces, VAC, pistes) datent d\'un cycle AIRAC expiré.';
+            }
+        }
     }).catch(() => {});
 
     // Version servie (bump ?v= posé par le workflow à chaque déploiement) :

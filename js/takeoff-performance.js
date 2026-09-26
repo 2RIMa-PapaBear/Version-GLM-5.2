@@ -47,7 +47,7 @@ import { getActiveAircraft } from './aircraft-fleet.js';
 import { resolveLoads, computeWb } from './wb-core.js';
 import { selectBestRunway } from './engine.js';
 import { getRunwaySurface, isSoftSurface, surfaceLabel, runwayBelongsToAirport } from './runway-surface.js';
-import { siaRunwayLengthFt, getSiaAirfield } from './sia-data.js';
+import { siaRunwayLengthFt, getSiaAirfield, getSiaRunways } from './sia-data.js';
 import { getDeclinationForIcao } from './magvar.js';
 
 // Distance de référence C172 (ft), au niveau de la mer / ISA.
@@ -496,7 +496,7 @@ function _massAndSlope(ac, icao, activeRwyName) {
  * @param {string} rwyName numéro en service (« 04 » ou « 04/22 »)
  * @returns {number|null} pente en % (arrondie au 0,1), ou null sans données.
  */
-function _calcRunwaySlopePct(icao, rwyName) {
+export function _calcRunwaySlopePct(icao, rwyName) {
     try {
         if (!icao || !rwyName) return null;
         const rwys = getSiaRunways(icao);
@@ -505,7 +505,7 @@ function _calcRunwaySlopePct(icao, rwyName) {
         // Trouve la paire de pistes contenant le numéro en service.
         const num = String(rwyName).split('/')[0].trim();
         const rwy = rwys.find(r => (r.d || '').includes(num)) || rwys.find(r => r.main);
-        if (!rwy?.t1?.altFt != null || rwy?.t2?.altFt == null) return null;
+        if (rwy?.t1?.altFt == null || rwy?.t2?.altFt == null) return null;
         if (!Number.isFinite(rwy.t1.altFt) || !Number.isFinite(rwy.t2.altFt)) return null;
         if (!Number.isFinite(rwy.len) || rwy.len <= 0) return null;
 
@@ -852,9 +852,11 @@ function _detectWetFromMetar() {
     // Helper : teste si un code phénomène apparaît comme token dans le brut
     // OU si sa traduction FR/EN est présente dans le champ temps.
     const has = (code, translations) => {
-        // Token exact dans le brut : on entoure d'espaces pour éviter les
-        // faux positifs (ex: "RA" dans "BRRA" ne doit pas matcher "BR").
-        if (new RegExp(`(^|\\s)${code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i').test(rawUpper)) return true;
+        // Token dans le brut, avec son préfixe d'intensité/vicinité éventuel
+        // (audit 26/09 : « -RA » (pluie faible) ne matchait pas « RA » →
+        // piste réelle mouillée traitée comme sèche). Les préfixes évitent
+        // les faux positifs internes (« RA » dans « BRRA » reste ignoré).
+        if (new RegExp(`(^|\\s)[-+VC]{0,2}${code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(rawUpper)) return true;
         return translations.some(t => tempsStr.includes(t));
     };
 

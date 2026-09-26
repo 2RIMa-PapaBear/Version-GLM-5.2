@@ -2,6 +2,11 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <!-- CSP (audit 26/09) : filet anti-exfiltration/injection — scripts
+         limités à nous + cdnjs (suncalc SRI), connexions réseau limitées
+         aux hôtes météo/cartes effectivement utilisés. 'unsafe-inline'
+         requis (script anti-flash nuit, styles inline des widgets). -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://meteo-relais.papabear56.workers.dev https://api.open-meteo.com https://api.core.openaip.net https://api.rainviewer.com https://aviationweather.gov https://nominatim.openstreetmap.org https://corsproxy.io https://script.google.com https://s3.amazonaws.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; manifest-src 'self'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Prévol — Briefing VFR complet : météo, log de nav, suivi GPS</title>
     <meta name="description" content="Briefing VFR complet : météo temps réel (METAR, TAF), planification de vol, log de nav imprimable, dossier de vol et suivi GPS en direct. Gratuit, PC et mobile.">
@@ -31,7 +36,7 @@
     <meta name="twitter:description" content="Météo METAR/TAF, planification de vol, log de nav imprimable, dossier de vol et suivi GPS en direct. Gratuit pour pilotes.">
     <meta name="twitter:image" content="https://papabear56.pages-perso.free.fr/og-image.png">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
-    <link rel="apple-touch-icon" sizes="180x180" href="favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="modulepreload" href="js/app.js?v=1.423">

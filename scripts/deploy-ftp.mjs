@@ -35,7 +35,7 @@ const STATE_PATH = path.join(ROOT, 'deploy.state.json');
 // Seuls ces chemins partent en prod (le reste du dépôt = dev : test/,
 // apps-script/, scripts/, package.json…).
 const ALLOWED = [
-    'index.html', 'accueil.html', 'sw.js', 'manifest.webmanifest', 'favicon.ico', 'icon.svg',
+    'index.html', 'accueil.html', 'sw.js', 'manifest.webmanifest', 'favicon.ico', 'icon.svg', 'icon-180.png',
     'notice-fr.html', 'notice-en.html',
     'robots.txt', 'sitemap.xml', 'og-image.png',
     'googlede163c2d99f6240d.html',

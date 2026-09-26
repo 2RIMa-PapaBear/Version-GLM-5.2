@@ -53,7 +53,9 @@ if (msg) {
             execFileSync('node', ['scripts/update-docs.mjs'], { cwd: ROOT, stdio: 'inherit' });
             const dirty = git(['status', '--porcelain']).split('\n').some(l => /notice-(fr|en)\.html|README\.md/.test(l));
             if (dirty) {
-                git(['add', 'README.md']);
+                // Amend : TOUT le journal (README + notices — audit 26/09 :
+                // seuls les README partaient, les notices salies restaient).
+                git(['add', 'README.md', 'notice-fr.html', 'notice-en.html']);
                 git(['commit', '--amend', '--no-edit']);
             }
         } catch (e) { console.warn('update-docs ignoré :', String(e).slice(0, 120)); }

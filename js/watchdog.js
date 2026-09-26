@@ -170,9 +170,11 @@ let _retryScheduled = false;
  * @returns {'GO'|'CAUTION'|'NO-GO'}
  */
 function _evaluateState(raw) {
-    // Visi.
-    const visiMatch = raw.match(/KT(?:\s+\d{3}V\d{3})?\s+(\d{4})\b/);
-    const visiM = visiMatch ? (parseInt(visiMatch[1], 10) === 9999 ? 10000 : parseInt(visiMatch[1], 10)) : 10000;
+    // Visi : groupe de 4 chiffres EXACT (suffixe ND/NDZ français toléré),
+    // sans exiger de groupe vent devant (audit 26/09) ; ILLISIBLE → null
+    // (exclu du verdict) au lieu d'un optimiste « 10 km » par défaut.
+    const visiMatch = raw.match(/(?:^|\s)(\d{4})(?:NDZ|ND)?(?=\s|$)/);
+    const visiM = visiMatch ? (parseInt(visiMatch[1], 10) >= 9999 ? 10000 : parseInt(visiMatch[1], 10)) : null;
 
     // Plafond.
     let ceilHund = 999;
@@ -185,10 +187,11 @@ function _evaluateState(raw) {
     if (vvMatch) ceilHund = parseInt(vvMatch[1], 10);
     if (/CAVOK|NSC|SKC|NCD/.test(raw)) ceilHund = 999;
 
-    // Catégorie.
-    if (ceilHund < 5 || visiM < 1600) return 'NO-GO';
-    if (ceilHund < 10 || visiM < 4800) return 'NO-GO';
-    if (ceilHund <= 30 || visiM <= 8000) return 'CAUTION';
+    // Catégorie (visi illisible → seul le plafond juge, jamais de faux GO
+    // sur une donnée absente — ni de faux NO-GO injustifié).
+    if (ceilHund < 5 || (visiM != null && visiM < 1600)) return 'NO-GO';
+    if (ceilHund < 10 || (visiM != null && visiM < 4800)) return 'NO-GO';
+    if (ceilHund <= 30 || (visiM != null && visiM <= 8000)) return 'CAUTION';
     return 'GO';
 }
 
@@ -218,8 +221,8 @@ function _updateFavoriteBadge(icao, weatherState, isFr = true) {
         // Repli (DOM ancien ou tiers) : recrée le voyant devant le code OACI.
         badge = document.createElement('span');
         badge.className = 'fav-status-badge';
-        const code = item.querySelector('.history-icao');
         const row = item.querySelector(".history-icao")?.parentElement;
+        const pin = item.querySelector('.fav-startup');   // audit 26/09 : `pin` non déclaré → ReferenceError latent
         if (pin && row) row.insertBefore(badge, pin.nextSibling);   // derrière le pin
         else if (row) row.appendChild(badge);
         else item.appendChild(badge);

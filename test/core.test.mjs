@@ -321,3 +321,13 @@ describe('fetchAvecRelais — corps vide', () => {
         } finally { globalThis.fetch = _realFetch; }
     });
 });
+
+// Sécurité (audit 26/09) : escapeHtml doit être sûr EN ATTRIBUT — les
+// guillemets échappés, sinon « a"onmouseover="x » sort de value="…"/data-*.
+test('escapeHtml : échappe les guillemets (usage attribut) et reste pur sous Node', async () => {
+    const { escapeHtml } = await import('../js/core.js');
+    assert.equal(escapeHtml('a"onmouseover="alert(1)'), 'a&quot;onmouseover=&quot;alert(1)');
+    assert.equal(escapeHtml("l'oiseau <b>&</b>"), 'l&#39;oiseau &lt;b&gt;&amp;&lt;/b&gt;');
+    assert.equal(escapeHtml(null), '');
+    assert.equal(escapeHtml(42), '42');
+});

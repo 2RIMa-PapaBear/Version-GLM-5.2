@@ -6,9 +6,20 @@ import assert from 'node:assert/strict';
 import { evaluateVfrMinima, metarVisiCeiling, VFR_MINIMA, tafVisiCeilingAt } from '../js/vfr-minima.js';
 
 describe('evaluateVfrMinima (matrice réglementaire)', () => {
-    test('contrôlé : visi ≥ 5 km et plafond ≥ 1500 ft → OK', () => {
+    test('contrôlé : visi ≥ 5 km et base ≥ 2500 ft (clearance D) → OK', () => {
         assert.equal(evaluateVfrMinima({ controlled: true, visiM: 9999, ceilingFt: 99999 }).level, 'ok');
-        assert.equal(evaluateVfrMinima({ controlled: true, visiM: 5000, ceilingFt: 1500 }).level, 'ok');
+        assert.equal(evaluateVfrMinima({ controlled: true, visiM: 5000, ceilingFt: 2500 }).level, 'ok');
+    });
+
+    test('contrôlé : plafond 1500–2500 ft → PRUDENCE (marge sous couche < 1000 ft — règle pilote 26/09)', () => {
+        const v = evaluateVfrMinima({ controlled: true, visiM: 9999, ceilingFt: 1500 });
+        assert.equal(v.level, 'caution');
+        assert.equal(v.key, 'ctrl_clearance');
+        assert.equal(evaluateVfrMinima({ controlled: true, visiM: 8000, ceilingFt: 2000 }).key, 'ctrl_clearance');
+        assert.equal(evaluateVfrMinima({ controlled: true, visiM: 8000, ceilingFt: 2499 }).key, 'ctrl_clearance');
+        assert.equal(evaluateVfrMinima({ controlled: true, visiM: 5000, ceilingFt: 2500 }).key, 'ctrl_ok', '2500 exactement = OK');
+        // Visi insuffisante en même temps → toujours sp_needed.
+        assert.equal(evaluateVfrMinima({ controlled: true, visiM: 4500, ceilingFt: 2000 }).key, 'sp_needed');
     });
 
     test('contrôlé : sous 5 km mais ≥ 1500 m et ≥ 600 ft → VFR SPÉCIAL (jour)', () => {
@@ -53,7 +64,7 @@ describe('evaluateVfrMinima (matrice réglementaire)', () => {
 
     test('constantes réglementaires intouchées', () => {
         assert.deepEqual(VFR_MINIMA, {
-            CTRL_VISI_M: 5000, CTRL_CEIL_FT: 1500,
+            CTRL_VISI_M: 5000, CTRL_CEIL_FT: 1500, CTRL_CLEARANCE_FT: 2500,
             SP_VISI_M: 1500, SP_CEIL_FT: 600,
             UNCTRL_VISI_M: 1500, UNCTRL_CEIL_FT: 500,
         });

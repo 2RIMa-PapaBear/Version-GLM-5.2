@@ -17,7 +17,7 @@
  * ================================================================ */
 import { config } from './config.js';
 import { getAirportByICAO, getAirportsInBbox } from './ui-module.js';
-import { state, memoGet } from './core.js';
+import { state, memoGet, escapeHtml } from './core.js';
 import { makeCollapsible } from './collapsible.js';
 
 const isFr = () => state.lang === 'fr';
@@ -353,10 +353,10 @@ let _panel = null, _body = null;
 
 function _notamHtml(n) {
     const body = notamBody(n).replace(/</g, '&lt;');
-    const loc = n.itemA && n.itemA !== n.sectionCode ? `<span style="color:#7DD3FC;font-size:10px;">${n.itemA}</span>` : '';
+    const loc = n.itemA && n.itemA !== n.sectionCode ? `<span style="color:#7DD3FC;font-size:10px;">${escapeHtml(n.itemA)}</span>` : '';
     return `<li style="margin:0 0 10px 0;">
         <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;">
-            <input type="checkbox" checked class="notam-ckb" data-nid="${n.id}" title="${isFr() ? 'Inclure dans le log de nav PDF' : 'Include in the nav log PDF'}" style="accent-color:#38BDF8;">
+            <input type="checkbox" checked class="notam-ckb" data-nid="${escapeHtml(n.id)}" title="${isFr() ? 'Inclure dans le log de nav PDF' : 'Include in the nav log PDF'}" style="accent-color:#38BDF8;">
             <b style="font-family:'DM Mono',monospace;font-size:12px;">${notamTitle(n)}</b>${loc}
             <span style="color:#94A3B8;font-size:11px;">${notamPeriod(n)}</span>
         </div>
@@ -498,7 +498,7 @@ async function _search(body, planRoute) {
         pib = await fetchRoutePib(buildPibRequest(route, { flUpper: planFlUpper() }));
     }
     if (pib.error) {
-        body.innerHTML = `<p style="font-size:12px;color:#F87171;">${tr ? 'Erreur : ' : 'Error: '}${pib.error}</p>`;
+        body.innerHTML = `<p style="font-size:12px;color:#F87171;">${tr ? 'Erreur : ' : 'Error: '}${escapeHtml(pib.error)}</p>`;
         return;
     }
     _flat = local ? collectFlatLocal(pib, route) : collectFlat(pib, route);
@@ -656,6 +656,7 @@ function _refreshSummary() {
         el.textContent = isFr()
             ? `Zone ${r} NM autour de ${route.icaos[0]} · ${flTxt} · VFR`
             : `${r} NM zone around ${route.icaos[0]} · ${flTxt} · VFR`;
+        _staleDayBanner(el);
         return;
     }
     const excluded = Array.isArray(route) ? route.filter(c => _isFreeWp(c)) : [];
@@ -677,6 +678,18 @@ function _refreshSummary() {
                 ? `Vol local — dossier du terrain ${state.requestedIcao} et de sa zone (${getRadiusNm()} NM) via « Actualiser ».`
                 : `Local flight — dossier for ${state.requestedIcao} and its area (${getRadiusNm()} NM) via “Refresh”.`)
             : (isFr() ? 'Aucun plan actif.' : 'No active plan.'));
+    _staleDayBanner(el);
+}
+
+// Dossier d'un AUTRE JOUR (onglet ouvert depuis la veille — audit 26/09) :
+// l'AZBA et les NOTAM affichés continuent d'être évalués sur CE dossier,
+// rien ne signalait qu'il datait d'un autre jour → bandeau rouge.
+function _staleDayBanner(el) {
+    if (!_lastFetchTs) return;
+    const d = new Date(_lastFetchTs);
+    if (d.toDateString() === new Date().toDateString()) return;
+    const fr = isFr();
+    el.innerHTML = `${escapeHtml(el.textContent)} <b style="color:#F87171;"> — ${fr ? `dossier du ${d.toLocaleDateString()} : actualisez !` : `briefing from ${d.toLocaleDateString()}: refresh!`}</b>`;
 }
 
 // Montage : le panneau apparaît avec le planificateur (mode Navigation).

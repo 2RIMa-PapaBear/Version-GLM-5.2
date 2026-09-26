@@ -87,7 +87,7 @@ export function readPermalink() {
         t: params.has('t') ? parseFloat(params.get('t')) : null,
         mode: params.get('mode') === 'nav' ? 'nav' : (params.get('mode') === 'local' ? 'local' : null),
         dest: params.get('dest')?.toUpperCase() || null,
-        wp: (params.get('wp') || '').trim().toUpperCase(),
+        wp: (params.get('wp') || '').replace(/[<>"'`=&;]/g, '').trim().toUpperCase(),
     };
 }
 

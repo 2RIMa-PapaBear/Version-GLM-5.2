@@ -325,8 +325,12 @@ export function analyzeWeatherAlerts(input) {
     const windMatch = text.match(/\b(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?KT\b/);
     if (windMatch) { v.windSpd = parseInt(windMatch[2]); if (windMatch[3]) v.windGust = parseInt(windMatch[3]); }
     
-    const visiMatch = text.match(/KT(?:\s+\d{3}V\d{3})?\s+(\d{4})\b/);
-    if (visiMatch) v.visi = parseInt(visiMatch[1]) === 9999 ? 10000 : parseInt(visiMatch[1]);
+    // Visi : groupe de 4 chiffres EXACT (tolère suffixe ND/NDZ français).
+    // Sans exiger de groupe vent devant (audit 26/09 : un METAR sans vent —
+    // calme ou /////KT — laissait la visi ignorée) ; un token 4 chiffres ne
+    // peut être que la visi (heure \d{6}Z = 7 car., Q1013 = 5 car., RVR préfixé R).
+    const visiMatch = text.match(/(?:^|\s)(\d{4})(?:NDZ|ND)?(?=\s|$)/);
+    if (visiMatch) v.visi = parseInt(visiMatch[1], 10) >= 9999 ? 10000 : parseInt(visiMatch[1], 10);
     else { const visiSM = text.match(/\b(\d+(?:\/\d+)?)SM\b/); if (visiSM) v.visi = Math.round((visiSM[1].includes('/') ? parseFloat(visiSM[1].split('/')[0]) / parseFloat(visiSM[1].split('/')[1]) : parseFloat(visiSM[1])) * 1609); }
     
     const cloudMatches = [...text.matchAll(/\b(FEW|SCT|BKN|OVC)(\d{3})/g)];

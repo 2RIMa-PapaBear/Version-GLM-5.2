@@ -43,9 +43,20 @@ eaip_06_aug_2026/
 eaip_*/
 *.zip
 
-# Sources SIA volumineuses locales (ré-téléchargeables depuis le SIA)
+# Sources SIA volumineuses locales (ré-téléchargeables depuis le portail SIA)
 telechargement AIRAC/donnees_tod_france_sia_1/
 telechargement AIRAC/*.pdf
+# Audit 26/09 : les XML bruts (AIXM ~44 Mo + XML_SIA ~27 Mo PAR CYCLE)
+# ne sont plus suivis — ils s'empilaient à chaque AIRAC (137 Mo à ce jour).
+# Ils restent sur disque pour fetch-sia-airac/fetch-obstacles (usage local).
+telechargement AIRAC/*.xml
+
+# Cellules openAIP régénérables (fetch-airspaces.mjs + npm run cells) :
+# 26 725 fichiers / 252 Mo suivis pour rien — jamais déployées par le FTP
+# standard (DENIED), uploadées à part. Dépôt allégé de ~380 Mo au clone.
+# NOTE : l'historique git les garde jusqu'à un filter-repo (à faire APRÈS
+# la bascule AIRAC du 01/10/2026, qui dépend du ref a937cce3).
+data/airspaces/cells/
 
 # Captures QA locales (rendu navigateur — régénérables)
 test/render/

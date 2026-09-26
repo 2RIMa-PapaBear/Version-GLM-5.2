@@ -103,6 +103,8 @@ jobs:
   # terrains (identité/horaires/avitaillement/tél), pistes, espaces,
   # fréquences services/A-A — tout vient du XML_SIA téléchargé MANUELLEMENT.
   # Ce job échoue (→ notification) tant que la base est en retard.
+  # Audit 26/09 : ce job exécutait check-obstacles (copier-coller) au lieu
+  # de check-sia-airac — la base XML SIA n'était jamais vérifiée.
   airac-sia-xml:
     runs-on: ubuntu-latest
     steps:
@@ -116,5 +118,5 @@ jobs:
         with:
           node-version: 20
 
-      - name: Fraîcheur obstacles SIA vs cycle AIRAC
-        run: node scripts/check-obstacles-airac.mjs
+      - name: Fraîcheur base XML SIA vs cycle AIRAC
+        run: node scripts/check-sia-airac.mjs

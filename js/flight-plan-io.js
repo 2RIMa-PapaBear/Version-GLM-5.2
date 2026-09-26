@@ -300,6 +300,14 @@ function _setDestination(icao) {
     toInput.dispatchEvent(new Event('input'));
 }
 
+// Nom de repère importé : borné et nettoyé des caractères capables de sortir
+// d'un attribut HTML — le nom devient le `code` du waypoint, réinjecté dans
+// les gabarits du planner (audit sécurité 26/09 : GPX/KML/JSON malveillants).
+function _safeWptName(raw, fallback = 'WPT') {
+    const n = String(raw || '').replace(/[<>"'`=&;]/g, '').trim().slice(0, 24);
+    return n || fallback;
+}
+
 // Point importé : code OACI connu → terrain, sinon repère libre nommé
 // (position aux coordonnées du fichier).
 function _resolvePoint(p) {
@@ -307,7 +315,7 @@ function _resolvePoint(p) {
     if (/^[A-Z][A-Z0-9]{3}$/.test(name) && getAirportByICAO(name)) return name;
     // Repère libre : signalé à regional-map, qui crée le marqueur + registre.
     document.dispatchEvent(new CustomEvent('restore-free-waypoint', {
-        detail: { lat: p.lat, lon: p.lon, name: (p.name || '').trim().slice(0, 24) || 'WPT' },
+        detail: { lat: p.lat, lon: p.lon, name: _safeWptName(p.name) },
     }));
     return null;   // le code (nom du repère) sera lu depuis le registre au moment de poser la liste
 }
@@ -350,7 +358,7 @@ export function restorePlan(planOrPoints, settings = null) {
     for (const w of (plan.wps || [])) {
         if (w && typeof w.lat === 'number' && typeof w.lon === 'number') {
             document.dispatchEvent(new CustomEvent('restore-free-waypoint', {
-                detail: { lat: w.lat, lon: w.lon, name: String(w.name || 'WPT').slice(0, 24) },
+                detail: { lat: w.lat, lon: w.lon, name: _safeWptName(w.name) },
             }));
         }
     }

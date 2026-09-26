@@ -19,7 +19,6 @@ import { state, escapeHtml } from './core.js';
 import { makeCollapsible } from './collapsible.js';
 import { getFlightMode } from './flight-mode.js';
 import { getActiveAircraft, usableFuelOf } from './aircraft-fleet.js';
-import { openFleetManager } from './fleet-ui.js';
 import { TAXI_MIN_DEP, TAXI_MIN_ARR } from './flight-planner.js';
 import {
     computeWb, resolveLoads, writeWbLoads, mountWbChart,
@@ -112,7 +111,11 @@ export function refreshWbWidget(icao = state.requestedIcao) {
         fleetBtn.style.cssText = 'background:none; border:1px solid var(--border-color); color:var(--text-muted); border-radius:6px; padding:3px 8px; font-size:11px; cursor:pointer; display:flex; align-items:center; gap:4px; margin-left:auto; margin-right:8px;';
         fleetBtn.innerHTML = `<i data-lucide="plane" style="width:13px;height:13px;"></i> ${isFr ? 'Flotte' : 'Fleet'}`;
         fleetBtn.addEventListener('click', (e) => e.stopPropagation());
-        fleetBtn.addEventListener('click', () => openFleetManager(() => { refreshWbWidget(icao); }));
+        // Fenêtre Flotte chargée à la demande (audit 26/09 : 48 Ko de JS
+        // hors boot ; même motif que flight-file.js).
+        fleetBtn.addEventListener('click', () => {
+            import('./fleet-ui.js').then(({ openFleetManager }) => openFleetManager(() => { refreshWbWidget(icao); }));
+        });
         header.appendChild(fleetBtn);
         if (window.lucide) window.lucide.createIcons({ root: header });
     }

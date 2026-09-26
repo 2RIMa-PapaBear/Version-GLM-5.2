@@ -1,5 +1,5 @@
 import { config } from './config.js';
-import { state } from './core.js';
+import { state, escapeHtml } from './core.js';
 import { getServiceFreq } from './freq-sia.js';
 import { horLabel } from './airspace-profile.js';
 import { bigDataUrl } from './data-base.js';
@@ -1178,8 +1178,4 @@ export function createAirspaceController(map) {
     };
 }
 
-function escapeHtml(text) {
-    const el = document.createElement('div');
-    el.textContent = String(text || '');
-    return el.innerHTML;
-}
+// escapeHtml vient de core.js (dédupliqué 26/09).

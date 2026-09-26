@@ -1,4 +1,4 @@
-import { state, I18N, fetchAvecRelais, memoGet } from './core.js';
+import { state, I18N, fetchAvecRelais, memoGet, escapeHtml } from './core.js';
 import { getAirportByICAO, getAirportsInBbox } from './ui-module.js';
 import { parseVisiToMeters, getCeiling, CAT_COLORS } from './core.js';
 import { getSiaAirfield } from './sia-data.js';
@@ -572,8 +572,4 @@ function _categoryFromMetar(raw) {
     return { cat, visiM, ceilHund, wind };
 }
 
-function escapeHtml(text) {
-    const el = document.createElement('div');
-    el.textContent = String(text || '');
-    return el.innerHTML;
-}
+// escapeHtml vient de core.js (dédupliqué 26/09).

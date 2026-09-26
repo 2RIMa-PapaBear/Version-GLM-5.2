@@ -24,7 +24,6 @@ import {
     getRunwayLength, getAircraftRef, getActiveRunwayNameForIcao, _parseWindForAxial,
 } from './takeoff-performance.js';
 import { getFleet, getActiveAircraft, getActiveAircraftId, setActiveAircraft } from './aircraft-fleet.js';
-import { openFleetManager } from './fleet-ui.js';
 import { getDeclinationForIcao } from './magvar.js';
 import { getActiveRunwaySurfaceInfo, surfaceLabel, isSoftSurface } from './runway-surface.js';
 
@@ -304,13 +303,14 @@ function render(container, r, icao) {
     const ldgFleetBtn = container.querySelector('#to-ldg-fleet');
     if (ldgFleetBtn) {
         ldgFleetBtn.addEventListener('click', () => {
-            openFleetManager(() => {
+            // Fenêtre Flotte chargée à la demande (audit 26/09, motif flight-file).
+            import('./fleet-ui.js').then(({ openFleetManager }) => openFleetManager(() => {
                 showTakeoffWidget(icao);
                 if (state.refreshCallback) {
                     state.lastRenderState = null;
                     state.refreshCallback();
                 }
-            });
+            }));
         });
     }
 
@@ -332,14 +332,14 @@ function render(container, r, icao) {
     const fleetBtn = container.closest('.collapsible-panel')?.querySelector('#to-fleet-btn');
     if (fleetBtn) {
         fleetBtn.addEventListener('click', () => {
-            openFleetManager(() => {
+            import('./fleet-ui.js').then(({ openFleetManager }) => openFleetManager(() => {
                 // Au retour : rafraîchit le widget + dashboard.
                 showTakeoffWidget(icao);
                 if (state.refreshCallback) {
                     state.lastRenderState = null;
                     state.refreshCallback();
                 }
-            });
+            }));
         });
     }
 
