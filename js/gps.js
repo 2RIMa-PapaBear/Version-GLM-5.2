@@ -29,7 +29,7 @@
 import { state } from './core.js';
 import { vrForType, chronoThresholdKt } from './aircraft-database.js';
 import { getActiveAircraft } from './aircraft-fleet.js';
-import { volSave, volAll, volDel, volDurMs, volName, toGpx, toKml, toG1000Csv, download } from './gps-vols.js';
+import { volSave, volAll, volDel, volDurMs, volName, toGpx, toKml, toG1000Csv, volFiles, shareFiles, download } from './gps-vols.js';
 import { readCurrentPlan, planPoints } from './flight-plan-io.js';
 import { getRegisteredMap } from './map-registry.js';
 
@@ -71,6 +71,7 @@ const T = () => isFr() ? {
     volSuppr: 'Supprimer ce vol',
     volTrace: 'Afficher ou masquer la trace de ce vol sur la carte',
     volCsvTitle: 'CSV format G1000 (Garmin) — le mieux reconnu par les analyseurs de vols',
+    volShareTitle: 'Partager GPX + KML + CSV par les applis de l\'appareil (mail, WhatsApp, Drive…) — sans partage natif : télécharge les trois fichiers',
     routePrevue: '(prévu)',
     dureeVol: 'vol',
     dureeSuivi: 'suivi',
@@ -100,6 +101,7 @@ const T = () => isFr() ? {
     volSuppr: 'Delete this flight',
     volTrace: 'Show or hide this flight\'s track on the map',
     volCsvTitle: 'G1000 (Garmin) CSV — best recognized by flight analyzers',
+    volShareTitle: 'Share GPX + KML + CSV via your device\'s apps (mail, WhatsApp, Drive…) — without native sharing: downloads all three files',
     routePrevue: '(planned)',
     dureeVol: 'flight',
     dureeSuivi: 'tracking',
@@ -140,9 +142,10 @@ const CSS = `
     padding: 9px 11px; border-bottom: 1px solid #334155; font-weight: 600; }
 .gps-vols-close { background: none; border: none; color: #94A3B8; cursor: pointer; padding: 2px; display: flex; }
 .gps-vols-list { padding: 6px 11px 10px; }
-.gps-vol-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #1E293B; }
+.gps-vol-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #1E293B; }
 .gps-vol-row:last-child { border-bottom: none; }
-.gps-vol-date { flex: 1; min-width: 0; }
+.gps-vol-date { flex: 1 1 100px; min-width: 100px; }
+.gps-vol-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .gps-vol-date b { color: #F1F5F9; }
 .gps-vol-meta { color: #94A3B8; font-size: 11px; }
 .gps-vol-btn { background: #1E293B; color: #E2E8F0; border: 1px solid #334155; border-radius: 6px;
@@ -502,11 +505,14 @@ async function openPanel() {
             : `${T().dureeSuivi} ${fmtDur(lastT - v.id)}`;
         return `<div class="gps-vol-row" data-id="${v.id}">
             <div class="gps-vol-date"><b>${date}</b><div class="gps-vol-meta">${duree} · ${v.pts.length} pts</div></div>
-            <button class="gps-vol-btn${replayVolId === v.id ? ' active' : ''}" data-x="see" title="${t.volTrace}">Trace</button>
-            <button class="gps-vol-btn" data-x="gpx">GPX</button>
-            <button class="gps-vol-btn" data-x="kml">KML</button>
-            <button class="gps-vol-btn" data-x="csv" title="${t.volCsvTitle || 'CSV G1000'}">CSV</button>
-            <button class="gps-vol-del" data-x="del" title="${t.volSuppr}"><i data-lucide="trash-2" style="width:13px;height:13px;"></i></button>
+            <div class="gps-vol-actions">
+                <button class="gps-vol-btn${replayVolId === v.id ? ' active' : ''}" data-x="see" title="${t.volTrace}">Trace</button>
+                <button class="gps-vol-btn" data-x="gpx">GPX</button>
+                <button class="gps-vol-btn" data-x="kml">KML</button>
+                <button class="gps-vol-btn" data-x="csv" title="${t.volCsvTitle || 'CSV G1000'}">CSV</button>
+                <button class="gps-vol-btn" data-x="share" title="${t.volShareTitle || 'Partager'}">Partager</button>
+                <button class="gps-vol-del" data-x="del" title="${t.volSuppr}"><i data-lucide="trash-2" style="width:13px;height:13px;"></i></button>
+            </div>
         </div>`;
     }).join('') : `<div class="gps-vols-empty">${t.volsAucun}</div>`;
     volsPanel.innerHTML = `<div class="gps-vols-head"><span>${t.volsTitle}</span>
@@ -532,6 +538,12 @@ async function openPanel() {
         row.querySelector('[data-x="gpx"]').addEventListener('click', () => download(volName(v) + '.gpx', toGpx(v, routeAtClick()), 'application/gpx+xml'));
         row.querySelector('[data-x="kml"]').addEventListener('click', () => download(volName(v) + '.kml', toKml(v, routeAtClick(), t.routePrevue), 'application/vnd.google-earth.kml+xml'));
         row.querySelector('[data-x="csv"]').addEventListener('click', () => download(volName(v) + '.csv', toG1000Csv(v), 'text/csv'));
+        // Partage natif (menu du téléphone) des trois formats d'un coup ;
+        // appareil sans partage de fichiers (PC) : téléchargement des trois.
+        row.querySelector('[data-x="share"]').addEventListener('click', async () => {
+            const files = volFiles(v, routeAtClick(), t.routePrevue);
+            if (!(await shareFiles(files, volName(v)))) files.forEach(f => download(f.name, f.content, f.mime));
+        });
         row.querySelector('[data-x="del"]').addEventListener('click', async () => {
             if (replayVolId === v.id) resetReplay();
             await volDel(v.id, updateVolsCount); openPanel();

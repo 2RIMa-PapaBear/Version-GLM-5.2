@@ -1,7 +1,7 @@
 // GPS-VOLS — exports et utilitaires purs (extrait de gps.js, item ⑥ 09/09).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { volName, toGpx, toKml, toG1000Csv, volDurMs, exportPts } from '../js/gps-vols.js';
+import { volName, toGpx, toKml, toG1000Csv, volDurMs, exportPts, volFiles, shareFiles } from '../js/gps-vols.js';
 
 const VOL = {
     id: Date.UTC(2026, 8, 9, 14, 30),
@@ -171,4 +171,65 @@ test('toGpx/toKml portent le type + immatriculation de l avion actif', async () 
     assert.ok(k.includes('<description>WT9-LSA · F-QA01</description>'), 'description KML');
     // Les trkpts restent intacts (2 points, time/ele inchangés).
     assert.equal((g.match(/<trkpt /g) || []).length, 2);
+});
+
+// Bouton « Partager » (retour pilote 26/09) : les trois formats d'un coup
+// par le menu du téléphone ; PC sans Web Share fichiers → repli download().
+test('volFiles : les trois exports d un vol (noms, mimes, contenus)', () => {
+    const files = volFiles(VOL, null, null);
+    assert.deepEqual(files.map(f => f.name),
+        [volName(VOL) + '.gpx', volName(VOL) + '.kml', volName(VOL) + '.csv']);
+    assert.deepEqual(files.map(f => f.mime),
+        ['application/gpx+xml', 'application/vnd.google-earth.kml+xml', 'text/csv']);
+    // Contenus identiques aux exports unitaires (mêmes fonctions, pas de copie).
+    assert.equal(files[0].content, toGpx(VOL));
+    assert.equal(files[1].content, toKml(VOL));
+    assert.equal(files[2].content, toG1000Csv(VOL));
+});
+
+test('shareFiles : repli download sur PC, partage natif avec des File sinon', async () => {
+    const files = [{ name: 'a.gpx', content: '<gpx/>', mime: 'application/gpx+xml' }];
+    // Node : pas de navigator.share → l'appelant doit retomber sur download().
+    if (!globalThis.navigator?.share) assert.equal(await shareFiles(files, 'vol'), false);
+
+    const desc = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+    try {
+        // Téléphone factice : partage accepté, File bien construits + titre.
+        const partages = [];
+        Object.defineProperty(globalThis, 'navigator', {
+            configurable: true,
+            value: {
+                canShare: ({ files: fs }) => fs.every(f => f instanceof File),
+                share: async (d) => { partages.push(d); },
+            },
+        });
+        assert.equal(await shareFiles(files, 'vol-X'), true);
+        assert.equal(partages.length, 1);
+        assert.equal(partages[0].title, 'vol-X');
+        assert.equal(partages[0].files[0].name, 'a.gpx');
+        assert.equal(partages[0].files[0].type, 'application/gpx+xml');
+
+        // Appareil qui a navigator.share mais refuse les fichiers (vieux
+        // navigateurs) : repli download, pas d'appel à share().
+        let appelé = 0;
+        Object.defineProperty(globalThis, 'navigator', {
+            configurable: true,
+            value: { canShare: () => false, share: async () => { appelé++; } },
+        });
+        assert.equal(await shareFiles(files, 'vol'), false);
+        assert.equal(appelé, 0);
+
+        // Feuille de partage fermée par le pilote (AbortError) : voulu —
+        // PAS de rafale de téléchargements en compensation.
+        Object.defineProperty(globalThis, 'navigator', {
+            configurable: true,
+            value: {
+                canShare: () => true,
+                share: async () => { const e = new Error('annulé'); e.name = 'AbortError'; throw e; },
+            },
+        });
+        assert.equal(await shareFiles(files, 'vol'), true);
+    } finally {
+        if (desc) Object.defineProperty(globalThis, 'navigator', desc);
+    }
 });

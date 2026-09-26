@@ -228,6 +228,39 @@ export function download(name, content, mime) {
     setTimeout(() => URL.revokeObjectURL(u), 2000);
 }
 
+// ---- Partage natif (Web Share niveau 2) ------------------------------------------
+
+/** Les trois fichiers d'export d'un vol, prêts pour download() (repli PC) ou
+ *  shareFiles() (partage natif mobile) — pure, testée sous Node.
+ *  routePts = plan prévu éventuel, routeLabel = libellé « (prévu) ». */
+export function volFiles(v, routePts, routeLabel) {
+    return [
+        { name: volName(v) + '.gpx', content: toGpx(v, routePts), mime: 'application/gpx+xml' },
+        { name: volName(v) + '.kml', content: toKml(v, routePts, routeLabel), mime: 'application/vnd.google-earth.kml+xml' },
+        { name: volName(v) + '.csv', content: toG1000Csv(v), mime: 'text/csv' },
+    ];
+}
+
+/** Partage natif des fichiers — le menu mail/WhatsApp/Drive du téléphone,
+ *  sans détour par le dossier Téléchargements. false si l'appareil ne sait
+ *  pas partager de fichiers (PC) : l'appelant retombe sur download().
+ *  AbortError = feuille de partage fermée par le pilote : ni erreur, ni
+ *  téléchargement en rafale en compensation. */
+export async function shareFiles(files, title) {
+    if (typeof navigator === 'undefined' || !navigator.share || !navigator.canShare) return false;
+    let fs;
+    try {
+        fs = files.map(f => new File([f.content], f.name, { type: f.mime }));
+    } catch (e) { return false; }
+    if (!navigator.canShare({ files: fs })) return false;
+    try {
+        await navigator.share({ files: fs, title });
+        return true;
+    } catch (e) {
+        return e?.name === 'AbortError';
+    }
+}
+
 // ---- Export CSV « G1000 » -------------------------------------------------------
 // Structure AUTHENTIQUE des journaux Garmin G1000 (carte SD) — fidèle au
 // fichier de référence de GPSBabel (reference/track/garmin_g1000.csv) :
