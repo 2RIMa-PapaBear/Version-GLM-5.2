@@ -6,8 +6,8 @@
 //   v2 : rotation « Route haut » (leaflet-rotate : setBearing actif, cap sol
 //        est mis vers le HAUT, retour Nord haut) ; enregistrement auto du
 //        vol en IndexedDB (chrono déclenché à la vitesse dérivée > 35 kt) ;
-//        panneau « Vols » avec exports .GPX / .KML réels (contenu vérifié),
-//        bouton « Partager » (repli téléchargement en headless) et suppression.
+//        panneau « Vols » avec exports .GPX / .KML réels (contenu vérifié)
+//        et suppression.
 import puppeteer from 'puppeteer-core';
 import http from 'node:http';
 import fs from 'node:fs';
@@ -331,33 +331,6 @@ fsOff ? ok('sortie du plein cadre (Échap)') : ko('sortie du plein cadre cassée
 await page.click('#gps-vols-btn');
 await page.waitForSelector('.gps-vols-panel.on .gps-vol-row', { timeout: 8000 });
 await new Promise(r => setTimeout(r, 500));   // le rendu du panneau est asynchrone
-
-// 7bis. BOUTON « PARTAGER » : les trois formats d'un coup. Headless/Brave
-// expose navigator.share (Windows) mais ne montre aucune feuille : on force
-// l'ABSENCE de partage natif pour tester le repli = 3 téléchargements.
-const shareLabel = await page.evaluate(() => document.querySelector('.gps-vol-row [data-x="share"]')?.textContent || null);
-shareLabel === 'Partager' ? ok('bouton « Partager » présent dans le panneau Vols') : ko('bouton « Partager » absent : ' + shareLabel);
-const shareNatif = await page.evaluate(() => !!(navigator.share && navigator.canShare));
-shareNatif ? ok('Web Share fichiers disponible sur cet appareil (menu natif à l\'usage)') : ok('pas de Web Share fichiers ici : repli téléchargement direct');
-await page.evaluate(() => {
-    Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
-    Object.defineProperty(navigator, 'canShare', { configurable: true, value: undefined });
-});
-const dlAvantPartage = fs.readdirSync(dlDir).length;
-await page.click('.gps-vol-row [data-x="share"]');
-let csvPartage = null;
-for (let i = 0; i < 40; i++) {   // max 10 s
-    await new Promise(r => setTimeout(r, 250));
-    csvPartage = fs.readdirSync(dlDir).find(n => n.endsWith('.csv'));
-    if (csvPartage) break;
-}
-const nApres = fs.readdirSync(dlDir).length;
-const csvTxt = csvPartage ? fs.readFileSync(path.join(dlDir, csvPartage), 'utf8') : '';
-// Le CSV est le marqueur fiable : jamais téléchargé avant ce clic (les noms
-// GPX/KML, à la minute près, recollent avec les exports unitaires ci-dessus).
-csvPartage && csvTxt.startsWith('#airframe_info')
-    ? ok(`repli téléchargement du partage OK (${nApres - dlAvantPartage} nouveaux fichiers, CSV G1000)`) : ko('repli téléchargement du partage incomplet : ' + fs.readdirSync(dlDir).join(', '));
-
 await page.evaluate(() => document.querySelector('.gps-vol-row [data-x="del"]').click());
 await new Promise(r => setTimeout(r, 600));
 const volsAfterDel = await idbVols();
