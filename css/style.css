@@ -3317,14 +3317,16 @@ html.theme-light .data-age-badge.age-old   { color: #B91C1C; background: rgba(23
          0 0 4px rgba(255, 255, 255, .9);
 }
 /* Enveloppe positionnelle : racine 0×0 posée sur le point (iconAnchor
- * [0,0]) ; le coin BAS-GAUCHE du bloc est ancré à 50 px à droite et
- * 50 px AU-DESSUS du symbole, IDENTIQUE pour tous les terrains — le
+ * [0,0]) ; le coin BAS-GAUCHE du bloc est ancré à --oaci-dx à droite et
+ * --oaci-dy AU-DESSUS du symbole, IDENTIQUE pour tous les terrains — le
  * bloc grandit ensuite vers la droite et le haut (comme la carte papier).
- * Cotes pilote réglables : left = décalage droit, bottom = décalage haut. */
+ * Les variables sont posées sur le conteneur carte par
+ * _updateOaciLabelVisibility() : décalage PROPORTIONNEL au zoom
+ * (retour pilote 27/09 — 25 px à z9 → 50 px à z13), repli 50 px. */
 .leaflet-container .oaci-label .oaci-in {
     position: absolute;
-    left: 50px;
-    bottom: 50px;
+    left: var(--oaci-dx, 50px);
+    bottom: var(--oaci-dy, 50px);
 }
 .leaflet-container .oaci-label .oaci-code {
     font-weight: 700;

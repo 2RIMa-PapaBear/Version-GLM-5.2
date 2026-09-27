@@ -1418,9 +1418,22 @@ function _removeOaciLabel(marker) {
     _map?.removeLayer(marker);
 }
 
+// Décalage de base des étiquettes, PROPORTIONNEL au zoom (retour pilote
+// 27/09 : 50 px fixes = trop loin à z9, correct à z13) : 25 px à z9,
+// ×~1,19 par niveau, 50 px à z13 — comme la carte papier où symbole et
+// annotation grandissent ensemble. Plancher 20 px (pastille ~7-10 px).
+function _oaciBaseOffset(zoom) {
+    return Math.max(20, Math.round(50 / Math.pow(1.19, 13 - zoom)));
+}
+
 function _updateOaciLabelVisibility() {
     if (!_map) return;
-    _map.getContainer().classList.toggle('hide-oaci-labels', _map.getZoom() < OACI_LABEL_MIN_ZOOM);
+    const z = _map.getZoom();
+    const cont = _map.getContainer();
+    cont.classList.toggle('hide-oaci-labels', z < OACI_LABEL_MIN_ZOOM);
+    const base = _oaciBaseOffset(z) + 'px';
+    cont.style.setProperty('--oaci-dx', base);
+    cont.style.setProperty('--oaci-dy', base);
     _updateCurrentOaciOffset();
 }
 
@@ -1452,9 +1465,10 @@ function _updateCurrentOaciOffset() {
     });
     if (!any) { inner.style.left = ''; inner.style.bottom = ''; return; }
 
+    const base = _oaciBaseOffset(_map.getZoom());
     const MARGIN = 15;
-    inner.style.left = Math.max(50, Math.round(maxX - pin.x) + MARGIN) + 'px';
-    inner.style.bottom = Math.max(50, Math.round(pin.y - minY) + MARGIN) + 'px';
+    inner.style.left = Math.max(base, Math.round(maxX - pin.x) + MARGIN) + 'px';
+    inner.style.bottom = Math.max(base, Math.round(pin.y - minY) + MARGIN) + 'px';
 }
 
 function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null, sub = null) {
