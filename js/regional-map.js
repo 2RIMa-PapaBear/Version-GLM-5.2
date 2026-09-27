@@ -1518,7 +1518,9 @@ function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null
     // le pictogramme remplace la pastille ; la couleur météo passe sur un
     // ANNEAU fin autour. Terrains non classés (étrangers, LF sans SIA) :
     // pastille pleine comme avant — à faire trancher par le pilote.
-    const sym = classifyOaciSymbol(icao);
+    // apt passé pour la classification des TERRAINS ÉTRANGERS (revêtement
+    // de la base locale — le SIA ne couvre que la France).
+    const sym = classifyOaciSymbol(icao, null, null, getAirportByICAO(icao));
 
     const marker = L.circleMarker([lat, lon], {
         radius: sym ? 17 : radius,

@@ -158,3 +158,19 @@ describe('MILITARY_OVERRIDES (saisies pilote)', () => {
         }
     });
 });
+
+describe('généralisation : terrains étrangers (base locale, retour pilote 27/09)', () => {
+    test('EG/EB : revêtement ASP → civil-piste-dur ; GRS → civil-bande', () => {
+        assert.equal(classifyOaciSymbol('EGKK', null, null, { surface: 'ASP' }).icon, 'civil-piste-dur');
+        assert.equal(classifyOaciSymbol('EBGB', null, null, { surface: 'GRS' }).icon, 'civil-bande');
+        assert.equal(classifyOaciSymbol('EGKK', null, null, { surface: 'ASP' }).statut, 'ÉTR');
+    });
+
+    test('étranger inconnu de la base → null (pastille)', () => {
+        assert.equal(classifyOaciSymbol('ZZZZ', null, null, null), null);
+    });
+
+    test('un LF reste prioritairement SIA (militaire LFRH malgré base)', () => {
+        assert.equal(classifyOaciSymbol('LFRH', { statut: 'RST' }, [{ d: '07/25', surf: 'béton', main: true }], { surface: 'ASP' }).icon, 'militaire-piste-dur');
+    });
+});
