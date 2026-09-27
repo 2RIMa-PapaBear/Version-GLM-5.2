@@ -940,124 +940,59 @@ export function createAirspaceController(map) {
         }
     }
 
-    // ---- Bande intérieure « carte OACI » ----------------------------------
-    // Inset géométrique du contour VERS L'INTÉRIEUR de `meters` : chaque
-    // sommet glisse le long de la normale intérieure moyenne de ses deux
-    // arêtes (calcul en métrique local, lon corrigé par cos(lat)).
-    // ANTI-BAVURES (retour pilote 27/09 : « bave dans les angles et sort
-    // des limites ») : 1) LIMITE DE MITRE — aux angles aigus la bissectrice
-    // allonge le décalage (miter blowout) : plafonné à 1,8× l'inset ;
-    // 2) CONTRÔLE D'APPARTENANCE — un sommet décalé qui sortirait de la
-    // zone reste à sa position d'origine (ray casting).
-    function _pointInRing(lon, lat, ring) {
-        let inside = false;
-        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-            const yi = ring[i][0], xi = ring[i][1], yj = ring[j][0], xj = ring[j][1];
-            if (((yi > lat) !== (yj > lat)) && (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi)) inside = !inside;
-        }
-        return inside;
-    }
-
-    function _insetRing(ring, meters) {
-        const n = ring.length;
-        if (n < 3 || meters <= 0) return null;
-        const M = 111320;
-        const lat0 = ring.reduce((a, p) => a + p[0], 0) / n;
-        const kx = M * Math.cos(lat0 * Math.PI / 180);
-        const pts = ring.map(p => [p[1] * kx, p[0] * M]);
-        // sens de parcours (aire signée) → côté intérieur
-        let area = 0;
-        for (let i = 0; i < n; i++) {
-            const a = pts[i], b = pts[(i + 1) % n];
-            area += a[0] * b[1] - b[0] * a[1];
-        }
-        const cw = area < 0;   // horaire en repère y-nord
-        const out = [];
-        for (let i = 0; i < n; i++) {
-            const p = pts[i];
-            const a = pts[(i - 1 + n) % n], b = pts[(i + 1) % n];
-            const e1 = [p[0] - a[0], p[1] - a[1]], e2 = [b[0] - p[0], b[1] - p[1]];
-            const l1 = Math.hypot(...e1) || 1, l2 = Math.hypot(...e2) || 1;
-            // normales intérieures des arêtes
-            const n1 = cw ? [e1[1] / l1, -e1[0] / l1] : [-e1[1] / l1, e1[0] / l1];
-            const n2 = cw ? [e2[1] / l2, -e2[0] / l2] : [-e2[1] / l2, e2[0] / l2];
-            let nx = n1[0] + n2[0], ny = n1[1] + n2[1];
-            const nl = Math.hypot(nx, ny);
-            if (nl < 0.05) { out.push(ring[i]); continue; }   // demi-tour : garde le sommet
-            nx /= nl; ny /= nl;
-            // limite de mitre : l'angle aigu entre les deux arêtes allonge
-            // le décalage sur la bissectrice — plafonné (≈1,8× l'inset).
-            const miter = 1 / Math.max(0.55, nx * n1[0] + ny * n1[1]);
-            const off = meters * Math.min(miter, 1.8);
-            const lat = (p[1] + ny * off) / M, lon = (p[0] + nx * off) / kx;
-            out.push(_pointInRing(lon, lat, ring) ? [lat, lon] : ring[i]);
-        }
-        return out;
-    }
-
-    // Inset px → mètres au zoom courant (bande W/2 + demi-trait de marge).
-    function _bandOffsetMeters(bandW, lat) {
-        const mPerPx = 40075016.686 * Math.cos(lat * Math.PI / 180) / (256 * Math.pow(2, map.getZoom()));
-        return (bandW / 2 + 1) * mPerPx;
-    }
-
-    // Distance minimale sommet → centre (m) : proxy de la « largeur » de la
-    // zone. SANS cette borne, l'inset en mètres (déduit des px au zoom
-    // courant : ~6 km/px en z7 !) traverse les PETITES zones — la bande
-    // dépassait la zone entière au dé-zoom (retour pilote 27/09).
-    function _ringCapMeters(ring) {
-        const n = ring.length, M = 111320;
-        const lat = ring.reduce((a, p) => a + p[0], 0) / n, lon = ring.reduce((a, p) => a + p[1], 0) / n;
-        const kx = M * Math.cos(lat * Math.PI / 180);
-        let dmin = Infinity;
-        for (const p of ring) dmin = Math.min(dmin, Math.hypot((p[1] - lon) * kx, (p[0] - lat) * M));
-        return dmin;
-    }
-
-    // Métriques de bande À CE ZOOM — COTES PILOTE 27/09 (badge debug) :
+    // Largeur de bande AU ZOOM courant — COTES PILOTE 27/09 (badge debug) :
     //   z11+ = 100 % (référence) ; z10 = 90 % ; z9 = 85 % ; z8 = 70 % ;
     //   z7 = 50 % ; z6 et moins = PAS de bande (trait seul).
-    // Garde-fous conservés : zone < 24 px à l'écran → pas de bande ;
-    // largeur ≤ 50 % de la largeur écran de la zone ; inset ≤ 45 % de sa
-    // taille géographique (l'inset en mètres dérivait des px : ~78 km en
-    // z7, traversait les petites zones).
     const ZOOM_BAND_SCALE = { 7: 0.5, 8: 0.7, 9: 0.85, 10: 0.9 };
-    function _bandMetrics(ring, bandW) {
+    function _bandWidth(bandW) {
         const z = map.getZoom();
         const f = z <= 6 ? 0 : (ZOOM_BAND_SCALE[z] ?? 1);
-        if (!f) return null;
-        const n = ring.length;
-        const lat = ring.reduce((a, p) => a + p[0], 0) / n;
-        const mPerPx = 40075016.686 * Math.cos(lat * Math.PI / 180) / (256 * Math.pow(2, z));
-        // GARDE-FOUS SUSPENDUS (essai pilote 27/09 « je veux voir ce que ça
-        // donne ») — rétablir tels quels pour revenir en arrière :
-        //   const dmin = _ringCapMeters(ring);
-        //   const zonePx = (2 * dmin) / mPerPx;
-        //   if (zonePx < 24) return null;
-        //   const w = Math.max(2, Math.min(bandW * f, 0.5 * zonePx));
-        //   const offM = (w / 2 + 1) * mPerPx;
-        //   if (offM > 0.45 * dmin) return null;
-        const w = bandW * f;
-        const offM = (w / 2 + 1) * mPerPx;
-        const inset = _insetRing(ring, offM);
-        return inset ? { w, inset } : null;
+        return f ? bandW * f : 0;
+    }
+
+    // Clip SVG « moitié intérieure » : clipPath = le contour de la zone,
+    // appliqué au trait épais posé sur ce même contour. Le 'd' du clip est
+    // re-synchronisé après chaque reprojection Leaflet (zoomend/moveend).
+    let _clipSeq = 0;
+    function _clipBandInside(band, ring) {
+        const el = band._path;
+        if (!el || !el.ownerSVGElement) return;   // renderer canvas : pas de clip
+        const svg = el.ownerSVGElement;
+        const NS = 'http://www.w3.org/2000/svg';
+        let defs = svg.querySelector('defs');
+        if (!defs) { defs = document.createElementNS(NS, 'defs'); svg.insertBefore(defs, svg.firstChild); }
+        const cp = document.createElementNS(NS, 'clipPath');
+        cp.id = 'oaci-band-clip-' + (++_clipSeq);
+        const p = document.createElementNS(NS, 'path');
+        cp.appendChild(p);
+        defs.appendChild(cp);
+        el.setAttribute('clip-path', 'url(#' + cp.id + ')');
+        band._oaciClipEl = cp;        // l'ÉLÉMENT clipPath (purgé au re-rendu)
+        band._oaciClipPath = p;
+        _syncClipD(band);
+    }
+
+    function _syncClipD(band) {
+        if (!band?._oaciClipPath || !band._path) return;
+        const d = band._path.getAttribute('d');
+        if (d) band._oaciClipPath.setAttribute('d', d);
     }
 
     function updateBands() {
         bandLayers.forEach(b => {
-            const bm = _bandMetrics(b.ring, b.bandW);
-            if (bm) {
-                b.poly.setLatLngs(bm.inset);
-                b.poly.setStyle({ opacity: 0.5, weight: bm.w });
-            } else {
-                // trop petite à ce zoom : masque (réapparaît au zoom avant)
-                b.poly.setLatLngs(b.ring);
-                b.poly.setStyle({ opacity: 0 });
-            }
+            const w = _bandWidth(b.bandW);
+            if (w) b.poly.setStyle({ weight: w, opacity: 0.5 });
+            else b.poly.setStyle({ opacity: 0 });   // z6- : pas de bande
+            // Leaflet a reprojeté les 'd' : le clip suit le même tracé.
+            _syncClipD(b.poly);
         });
     }
 
     function _render(items) {
+        // Retire les clipPath SVG des bandes du rendu précédent (sinon ils
+        // s'accumulent dans <defs> à chaque re-rendu — l'élément clipPath
+        // ENTIER, pas seulement son path enfant).
+        bandLayers.forEach(b => { b.poly?._oaciClipEl?.remove(); });
         layerGroup.clearLayers();
         polyMeta.clear();
         bandLayers = [];
@@ -1139,15 +1074,23 @@ export function createAirspaceController(map) {
                 // actives seulement (CTR pointillé long : bande quand
                 // même ; SIV : pas de bande).
                 if (st.bandW && activeToday) {
-                    const bm = _bandMetrics(ring, st.bandW || 12);
-                    if (bm) {
-                        const band = L.polygon(bm.inset, {
-                            stroke: true, color: st.color, weight: bm.w,
+                    // Bande ÉPOUSANT la limite (retour pilote 27/09 : « ne
+                    // suivent pas correctement les lignes pleines » —
+                    // l'inset par sommets pincé les angles) : le trait est
+                    // posé SUR le contour, épaisseur bandW, puis ROGNÉ au
+                    // polygone (clipPath SVG) → seule la moitié INTÉRIEURE
+                    // est peinte, collée à la limite en tout point.
+                    const w = _bandWidth(st.bandW || 12);
+                    if (w) {
+                        const band = L.polygon(ring, {
+                            stroke: true, color: st.color, weight: w,
                             opacity: 0.5,   // 50 % (retour pilote 27/09)
-                            fill: false, interactive: false, lineCap: 'butt',
+                            fill: false, interactive: false,
+                            lineCap: 'butt', lineJoin: 'round',
                         });
                         layerGroup.addLayer(band);
-                        bandLayers.push({ poly: band, ring, bandW: st.bandW || 12 });
+                        _clipBandInside(band, ring);
+                        bandLayers.push({ poly: band, bandW: st.bandW || 12 });
                     }
                 }
                 const poly = L.polygon(ring, {
