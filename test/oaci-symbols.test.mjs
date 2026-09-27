@@ -102,7 +102,7 @@ describe('symboles SVG recomposés (cardinaux COLLÉS, cotes mesurées)', () => 
     test('piste-dur civil : 4 traits cardinaux collés (rects y=2, h=12) + canal pivoté + disque r36', () => {
         const svg = oaciSymbolSvg('civil-piste-dur', 133.5);
         assert.ok(svg.includes('rotate(133.5 50 50)'), 'canal pivoté au cap');
-        assert.ok(svg.includes('<rect x="46.25" y="2" width="7.5" height="12"'), 'trait N collé au disque (bord r36 → r48)');
+        assert.ok(svg.includes('<rect x="44.6" y="2" width="10.8" height="12"'), 'trait N collé (+1 px : largeur 10,8)');
         assert.equal((svg.match(/<rect /g) || []).length, 5, '4 cardinaux + canal');
         assert.ok(svg.includes('r="36" fill="#0040A0"'), 'disque');
         assert.ok(!svg.includes('r="25.6"'), 'civil : pas d anneau externe');
@@ -113,8 +113,8 @@ describe('symboles SVG recomposés (cardinaux COLLÉS, cotes mesurées)', () => 
         assert.ok(mx.includes('r="25.6"'));
         assert.ok(mx.includes('height="20.2"'), 'traits collés au bord externe de l anneau');
         const mil = oaciSymbolSvg('militaire-piste-dur', 90);
-        assert.ok(mil.includes('#E03020') && mil.includes('r="27.36"'), 'échelle militaire');
-        assert.ok(mil.includes('width="5.7"'), 'traits militaire plus fins (7,5×0,76)');
+        assert.ok(mil.includes('#E03020') && mil.includes('r="36" fill="#E03020"'), 'militaire À LA MÊME TAILLE que civil (retour pilote)');
+        assert.ok(mil.includes('width="10.8"'), 'traits militaire épaissis comme les autres');
     });
 
     test('bande : anneau FIN (r34 ép. 7), sans orientation', () => {
