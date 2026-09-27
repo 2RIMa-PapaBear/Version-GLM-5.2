@@ -866,7 +866,10 @@ function _pointInRing(lat, lng, ring) {
 export function createAirspaceController(map) {
     let layerGroup = L.layerGroup().addTo(map);
     let visible = false;
-    let activeGroups = new Set(Object.keys(AIRSPACE_GROUPS));   // tout coché
+    // Retour pilote 27/09 : groupes d'espaces NON COCHÉS par défaut —
+    // même comportement que VOR/NDB/Points VFR/Obstacles (on n'affiche
+    // que ce que l'on coche dans le menu « Espaces »).
+    let activeGroups = new Set();
     let lastItems = null;                                          // rejouer sans refetch
     let loaded = false;
     let controlsEl = null;
