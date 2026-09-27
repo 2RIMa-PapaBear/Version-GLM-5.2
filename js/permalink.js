@@ -61,9 +61,11 @@ export function buildPermalink() {
         url.searchParams.set('mode', 'nav');
         // Navigation complète : destination + étapes — le lien rouvre le plan
         // de vol tel quel (et pas seulement le terrain de départ).
-        const icaoU = (icao || '').toUpperCase();
+        // S4 (audit 27/09) : dest ÉGALE au départ = aller-retour — on encode
+        // aussi (le décodeur l'autorise, retour pilote 25/09) ; l'ancienne
+        // garde `dest !== icao` perdait le plan complet à l'encodage.
         const dest = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
-        if (/^[A-Z][A-Z0-9]{3}$/.test(dest) && dest !== icaoU) {
+        if (/^[A-Z][A-Z0-9]{3}$/.test(dest)) {
             url.searchParams.set('dest', dest);
             // Codes du plan (le champ affiche les noms réels des repères).
             const wps = parseWaypointsField(document.getElementById('fp-waypoints')?.value || '').join(' ');

@@ -212,3 +212,19 @@ describe('tafVisiCeilingAt (heure sur l\'axe du TAF)', () => {
         assert.equal(horsTempo.ceilingFt, 3000);
     });
 });
+
+describe('airspaceContextFor — contexte indisponible (N5, audit 27/09)', () => {
+    test('réseau mort → repli CONSERVATEUR (controlled) + drapeau unknown', async () => {
+        const { airspaceContextFor } = await import('../js/vfr-minima.js');
+        const realFetch = globalThis.fetch;
+        globalThis.fetch = async () => { throw new Error('réseau coupé'); };
+        try {
+            const ctx = await airspaceContextFor('LFRV', 47.66, -2.76);
+            assert.equal(ctx.unknown, true, 'drapeau unknown posé');
+            assert.equal(ctx.controlled, true, 'repli contrôlé (minima exigeants)');
+            assert.equal(ctx.zone, null);
+        } finally {
+            globalThis.fetch = realFetch;
+        }
+    });
+});

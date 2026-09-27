@@ -120,6 +120,20 @@ export function getFleet() {
     }
     if (fuelMigrated) _writeLs(LS_FLEET, fleet);
 
+    // A7 (audit 27/09) : postes homonymes déjà enregistrés sous l'ancien
+    // code → noms dédoublonnés une fois à la lecture, même logique que le
+    // sanitize à la sauvegarde (clés `masses[nom]` uniques de bout en bout).
+    let wbMigrated = false;
+    for (const a of fleet) {
+        const sts = a?.wb?.stations;
+        if (Array.isArray(sts) && sts.length) {
+            const before = sts.map(s => s?.name).join('|');
+            _dedupeStationNames(sts);
+            if (sts.map(s => s?.name).join('|') !== before) wbMigrated = true;
+        }
+    }
+    if (wbMigrated) _writeLs(LS_FLEET, fleet);
+
     return fleet;
 }
 
@@ -301,6 +315,29 @@ const WB_MASS_UNITS = ['kg', 'lbs'];
 const WB_ARM_UNITS = ['mm', 'm', 'ft', 'in'];
 
 /**
+ * Postes à nom UNIQUE (A7, audit 27/09) : deux postes homonymes
+ * partageaient la clé `masses[nom]` du chargement du jour (widget comme
+ * computeWb) → la masse saisie était comptée DEUX fois au centrage.
+ * Suffixe « 2 », « 3 »… le nom d'origine reste sur la 1ʳᵉ occurrence.
+ * Mutateur ; retourne le tableau pour chaînage.
+ */
+function _dedupeStationNames(stations) {
+    const seen = new Set();
+    for (const st of stations) {
+        if (!st || typeof st !== 'object' || !st.name) continue;
+        let name = String(st.name).trim();
+        if (seen.has(name.toLowerCase())) {
+            let n = 2;
+            while (seen.has(`${name} ${n}`.toLowerCase())) n++;
+            name = `${name} ${n}`.slice(0, 24);
+        }
+        seen.add(name.toLowerCase());
+        st.name = name;
+    }
+    return stations;
+}
+
+/**
  * Valide/normalise le bloc centrage. Retourne null si le bloc est
  * absent ou inutilisable (masse à vide ou enveloppe manquante) —
  * la section Centrage reste alors masquée pour cet avion.
@@ -343,6 +380,9 @@ function _sanitizeWb(raw) {
             fuel,
         });
     }
+    // A7 : homonymes → « Passager 2 »… (avant le retour, pour que les clés
+    // de saisie du widget et du calcul soient uniques de bout en bout).
+    _dedupeStationNames(stations);
 
     const mtowKg = num(raw.mtowKg);
     const density = num(raw.fuelDensity);

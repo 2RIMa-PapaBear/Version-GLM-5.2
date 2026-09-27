@@ -286,6 +286,7 @@ function _loadCellItems(lat, lon) {
 const SIA_COVERAGE = [41, -63, 52, 12];   // France métropole + DOM proches
 let _siaItems = null;
 let _siaPending = null;
+let _siaOk = false;   // base chargée (réseau OU cache IDB) — voir siaAirspacesOk()
 
 async function _loadSiaItems() {
     if (_siaItems) return _siaItems;
@@ -300,17 +301,37 @@ async function _loadSiaItems() {
         // absent des caches v2 — nouveau clé = les clients re-téléchargent
         // sans attendre le TTL de 7 j.
         const cached = await _idbGet('sia:airspaces:v3');
-        if (cached?.data && Date.now() - cached.ts < CELL_TTL_MS) { _siaItems = stamp(cached.data); return _siaItems; }
+        if (cached?.data && Date.now() - cached.ts < CELL_TTL_MS) { _siaItems = stamp(cached.data); _siaOk = true; return _siaItems; }
         try {
             const res = await fetch(`data/sia-airspaces.json?t=${cached?.ts || 0}`, { signal: AbortSignal.timeout(15000) });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const d = await res.json();
             _siaItems = stamp(d.items.map(_expandFileItem));
+            _siaOk = true;
             _idbPut('sia:airspaces:v3', _siaItems);
-        } catch { _siaItems = stamp(cached?.data || []); }
+        } catch {
+            // Échec réseau : repli sur le cache IDB s'il existe (base alors
+            // encore disponible, périmée mais consultable) — sinon la base
+            // est INDISPONIBLE (siaAirspacesOk() reste false).
+            _siaOk = !!(cached?.data?.length);
+            _siaItems = stamp(cached?.data || []);
+        }
         return _siaItems;
     })();
     return _siaPending;
+}
+
+/**
+ * N5 (audit 27/09) : la base SIA des zones est-elle disponible ? Distingue
+ * « aucune zone au sol » (réponse) d'un « service indisponible » (on ne
+ * sait pas) pour les consommateurs type minima VFR.
+ */
+export function siaAirspacesOk() { return _siaOk === true; }
+
+/** Le point est-il dans la couverture de la base SIA ? */
+export function siaCoversPoint(lat, lon) {
+    return lat >= SIA_COVERAGE[0] && lat <= SIA_COVERAGE[2]
+        && lon >= SIA_COVERAGE[1] && lon <= SIA_COVERAGE[3];
 }
 
 function _bboxInSia(minLat, minLon, maxLat, maxLon) {

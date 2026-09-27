@@ -391,3 +391,42 @@ describe('flotte — drapeau ULM (fiche 7)', () => {
         assert.equal(ac.isULM, true);
     });
 });
+
+describe('flotte — postes homonymes (A7, audit 27/09)', () => {
+    const wbHomonymes = {
+        emptyMassKg: 500, emptyArmMm: 400,
+        envelope: [[500, 400], [600, 380], [600, 500], [500, 500]],
+        stations: [
+            { name: 'Passager', armMm: 1000, maxKg: 130 },
+            { name: 'Passager', armMm: 1400, maxKg: 130 },
+        ],
+    };
+
+    test('sanitize : homonymes → « Passager 2 » (clés masses uniques)', () => {
+        const ac = fleet.addAircraft({ name: 'Deux', wb: wbHomonymes });
+        assert.deepEqual(ac.wb.stations.map(s => s.name), ['Passager', 'Passager 2']);
+    });
+
+    test('getFleet : enregistrement déjà homonyme → dédoublonné à la lecture', () => {
+        _store.set('ac-fleet', JSON.stringify([{
+            id: 'ac_vieux', name: 'Vieux', groundRoll: 400, fiftyFt: 800, wb: wbHomonymes,
+        }]));
+        fleet.getFleet();
+        const stored = JSON.parse(_store.get('ac-fleet'));
+        assert.deepEqual(stored[0].wb.stations.map(s => s.name), ['Passager', 'Passager 2']);
+    });
+
+    test('computeWb : 70 kg au 1ᵉʳ « Passager » → +70 kg (et non +140)', async () => {
+        const { computeWb } = await import('../js/wb-core.js');
+        const ac = fleet.addAircraft({ name: 'Trois', wb: wbHomonymes });
+        const res = computeWb(ac.wb, { masses: { 'Passager': 70 }, fuelL: 0, burnL: 0 });
+        assert.equal(res.takeoff.massKg, 570, '500 à vide + 70 une seule fois');
+    });
+
+    test('computeWb : masses distinctes par poste suffixé → somme exacte', async () => {
+        const { computeWb } = await import('../js/wb-core.js');
+        const ac = fleet.addAircraft({ name: 'Quatre', wb: wbHomonymes });
+        const res = computeWb(ac.wb, { masses: { 'Passager': 70, 'Passager 2': 30 }, fuelL: 0, burnL: 0 });
+        assert.equal(res.takeoff.massKg, 600);
+    });
+});

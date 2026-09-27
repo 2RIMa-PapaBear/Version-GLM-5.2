@@ -40,7 +40,7 @@ const DEFAULT_INTERVAL_MIN = 15;
 const MIN_INTERVAL_MIN = 5;
 
 // État précédent des favoris (pour détecter les transitions).
-let _lastStates = new Map();   // icao → 'GO' | 'CAUTION' | 'NO-GO'
+let _lastStates = new Map();   // icao → 'GO' | 'CAUTION' | 'NO-GO' | 'UNKNOWN'
 let _timer = null;
 
 /**
@@ -132,7 +132,16 @@ async function _check() {
 
         for (const icao of favs) {
             const raw = metarByCode[icao.toUpperCase()];
-            if (!raw) continue;
+            if (!raw) {
+                // N4 (audit 27/09) : favori SANS METAR → olive grise UNKNOWN.
+                // L'ancien `continue` laissait l'ancien état peint comme s'il
+                // était courant (« jamais une donnée périmée présentée comme
+                // courante »). Pas d'alerte : UNKNOWN n'entre pas dans les
+                // transitions (une donnée revenue n'est pas une dégradation).
+                _lastStates.set(icao, 'UNKNOWN');
+                _updateFavoriteBadge(icao, 'UNKNOWN', isFr);
+                continue;
+            }
 
             const newState = _evaluateState(raw);
             const oldState = _lastStates.get(icao);
@@ -197,10 +206,12 @@ function _evaluateState(raw) {
 
 /**
  * Indique si newState est pire que oldState.
+ * 'UNKNOWN' (donnée absente) n'est jamais « pire » ni « meilleur » : une
+ * donnée revenue ne fait pas une dégradation, une donnée perdue pas un GO.
  */
 function _isWorse(newState, oldState) {
     const rank = { 'GO': 0, 'CAUTION': 1, 'NO-GO': 2 };
-    return rank[newState] > rank[oldState];
+    return rank[newState] != null && rank[oldState] != null && rank[newState] > rank[oldState];
 }
 
 /**
@@ -215,7 +226,7 @@ function _updateFavoriteBadge(icao, weatherState, isFr = true) {
     const item = favList.querySelector(`[data-icao="${icao.toUpperCase()}"]`);
     if (!item) return;
 
-    const colors = { 'GO': '#10B981', 'CAUTION': '#F59E0B', 'NO-GO': '#EF4444' };
+    const colors = { 'GO': '#10B981', 'CAUTION': '#F59E0B', 'NO-GO': '#EF4444', 'UNKNOWN': '#9CA3AF' };
     let badge = item.querySelector('.fav-status-badge');
     if (!badge) {
         // Repli (DOM ancien ou tiers) : recrée le voyant devant le code OACI.
@@ -234,8 +245,8 @@ function _updateFavoriteBadge(icao, weatherState, isFr = true) {
     badge.style.background = colors[weatherState] || 'transparent';
     badge.style.borderColor = colors[weatherState] || 'transparent';
     badge.title = isFr
-        ? { 'GO': 'Météo favorable', 'CAUTION': 'Météo en dégradation — prudence', 'NO-GO': 'Météo défavorable — NO-GO' }[weatherState] || weatherState
-        : { 'GO': 'Good weather', 'CAUTION': 'Degrading weather — caution', 'NO-GO': 'Unfavorable weather — NO-GO' }[weatherState] || weatherState;
+        ? { 'GO': 'Météo favorable', 'CAUTION': 'Météo en dégradation — prudence', 'NO-GO': 'Météo défavorable — NO-GO', 'UNKNOWN': 'METAR indisponible — état inconnu' }[weatherState] || weatherState
+        : { 'GO': 'Good weather', 'CAUTION': 'Degrading weather — caution', 'NO-GO': 'Unfavorable weather — NO-GO', 'UNKNOWN': 'METAR unavailable — unknown state' }[weatherState] || weatherState;
     badge.setAttribute('aria-label', badge.title);
 }
 

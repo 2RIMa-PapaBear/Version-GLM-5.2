@@ -98,3 +98,43 @@ describe('watchdog — voyant météo des favoris (emplacement réservé)', () =
         assert.equal(badges.get('LFRV').textContent, ' ');
     });
 });
+
+describe('watchdog — favori sans METAR (N4, audit 27/09)', () => {
+    // Favori supplémentaire ABSENT du stub réseau : l'ancien code le sautait
+    // (`if (!raw) continue;`) en laissant l'olive peinte d'un état périmé.
+    const badgeN4 = makeEl();
+    const itemN4 = makeEl();
+    itemN4.querySelector = (sel) => (sel === '.fav-status-badge' ? badgeN4 : null);
+    badges.set('LFER', badgeN4);
+    items.set('LFER', itemN4);
+
+    test('olive grise UNKNOWN + infobulle explicite (jamais de silence)', async () => {
+        _ls.set('favorites', JSON.stringify(['LFRV', 'LFRC', 'LFOM', 'LFER']));
+        await checkNow();
+        assert.equal(badgeN4.style.background, '#9CA3AF', 'gris UNKNOWN');
+        assert.match(badgeN4.title, /indisponible/);
+        // Les favoris avec METAR restent jugés normalement.
+        assert.equal(badges.get('LFRV').style.background, '#10B981');
+        assert.equal(badges.get('LFRC').style.background, '#EF4444');
+    });
+
+    test('applyFavoriteBadges repeint le UNKNOWN après re-rendu', () => {
+        badgeN4.style.background = '';
+        applyFavoriteBadges();
+        assert.equal(badgeN4.style.background, '#9CA3AF');
+    });
+
+    test('la donnée revenue n est pas une « dégradation » : olive réelle, pas d alerte', async () => {
+        const withLFER = [
+            ...METARS,
+            { icaoId: 'LFER', rawOb: 'METAR LFER 011630Z 27006KT CAVOK 18/10 Q1021' },
+        ];
+        globalThis.fetch = async () => ({
+            ok: true,
+            text: async () => JSON.stringify(withLFER),
+            json: async () => withLFER,
+        });
+        await checkNow();
+        assert.equal(badgeN4.style.background, '#10B981', 'état réel retrouvé');
+    });
+});

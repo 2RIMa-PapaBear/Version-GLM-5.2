@@ -150,12 +150,17 @@ async function _airspaceContext(icao, lat, lon) {
     const key = icao || `${lat.toFixed(3)}|${lon.toFixed(3)}`;
     const hit = _ctxCache.get(key);
     if (hit && Date.now() - hit.ts < CTX_TTL) return hit;
-    let out = { zone: null, type: '', classe: '', controlled: false, ts: Date.now() };
+    let out = { zone: null, type: '', classe: '', controlled: false, unknown: false, ts: Date.now() };
+    let siaOk = false, inSiaCov = false;
     try {
-        const { fetchAirspacesForBbox, _decodeType, _decodeIcaoClass } = await import('./airspaces.js');
+        const { fetchAirspacesForBbox, _decodeType, _decodeIcaoClass, siaAirspacesOk, siaCoversPoint } =
+            await import('./airspaces.js');
         const { pointInAirspace, limitToFt } = await import('./airspace-profile.js');
+        siaOk = siaAirspacesOk();
+        inSiaCov = siaCoversPoint(lat, lon);
         const d = 0.15;   // ~16 km autour du terrain
-        const items = (await fetchAirspacesForBbox(lat - d, lon - d, lat + d, lon + d)) || [];
+        const items = await fetchAirspacesForBbox(lat - d, lon - d, lat + d, lon + d);
+        if (!Array.isArray(items)) throw new Error('cellules de zones indisponibles');
         let best = null;
         for (const it of items) {
             const lo = limitToFt(it.lowerLimit);
@@ -172,11 +177,23 @@ async function _airspaceContext(icao, lat, lon) {
                 zone: String(best.it.name || best.type || '').trim().slice(0, 28),
                 type: best.type, classe: best.classe,
                 controlled: /CTR|TMA|CTA/.test(best.type) || /^[A-E]$/.test(best.classe),
+                unknown: false,
                 ts: Date.now(),
             };
+        } else if (inSiaCov && !siaOk) {
+            // N5 (audit 27/09) : aucune zone trouvée MAIS la base SIA des
+            // zones est indisponible — « on ne sait pas » ≠ « réputé non
+            // contrôlé » : repli conservateur (minima contrôlés) + unknown.
+            out = { zone: null, type: '', classe: '', controlled: true, unknown: true, ts: Date.now() };
         }
-    } catch { /* cellules de zones indisponibles → réputé non contrôlé */ }
-    _ctxCache.set(key, out);
+    } catch {
+        // N5 : contexte INDISPONIBLE ≠ espace non contrôlé — l'ancien repli
+        // assouplissait silencieusement les minima (optimiste). Repli
+        // CONSERVATEUR : minima « contrôlés » + drapeau unknown pour
+        // l'affichage ; pas de cache → nouvelle tentative au prochain tour.
+        out = { zone: null, type: '', classe: '', controlled: true, unknown: true, ts: Date.now() };
+    }
+    if (!out.unknown) _ctxCache.set(key, out);
     return out;
 }
 
@@ -230,7 +247,7 @@ export async function collectVfrMinima(plan) {
     const rows = [];
     for (const p of pts) {
         const row = { role: p.role, icao: p.icao, name: null, zone: null, classe: '',
-                      controlled: false, visiM: null, ceilingFt: null, source: null,
+                      controlled: false, unknown: false, visiM: null, ceilingFt: null, source: null,
                       when: p.when, isNight: false, verdict: { level: 'unknown', key: 'unknown' } };
         try {
             const apt = getAirportByICAO(p.icao);
@@ -239,7 +256,8 @@ export async function collectVfrMinima(plan) {
         try {
             const ctx = await _airspaceContext(p.icao, p.lat, p.lon);
             row.zone = ctx.zone; row.classe = ctx.classe; row.controlled = ctx.controlled;
-        } catch { /* garde le défaut non contrôlé */ }
+            row.unknown = ctx.unknown === true;
+        } catch { /* garde le repli conservateur */ }
         try {
             if (p.kind === 'metar') {
                 // fetchMetarWithFallback renvoie {raw, from, distNm} (avec

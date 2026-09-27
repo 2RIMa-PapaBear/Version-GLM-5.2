@@ -1151,8 +1151,10 @@ function _minimaRowHtml(r, isFr) {
         : r.role === 'etape' ? t('Étape (posée)', 'Stopover')
         : r.role === 'div' ? t('Dégagement', 'Alternate') : t('Arrivée', 'Arrival');
     const espace = r.zone
-        ? `${escapeHtml(r.zone)}${r.classe ? ' · ' + escapeHtml(r.classe) : ''} — ${r.controlled ? t('contrôlé', 'controlled') : t('non contrôlé', 'uncontrolled')}`
-        : t('non contrôlé (aucune zone au sol)', 'uncontrolled (no ground airspace)');
+        ? `${escapeHtml(r.zone)}${r.classe ? ' · ' + escapeHtml(r.classe) : ''} — ${r.controlled ? t('contrôlé', 'controlled') : t('non contrôlé', 'uncontrolled')}${r.unknown ? t(' · zones indisponibles', ' · zones unavailable') : ''}`
+        : r.unknown
+            ? t('zones indisponibles — repli « contrôlé »', 'zones unavailable — controlled fallback')
+            : t('non contrôlé (aucune zone au sol)', 'uncontrolled (no ground airspace)');
     const meteo = (r.visiM != null)
         ? `${r.source} : ${r.visiM >= 10000 ? '≥ 10 km' : Math.round(r.visiM) + ' m'} · ${t('plafond', 'ceiling')} ${r.ceilingFt >= 99999 ? '—' : r.ceilingFt + ' ft'}`
         : '';

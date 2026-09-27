@@ -165,3 +165,48 @@ describe('parsePlanJson', () => {
         assert.equal(parsePlanJson('{"foo":1}'), null);
     });
 });
+
+describe('parseGpx — rtept sans nom / attributs inversés (N6+N7, audit 27/09)', () => {
+    test('rtept SANS <name> : le point suivant n est plus avalé', () => {
+        const gpx = `<gpx><rte>
+            <rtept lat="47.0" lon="-2.5"></rtept>
+            <rtept lat="47.1" lon="-2.6"><name>AVENUE</name></rtept>
+        </rte></gpx>`;
+        const pts = parseGpx(gpx);
+        assert.equal(pts.length, 2, 'DEUX points (l ancien code n en rendait qu un)');
+        assert.equal(pts[0].name, '');
+        assert.equal(pts[1].name, 'AVENUE');
+        assert.equal(pts[1].lat, 47.1);
+        assert.equal(pts[1].lon, -2.6);
+    });
+
+    test('attributs lon AVANT lat (fichiers tiers) reconnus', () => {
+        const pts = parseGpx('<gpx><wpt lon="-2.5" lat="47.0"><name>BIDON</name></wpt></gpx>');
+        assert.equal(pts.length, 1);
+        assert.equal(pts[0].lat, 47.0);
+        assert.equal(pts[0].lon, -2.5);
+        assert.equal(pts[0].name, 'BIDON');
+    });
+
+    test('rtept auto-fermé toléré', () => {
+        const gpx = '<gpx><rte><rtept lat="47.0" lon="-2.5"/><rtept lat="47.1" lon="-2.6"><name>X</name></rtept></rte></gpx>';
+        const pts = parseGpx(gpx);
+        assert.equal(pts.length, 2);
+        assert.equal(pts[0].name, '');
+        assert.equal(pts[1].name, 'X');
+    });
+
+    test('round-trip buildGpx → parseGpx inchangé', () => {
+        const plan = {
+            dep: 'LFRV', dest: 'LFRN',
+            wps: [
+                { name: 'LFRV', lat: 47.66, lon: -2.76 },
+                { name: 'LFRN', lat: 48.07, lon: -1.73 },
+            ],
+        };
+        const pts = parseGpx(buildGpx(plan));
+        assert.equal(pts.length, 2);
+        assert.equal(pts[1].name, 'LFRN');
+        assert.ok(Math.abs(pts[1].lat - 48.07) < 1e-5);
+    });
+});

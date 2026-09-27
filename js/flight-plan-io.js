@@ -118,19 +118,33 @@ ${rtepts}
 }
 
 // Parse un GPX : rte>rtept prioritaire, sinon liste de wpt.
+// N6/N7 (audit 27/09) : attributs lat/lon reconnus INDÉPENDAMMENT de leur
+// ordre (fichiers tiers), et corps du point tempéré (?:(?!<\/?rtept)…) pour
+// qu'un rtept SANS <name> n'avale pas le point suivant au profit de son nom.
 export function parseGpx(text) {
     const pts = [];
-    const rte = /<rtept[^>]*lat="([-\d.]+)"[^>]*lon="([-\d.]+)"[^>]*>(?:[\s\S]*?<name>([^<]*)<\/name>)?[\s\S]*?<\/rtept>/g;
+    const rte = /<rtept\b([^>]*?)(\/>|>((?:(?!<\/?rtept)[\s\S])*?)<\/rtept>)/g;
     let m;
     while ((m = rte.exec(text)) !== null) {
-        pts.push({ lat: parseFloat(m[1]), lon: parseFloat(m[2]), name: _xmlDecode((m[3] || '')).trim() });
+        const p = _gpxPoint(m[1], m[2] === '/>' ? '' : (m[3] || ''));
+        if (p) pts.push(p);
     }
     if (pts.length) return pts;
-    const wpt = /<wpt[^>]*lat="([-\d.]+)"[^>]*lon="([-\d.]+)"[^>]*>(?:[\s\S]*?<name>([^<]*)<\/name>)?[\s\S]*?<\/wpt>/g;
+    const wpt = /<wpt\b([^>]*?)(\/>|>((?:(?!<\/?wpt)[\s\S])*?)<\/wpt>)/g;
     while ((m = wpt.exec(text)) !== null) {
-        pts.push({ lat: parseFloat(m[1]), lon: parseFloat(m[2]), name: _xmlDecode((m[3] || '')).trim() });
+        const p = _gpxPoint(m[1], m[2] === '/>' ? '' : (m[3] || ''));
+        if (p) pts.push(p);
     }
     return pts;
+}
+
+/** Attributs d'un point GPX (lat/lon dans n'importe quel ordre) + <name>. */
+function _gpxPoint(attrs, inner) {
+    const lat = (attrs.match(/\blat="([-\d.]+)"/) || [])[1];
+    const lon = (attrs.match(/\blon="([-\d.]+)"/) || [])[1];
+    if (lat == null || lon == null) return null;
+    const name = _xmlDecode((inner.match(/<name>([^<]*)<\/name>/) || [])[1] || '').trim();
+    return { lat: parseFloat(lat), lon: parseFloat(lon), name };
 }
 
 // ---------- KML ----------

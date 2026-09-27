@@ -95,9 +95,11 @@ export function evaluateGoNoGo() {
     }
 
     // Verdict VMC/IMC (SERA.5005, conditionné par la classe d'espace).
+    // N5 (audit 27/09) : contexte indisponible → repli « contrôlé » signalé,
+    // jamais présenté comme un espace réputé non contrôlé.
     const zoneLbl = ctx?.zone
-        ? ` (${ctx.zone}${ctx.classe ? ` · cl. ${ctx.classe}` : ''})`
-        : '';
+        ? ` (${ctx.zone}${ctx.classe ? ` · cl. ${ctx.classe}` : ''}${ctx.unknown ? (isFr ? ' · zones indisponibles' : ' · zones unavailable') : ''})`
+        : (ctx?.unknown ? (isFr ? ' (zones indisponibles — repli contrôlé)' : ' (zones unavailable — controlled fallback)') : '');
     const v = catObj.verdict;
     if (v.level === 'danger') {
         verdict = 'NO-GO';
@@ -363,6 +365,7 @@ export async function refreshAirspaceCtx(icao) {
         zone: ctx?.zone ?? null,
         classe: ctx?.classe ?? '',
         controlled: !!ctx?.controlled,
+        unknown: !!ctx?.unknown,
         isNight,
     };
     renderGoNoGo();
