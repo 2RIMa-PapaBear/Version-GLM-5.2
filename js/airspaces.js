@@ -105,13 +105,14 @@ export const AIRSPACE_STYLE = {
     // contour, recalculé au zoom). SIV : pointillés courts vert sapin.
     // `color` reste la couleur de FAMILLE (légende, groupes, infobulles).
     CTR:    { color: '#3B82F6', fill: 'rgba(59,130,246,0.10)', weight: 2, label: 'CTR',
-              line: '#1A1A1A', lineW: 1.2, band: '#9CC0E4', bandW: 6 },
+              line: '#1A1A1A', lineW: 1.2, bandW: 6,
+              dashArray: '14 5' },   // trait CTR = POINTILLÉ LONG (carte OACI)
     // STRICT SIA (décision pilote 09/09) : espaces contrôlés en BLEU
     // (les TMA/CTA étaient orange, confondues avec les zones D ambre).
     TMA:    { color: '#3B82F6', fill: 'rgba(59,130,246,0.10)', weight: 2, label: 'TMA',
-              line: '#1A1A1A', lineW: 1.2, band: '#9CC0E4', bandW: 6 },
+              line: '#1A1A1A', lineW: 1.2, bandW: 6 },
     CTA:    { color: '#3B82F6', fill: 'rgba(59,130,246,0.10)', weight: 1.5, label: 'CTA',
-              line: '#1A1A1A', lineW: 1.2, band: '#9CC0E4', bandW: 5 },
+              line: '#1A1A1A', lineW: 1.2, bandW: 5 },
     ATZ:    { color: '#FBBF24', fill: 'rgba(251,191,36,0.08)', weight: 1.2, label: 'ATZ' },
     ACRO:   { color: '#A855F7', fill: 'rgba(168,85,247,0.08)', weight: 1, label: 'Voltige' },
     'A':    { color: '#DC2626', fill: 'rgba(220,38,38,0.10)',  weight: 1.5, label: 'A' },
@@ -125,11 +126,11 @@ export const AIRSPACE_STYLE = {
     'GLIDER': { color: '#4ADE80', fill: 'rgba(74,222,128,0.08)', weight: 1, label: 'Planel' },
     'DROP': { color: '#94A3B8', fill: 'rgba(148,163,184,0.08)', weight: 1, label: 'Parachut.' },
     'RESTRICTED': { color: '#EF4444', fill: 'rgba(239,68,68,0.18)', weight: 2, label: 'Réglementée',
-              line: '#1A1A1A', lineW: 1.2, band: '#F0606C', bandW: 6 },
+              line: '#1A1A1A', lineW: 1.2, bandW: 6 },
     'DANGER': { color: '#EF4444', fill: 'rgba(239,68,68,0.12)', weight: 2, label: 'Dangereuse',
-              line: '#1A1A1A', lineW: 1.2, band: '#F0606C', bandW: 6 },
+              line: '#1A1A1A', lineW: 1.2, bandW: 6 },
     'PROHIBITED': { color: '#DC2626', fill: 'rgba(220,38,38,0.25)', weight: 2.5, label: 'Interdite',
-              line: '#1A1A1A', lineW: 1.2, band: '#F0606C', bandW: 7 },
+              line: '#1A1A1A', lineW: 1.2, bandW: 7 },
     // STRICT SIA (décision pilote 09/09) : TOUS les espaces contrôlés en
     // BLEU (CTR, TMA/CTA, SIV) — la distinction passe par les étiquettes,
     // comme sur la carte papier. SIV : remplissage plus léger + contour
@@ -1058,30 +1059,34 @@ export function createAirspaceController(map) {
 
             rings.forEach((ring, ringIdx) => {
                 if (ring.length < 2) return;
-                // Contours POINTILLÉS (SIV et zones R/D/P non actives — B2
-                // v2) : un HALO sombre passe SOUS le trait — sans lui, toute
-                // ligne superposée (bordure CTR/TMA pleine, SIV voisin
-                // partageant la limite) remplit les trous et l'effet
-                // pointillé disparaît (retour pilote 09/09).
-                if (st.dashArray || !activeToday) {
+                // Pointillé du jour (zones actives) : SIV court, CTR LONG ;
+                // zone NON active ce jour → pointillé court « 8 5 » (B2 v2).
+                const finalDash = activeToday ? st.dashArray : (st.dashArray || '8 5');
+                const fillOp = parseFloat(st.fill.match(/[\d.]+(?=\))/)[0]) || 0.10;
+                // HALO sombre SOUS le trait pointillé — sans lui, toute ligne
+                // superposée remplit les trous et l'effet pointillé
+                // disparaît (retour pilote 09/09).
+                if (finalDash) {
                     L.polygon(ring, {
                         stroke: true, color: 'rgba(2,6,23,0.35)',
                         weight: ((st.lineW || st.weight) || 2.5) + 1.5,
                         fill: false, interactive: false,
                     }).addTo(layerGroup);
                 }
-                // Bande intérieure CLAIRE « carte OACI » (retour pilote
-                // 27/09) : inset du contour, épaisseur px constante —
-                // recalculée au zoom (updateBands). Uniquement pour les
-                // zones à trait PLEIN et actives (SIV pointillé : pas de
-                // bande ; inactive : pointillé + halo existants).
-                const finalDash = st.dashArray || (activeToday ? undefined : '8 5');
-                if (st.band && !finalDash) {
+                // Bande intérieure « carte OACI » (retours pilote 27/09) :
+                // inset du contour, épaisseur px constante recalculée au
+                // zoom (updateBands) ; COULEUR = couleur de famille avec la
+                // TRANSPARENCE de l'ancien remplissage (le remplissage
+                // plein est supprimé — la bande le remplace). Zones
+                // actives seulement (CTR pointillé long : bande quand
+                // même ; SIV : pas de bande).
+                if (st.bandW && activeToday) {
                     const lat = ring.reduce((a, q) => a + q[0], 0) / ring.length;
                     const inset = _insetRing(ring, _bandOffsetMeters(st.bandW || 6, lat));
                     if (inset) {
                         const band = L.polygon(inset, {
-                            stroke: true, color: st.band, weight: st.bandW || 6,
+                            stroke: true, color: st.color, weight: st.bandW || 6,
+                            opacity: fillOp,
                             fill: false, interactive: false, lineCap: 'butt',
                         });
                         layerGroup.addLayer(band);
@@ -1092,8 +1097,8 @@ export function createAirspaceController(map) {
                     color: st.line || st.color,   // trait FIN de limite (carte OACI)
                     weight: st.lineW || st.weight,
                     fillColor: st.color,
-                    fillOpacity: parseFloat(st.fill.match(/[\d.]+(?=\))/)[0]) || 0.08,
-                    dashArray: finalDash,   // SIV pointillé court ; zone non active ce jour
+                    fillOpacity: 0,   // remplissage supprimé (retour pilote) — 0 garde la zone interactive
+                    dashArray: finalDash,   // SIV court / CTR long ; zone non active ce jour
                     interactive: true,
 
                 });
