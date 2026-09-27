@@ -83,35 +83,39 @@ export function oaciIconRotation(icon, bearing) {
     return ((bearing - OACI_BAR_HEADING + 90) % 180 + 180) % 180 - 90;
 }
 
-/* ---- Symboles DESSINÉS EN SVG (retour pilote 27/09) --------------------
- * Les repères cardinaux N/E/S/W restent FIXES — seule la piste pivote
- * (impossible en pivotant les PNG extraits, on recompose). Formes
- * relevées sur les pictogrammes légende (dumps ASCII) :
- *   piste-dur   : disque plein + canal blanc de piste pivoté au cap VRAI ;
- *   bande       : anneau épais (plateforme non revêtue, sans orientation) ;
- *   helistation : disque + « H » blanc ;
- *   hydro       : disque + ancre blanche ;
- *   prive       : disque + « P » blanc ;
- *   desaffecte  : anneau noir barré d'un X (noir, sans cardinaux).
- * Anneau externe (double) pour mixte/militaire. Couleurs échantillonnées :
- * bleu #0040A0, rouge #E03020, noir #141414. */
+/* ---- Symboles DESSINÉS EN SVG (retours pilote 27/09) --------------------
+ * Repères cardinaux N/E/S/W FIXES et COLLÉS au disque (correction pilote :
+ * l'encre est continue du centre à r≈44/46 sur les axes — profil radial
+ * mesuré sur les PNG légende), seule la piste pivote. Cotes relevées sur
+ * les pictogrammes (px ×100/92 — militaire dessiné plus petit sur la
+ * planche, k=0.76, tailles relatives préservées) :
+ *   disque r≈36 ; traits cardinaux collés (du bord à r≈48, largeur 7,5) ;
+ *   anneau externe (mixte/militaire) r≈25,6 ± 2,2, détaché du disque ;
+ *   « bande » : anneau FIN r≈34 ép. 7 (pas 16 — retour pilote) ;
+ *   canal piste largeur ≈ 14, débordant du disque.
+ *   hélistation : disque + H blanc ; hydro : disque + ancre ;
+ *   privé : disque + P ; désaffecté : anneau noir épais barré X.
+ * Couleurs échantillonnées : bleu #0040A0, rouge #E03020, noir #141414. */
 const OACI_STYLES = {
-    civil: { color: '#0040A0', doubleRing: false },
-    mixte: { color: '#0040A0', doubleRing: true },
-    militaire: { color: '#E03020', doubleRing: true },
+    civil: { color: '#0040A0', k: 1.0, doubleRing: false },
+    mixte: { color: '#0040A0', k: 1.0, doubleRing: true },
+    militaire: { color: '#E03020', k: 0.76, doubleRing: true },
 };
 
 const SVG_OPEN = '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">';
 const SVG_CLOSE = '</svg>';
-// Traits cardinaux externes (épais : retour pilote 27/09 « trop fins »).
-const SVG_TICKS = c => `<g stroke="${c}" stroke-width="9">`
-    + `<line x1="50" y1="2" x2="50" y2="9"/>`      // N
-    + `<line x1="98" y1="50" x2="91" y2="50"/>`    // E
-    + `<line x1="50" y1="98" x2="50" y2="91"/>`    // S
-    + `<line x1="2" y1="50" x2="9" y2="50"/>`      // W
-    + `</g>`;
-const SVG_RING = c => `<circle cx="50" cy="50" r="39" fill="none" stroke="${c}" stroke-width="4.5"/>`;
-const SVG_DISC = c => `<circle cx="50" cy="50" r="32" fill="${c}"/>`;
+
+/** 4 traits cardinaux COLLÉS au bord du symbole (rectangles, retour
+ *  pilote : attachés, épais 7,5 u, du bord du disque/anneau à r=48). */
+const SVG_TICKS = (c, attach, out, w) => {
+    const h = out - attach, x = 50 - w / 2;
+    return `<g fill="${c}">`
+        + `<rect x="${x}" y="${50 - out}" width="${w}" height="${h}"/>`                    // N
+        + `<rect x="${50 + attach}" y="${x}" width="${h}" height="${w}"/>`                 // E
+        + `<rect x="${x}" y="${50 + attach}" width="${w}" height="${h}"/>`                 // S
+        + `<rect x="${50 - out}" y="${x}" width="${h}" height="${w}"/>`                    // W
+        + `</g>`;
+};
 
 /** SVG inline (~30 px) du symbole `icon` (cf. classifyOaciSymbol).
  *  `bearing` : axe de piste en ° (mod 180) pour les « *-piste-dur » —
@@ -121,40 +125,61 @@ export function oaciSymbolSvg(icon, bearing) {
     if (name === 'desaffecte') {
         const c = '#141414';
         return SVG_OPEN
-            + `<circle cx="50" cy="50" r="26" fill="none" stroke="${c}" stroke-width="15"/>`
-            + `<g stroke="${c}" stroke-width="7"><line x1="31" y1="31" x2="69" y2="69"/><line x1="69" y1="31" x2="31" y2="69"/></g>`
+            + `<circle cx="50" cy="50" r="28" fill="none" stroke="${c}" stroke-width="16"/>`
+            + `<g stroke="${c}" stroke-width="7"><line x1="32" y1="32" x2="68" y2="68"/><line x1="68" y1="32" x2="32" y2="68"/></g>`
             + SVG_CLOSE;
     }
     if (name === 'prive') {
         const c = OACI_STYLES.civil.color;
-        return SVG_OPEN + SVG_TICKS(c) + SVG_DISC(c)
-            + `<g fill="#fff"><rect x="38" y="26" width="9" height="48"/>`
-            + `<circle cx="53" cy="37" r="13"/></g>`
-            + `<circle cx="53" cy="37" r="6.5" fill="${c}"/>`
+        return SVG_OPEN
+            + SVG_TICKS(c, 36, 48, 7.5)
+            + `<circle cx="50" cy="50" r="36" fill="${c}"/>`
+            + `<g fill="#fff"><rect x="40" y="27" width="9" height="50"/>`
+            + `<circle cx="55" cy="37" r="14"/></g>`
+            + `<circle cx="55" cy="37" r="7" fill="${c}"/>`
             + SVG_CLOSE;
     }
     const st = OACI_STYLES[name.split('-')[0]];
     const type = name.split('-').slice(1).join('-');
     if (!st || !['piste-dur', 'bande', 'helistation', 'hydro'].includes(type)) return null;
-    const c = st.color;
+    const k = st.k, c = st.color;
+    const discR = 36 * k;
+    const outerR = 25.6 * k, outerW = 4.4 * k;
+    const tickW = 7.5 * k, tickOut = 48 * k;
+    const attach = st.doubleRing ? outerR + outerW / 2 : (type === 'bande' ? 34 * k + 3.5 * k : discR);
     let core = '';
     if (type === 'piste-dur') {
         const hdg = Number.isFinite(bearing) ? ((bearing % 180) + 180) % 180 : OACI_BAR_HEADING;
-        core = SVG_DISC(c)
-            + `<g transform="rotate(${hdg} 50 50)"><rect x="44" y="16" width="12" height="68" fill="#fff"/></g>`;
+        const chW = 14 * k, chHalf = 37.5 * k;
+        core = `<circle cx="50" cy="50" r="${discR}" fill="${c}"/>`
+            + `<g transform="rotate(${hdg} 50 50)"><rect x="${50 - chW / 2}" y="${50 - chHalf}" width="${chW}" height="${2 * chHalf}" fill="#fff"/></g>`;
     } else if (type === 'bande') {
-        core = `<circle cx="50" cy="50" r="26" fill="none" stroke="${c}" stroke-width="16"/>`;
+        const ringR = 34 * k, ringW = 7 * k;
+        core = `<circle cx="50" cy="50" r="${ringR}" fill="none" stroke="${c}" stroke-width="${ringW}"/>`;
     } else if (type === 'helistation') {
-        core = SVG_DISC(c)
-            + `<g fill="#fff"><rect x="36" y="27" width="9" height="46"/><rect x="55" y="27" width="9" height="46"/><rect x="36" y="46" width="28" height="8"/></g>`;
+        core = `<circle cx="50" cy="50" r="${discR}" fill="${c}"/>`
+            + `<g fill="#fff">`
+            + `<rect x="${50 - 14 * k}" y="${50 - 19 * k}" width="${9 * k}" height="${38 * k}"/>`
+            + `<rect x="${50 + 5 * k}" y="${50 - 19 * k}" width="${9 * k}" height="${38 * k}"/>`
+            + `<rect x="${50 - 14 * k}" y="${50 - 4 * k}" width="${28 * k}" height="${8 * k}"/>`
+            + `</g>`;
     } else if (type === 'hydro') {
-        core = SVG_DISC(c)
-            + `<g stroke="#fff" fill="none" stroke-width="7">`
-            + `<line x1="50" y1="24" x2="50" y2="62"/><line x1="31" y1="32" x2="69" y2="32"/>`
-            + `<path d="M 31 56 A 19 16 0 0 0 69 56"/></g>`
-            + `<g stroke="#fff" stroke-width="6"><line x1="26" y1="50" x2="34" y2="58"/><line x1="74" y1="50" x2="66" y2="58"/></g>`;
+        core = `<circle cx="50" cy="50" r="${discR}" fill="${c}"/>`
+            + `<g stroke="#fff" fill="none" stroke-width="${7 * k}">`
+            + `<line x1="50" y1="${50 - 21 * k}" x2="50" y2="${50 + 10 * k}"/>`
+            + `<line x1="${50 - 15 * k}" y1="${50 - 14 * k}" x2="${50 + 15 * k}" y2="${50 - 14 * k}"/>`
+            + `<path d="M ${50 - 15 * k} ${50 + 4 * k} A ${15 * k} ${13 * k} 0 0 0 ${50 + 15 * k} ${50 + 4 * k}"/>`
+            + `</g>`
+            + `<g stroke="#fff" stroke-width="${6 * k}">`
+            + `<line x1="${50 - 19 * k}" y1="${50 - 1 * k}" x2="${50 - 12 * k}" y2="${50 + 6 * k}"/>`
+            + `<line x1="${50 + 19 * k}" y1="${50 - 1 * k}" x2="${50 + 12 * k}" y2="${50 + 6 * k}"/>`
+            + `</g>`;
     }
-    return SVG_OPEN + SVG_TICKS(c) + (st.doubleRing ? SVG_RING(c) : '') + core + SVG_CLOSE;
+    return SVG_OPEN
+        + SVG_TICKS(c, attach, tickOut, tickW)
+        + (st.doubleRing ? `<circle cx="50" cy="50" r="${outerR}" fill="none" stroke="${c}" stroke-width="${outerW}"/>` : '')
+        + core
+        + SVG_CLOSE;
 }
 
 /** @deprecated — remplacé par oaciSymbolSvg (tous les symboles). */
