@@ -21,6 +21,10 @@ on:
     - cron: '30 5 * * 1'   # hebdomadaire, lundi 05:30 UTC ≈ 07:30 Paris (été)
   workflow_dispatch:
 
+concurrency:
+  group: update-radio-points
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -38,14 +42,14 @@ jobs:
         with:
           node-version: 24
 
-      - name: Crawl mondial des espaces aériens (cellules 1°, budget 4 h)
-        env:
-          OPENAIP_API_KEY: ${{ secrets.OPENAIP_API_KEY }}
-        run: node scripts/fetch-airspaces.mjs --budget-minutes=240
-
+      # ORDRE INVERSÉ (28/09) : les extractions COURTES d'abord, commitées et
+      # poussées immédiatement. Avant, freq-sia n'était committé qu'APRÈS le
+      # crawl de 4 h — et le push final était rejeté (« fetch first ») dès que
+      # la branche avait avancé pendant le crawl (déploiements, bascules…) :
+      # tout le travail du run était PERDU, l'état .crawl.json avec lui, d'où
+      # des runs qui recommençaient de zéro (échecs des 21+23/09, exactement
+      # ça) et freq-sia figé au 08-06.
       - name: Fréquences officielles SIA (eAIP, à chaque nouvel AIRAC)
-        env:
-          OPENAIP_API_KEY: ${{ secrets.OPENAIP_API_KEY }}
         run: node scripts/fetch-freq-sia.mjs
 
       - name: Radiophares + points VFR
@@ -57,20 +61,63 @@ jobs:
       - name: Sup AIP série A (SIA)
         run: node scripts/fetch-sup-sia.mjs
 
-      # Obstacles : base OFFICIELLE SIA (export AIXM OM) — mise à jour à chaque
-      # cycle AIRAC avec le reste de la base SIA (téléchargement manuel puis
-      # node scripts/fetch-obstacles.mjs), PAS dans ce cron openAIP.
-
-      - name: Commit + push si changement
+      - name: Commit + push (fréquences eAIP + radio-points + sup AIP)
         run: |
           git config user.name "radio-points-bot"
           git config user.email "radio-points-bot@users.noreply.github.com"
-          git add data/radio-points.json data/sup-sia.json data/airspaces/ data/freq-sia.json
+          git add data/radio-points.json data/sup-sia.json data/freq-sia.json
           if git diff --cached --quiet; then
-            echo "Aucun changement openAIP aujourd'hui."
+            echo "Aucun changement de fréquences/radio-points."
           else
-            git commit -m "openAIP: maj automatique espaces (crawl) + radio-points + fréquences eAIP ($(date -u +%F))"
-            git push
+            git commit -m "openAIP: fréquences eAIP + radio-points + sup AIP ($(date -u +%F))"
+            git fetch origin Version-2.0
+            git rebase origin/Version-2.0 || {
+              git rebase --abort || true
+              git merge origin/Version-2.0 || true
+              # Conflits : les données du run sont les plus fraîches (le bot
+              # est l'écrivain exclusif de ces fichiers) — elles gagnent.
+              git diff --name-only --diff-filter=U | xargs -r git checkout --ours --
+              git add -A
+              git commit --no-edit || true
+            }
+            git push origin Version-2.0
+          fi
+
+      - name: Crawl mondial des espaces aériens (cellules 1°, budget 4 h)
+        env:
+          OPENAIP_API_KEY: ${{ secrets.OPENAIP_API_KEY }}
+        run: node scripts/fetch-airspaces.mjs --budget-minutes=240
+
+      - name: Commit + push (cellules espaces + état du crawl)
+        run: |
+          git config user.name "radio-points-bot"
+          git config user.email "radio-points-bot@users.noreply.github.com"
+          git add data/airspaces/
+          if git diff --cached --quiet; then
+            echo "Aucun changement de cellules aujourd'hui."
+          else
+            git commit -m "openAIP: maj automatique espaces (crawl) ($(date -u +%F))"
+            # Le crawl a duré 4 h : la branche a presque à coup sûr avancé
+            # pendant ce temps. Ré-intégrer AVANT de pousser (rebase si
+            # propre, sinon merge où les données fraîches du run gagnent),
+            # puis 3 ré-essais — le rejet définitif reste signalé en rouge.
+            git fetch origin Version-2.0
+            if ! git rebase origin/Version-2.0; then
+              git rebase --abort || true
+              git merge origin/Version-2.0 || true
+              git diff --name-only --diff-filter=U | xargs -r git checkout --ours --
+              git add -A
+              git commit --no-edit || true
+            fi
+            ok=0
+            for i in 1 2 3; do
+              if git push origin Version-2.0; then ok=1; break; fi
+              echo "  … push rejeté (essai $i/3) — ré-intégration dans 20 s"
+              sleep 20
+              git fetch origin Version-2.0
+              git rebase origin/Version-2.0 || { git rebase --abort || true; break; }
+            done
+            [ "$ok" = "1" ] || { echo "::error::Push toujours rejeté après ré-essais — données du run NON publiées."; exit 1; }
           fi
 
   deploy:
