@@ -1,11 +1,12 @@
-// Auto-hébergement des polices DM Sans (variable) / DM Mono (statique) :
+// Auto-hébergement des polices DM Sans (variable) / DM Mono (statique) /
+// Archivo (substitut libre d'Univers pour les étiquettes « carte OACI ») :
 // télécharge les woff2 depuis Google Fonts, déduplique par URL (la police
 // variable couvre toute la plage de graisses) et génère css/fonts.css avec
 // des chemins locaux. Usage : node test/gen-local-fonts.mjs
 import fs from 'node:fs';
 import path from 'node:path';
 
-const CSS2_URL = 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap';
+const CSS2_URL = 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&family=Archivo:wght@400;500;700&display=swap';
 // UA moderne → Google sert du woff2 avec sous-ensembles unicode-range.
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
 
