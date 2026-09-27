@@ -146,7 +146,8 @@ export const AIRSPACE_STYLE = {
 // sans re-téléchargement (les items du dernier cadrage sont rejoués).
 export const AIRSPACE_GROUPS = {
     ctr:    { kinds: ['CTR'], label: 'CTR', en: 'CTR', color: '#3B82F6' },
-    tma:    { kinds: ['TMA', 'CTA'], label: 'TMA / CTA', en: 'TMA / CTA', color: '#3B82F6' },
+    tma:    { kinds: ['TMA'], label: 'TMA', en: 'TMA', color: '#3B82F6' },
+    cta:    { kinds: ['CTA'], label: 'CTA', en: 'CTA', color: '#3B82F6' },   // séparés (pilote 27/09)
     siv:    { kinds: ['SIV'], label: 'SIV', en: 'SIV', color: '#2B5D34' },
     atz:    { kinds: ['ATZ'], label: 'ATZ', en: 'ATZ', color: '#FBBF24' },
     rpd:    { kinds: ['RESTRICTED', 'PROHIBITED', 'DANGER', 'DROP'], label: 'Zones R · P · D', en: 'R · P · D areas', color: '#DC2626' },
