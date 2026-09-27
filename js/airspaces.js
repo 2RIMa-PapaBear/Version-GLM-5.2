@@ -996,19 +996,25 @@ export function createAirspaceController(map) {
         return dmin;
     }
 
-    // Métriques de bande À CE ZOOM (retour pilote 27/09 : « l'épaisseur
-    // s'élargit trop au dé-zoom » — une bande de 12 px constants recouvrait
-    // les petites zones) : largeur = min(souhaitée, 60 % de la largeur
-    // ÉCRAN de la zone) ; zone < ~16 px à l'écran → PAS de bande (trait
-    // seul) ; inset plafonné à 45 % de la taille géographique.
+    // Métriques de bande À CE ZOOM — COTES PILOTE 27/09 (badge debug) :
+    //   z11+ = 100 % (référence) ; z10 = 90 % ; z9 = 85 % ; z8 = 70 % ;
+    //   z7 = 50 % ; z6 et moins = PAS de bande (trait seul).
+    // Garde-fous conservés : zone < 24 px à l'écran → pas de bande ;
+    // largeur ≤ 50 % de la largeur écran de la zone ; inset ≤ 45 % de sa
+    // taille géographique (l'inset en mètres dérivait des px : ~78 km en
+    // z7, traversait les petites zones).
+    const ZOOM_BAND_SCALE = { 7: 0.5, 8: 0.7, 9: 0.85, 10: 0.9 };
     function _bandMetrics(ring, bandW) {
+        const z = map.getZoom();
+        const f = z <= 6 ? 0 : (ZOOM_BAND_SCALE[z] ?? 1);
+        if (!f) return null;
         const n = ring.length;
         const lat = ring.reduce((a, p) => a + p[0], 0) / n;
-        const mPerPx = 40075016.686 * Math.cos(lat * Math.PI / 180) / (256 * Math.pow(2, map.getZoom()));
+        const mPerPx = 40075016.686 * Math.cos(lat * Math.PI / 180) / (256 * Math.pow(2, z));
         const dmin = _ringCapMeters(ring);
         const zonePx = (2 * dmin) / mPerPx;
         if (zonePx < 24) return null;   // zone trop petite à l'écran : trait seul
-        const w = Math.max(2, Math.min(bandW, 0.5 * zonePx));
+        const w = Math.max(2, Math.min(bandW * f, 0.5 * zonePx));
         const offM = (w / 2 + 1) * mPerPx;
         if (offM > 0.45 * dmin) return null;
         const inset = _insetRing(ring, offM);
