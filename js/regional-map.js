@@ -1418,12 +1418,20 @@ function _removeOaciLabel(marker) {
     _map?.removeLayer(marker);
 }
 
-// Décalage de base des étiquettes, PROPORTIONNEL au zoom (retour pilote
-// 27/09 : 50 px fixes = trop loin à z9, correct à z13) : 25 px à z9,
-// ×~1,19 par niveau, 50 px à z13 — comme la carte papier où symbole et
-// annotation grandissent ensemble. Plancher 20 px (pastille ~7-10 px).
+// Décalage de base des étiquettes selon le zoom — COURBE PILOTE 27/09 :
+// z9=12, z10=20, z11=32, z13=50 « correct » (z12 interpolé 40), plafonné
+// à 50 au-delà (le terrain courant continue de suivre ses pistes).
 function _oaciBaseOffset(zoom) {
-    return Math.max(20, Math.round(50 / Math.pow(1.19, 13 - zoom)));
+    const T = [[9, 12], [10, 20], [11, 32], [12, 40], [13, 50]];
+    if (zoom <= T[0][0]) return T[0][1];
+    if (zoom >= T[T.length - 1][0]) return T[T.length - 1][1];
+    for (let i = 1; i < T.length; i++) {
+        if (zoom <= T[i][0]) {
+            const [z0, v0] = T[i - 1], [z1, v1] = T[i];
+            return Math.round(v0 + (v1 - v0) * (zoom - z0) / (z1 - z0));
+        }
+    }
+    return T[T.length - 1][1];
 }
 
 function _updateOaciLabelVisibility() {
