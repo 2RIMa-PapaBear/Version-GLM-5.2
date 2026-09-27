@@ -83,39 +83,82 @@ export function oaciIconRotation(icon, bearing) {
     return ((bearing - OACI_BAR_HEADING + 90) % 180 + 180) % 180 - 90;
 }
 
-/* ---- Symboles « piste en dur » DESSINÉS EN SVG -------------------------
- * (retour pilote 27/09 : les repères cardinaux N/E/S/W du pictogramme
- * doivent rester FIXES — seule la piste pivote ; impossible en pivotant
- * le PNG extrait, on compose) : disque plein + canal blanc de piste
- * pivoté au cap VRAI + 4 traits cardinaux externes fixes ; anneau
- * externe pour mixte/militaire (double). Couleurs échantillonnées des
- * pictogrammes légende : bleu #0040A0, rouge #E03020. */
-const OACI_DUR_STYLES = {
+/* ---- Symboles DESSINÉS EN SVG (retour pilote 27/09) --------------------
+ * Les repères cardinaux N/E/S/W restent FIXES — seule la piste pivote
+ * (impossible en pivotant les PNG extraits, on recompose). Formes
+ * relevées sur les pictogrammes légende (dumps ASCII) :
+ *   piste-dur   : disque plein + canal blanc de piste pivoté au cap VRAI ;
+ *   bande       : anneau épais (plateforme non revêtue, sans orientation) ;
+ *   helistation : disque + « H » blanc ;
+ *   hydro       : disque + ancre blanche ;
+ *   prive       : disque + « P » blanc ;
+ *   desaffecte  : anneau noir barré d'un X (noir, sans cardinaux).
+ * Anneau externe (double) pour mixte/militaire. Couleurs échantillonnées :
+ * bleu #0040A0, rouge #E03020, noir #141414. */
+const OACI_STYLES = {
     civil: { color: '#0040A0', doubleRing: false },
     mixte: { color: '#0040A0', doubleRing: true },
     militaire: { color: '#E03020', doubleRing: true },
 };
 
-/** SVG du symbole « piste en dur » (inline, ~30 px). `bearing` : axe de
- *  piste en ° (mod 180) — repli à la pose légende (40°). Null si l'icône
- *  n'est pas de la famille piste-dur. */
-export function oaciDurSymbolSvg(icon, bearing) {
-    const st = OACI_DUR_STYLES[String(icon || '').split('-')[0]];
-    if (!st || !icon.endsWith('piste-dur')) return null;
-    const hdg = Number.isFinite(bearing) ? ((bearing % 180) + 180) % 180 : OACI_BAR_HEADING;
+const SVG_OPEN = '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">';
+const SVG_CLOSE = '</svg>';
+// Traits cardinaux externes (épais : retour pilote 27/09 « trop fins »).
+const SVG_TICKS = c => `<g stroke="${c}" stroke-width="9">`
+    + `<line x1="50" y1="2" x2="50" y2="9"/>`      // N
+    + `<line x1="98" y1="50" x2="91" y2="50"/>`    // E
+    + `<line x1="50" y1="98" x2="50" y2="91"/>`    // S
+    + `<line x1="2" y1="50" x2="9" y2="50"/>`      // W
+    + `</g>`;
+const SVG_RING = c => `<circle cx="50" cy="50" r="39" fill="none" stroke="${c}" stroke-width="4.5"/>`;
+const SVG_DISC = c => `<circle cx="50" cy="50" r="32" fill="${c}"/>`;
+
+/** SVG inline (~30 px) du symbole `icon` (cf. classifyOaciSymbol).
+ *  `bearing` : axe de piste en ° (mod 180) pour les « *-piste-dur » —
+ *  repli à la pose légende (40°). Null si le nom d'icône est inconnu. */
+export function oaciSymbolSvg(icon, bearing) {
+    const name = String(icon || '');
+    if (name === 'desaffecte') {
+        const c = '#141414';
+        return SVG_OPEN
+            + `<circle cx="50" cy="50" r="26" fill="none" stroke="${c}" stroke-width="15"/>`
+            + `<g stroke="${c}" stroke-width="7"><line x1="31" y1="31" x2="69" y2="69"/><line x1="69" y1="31" x2="31" y2="69"/></g>`
+            + SVG_CLOSE;
+    }
+    if (name === 'prive') {
+        const c = OACI_STYLES.civil.color;
+        return SVG_OPEN + SVG_TICKS(c) + SVG_DISC(c)
+            + `<g fill="#fff"><rect x="38" y="26" width="9" height="48"/>`
+            + `<circle cx="53" cy="37" r="13"/></g>`
+            + `<circle cx="53" cy="37" r="6.5" fill="${c}"/>`
+            + SVG_CLOSE;
+    }
+    const st = OACI_STYLES[name.split('-')[0]];
+    const type = name.split('-').slice(1).join('-');
+    if (!st || !['piste-dur', 'bande', 'helistation', 'hydro'].includes(type)) return null;
     const c = st.color;
-    return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">`
-        + `<g stroke="${c}" stroke-width="6">`
-        + `<line x1="50" y1="2" x2="50" y2="8"/>`                       // N
-        + `<line x1="98" y1="50" x2="92" y2="50"/>`                     // E
-        + `<line x1="50" y1="98" x2="50" y2="92"/>`                     // S
-        + `<line x1="2" y1="50" x2="8" y2="50"/>`                       // W
-        + `</g>`
-        + (st.doubleRing ? `<circle cx="50" cy="50" r="39" fill="none" stroke="${c}" stroke-width="4.5"/>` : '')
-        + `<circle cx="50" cy="50" r="32" fill="${c}"/>`
-        + `<g transform="rotate(${hdg} 50 50)"><rect x="44" y="16" width="12" height="68" fill="#fff"/></g>`
-        + `</svg>`;
+    let core = '';
+    if (type === 'piste-dur') {
+        const hdg = Number.isFinite(bearing) ? ((bearing % 180) + 180) % 180 : OACI_BAR_HEADING;
+        core = SVG_DISC(c)
+            + `<g transform="rotate(${hdg} 50 50)"><rect x="44" y="16" width="12" height="68" fill="#fff"/></g>`;
+    } else if (type === 'bande') {
+        core = `<circle cx="50" cy="50" r="26" fill="none" stroke="${c}" stroke-width="16"/>`;
+    } else if (type === 'helistation') {
+        core = SVG_DISC(c)
+            + `<g fill="#fff"><rect x="36" y="27" width="9" height="46"/><rect x="55" y="27" width="9" height="46"/><rect x="36" y="46" width="28" height="8"/></g>`;
+    } else if (type === 'hydro') {
+        core = SVG_DISC(c)
+            + `<g stroke="#fff" fill="none" stroke-width="7">`
+            + `<line x1="50" y1="24" x2="50" y2="62"/><line x1="31" y1="32" x2="69" y2="32"/>`
+            + `<path d="M 31 56 A 19 16 0 0 0 69 56"/></g>`
+            + `<g stroke="#fff" stroke-width="6"><line x1="26" y1="50" x2="34" y2="58"/><line x1="74" y1="50" x2="66" y2="58"/></g>`;
+    }
+    return SVG_OPEN + SVG_TICKS(c) + (st.doubleRing ? SVG_RING(c) : '') + core + SVG_CLOSE;
 }
+
+/** @deprecated — remplacé par oaciSymbolSvg (tous les symboles). */
+export function oaciDurSymbolSvg(icon, bearing) { return oaciSymbolSvg(icon, bearing); }
 
 /** Classe un terrain français.
  *  @returns {{icon: string, statut: string, surf: string|null}|null}

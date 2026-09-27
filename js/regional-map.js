@@ -15,7 +15,7 @@ import { mountWindLayer } from './wind-layer.js';
 import { mountTemsiButton, closeTemsiViewer } from './temsi.js';
 import { mountFrontsButton, closeFrontsViewer } from './fronts.js';
 import { getAirportFreqs, loadFreqSources } from './freq-sia.js';
-import { classifyOaciSymbol, oaciRunwayBearing, oaciDurSymbolSvg, OACI_SYMBOL_DIR, OACI_SYMBOL_SIZE } from './oaci-symbols.js';
+import { classifyOaciSymbol, oaciRunwayBearing, oaciSymbolSvg, OACI_SYMBOL_SIZE } from './oaci-symbols.js';
 
 let _map = null;
 let _precip = null;
@@ -1514,32 +1514,28 @@ function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null
     }).addTo(_map);
 
     if (sym) {
-        // Symbole « piste en dur » : DESSINÉ EN SVG — la piste pivote au
-        // cap réel, les repères cardinaux N/E/S/W restent FIXES (retour
-        // pilote 27/09 : pivoter le PNG extrait désaxait les cardinaux).
+        // Symbole DESSINÉ EN SVG (retour pilote 27/09 : la piste pivote au
+        // cap réel, les repères cardinaux N/E/S/W restent FIXES ; PNG
+        // extraits remplacés par des recompositions vectorielles).
         // Cap : seuils SIA (cap vrai) d'abord, sinon cap magnétique base.
         let bearing = oaciRunwayBearing(icao);
         if (!Number.isFinite(bearing)) {
             const paires = _parseRunwayPairs(getAirportByICAO(icao)?.runways || []);
             if (paires.length) bearing = paires[0].hdg % 180;
         }
-        const svg = oaciDurSymbolSvg(sym.icon, bearing);
-        marker.oaciIcon = L.marker([lat, lon], {
-            interactive: false,
-            keyboard: false,
-            icon: svg
-                ? L.divIcon({
+        const svg = oaciSymbolSvg(sym.icon, bearing);
+        if (svg) {
+            marker.oaciIcon = L.marker([lat, lon], {
+                interactive: false,
+                keyboard: false,
+                icon: L.divIcon({
                     className: 'oaci-sym',
                     html: svg,
                     iconSize: [OACI_SYMBOL_SIZE, OACI_SYMBOL_SIZE],
                     iconAnchor: [OACI_SYMBOL_SIZE / 2, OACI_SYMBOL_SIZE / 2],
-                })
-                : L.icon({
-                    iconUrl: `${OACI_SYMBOL_DIR}/${sym.icon}.png`,
-                    iconSize: [OACI_SYMBOL_SIZE, OACI_SYMBOL_SIZE],
-                    iconAnchor: [OACI_SYMBOL_SIZE / 2, OACI_SYMBOL_SIZE / 2],
                 }),
-        }).addTo(_map);
+            }).addTo(_map);
+        }
     }
     // Marqueur DOM léger superposé au cercle SVG : capte proprement les
     // clics (droit inclus) mÃªme quand le path est recouvert par d'autres
