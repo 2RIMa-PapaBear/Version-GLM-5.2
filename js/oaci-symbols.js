@@ -16,9 +16,11 @@
  *   - MIXTE_OVERRIDES : mixtes non dérivables du SIA (saisie pilote).
  *
  * ORIENTATION (retour pilote 27/09) : les icônes « *-piste-dur » sont
- * PIVOTÉES au cap réel de la piste principale — les pictogrammes de la
- * légende sont dessinés barre à ~140° (mesure PCA de l'encre centrale :
- * civil 137°, mixte 142°, militaire 142° → 140° retenu). « bande »,
+ * PIVOTÉES au cap réel de la piste principale. Le pictogramme source =
+ * disque barré d'un canal blanc (la piste) : l'axe se mesure aux TROUS
+ * du disque où le canal sort (caps 24-58°, centre ≈ 40° — civil 42,
+ * militaire 37 ; une 1ʳᵉ mesure PCA à 140° lisait l'élément
+ * PERPENDICULAIRE : erreur ~100° signalée par le pilote). « bande »,
  * hélistation, hydro : pas de rotation (plateforme/symbole fixes).
  *
  * Hors France (non-LF) ou sans info → null : pastille météo classique.
@@ -30,8 +32,9 @@ export const OACI_SYMBOL_SIZE = 30;   // px d'affichage (source ~90 px)
 
 const SOFT = /gazon|non rev|terre|sable/i;
 
-// Angle de la barre-piste DANS les pictogrammes source (degrés boussole).
-export const OACI_BAR_HEADING = 140;
+// Angle de la barre-piste DANS les pictogrammes source (degrés boussole) :
+// axe du canal blanc (mesure : trous du disque aux caps 24-58° → ~40°).
+export const OACI_BAR_HEADING = 40;
 
 // Saisies pilote 27/09 (terrains sans entrée sia-airfields).
 export const MANUAL_OVERRIDES = new Map([

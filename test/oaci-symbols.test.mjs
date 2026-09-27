@@ -85,11 +85,12 @@ describe('saisies pilote + orientation piste (27/09)', () => {
         assert.equal(oaciRunwayBearing('LFXX', null), null);
     });
 
-    test('oaciIconRotation : barre légende à 140° — piste à 140 = 0°, à 50 = −90', () => {
-        assert.equal(oaciIconRotation('civil-piste-dur', 140), 0);
-        assert.equal(oaciIconRotation('civil-piste-dur', 320), 0);       // 320 ≡ 140 (mod 180)
-        assert.equal(oaciIconRotation('civil-piste-dur', 50), -90);      // 50−140 = −90
-        assert.equal(oaciIconRotation('civil-piste-dur', 220), 80);      // 220 mod 180 = 40 → 40−140 = −100 ≡ 80
+    test('oaciIconRotation : canal piste dessiné à ~40° dans le pictogramme', () => {
+        assert.equal(oaciIconRotation('civil-piste-dur', 40), 0);
+        assert.equal(oaciIconRotation('civil-piste-dur', 220), 0);       // 220 ≡ 40 (mod 180)
+        assert.equal(oaciIconRotation('civil-piste-dur', 50), 10);
+        assert.equal(oaciIconRotation('civil-piste-dur', 320), -80);     // 320 mod 180 = 140 → 140−40 = 100 ≡ −80
+        assert.equal(oaciIconRotation('civil-piste-dur', 133.5), 93.5 - 180);   // Le Touquet 13/31
         // pas de rotation hors famille « piste-dur »
         assert.equal(oaciIconRotation('civil-bande', 50), 0);
         assert.equal(oaciIconRotation('prive', 50), 0);
