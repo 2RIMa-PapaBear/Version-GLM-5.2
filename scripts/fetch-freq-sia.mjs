@@ -42,7 +42,11 @@ const AIRAC_DAY_MS = 28 * 86400000;
 
 function baseUrlOf(date) {
     const d = new Date(date + 'T00:00:00Z');
-    const folder = `eAIP_${d.getUTCDate()}_${MONTHS[d.getUTCMonth()]}_${d.getUTCFullYear()}`;
+    // Le SIA PADDE le jour sur 2 chiffres (eAIP_03_SEP_2026) — l'ancien
+    // « eAIP_3_SEP_2026 » renvoyait 404 pour TOUT cycle : c'est ce qui a
+    // figé freq-sia au 08-06 (extrait initialement depuis le ZIP, sans le
+    // portail — le défaut était donc invisible jusqu'au cycle à jour pair).
+    const folder = `eAIP_${String(d.getUTCDate()).padStart(2, '0')}_${MONTHS[d.getUTCMonth()]}_${d.getUTCFullYear()}`;
     return { date, folder, base: `${SIA}/${folder}/FRANCE/AIRAC-${date}/html/eAIP` };
 }
 
@@ -55,14 +59,24 @@ function airacInForce() {
 
 async function probeEdition(date) {
     const { folder, base } = baseUrlOf(date);
-    try {
-        const res = await fetch(`${SIA}/${folder}/FRANCE/AIRAC-${date}/html/index-fr-FR.html`, { signal: AbortSignal.timeout(15000) });
-        console.log(`  sonde édition ${date} → ${res.status}`);
-        return res.ok ? base : null;
-    } catch (e) {
-        console.log(`  sonde ${date} → ${e.message.slice(0, 40)}`);
-        return null;
+    // 3 tentatives espacées : le CDN SIA répond 404 de façon ERRATIQUE —
+    // l'extracteur fetchText les tolère depuis l'origine, la sonde non :
+    // un 404 isolé sur l'index faisait rater TOUTE l'édition (freq-sia
+    // figé au 08-06 du 05/09 au 27/09 alors que le 09-03 était en ligne).
+    for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+            const res = await fetch(`${SIA}/${folder}/FRANCE/AIRAC-${date}/html/index-fr-FR.html`, { signal: AbortSignal.timeout(15000) });
+            console.log(`  sonde édition ${date} → ${res.status}${attempt ? ` (essai ${attempt + 1})` : ''}`);
+            if (res.ok) return base;
+            if (res.status === 404 && attempt < 2) { await sleep(8000); continue; }
+            return null;
+        } catch (e) {
+            console.log(`  sonde ${date} → ${e.message.slice(0, 40)}`);
+            if (attempt < 2) { await sleep(8000); continue; }
+            return null;
+        }
     }
+    return null;
 }
 
 async function findCurrentAirac() {

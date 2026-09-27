@@ -125,12 +125,12 @@ function _ldgSectionHTML(landing, icao, isFr, activeRwyFallback) {
                     : `${escapeHtml(icao)} has no METAR — weather from <b>${escapeHtml(landing.metarFrom)}</b> (${landing.metarDistNm} NM)`}
             </div>` : ''}
             <div class="to-metrics-grid">
-                <span title="${isFr ? 'Le premier chiffre (blanc) = performance calculée du jour, le second (ambre) = distance majorée de 20 % pour la comparaison à la LDA.' : 'First figure (white) = calculated performance, second (amber) = distance with 20% margin for LDA comparison.'}"><span class="lab">${isFr ? 'Franch. 50ft' : '50 ft obst.'} :</span> <span class="val">${ftToM(landing.fiftyFt)} m${landing.fiftyMargined ? ` <span style="color:#FBBF24;">→ ${ftToM(landing.fiftyMargined)} m ${isFr ? 'avec marge' : 'w/ margin'}</span>` : ''}</span></span>
-                <span><span class="lab">${isFr ? 'Roulement' : 'Roll'} :</span> <span class="val">${ftToM(landing.rollFt)} m</span></span>
-                <span><span class="lab">${isFr ? 'Vent' : 'Wind'} :</span> <span class="val">${hw == null ? '—' : `${Math.abs(hw)} kt ${hw >= 0 ? (isFr ? 'de face' : 'headwind') : (isFr ? 'arrière' : 'tailwind')}`}${landing.crosswindKt != null ? ` / ${landing.crosswindKt} kt ${landing.crosswindSide === 'D' ? (isFr ? 'de droite' : 'right') : (isFr ? 'de gauche' : 'left')}` : ''}</span></span>
+                <span title="${isFr ? 'Le premier chiffre (blanc) = performance calculée du jour, le second (ambre) = distance majorée de 20 % pour la comparaison à la LDA.' : 'First figure (white) = calculated performance, second (amber) = distance with 20% margin for LDA comparison.'}"><span class="lab">${isFr ? 'Franch. 50ft' : '50 ft obst.'} :</span> <span class="val">${ftToM(landing.fiftyFt)}m${landing.fiftyMargined ? ` <span style="color:#FBBF24;">→ ${ftToM(landing.fiftyMargined)}m ${isFr ? 'avec marge' : 'w/ margin'}</span>` : ''}</span></span>
+                <span><span class="lab">${isFr ? 'Roulement' : 'Roll'} :</span> <span class="val">${ftToM(landing.rollFt)}m</span></span>
+                <span><span class="lab">${isFr ? 'Vent' : 'Wind'} :</span> <span class="val" title="${isFr ? 'F : vent de face · A : vent arrière · D/G : composante de travers droite/gauche' : 'H: headwind · T: tailwind · R/L: crosswind right/left'}">${hw == null ? '—' : `${Math.abs(hw)}kt ${hw >= 0 ? (isFr ? 'F' : 'H') : (isFr ? 'A' : 'T')}`}${landing.crosswindKt != null ? ` / ${landing.crosswindKt}kt ${landing.crosswindSide === 'D' ? (isFr ? 'D' : 'R') : (isFr ? 'G' : 'L')}` : ''}</span></span>
                 <span><span class="lab">${isFr ? 'Revêtement' : 'Surface'} :</span> <span class="val">${surfInfo ? escapeHtml(surfInfo.label) : '—'}${landing.surfaceFactor > 1
                     ? ` <span style="color:#FBBF24;">+${Math.round((landing.surfaceFactor - 1) * 100)}%</span>` : ''}</span></span>
-                <span><span class="lab">${isFr ? 'Densité-alt.' : 'Density alt.'} :</span> <span class="val">${landing.da} ft</span></span>
+                <span><span class="lab">${isFr ? 'Densité-alt.' : 'Density alt.'} :</span> <span class="val">${landing.da}ft</span></span>
             </div>
             <div class="to-landing-profile" style="margin-top:10px;"></div>
             <div style="display:flex; align-items:baseline; gap:6px; margin-top:10px; flex-wrap:wrap; font-size:12px; line-height:1.6;">
@@ -211,14 +211,14 @@ function render(container, r, icao) {
         </div>
         ${r ? `
         <div class="to-metrics-grid">
-            <span><span class="lab">${lblRoll} :</span> <span class="val">${ftToM(r.groundRoll)} m</span></span>
-            <span><span class="lab">${lbl50ft} :</span> <span class="val">${ftToM(r.fiftyFt)} m</span></span>
-            <span><span class="lab">${lblDa} :</span> <span class="val">${r.da} ft</span></span>
+            <span><span class="lab">${lblRoll} :</span> <span class="val">${ftToM(r.groundRoll)}m</span></span>
+            <span><span class="lab">${lbl50ft} :</span> <span class="val">${ftToM(r.fiftyFt)}m</span></span>
+            <span><span class="lab">${lblDa} :</span> <span class="val">${r.da}ft</span></span>
             <span><span class="lab">${isFr ? 'Revêtement' : 'Surface'} :</span> <span class="val">${surfInfo ? escapeHtml(surfInfo.label) : '—'}${r.surfaceFactor > 1
                 ? `${surfState ? ' · ' + surfState : ''} <span style="color:${surfSoft ? '#FBBF24' : '#38BDF8'};">+${Math.round((r.surfaceFactor - 1) * 100)}%</span>` : ''}</span></span>
-            <span><span class="lab">${isFr ? 'Vent' : 'Wind'} :</span> <span class="val">${r.headwindKt == null ? '—' : `${Math.abs(r.headwindKt)} kt ${r.headwindKt >= 0 ? (isFr ? 'de face' : 'headwind') : (isFr ? 'arrière' : 'tailwind')}`}${r.windFactor > 1
+            <span><span class="lab">${isFr ? 'Vent' : 'Wind'} :</span> <span class="val" title="${isFr ? 'F : vent de face · A : vent arrière' : 'H: headwind · T: tailwind'}">${r.headwindKt == null ? '—' : `${Math.abs(r.headwindKt)}kt ${r.headwindKt >= 0 ? (isFr ? 'F' : 'H') : (isFr ? 'A' : 'T')}`}${r.windFactor > 1
                 ? ` <span style="color:#FBBF24;">+${Math.round((r.windFactor - 1) * 100)}%</span>` : ''}</span></span>
-            <span><span class="lab">${lblAcRef} :</span> <span class="val">${ftToM(ref.groundRoll)}/${ftToM(ref.fiftyFt)} m</span></span>
+            <span><span class="lab">${lblAcRef} :</span> <span class="val">${ftToM(ref.groundRoll)}/${ftToM(ref.fiftyFt)}m</span></span>
         </div>
         <div class="to-profile" style="margin-top:10px;"></div>
         <div style="display:flex; align-items:baseline; gap:6px; margin-top:10px; flex-wrap:wrap; font-size:12px; line-height:1.6;">
