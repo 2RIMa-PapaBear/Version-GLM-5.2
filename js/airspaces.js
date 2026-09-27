@@ -1011,12 +1011,16 @@ export function createAirspaceController(map) {
         const n = ring.length;
         const lat = ring.reduce((a, p) => a + p[0], 0) / n;
         const mPerPx = 40075016.686 * Math.cos(lat * Math.PI / 180) / (256 * Math.pow(2, z));
-        const dmin = _ringCapMeters(ring);
-        const zonePx = (2 * dmin) / mPerPx;
-        if (zonePx < 24) return null;   // zone trop petite à l'écran : trait seul
-        const w = Math.max(2, Math.min(bandW * f, 0.5 * zonePx));
+        // GARDE-FOUS SUSPENDUS (essai pilote 27/09 « je veux voir ce que ça
+        // donne ») — rétablir tels quels pour revenir en arrière :
+        //   const dmin = _ringCapMeters(ring);
+        //   const zonePx = (2 * dmin) / mPerPx;
+        //   if (zonePx < 24) return null;
+        //   const w = Math.max(2, Math.min(bandW * f, 0.5 * zonePx));
+        //   const offM = (w / 2 + 1) * mPerPx;
+        //   if (offM > 0.45 * dmin) return null;
+        const w = bandW * f;
         const offM = (w / 2 + 1) * mPerPx;
-        if (offM > 0.45 * dmin) return null;
         const inset = _insetRing(ring, offM);
         return inset ? { w, inset } : null;
     }
