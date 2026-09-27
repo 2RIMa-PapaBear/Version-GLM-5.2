@@ -6,6 +6,8 @@ dans une PWA installable qui fonctionne aussi hors ligne.
 
 🌐 **Application en ligne :** <https://papabear56.pages-perso.free.fr/> (HTTPS — PWA installable, suivi GPS actif)
 
+📦 **Version actuelle : 3.1** — fiabilité décisionnelle issue de la campagne d'audit 27-28/09/2026 (vents de croisière isobariques à l'heure de vol, minima SERA.5005, crépuscules civils, réserve carburant réglementaire, POH Robin, zones ASFC converties avec le relief, filtre géographique SIGMET…) — journal complet en bas de page.
+
 ## Captures d'écran
 
 | Météo & rose des vents | Performance décollage |
@@ -288,7 +290,7 @@ npm run deploy:test -- --mirror      # supprime aussi les fichiers distants disp
 - **2026-09-05** — FICHE TERRAIN v3 — feu vert pilote après aperçu PDF (Apercu_fiche_terrain.pdf, 3 terrains LFRN/LFRV/LFPF) : section Terrain en LIGNES LIBELL…
 - **2026-09-05** — FICHE TERRAIN v2 (retours pilote : ordre + lisibilité) : ① FRÉQUENCES en tête (sans sous-titre redondant) ② PISTES (seuils officiels affiché…
 - **2026-09-05** — FICHE TERRAIN COMPLÈTE dans l onglet « Fréquences & info terrain » (demande pilote, 4 arbitrages validés) : ① IDENTITÉ en chips — élévation,…
-<!-- docs:lastSha=97f5ca19a4da09d972b40d4a43fc639c10ce1ef0 -->
+<!-- docs:lastSha=1918a15dabb70e6e4ebae317e33fed1cfbd07a32 -->
 
 
 
