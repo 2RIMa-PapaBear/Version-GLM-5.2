@@ -83,6 +83,40 @@ export function oaciIconRotation(icon, bearing) {
     return ((bearing - OACI_BAR_HEADING + 90) % 180 + 180) % 180 - 90;
 }
 
+/* ---- Symboles « piste en dur » DESSINÉS EN SVG -------------------------
+ * (retour pilote 27/09 : les repères cardinaux N/E/S/W du pictogramme
+ * doivent rester FIXES — seule la piste pivote ; impossible en pivotant
+ * le PNG extrait, on compose) : disque plein + canal blanc de piste
+ * pivoté au cap VRAI + 4 traits cardinaux externes fixes ; anneau
+ * externe pour mixte/militaire (double). Couleurs échantillonnées des
+ * pictogrammes légende : bleu #0040A0, rouge #E03020. */
+const OACI_DUR_STYLES = {
+    civil: { color: '#0040A0', doubleRing: false },
+    mixte: { color: '#0040A0', doubleRing: true },
+    militaire: { color: '#E03020', doubleRing: true },
+};
+
+/** SVG du symbole « piste en dur » (inline, ~30 px). `bearing` : axe de
+ *  piste en ° (mod 180) — repli à la pose légende (40°). Null si l'icône
+ *  n'est pas de la famille piste-dur. */
+export function oaciDurSymbolSvg(icon, bearing) {
+    const st = OACI_DUR_STYLES[String(icon || '').split('-')[0]];
+    if (!st || !icon.endsWith('piste-dur')) return null;
+    const hdg = Number.isFinite(bearing) ? ((bearing % 180) + 180) % 180 : OACI_BAR_HEADING;
+    const c = st.color;
+    return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">`
+        + `<g stroke="${c}" stroke-width="6">`
+        + `<line x1="50" y1="2" x2="50" y2="8"/>`                       // N
+        + `<line x1="98" y1="50" x2="92" y2="50"/>`                     // E
+        + `<line x1="50" y1="98" x2="50" y2="92"/>`                     // S
+        + `<line x1="2" y1="50" x2="8" y2="50"/>`                       // W
+        + `</g>`
+        + (st.doubleRing ? `<circle cx="50" cy="50" r="39" fill="none" stroke="${c}" stroke-width="4.5"/>` : '')
+        + `<circle cx="50" cy="50" r="32" fill="${c}"/>`
+        + `<g transform="rotate(${hdg} 50 50)"><rect x="44" y="16" width="12" height="68" fill="#fff"/></g>`
+        + `</svg>`;
+}
+
 /** Classe un terrain français.
  *  @returns {{icon: string, statut: string, surf: string|null}|null}
  *  siaAf/siaRws : injection pour les TESTS (sinon getters sia-data). */
