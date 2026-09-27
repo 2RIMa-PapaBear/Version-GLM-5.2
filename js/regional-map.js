@@ -1393,9 +1393,9 @@ function _addOaciLabel(lat, lon, icao, name) {
             className: 'oaci-label',
             iconSize: null,          // taille par contenu (3 lignes)
             // Décalé en HAUT À DROITE du symbole (cotes pilote 27/09 :
-            // 25 px à droite, 45 px au-dessus) — ne masque ni la pastille
+            // 50 px à droite, 50 px au-dessus) — ne masque ni la pastille
             // ni le trait de piste.
-            iconAnchor: [25, 45],
+            iconAnchor: [50, 50],
         }),
     }).addTo(_map);
     const el = marker.getElement();
