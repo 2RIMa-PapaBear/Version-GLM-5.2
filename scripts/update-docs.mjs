@@ -62,6 +62,27 @@ function majDoc({ file, ancreFin, entree, habillage }) {
         fs.writeFileSync(p, s);
     }
 
+    // AUTO-RÉPARATION (28/09) : les marqueurs debut/fin peuvent être perdus
+    // dans une édition manuelle — l'insertion échouait alors en SILENCE
+    // (le lastSha avançait, les entrées n'étaient jamais écrites : journal
+    // resté figé au 06/09 malgré des dizaines de pubs). On les recrée
+    // autour des entrées existantes : debut sous le titre, fin devant le
+    // marqueur lastSha.
+    if (!s.includes(habillage.debut)) {
+        const reTitre = new RegExp(habillage.titre.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[ \\t]*\\r?\\n', 'm');
+        const mT = s.match(reTitre);
+        if (!mT || !s.includes('<!-- docs:lastSha=')) {
+            console.warn(`  ${file} : titre/marqueur introuvables — ignoré`);
+            return;
+        }
+        const apresTitre = mT.index + mT[0].length;
+        s = s.slice(0, apresTitre) + habillage.debut + '\n' + s.slice(apresTitre);
+        const iMarq = s.indexOf('<!-- docs:lastSha=');
+        s = s.slice(0, iMarq) + habillage.fin + '\n' + s.slice(iMarq);
+        fs.writeFileSync(p, s);
+        console.warn(`  ${file} : marqueurs debut/fin RECÉÉS (perdus — le journal était figé)`);
+    }
+
     const m = s.match(/<!-- docs:lastSha=([0-9a-f]+|aucun) -->/);
     const lastSha = m[1] === 'aucun' ? null : m[1];
     let entrees = commitsDepuis(lastSha);
