@@ -3351,3 +3351,7 @@ html.theme-light .data-age-badge.age-old   { color: #B91C1C; background: rgba(23
  * (OACI_SYMBOL_SIZE — maintenir en phase). */
 .leaflet-container .oaci-sym { background: transparent; border: none; }
 .leaflet-container .oaci-sym img { width: 30px; height: 30px; display: block; }
+
+/* Symbole OACI « piste en dur » dessiné en SVG (oaci-symbols.js) :
+ * 30×30, la piste pivote à l'intérieur, cardinaux fixes. */
+.leaflet-container .oaci-sym svg { display: block; width: 30px; height: 30px; }
