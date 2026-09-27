@@ -5,7 +5,8 @@
  *     observations officielles eAIP et codes d'horaires) ;
  *   #airfield-widget « Info terrain » : identité, pistes, HORAIRES DU
  *     SERVICE et AVITAILLEMENT en sous-sections REPLIABLES, carte VAC
- *     « Atterrissage à vue » en dernière ligne.
+ *     « Atterrissage à vue », puis fiche Icarus (FFA) si le terrain
+ *     figure dans l'index officiel FFA.
  *
  * Sources : corrections manuelles > eAIP/XML SIA > openAIP (fréquences),
  * base SIA (identité/pistes/horaires/avitaillement), base embarquée
@@ -20,6 +21,7 @@ import { makeCollapsible } from './collapsible.js';
 import { loadFreqSources, getAirportFreqs, getSiaAirac, parseAtisTel } from './freq-sia.js';
 import { loadSiaAux, getSiaAirfield, getSiaRunways, getSiaAuxAirac } from './sia-data.js';
 import { hasVac, openVac } from './vac-viewer.js';
+import { loadIcarusIndex, icarusEntry } from './icarus.js';
 import { getDeclinationForIcao } from './magvar.js';
 import { getFlightMode } from './flight-mode.js';
 
@@ -46,6 +48,7 @@ export async function showFrequenciesWidget(icao) {
         loadFreqSources(),
         loadSiaAux().catch(() => null),
         initAirportsDB().catch(() => {}),
+        loadIcarusIndex().catch(() => null),
     ]);
     const apt = getAirportByICAO(icao);
     const { source, freqs } = getAirportFreqs(icao, apt?.frequencies);
@@ -56,6 +59,7 @@ export async function showFrequenciesWidget(icao) {
     const ident = identityRows(icao, apt, sia, isFr);
     const runways = runwayRows(icao, apt, sia);
     const avecCarte = await hasVac(icao).catch(() => false);
+    const icarus = icarusEntry(icao);
 
     // DESTINATION (navigation uniquement, retour pilote 19/09) : les deux
     // onglets « Fréquences » et « Info terrain » doublent leurs blocs —
@@ -68,13 +72,14 @@ export async function showFrequenciesWidget(icao) {
             || (state.route?.length ? String(state.route[state.route.length - 1]).toUpperCase() : '');
         if (/^[A-Z][A-Z0-9]{3}$/.test(d) && d !== icao) dest = d;
     }
-    let apt2 = null, sia2 = null, vac2 = null, avecCarte2 = false, freqs2 = [], source2 = null;
+    let apt2 = null, sia2 = null, vac2 = null, avecCarte2 = false, icarus2 = null, freqs2 = [], source2 = null;
     if (dest) {
         apt2 = getAirportByICAO(dest);
         ({ source: source2, freqs: freqs2 } = getAirportFreqs(dest, apt2?.frequencies));
         sia2 = aux ? getSiaAirfield(dest) : null;
         vac2 = getVacLink(dest);
         avecCarte2 = await hasVac(dest).catch(() => false);
+        icarus2 = icarusEntry(dest);
     }
 
     // ---- Onglet 1 : FRÉQUENCES ----
@@ -93,16 +98,16 @@ export async function showFrequenciesWidget(icao) {
     }
 
     // ---- Onglet 2 : INFO TERRAIN ----
-    const blocks = [{ icao, ident, runways, sia, vac, avecCarte, title: isFr ? 'Info terrain' : 'Airfield info' }];
+    const blocks = [{ icao, ident, runways, sia, vac, avecCarte, icarus, title: isFr ? 'Info terrain' : 'Airfield info' }];
     if (dest) {
         const ident2 = identityRows(dest, apt2, sia2, isFr);
         const runways2 = runwayRows(dest, apt2, sia2);
-        if (ident2.length || runways2.length || sia2?.horAts || sia2?.tel || sia2?.horAvt || avecCarte2 || !!vac2) {
+        if (ident2.length || runways2.length || sia2?.horAts || sia2?.tel || sia2?.horAvt || avecCarte2 || !!vac2 || icarus2) {
             blocks[0].title = isFr ? 'Info terrain de départ' : 'Airfield info — departure';
-            blocks.push({ icao: dest, ident: ident2, runways: runways2, sia: sia2, vac: vac2, avecCarte: avecCarte2, title: isFr ? 'Info terrain d\u2019arrivée' : 'Airfield info — arrival' });
+            blocks.push({ icao: dest, ident: ident2, runways: runways2, sia: sia2, vac: vac2, avecCarte: avecCarte2, icarus: icarus2, title: isFr ? 'Info terrain d\u2019arrivée' : 'Airfield info — arrival' });
         }
     }
-    const hasData = (b) => b.ident.length || b.runways.length || b.sia?.horAts || b.sia?.tel || b.sia?.horAvt || b.avecCarte || !!b.vac;
+    const hasData = (b) => b.ident.length || b.runways.length || b.sia?.horAts || b.sia?.tel || b.sia?.horAvt || b.avecCarte || !!b.vac || !!b.icarus;
     const shown = blocks.filter(hasData);
     if (shown.length) {
         const body = makeCollapsible(terrainContainer, isFr ? 'Info terrain' : 'Airfield info', 'id-card');
@@ -315,7 +320,7 @@ function renderTerrain(container, blocks, isFr) {
     });
 }
 
-function terrainBlockHtml({ icao, ident, runways, sia, vac, avecCarte, title }, isFr) {
+function terrainBlockHtml({ icao, ident, runways, sia, vac, avecCarte, icarus, title }, isFr) {
     let html = `<div class="dash-title" style="margin-bottom:10px;">
         <i data-lucide="id-card" class="icon-sm"></i>
         <span>${escapeHtml(title)}</span>
@@ -387,6 +392,27 @@ function terrainBlockHtml({ icao, ident, runways, sia, vac, avecCarte, title }, 
             ${vac.country ? `<span style="margin-left:auto; font-size:10px; color:var(--text-muted); font-weight:500;">${escapeHtml(vac.country)}</span>` : ''}
             <i data-lucide="external-link" style="width:11px;height:11px;color:var(--text-muted);"></i>
         </a>`;
+    }
+
+    // Fiche Icarus (FFA) : menaces locales du terrain — complément NON
+    // officiel SIA, donc TOUJOURS après le bouton « Carte VAC » et seulement
+    // si le terrain figure dans l'index officiel FFA (data/icarus.json).
+    if (icarus?.url) {
+        html += `<a href="${escapeHtml(icarus.url)}" target="_blank" rel="noopener noreferrer"
+            style="display:flex; align-items:center; gap:8px; margin-top:6px; width:100%; box-sizing:border-box; padding:9px 12px; background:rgba(56,189,248,0.08); border:1px solid rgba(56,189,248,0.25); border-radius:6px; text-decoration:none; color:var(--primary); font-size:12.5px; font-weight:600; transition:background 0.15s;"
+            onmouseover="this.style.background='rgba(56,189,248,0.15)'"
+            onmouseout="this.style.background='rgba(56,189,248,0.08)'">
+            <i data-lucide="shield-alert" style="width:14px;height:14px;"></i>
+            <span>${isFr ? 'Fiche Icarus (FFA)' : 'ICARUS sheet (FFA)'}</span>
+            <span style="margin-left:auto; font-size:10px; color:var(--text-muted); font-weight:500;">${isFr ? 'menaces locales du terrain' : 'local airfield hazards'}</span>
+            <i data-lucide="external-link" style="width:11px;height:11px;color:var(--text-muted);"></i>
+        </a>`;
+        html += `<div style="font-size:10.5px; color:var(--text-muted); margin-top:4px;">
+            <i data-lucide="info" style="width:11px;height:11px;vertical-align:middle;"></i>
+            ${isFr
+                ? 'Fiche ICARUS — FFA (Commission Prévention Sécurité) : complément non officiel, la VAC reste la référence. Lien sortant, aucune copie hébergée, © FFA.'
+                : 'ICARUS sheet — FFA (Safety &amp; Prevention Committee): unofficial supplement, the VAC chart remains the reference. Outbound link, no copy hosted, © FFA.'}
+        </div>`;
     }
 
     // Note de source des infos terrain.
