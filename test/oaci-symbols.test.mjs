@@ -4,7 +4,7 @@
 // sinon piste-dur) ; hors France/sans entrée SIA → null (à demander).
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyOaciSymbol, MIXTE_OVERRIDES, MANUAL_OVERRIDES, MILITARY_OVERRIDES, bearingDeg, oaciRunwayBearing, oaciIconRotation, oaciSymbolSvg, OACI_BAR_HEADING } from '../js/oaci-symbols.js';
+import { classifyOaciSymbol, classifyForeignSymbolOa, MIXTE_OVERRIDES, MANUAL_OVERRIDES, MILITARY_OVERRIDES, bearingDeg, oaciRunwayBearing, oaciIconRotation, oaciSymbolSvg, OACI_BAR_HEADING } from '../js/oaci-symbols.js';
 
 const AF = (statut, prive = false) => ({ statut, prive });
 const RW = surf => [{ d: '10/28', surf, main: true }];
@@ -172,5 +172,20 @@ describe('généralisation : terrains étrangers (base locale, retour pilote 27/
 
     test('un LF reste prioritairement SIA (militaire LFRH malgré base)', () => {
         assert.equal(classifyOaciSymbol('LFRH', { statut: 'RST' }, [{ d: '07/25', surf: 'béton', main: true }], { surface: 'ASP' }).icon, 'militaire-piste-dur');
+    });
+});
+
+describe('type étranger depuis openAIP (classifyForeignSymbolOa)', () => {
+    test('militaire openAIP → militaire-<surface> ; surface GRS → bande', () => {
+        assert.equal(classifyForeignSymbolOa({ military: true, type: 'AD', surface: 'ASP' }).icon, 'militaire-piste-dur');
+        assert.equal(classifyForeignSymbolOa({ military: true, type: 'AD', surface: 'GRS' }).icon, 'militaire-bande');
+    });
+    test('fermé (AD-CLSD) → désaffecté ; HELI → hélistation ; civil sinon', () => {
+        assert.equal(classifyForeignSymbolOa({ military: false, type: 'AD-CLSD', surface: 'ASP' }).icon, 'desaffecte');
+        assert.equal(classifyForeignSymbolOa({ military: false, type: 'HELI', surface: null }).icon, 'civil-helistation');
+        assert.equal(classifyForeignSymbolOa({ military: false, type: 'AD', surface: 'ASP' }).icon, 'civil-piste-dur');
+    });
+    test('objet vide → null (classement base conservé)', () => {
+        assert.equal(classifyForeignSymbolOa(null), null);
     });
 });
