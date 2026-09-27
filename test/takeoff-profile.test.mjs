@@ -212,3 +212,24 @@ test('atterrissage svg : invariants de contenu sur les 4 verdicts', () => {
     assert.ok(landingProfileSvg(LDG.danger, true).includes(`manque ${ftToM(Math.abs(LDG.danger.margin))} m`), 'manque X m');
     assert.ok(landingProfileSvg(LDG.ok, true).includes(`arrêt · ${ftToM(LDG.ok.fiftyFt)} m`), 'étiquette arrêt');
 });
+
+test('A8 (audit 27/09) : fiftyEffX aligne la barre de marge sur le chiffre', () => {
+    // Marge RÉELLE factorisée (120 ft) ≠ piste − 50 ft brut (220 ft) :
+    // la barre doit démarrer à la position FACTORISÉE, pas brute.
+    const r = { groundRoll: 950, fiftyFt: 1680, runwayLength: 1900, margin: 120, level: 'caution' };
+    const L = takeoffProfileLayout(r, 340);
+    const expected = 340 - 120 * (340 / 1900);
+    assert.ok(Math.abs(L.fiftyEffX - expected) < 1e-9, `fiftyEffX ${L.fiftyEffX} ≈ ${expected}`);
+    assert.ok(L.fiftyEffX > L.fiftyX, 'position factorisée plus à droite que le 50 ft brut');
+    // Le SVG trace la barre (height 3.5, la 1re piste est height 7) à partir de fiftyEffX.
+    const svg = takeoffProfileSvg(r, true, 340);
+    const m = svg.match(/<rect x="([\d.]+)"[^>]*height="3\.5"/);
+    assert.ok(m, 'barre de marge présente');
+    assert.ok(Math.abs(parseFloat(m[1]) - (L.fiftyEffX + 3)) < 0.01, 'barre posée sur le 50 ft factorisé');
+});
+
+test('A8 : sans facteur (marge brute = piste − 50 ft), fiftyEffX = fiftyX', () => {
+    const r = { groundRoll: 950, fiftyFt: 1680, runwayLength: 1900, margin: 220, level: 'caution' };
+    const L = takeoffProfileLayout(r, 340);
+    assert.ok(Math.abs(L.fiftyEffX - L.fiftyX) < 1e-9);
+});

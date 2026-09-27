@@ -704,7 +704,10 @@ async function _generateNavLogPdfInto(tab, { file = false, local = false } = {})
             const finp = await collectFileInputs();
             const tiles = computeFileTiles(finp);
             const vacInfo = await getVacIndexInfo();
-            const hhmm = (ts) => ts ? new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+            // S7 (audit 27/09) : heures du dossier en UTC MARQUÉ — les
+            // timestamps « données vues à » sont des instants UTC, jamais
+            // l'heure locale du lecteur (ambiguïté interdite sur un PDF).
+            const hhmm = (ts) => ts ? new Date(ts).toLocaleTimeString([], { timeZone: 'UTC', hour: '2-digit', minute: '2-digit', hour12: false }) + ' UTC' : '';
             const lvlTxt = (l) => l === 'ok' ? 'OK' : (l === 'caution' || l === 'limitative' ? '!' : '!!');
             const rows = [
                 { status: tiles.weather.status, label: isFr3 ? 'Météo' : 'Weather',
@@ -732,7 +735,9 @@ async function _generateNavLogPdfInto(tab, { file = false, local = false } = {})
                         : tiles.wb.status === 'danger' ? (isFr3 ? 'HORS LIMITES' : 'OUT OF LIMITS')
                         : (isFr3 ? 'non configuré (flotte)' : 'not configured (fleet)'), ref: '' },
             ];
-            const generatedLabel = new Date().toLocaleString([], { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+            // S7 : heure de GÉNÉRATION du dossier en UTC marqué (cohérent avec les
+                // périodes NOTAM déjà en Z).
+                const generatedLabel = new Date().toLocaleString([], { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' }) + ' UTC';
             const ac = getActiveAircraft() || {};
             // Cartes VAC INTÉGRÉES (option ②=B, demandée par le pilote le
             // 16/09) : rendues AVANT la garde pour que son attestation soit
@@ -857,7 +862,8 @@ async function _generateNavLogPdfInto(tab, { file = false, local = false } = {})
             }
             const mapData = await buildFlightMapData({
                 isFr: isFr3,
-                generatedLabel: new Date().toLocaleString([], { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                // S7 : UTC marqué (cf. page de garde).
+                generatedLabel: new Date().toLocaleString([], { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' }) + ' UTC',
                 routeLabel: local
                     ? `${fromIcao} · ${isFr3 ? 'vol local' : 'local flight'}`
                     : `${fromIcao} - ${toIcao}${state.diversionIcao ? ` · ${isFr3 ? 'dégagement' : 'alt.'} ${state.diversionIcao}` : ''}`,

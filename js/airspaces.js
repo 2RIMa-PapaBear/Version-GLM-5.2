@@ -1,7 +1,7 @@
 import { config } from './config.js';
 import { state, escapeHtml } from './core.js';
 import { getServiceFreq } from './freq-sia.js';
-import { horLabel, MAX_BASE_FT } from './airspace-profile.js';
+import { horLabel, MAX_BASE_FT, isRdpZone } from './airspace-profile.js';
 import { bigDataUrl } from './data-base.js';
 import { getCurrentNotams } from './notam.js';
 import { zoneActivation, zoneActiveToday } from './azba.js';
@@ -931,8 +931,13 @@ export function createAirspaceController(map) {
 
         items.forEach(as => {
 
-            const baseFt = _baseFt(as);
-            if (baseFt > MAX_BASE_FT) return;
+            // A8 (audit 27/09) : les R/D/P « toujours visibles » (consigne
+            // 20/09) échappent aussi au filtre de plancher — l'ancien ordre
+            // faisait disparaître une R/D/P 6000-9500 de la carte.
+            if (!isRdpZone(as.name || as.designator)) {
+                const baseFt = _baseFt(as);
+                if (baseFt > MAX_BASE_FT) return;
+            }
 
             // Zones ADMINISTRATIVES nationales (FIR, UIR, LTA « FRANCE »…)
             // tracées comme de grands cadres orange : inutiles en VFR —

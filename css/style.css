@@ -116,13 +116,20 @@ button { font-family: 'DM Sans', Verdana, sans-serif; letter-spacing: .5px; }
 }
 
 @media (pointer: coarse) {
-    .btn-help, .fav-load-btn, .fav-remove-btn, .history-item, .autocomplete-item, .rwy-bubble {
-        min-height: 44px; 
+    .btn-help, .fav-load-btn, .fav-remove-btn, .history-item, .autocomplete-item, .rwy-bubble,
+    .btn-lang-toggle, .btn-close-modal, .plan-io-btn, .alt-divert, .gps-vol-del, .mp-vac-btn,
+    #ff-print, #to-ldg-fleet, button[data-vac] {
+        min-height: 44px;
     }
     .rwy-bubble {
         display: flex; align-items: center; justify-content: center;
     }
 }
+/* S8 (audit 27/09) : les boutons critiques cités ci-dessus avaient des
+   hauteurs fixes inférieures à la cible 44 px (poubelle vol 19 px, « Voir »
+   VAC 22 px, « Ouvrir la flotte » 24 px, « Imprimer le dossier » 26 px…).
+   min-height s'impose aux hauteurs inline/fixes ; l'alignement vertical
+   reste assuré (flex interne déjà présent sur la plupart). */
 
 .card {
     background: rgba(17, 26, 44, 0.82);

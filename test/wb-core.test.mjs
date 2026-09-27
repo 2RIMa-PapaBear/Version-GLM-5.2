@@ -303,3 +303,33 @@ describe('wb — intégration flotte (sanitize du bloc)', () => {
         assert.equal(byName['Carburant'].maxKg, null);   // pas de défaut carburant
     });
 });
+
+describe('pointInEnvelopeTolerant — CG sur la limite (A6, audit 27/09)', () => {
+    // Rect 500-600 kg / 400-500 mm.
+    const RECT = [[500, 400], [600, 400], [600, 500], [500, 500]];
+
+    test('ray-casting strict : un point SUR l arête est dehors (bug documenté)', () => {
+        assert.equal(wb.pointInEnvelope(RECT, 600, 450), false, '600 kg pile sur l arête max');
+    });
+
+    test('tolérant : le point sur l arête est dedans (convention POH inclusive)', () => {
+        assert.equal(wb.pointInEnvelopeTolerant(RECT, 600, 450), true);
+        assert.equal(wb.pointInEnvelopeTolerant(RECT, 550, 400), true, 'arête avant');
+        assert.equal(wb.pointInEnvelopeTolerant(RECT, 550, 500), true, 'arrière');
+        assert.equal(wb.pointInEnvelopeTolerant(RECT, 650, 450), false, '1 kg+ dehors : rejeté');
+        assert.equal(wb.pointInEnvelopeTolerant(RECT, 550, 510), false, '10 mm dehors : rejeté');
+    });
+
+    test('computeWb : CG pile sur la limite arrière → verdict ok (pas danger)', async () => {
+        const acWb = {
+            units: { mass: 'kg', arm: 'mm' },
+            emptyMassKg: 500, emptyArmMm: 400, mtowKg: 700, fuelDensity: 0.72,
+            envelope: RECT,
+            stations: [{ name: 'Pax', armMm: 700, maxKg: 130, fuel: false }],
+        };
+        const res = wb.computeWb(acWb, { masses: { 'Pax': 100 }, fuelL: 0, burnL: 0 });
+        assert.equal(Math.round(res.takeoff.cgMm), 450);
+        assert.equal(res.takeoff.massKg, 600, 'pile sur l arête de masse max');
+        assert.equal(res.level, 'ok', `attendu ok, reçu ${res.level}`);
+    });
+});

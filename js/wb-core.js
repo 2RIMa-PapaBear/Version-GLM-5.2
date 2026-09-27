@@ -78,6 +78,20 @@ export function pointInEnvelope(envelope, mass, arm) {
 }
 
 /**
+ * Point DANS l'enveloppe, arête tolérée (A6, audit 27/09) : un CG posé
+ * EXACTEMENT sur la limite certifiée est légal (convention POH, limites
+ * incluses) — le ray-casting strict le jugeait dehors ou dedans selon le
+ * flanc (900 kg à 2 600 = limite arrière → « HORS LIMITES »). Tolérance :
+ * le point compte comme dedans s'il l'est à ±0,5 kg / ±1 mm près.
+ */
+export function pointInEnvelopeTolerant(envelope, mass, arm) {
+    if (pointInEnvelope(envelope, mass, arm)) return true;
+    const DM = 0.5, DA = 1;
+    return pointInEnvelope(envelope, mass - DM, arm) || pointInEnvelope(envelope, mass + DM, arm)
+        || pointInEnvelope(envelope, mass, arm - DA) || pointInEnvelope(envelope, mass, arm + DA);
+}
+
+/**
  * Bras des limites AVANT (min) et ARRIÈRE (max) de l'enveloppe pour une
  * masse donnée (interpolation des arêtes croisées). null si la masse est
  * hors de la plage couverte par l'enveloppe.
@@ -182,7 +196,7 @@ export function computeWb(wb, loads = {}) {
         const { fwdMm, aftMm } = armLimitsAt(wb.envelope, p.massKg);
         const inside = fwdMm != null && aftMm != null &&
             p.cgMm != null && p.cgMm >= fwdMm && p.cgMm <= aftMm &&
-            pointInEnvelope(wb.envelope, p.massKg, p.cgMm);
+            pointInEnvelopeTolerant(wb.envelope, p.massKg, p.cgMm);
         return { inside, fwdMm: p.cgMm != null && fwdMm != null ? p.cgMm - fwdMm : null,
                  aftMm: p.cgMm != null && aftMm != null ? aftMm - p.cgMm : null };
     };

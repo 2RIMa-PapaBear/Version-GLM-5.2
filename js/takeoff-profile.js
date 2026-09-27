@@ -66,7 +66,7 @@ const PLANE_LIFT = 4;    // garde ventre ↔ trait (piste ou montée), idem PDF
  * @param {number} [width] Largeur du viewBox (= largeur du conteneur).
  * @returns {{W:number,H:number,x0:number,xR:number,rwyY:number,fiftyY:number,
  *            pxPerFt:number,liftX:number,fiftyX:number,fiftyDrawX:number,
- *            rwyEndX:number|null,labelLiftX:number,climbAngle:number,
+ *            rwyEndX:number|null,fiftyEffX:number,labelLiftX:number,climbAngle:number,
  *            planeScale:number,col:string}}
  */
 export function takeoffProfileLayout(r, width = 340) {
@@ -88,6 +88,14 @@ export function takeoffProfileLayout(r, width = 340) {
     // Position dessinée : bornée au bord droit (montée tronquée).
     const fiftyDrawX = Math.min(fiftyX, XR - 2);
     const rwyEndX = known ? XR : null;
+    // A8 (audit 27/09) : position du 50 ft FACTORISÉE — celle que chiffre
+    // l'étiquette de marge (piste − 50 ft ×facteurs herbe/état/masse). La
+    // barre de marge dessinée s'aligne sur ce CHIFFRE : partant du 50 ft
+    // brut, la marge visuelle surestimait la marge chiffrée de la part du
+    // facteur (63 m sur le cas +20 % herbe).
+    const fiftyEffX = (known && r.margin != null && r.margin >= 0)
+        ? Math.max(0, XR - r.margin * pxPerFt)
+        : fiftyX;
 
     // Étiquette du point de rotation : bornée à droite (10 px ≈ 36 px
     // de large) pour rester lisible et dans le cadre.
@@ -115,7 +123,7 @@ export function takeoffProfileLayout(r, width = 340) {
 
     return {
         W, H, x0: 0, xR: XR, rwyY: RWY_Y, fiftyY: FT50_Y,
-        pxPerFt, liftX, fiftyX, fiftyDrawX, rwyEndX, labelLiftX,
+        pxPerFt, liftX, fiftyX, fiftyDrawX, rwyEndX, fiftyEffX, labelLiftX,
         fiftyLblX, fiftyLblAnchor, fiftyLblY, climbAngle, planeScale,
         col: LEVEL_COLORS[r.level] || LEVEL_COLORS.unknown,
     };
@@ -189,9 +197,11 @@ export function takeoffProfileSvg(r, isFr = true, width = 340) {
     // ---- Marge restante / manque ----
     if (known && r.margin != null) {
         if (r.margin >= 0) {
-            const mw = L.rwyEndX - L.fiftyX - 6;
+            // A8 : la barre part du 50 ft FACTORISÉ (fiftyEffX) — sa largeur
+            // correspond désormais au chiffre affiché « +X m ».
+            const mw = L.rwyEndX - L.fiftyEffX - 6;
             if (mw > 4) {
-                p.push(`<rect x="${L.fiftyX + 3}" y="${RWY_Y - 8}" width="${mw}" height="3.5" rx="1.5" fill="${L.col}" opacity="0.5"/>`);
+                p.push(`<rect x="${L.fiftyEffX + 3}" y="${RWY_Y - 8}" width="${mw}" height="3.5" rx="1.5" fill="${L.col}" opacity="0.5"/>`);
                 if (mw >= 46) {
                     p.push(`<text x="${(L.fiftyX + L.rwyEndX) / 2}" y="${RWY_Y - 12}" text-anchor="middle" font-family="${MONO}" font-size="10" fill="${L.col}">+${ftToM(r.margin)} m</text>`);
                 }

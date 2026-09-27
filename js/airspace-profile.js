@@ -208,17 +208,22 @@ export function computeRouteAirspaces(points, items, opts) {
         // FIR/UIR/secteurs ACC openAIP dont le nom ne dit pas « FIR »
         // (ex. « LRBB », « POLARIS ACC ») — filtrés aussi sur la carte.
         if (!as._sia && (as.type === 10 || as.type === 11 || as.type === 27)) continue;
+        // A8 (audit 27/09) : l'exception R/D/P « toujours retenues »
+        // (consigne 20/09) doit précéder TOUS les filtres d'altitude —
+        // l'ancien ordre laissait le filtre de plancher (puis le filtre
+        // croisière) éliminer une R/D/P 6000-9500 survolée à 3500.
+        const rdp = isRdpZone(as.name || as.designator);
         const loLim = as.lowerLimit ?? as.lower, upLim = as.upperLimit ?? as.upper;
         const lo = (limitToFt(loLim) ?? 0) + (_asfc(loLim) ? elevMin : 0);
         const upRaw = limitToFt(upLim);
         const up = upRaw == null ? null : upRaw + (_asfc(upLim) ? elevMax : 0);
         if (up == null || up <= 0) continue;            // plafond inconnu : on ignore
-        if (lo > MAX_BASE_FT) continue;                  // plancher trop haut pour du VFR
+        if (lo > MAX_BASE_FT && !rdp) continue;          // plancher trop haut pour du VFR
         if (up <= lo) continue;
         // Altitude du vol : hors tranche verticale (marge 1000 ft) → la zone
         // ne concerne pas ce vol (entièrement au-dessus ou en dessous) —
         // SAUF zones réglementées R/D/P, toujours retenues (consigne 20/09).
-        if (cruise != null && !isRdpZone(as.name || as.designator)
+        if (cruise != null && !rdp
             && (up < cruise - ALT_TOLERANCE_FT || lo > cruise + ALT_TOLERANCE_FT)) continue;
 
         const ranges = crossedRanges(points, as.geometry,

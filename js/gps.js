@@ -40,6 +40,16 @@ const TRACE_COLOR = '#D946EF';   // magenta EFB, distinct de la route (#38BDF8)
 // Chrono de vol (item ⑤ 09/09) : seuil DÉRIVÉ DE LA FLOTTE — VR de l'avion
 // actif moins 5 kt (décollage réel, pas roulage) ; sans avion → 55−5 = 50 kt.
 let ftStartMs = chronoThresholdKt(55) / 1.94384;
+// N8 (audit 27/09) : hystérésis du chrono — DÉPART seulement sur
+// CHRONO_FIXES fixes consécutifs au-dessus du seuil (précision bornée :
+// un fix isolé bruité ne démarre plus le chrono) ; ARRÊT après
+// CHRONO_STOP_MS sous le seuil (parking, roulage attendu) — la durée
+// « vol » ne s'étend plus jusqu'à l'arrêt du suivi.
+const CHRONO_FIXES = 3;
+const CHRONO_ACC_MAX_M = 50;
+const CHRONO_STOP_MS = 60000;
+let chronoUp = 0;
+let chronoBelowT = null;
 // Durée minimale d'une session pour être conservée (réglage pilote 09/09) ;
 // surchargeable avant le chargement via window.__gpsVolMinMs (QA).
 const VOL_MIN_MS = (typeof window !== 'undefined' && Number(window.__gpsVolMinMs)) || 300000;
@@ -429,8 +439,22 @@ function onFix(pos) {
             hdg: haveHdg ? Math.round(lastHdg * 10) / 10 : null,
             acc: Number.isFinite(c.accuracy) ? c.accuracy : null,   // précision GPS (m), pour l'export
         });
-        // Chrono de vol : première vitesse au-dessus du seuil décollage (VR − 5 kt)
-        if (!curVol.flightStartT && Number.isFinite(spd) && spd >= ftStartMs) curVol.flightStartT = t;
+        // Chrono de vol (N8, audit 27/09) : hystérésis — DÉPART sur
+        // CHRONO_FIXES fixes consécutifs au-dessus du seuil décollage
+        // (VR − 5 kt, précision ≤ CHRONO_ACC_MAX_M) ; ARRÊT après
+        // CHRONO_STOP_MS sous le seuil. Retrouver de la vitesse ensuite
+        // re-démarre un chrono neuf (second circuit, remotorisation…).
+        if (Number.isFinite(spd) && spd >= ftStartMs && Number.isFinite(lastAcc) && lastAcc <= CHRONO_ACC_MAX_M) {
+            chronoUp = Math.min(chronoUp + 1, CHRONO_FIXES);
+            chronoBelowT = null;
+            if (!curVol.flightStartT && chronoUp >= CHRONO_FIXES) curVol.flightStartT = t;
+        } else {
+            chronoUp = 0;
+            if (curVol.flightStartT) {
+                if (chronoBelowT == null) chronoBelowT = t;
+                else if (t - chronoBelowT >= CHRONO_STOP_MS) { curVol.flightStartT = null; chronoBelowT = null; }
+            }
+        }
     }
     drawPlane(ll, lastHdg, lastAcc);
     if (marker && marker.isPopupOpen()) marker.setPopupContent(_volInfoHtml());
@@ -498,6 +522,8 @@ function stop() {
         else volDel(curVol.id, updateVolsCount);   // vol trop court : pas enregistré
         curVol = null;
     }
+    // Hystérésis du chrono réinitialisée avec la session (N8).
+    chronoUp = 0; chronoBelowT = null;
     mode = 'off';
     render();
     renderRec();

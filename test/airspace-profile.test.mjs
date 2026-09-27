@@ -254,3 +254,16 @@ test('computeRouteAirspaces : code horaire d\u2019activation porté au segment',
     assert.equal(g[0].segs[0].hor, 'NOTAM');
     assert.equal(g[0].segs[0].act, 'Tir');
 });
+
+test('A8 (audit 27/09) : R/D/P à plancher élevé toujours retenues', () => {
+    // R/D/P plafonnée haut (plancher 20000 > MAX_BASE_FT 19500) : les
+    // filtres d'altitude ne doivent PAS l'éliminer (consigne 20/09).
+    const rdp = { ...zone('R 999 A', null, 20000, 24000, SQ(1, 2)) };
+    const tma = zone('TMA TEST', null, 20000, 24000, SQ(1, 2));
+    const res = computeRouteAirspaces(ROUTE, [rdp, tma], { cruiseAltFt: 21000 });
+    assert.ok(res.some(g => /R 999/.test(g.name)), 'R/D/P retenue malgré le plancher élevé');
+    assert.ok(!res.some(g => /TMA TEST/.test(g.name)), 'TMA témoin filtrée');
+    // Croisière en dessous : la R/D/P reste visible (exception croisière).
+    const res2 = computeRouteAirspaces(ROUTE, [rdp], { cruiseAltFt: 3500 });
+    assert.ok(res2.some(g => /R 999/.test(g.name)), 'R/D/P retenue hors tranche croisière');
+});

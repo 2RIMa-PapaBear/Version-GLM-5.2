@@ -327,7 +327,7 @@ export async function showFlightFile(forceIcao) {
     const vacRows = t.vac.items.map(v => {
         const seen = getVacConsultedTs(v.icao);
         const seenLbl = seen
-            ? new Date(seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            ? new Date(seen).toLocaleTimeString([], { timeZone: 'UTC', hour: '2-digit', minute: '2-digit', hour12: false }) + ' UTC'
             : null;
         return `<div style="display:flex; align-items:center; gap:6px;">
             <span style="font-family:'DM Mono',monospace; font-weight:700;">${escapeHtml(v.icao)}</span>
@@ -530,7 +530,7 @@ function _refreshVacTileNow(icaoConsulte) {
         const seen = getVacConsultedTs(code);
         if (seen && spans[1]) {
             spans[1].textContent = (isFr ? 'consultée ' : 'viewed ')
-                + new Date(seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                + new Date(seen).toLocaleTimeString([], { timeZone: 'UTC', hour: '2-digit', minute: '2-digit', hour12: false }) + ' UTC';
             spans[1].style.color = LVL.ok;
         } else if (!seen) restent++;
     }
