@@ -301,20 +301,11 @@ export function createRadioPointsController(map, deps = {}) {
         group.appendChild(menuEl);
 
         const close = () => { menuEl.style.display = 'none'; btn.setAttribute('aria-expanded', 'false'); };
-        // Retour pilote 27/09 : À L'OUVERTURE, TOUTES les cases DÉCOCHÉES —
-        // chaque ouverture repart d'une carte vierge de couches, on ne
-        // re-coche que ce qu'on veut voir (le menu se referme après chaque
-        // case, cf. change/close ci-dessous).
-        const resetAllOff = () => {
-            menuEl.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-                const kind = cb.dataset.rpKind;
-                if (kind) setKind(kind, false);
-                else if (cb.dataset.rpAirgroup) deps.airspace?.setGroup(cb.dataset.rpAirgroup, false);
-                else if (cb.dataset.rpAirspaces != null) deps.airspace?.toggle(false);
-                cb.checked = false;
-            });
-        };
-        const open = () => { resetAllOff(); _syncFromState(); menuEl.style.display = 'block'; btn.setAttribute('aria-expanded', 'true'); };
+        // Ouverture : les cases reflètent l'ÉTAT RÉEL des couches (la règle
+        // « tout décocher à l'ouverture » du 27/09 a été ANNULÉE par le
+        // pilote dans la foulée). Sélection multiple possible : le menu
+        // reste ouvert (cf. change ci-dessous).
+        const open = () => { _syncFromState(); menuEl.style.display = 'block'; btn.setAttribute('aria-expanded', 'true'); };
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             menuEl.style.display === 'block' ? close() : open();
@@ -343,12 +334,11 @@ export function createRadioPointsController(map, deps = {}) {
                     deps.airspace.toggle(e.target.checked);
                 }
             }
-            // Referme après CHAQUE case : ouvert, le menu flotte sur la carte
-            // et intercepte les clics des points VFR situés dessous (retour
-            // pilote 16/09 « le clic gauche ne fonctionne pas sur les points
-            // VFR » — le clic tombait sur les libellés du menu, jamais sur
-            // le marqueur). Échap et clic extérieur ferment aussi.
-            close();
+            // Le menu RESTE OUVERT : sélectionner PLUSIEURS cases d'affilée
+            // (retour pilote 27/09 — l'ancienne fermeture après chaque case
+            // datait du 16/09). Fermeture par Échap, clic extérieur ou
+            // re-clic sur le bouton « Espaces » ; un clic sur la carte sous
+            // le menu referme ET atteint le marqueur (rien n'est bloqué).
         });
     }
 
