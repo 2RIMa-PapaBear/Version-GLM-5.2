@@ -4,7 +4,7 @@
 // sinon piste-dur) ; hors France/sans entrée SIA → null (à demander).
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyOaciSymbol, MIXTE_OVERRIDES, MANUAL_OVERRIDES, bearingDeg, oaciRunwayBearing, oaciIconRotation, oaciDurSymbolSvg, OACI_BAR_HEADING } from '../js/oaci-symbols.js';
+import { classifyOaciSymbol, MIXTE_OVERRIDES, MANUAL_OVERRIDES, bearingDeg, oaciRunwayBearing, oaciIconRotation, oaciSymbolSvg, OACI_BAR_HEADING } from '../js/oaci-symbols.js';
 
 const AF = (statut, prive = false) => ({ statut, prive });
 const RW = surf => [{ d: '10/28', surf, main: true }];
@@ -98,25 +98,43 @@ describe('saisies pilote + orientation piste (27/09)', () => {
     });
 });
 
-describe('symbole SVG « piste en dur » (cardinaux fixes, piste pivotée)', () => {
-    test('famille piste-dur : SVG avec 4 traits cardinaux + canal pivoté au cap', () => {
-        const svg = oaciDurSymbolSvg('civil-piste-dur', 133.5);
+describe('symboles SVG recomposés (cardinaux fixes, piste pivotée)', () => {
+    test('piste-dur : 4 traits cardinaux ÉPAIS (stroke 9) + canal pivoté au cap', () => {
+        const svg = oaciSymbolSvg('civil-piste-dur', 133.5);
         assert.ok(svg.includes('rotate(133.5 50 50)'), 'canal pivoté au cap');
-        assert.equal((svg.match(/<line /g) || []).length, 4, '4 traits cardinaux N/E/S/W');
+        assert.ok(svg.includes('stroke-width="9"'), 'cardinaux épaissis (retour pilote)');
+        assert.equal((svg.match(/<line /g) || []).length, 4);
         assert.ok(svg.includes('#0040A0'));
-        assert.ok(!svg.includes('<circle cx="50" cy="50" r="39"'), 'civil : pas d\'anneau externe');
+        assert.ok(!svg.includes('r="39"'), "civil : pas d anneau externe");
     });
 
     test('mixte/militaire : anneau externe (double) ; rouge militaire', () => {
-        assert.ok(oaciDurSymbolSvg('mixte-piste-dur', 40).includes('r="39"'));
-        const mil = oaciDurSymbolSvg('militaire-piste-dur', 90);
+        assert.ok(oaciSymbolSvg('mixte-piste-dur', 40).includes('r="39"'));
+        const mil = oaciSymbolSvg('militaire-piste-dur', 90);
         assert.ok(mil.includes('#E03020') && mil.includes('r="39"'));
     });
 
-    test('hors famille → null (PNG extrait utilisé) ; cap normalisé mod 180', () => {
-        assert.equal(oaciDurSymbolSvg('civil-bande', 90), null);
-        assert.equal(oaciDurSymbolSvg('prive', 90), null);
-        assert.ok(oaciDurSymbolSvg('civil-piste-dur', 313.5).includes('rotate(133.5 50 50)'));
-        assert.ok(oaciDurSymbolSvg('civil-piste-dur', null).includes(`rotate(${OACI_BAR_HEADING} 50 50)`));
+    test('bande : anneau épais sans canal ; hélistation : H blanc ; hydro : ancre', () => {
+        const bande = oaciSymbolSvg('civil-bande', 90);
+        assert.ok(bande.includes('r="26"') && bande.includes('stroke-width="16"'));
+        assert.ok(!bande.includes("rotate("), "bande : pas d orientation");
+        const heli = oaciSymbolSvg('civil-helistation', null);
+        assert.ok((heli.match(/<rect /g) || []).length >= 3, 'H = 2 montants + barre');
+        const hydro = oaciSymbolSvg('civil-hydro', null);
+        assert.ok(hydro.includes('A 19 16'), 'ancre (arc)');
+    });
+
+    test('privé : P blanc sur disque ; désaffecté : anneau noir barré X, sans cardinaux', () => {
+        const p = oaciSymbolSvg('prive', null);
+        assert.ok(p.includes('#0040A0') && p.includes('<circle cx="53" cy="37" r="13"') && p.includes('stroke-width="9"'));
+        const d = oaciSymbolSvg('desaffecte', null);
+        assert.ok(d.includes('#141414') && (d.match(/<line /g) || []).length === 2, 'X sans cardinaux');
+    });
+
+    test('nom inconnu → null ; cap normalisé mod 180 ; repli pose légende', () => {
+        assert.equal(oaciSymbolSvg('civil-foo', 90), null);
+        assert.equal(oaciSymbolSvg('nimporte', 90), null);
+        assert.ok(oaciSymbolSvg('civil-piste-dur', 313.5).includes('rotate(133.5 50 50)'));
+        assert.ok(oaciSymbolSvg('civil-piste-dur', null).includes(`rotate(${OACI_BAR_HEADING} 50 50)`));
     });
 });
