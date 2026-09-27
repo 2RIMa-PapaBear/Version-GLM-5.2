@@ -492,7 +492,7 @@ function _drawZoneTooltip({ g, seg }, cw, xOf) {
     // accolé à la 3e ligne : l'ouverture d'une zone conditionnelle compte
     // autant que sa fréquence.
     let line3 = g.freq ? `${g.freq} MHz` : (seg.act || `${nm} NM`);
-    if (seg.hor) line3 += `  ·  ${horLabel(seg.hor, true)}`;
+    if (seg.hor) line3 += `  ·  ${horLabel(seg.hor, true, seg.horTxt)}`;
     const lines = [
         g.name,
         `ALT MIN : ${_altTxt(g.lo)}   ALT MAX : ${_altTxt(seg.up)}`,

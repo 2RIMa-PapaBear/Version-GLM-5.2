@@ -16,7 +16,7 @@
  * intelligente — cf. deps.createWaypoint).
  * ================================================================ */
 
-import { state } from './core.js';
+import { state, escapeHtml } from './core.js';
 import { AIRSPACE_GROUPS } from './airspaces.js';
 import {
     loadRadioPoints, loadObstacles, filterBbox, visibleKinds,
@@ -25,8 +25,8 @@ import {
 
 const COLORS = { vor: '#60A5FA', ndb: '#4ADE80', vrp: '#2563EB', obstacle: '#F87171' };
 
-const _esc = (s) => String(s ?? '').replace(/[&<>"']/g, c =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+// S5 (audit 27/09) : core.escapeHtml remplace la copie locale (F13/A10).
+const _esc = escapeHtml;
 
 /** Symboles conventionnels des cartes aéro (SIA/OACI) :
  *  VOR = hexagone + point central ; NDB = « goutte » (cercle + tige) ;

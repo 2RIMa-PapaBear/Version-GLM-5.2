@@ -282,8 +282,8 @@ const flatVfr = (grp) => Object.values(grp || {}).filter(Array.isArray).flat().f
 const flatVfrFir = (grp) => flattenFirList(Object.values(grp || {}).filter(Array.isArray).flat()).filter(isVfrNotam);
 
 /** Liste plate annotée pour le dossier LOCAL (zone 30 NM). */
-export function collectFlatLocal(pib, planRoute = []) {
-    const groups = GROUPS_LOCAL();
+export function collectFlatLocal(pib, planRoute = [], radiusNm = null) {
+    const groups = GROUPS_LOCAL(radiusNm);
     const icao = planRoute[0];
     const out = [];
     const push = (gLabel, list) => { for (const n of list || []) { n._grp = gLabel; out.push(n); } };
@@ -317,11 +317,13 @@ export function getLastNotamFetchTs() {
     return _lastFetchTs;
 }
 
-const GROUPS_LOCAL = () => (isFr() ? {
-    ADSur: 'Zone 30 NM', FIR: 'En route (FIR)', Other: 'Autres zones',
+// A7 (audit 27/09) : le libellé porte le rayon RÉEL de la zone (réglable
+// 10-40 NM, défaut 20) au lieu d'un « Zone 30 NM » figé.
+const GROUPS_LOCAL = (radiusNm) => (isFr() ? {
+    ADSur: `Zone ${radiusNm || 20} NM`, FIR: 'En route (FIR)', Other: 'Autres zones',
     ADDep: 'Départ', ADDes: 'Arrivée', ADDeg: 'Dégagements',
 } : {
-    ADSur: '30 NM zone', FIR: 'En route (FIR)', Other: 'Other areas',
+    ADSur: `${radiusNm || 20} NM zone`, FIR: 'En route (FIR)', Other: 'Other areas',
     ADDep: 'Departure', ADDes: 'Destination', ADDeg: 'Alternates',
 });
 
@@ -418,9 +420,11 @@ function _renderPib(pib, planRoute = [], opts = {}) {
     const ordre = [];
     if (local) {
         // Ordre pilote 10/09 : dossier des TERRAINS de la zone (l AD observé
-        // en tête d anneau) puis zones/FIR du rayon 30 NM.
+        // en tête d anneau) puis zones/FIR du rayon. A7 (audit 27/09) : la
+        // section ADSur (« Zone X NM ») est RENDUE en local — collectFlatLocal
+        // comptait ses NOTAM sans jamais les afficher (jamais cochables).
         ordre.push(['__WP__', null]);
-        ordre.push(['FIR', groups.FIR], ['Other', groups.Other]);
+        ordre.push(['ADSur', groups.ADSur], ['FIR', groups.FIR], ['Other', groups.Other]);
     } else {
         if (dep) ordre.push(['ADDep', `${groups.ADDep} ${dep}`]);
         ordre.push(['FIR', groups.FIR]);            // ordre pilote : le FIR suit le départ

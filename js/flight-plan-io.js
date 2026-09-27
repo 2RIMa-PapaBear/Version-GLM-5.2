@@ -180,6 +180,9 @@ export function parseKml(text) {
         const nm = block.match(/<name>([^<]*)<\/name>/);
         const co = block.match(/<coordinates>([^<]*)<\/coordinates>/);
         if (!co) continue;
+        // N17 (audit 27/09) : routes/polygones/traces (LineString, Polygon,
+        // Track) ne sont JAMAIS des waypoints — même à coordonnée unique.
+        if (/<LineString|<Polygon|<Track/.test(block)) continue;
         const xyz = co[1].trim().split(/[\s,]+/).map(Number);
         if (!isFinite(xyz[0]) || !isFinite(xyz[1])) continue;
         // Une LineString (route) a plusieurs points : on ne garde que les

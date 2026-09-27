@@ -35,6 +35,9 @@ export function evaluateCarbIcing(oatC, tdC) {
         typeof tdC !== 'number' || isNaN(tdC)) return null;
 
     const t = oatC;
+    // N7 (audit 27/09) : Td > T est physiquement impossible (donnée
+    // corrompue) — rejeté au lieu d'un spread négatif « serious ».
+    if (tdC > oatC) return null;
     const s = oatC - tdC; // écart T − Td : proxy d'humidité (plus il est faible, plus l'air est humide)
     const carb = estimateCarbTempC(oatC);
 

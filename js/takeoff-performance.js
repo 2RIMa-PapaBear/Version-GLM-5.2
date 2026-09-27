@@ -166,18 +166,9 @@ export function isRunwayLengthAuto(icao) {
  * @param {string} icao
  * @param {number} ft Longueur en pieds.
  */
-export function setRunwayLength(icao, ft) {
-    if (!icao) return;
-    try {
-        if (ft == null || isNaN(ft)) {
-            localStorage.removeItem(LS_RWY_LEN_PREFIX + icao.toUpperCase());
-        } else {
-            localStorage.setItem(LS_RWY_LEN_PREFIX + icao.toUpperCase(), String(Math.round(ft)));
-        }
-    } catch {
-        /* quota */
-    }
-}
+// A10 (audit 27/09) : setRunwayLength SUPPRIMÉE — plus aucune UI n'écrivait
+// cette clé (fonctionnalité morte) ; getRunwayLength lit encore les valeurs
+// héritées d'anciennes sessions.
 
 /**
  * Récupère les distances de référence de l'avion actif (depuis la flotte).
@@ -406,8 +397,8 @@ function _takeoffVerdict(icao, daResult, corr, surfaceCode, headwindKt = null) {
             aircraftName: acRef.name,
             surfaceNote,
             message: isFr
-                ? `Roulement estimé ${ftToM(corr.groundRoll)} m (DA ${Math.round(daResult.da)} ft)${surfaceNote}${windNote} — renseignez la longueur de piste`
-                : `Est. roll ${ftToM(corr.groundRoll)} m (DA ${Math.round(daResult.da)} ft)${surfaceNote}${windNote} — set runway length`,
+                ? `Roulement estimé ${ftToM(corr.groundRoll)} m (DA ${Math.round(daResult.da)} ft)${surfaceNote}${windNote} — longueur de piste inconnue`
+                : `Est. roll ${ftToM(corr.groundRoll)} m (DA ${Math.round(daResult.da)} ft)${surfaceNote}${windNote} — runway length unknown`,
         };
     }
 
@@ -683,8 +674,8 @@ function _landingVerdict(icao, daResult, corr, headwindKt, activeName, isForecas
         return {
             ...base, runwayLength: null, margin: null, level: 'unknown',
             message: isFr
-                ? `Roulement atterrissage estimé ${ftToM(corr.rollFt)} m — renseignez la longueur de piste`
-                : `Est. landing roll ${ftToM(corr.rollFt)} m — set runway length`,
+                ? `Roulement atterrissage estimé ${ftToM(corr.rollFt)} m — longueur de piste inconnue`
+                : `Est. landing roll ${ftToM(corr.rollFt)} m — runway length unknown`,
         };
     }
 

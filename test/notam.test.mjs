@@ -133,9 +133,13 @@ test('collectFlatLocal : zone 30 NM + FIR + Autres, annotés', () => {
         FIR: {},
         Other: { autres_info: [{ id: 3, qLine: { traffic: 'V' } }] },
     } };
-    const flat = collectFlatLocal(pib, ['LFRV']);
+    // A7 (audit 27/09) : le libellé porte le rayon RÉEL (paramètre) —
+    // défaut 20 NM si aucun rayon n'est passé.
+    const flat = collectFlatLocal(pib, ['LFRV'], 30);
     assert.equal(flat.length, 2, 'le NOTAM IFR pur est écarté');
     assert.ok(flat[0]._grp.startsWith('Zone 30 NM'));
+    assert.ok(collectFlatLocal(pib, ['LFRV'])[0]._grp.startsWith('Zone 20 NM'),
+        'défaut 20 NM sans rayon explicite');
     assert.ok(flat[1]._grp.startsWith('Autres'));
 });
 

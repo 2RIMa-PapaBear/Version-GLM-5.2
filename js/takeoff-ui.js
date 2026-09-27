@@ -25,7 +25,8 @@ import {
 } from './takeoff-performance.js';
 import { getFleet, getActiveAircraft, getActiveAircraftId, setActiveAircraft } from './aircraft-fleet.js';
 import { getDeclinationForIcao } from './magvar.js';
-import { getActiveRunwaySurfaceInfo, surfaceLabel, isSoftSurface } from './runway-surface.js';
+import { getActiveRunwaySurfaceInfo, surfaceLabel, isSoftSurface, runwayBelongsToAirport } from './runway-surface.js';
+import { getAirportByICAO } from './ui-module.js';
 
 // Jeton anti-course des atterrissages de destination asynchrones.
 let _ldgSeq = 0;
@@ -173,8 +174,13 @@ function render(container, r, icao) {
     if (ventStr) {
         rwyWind = _parseWindForAxial(ventStr);
     }
-    const activeRwy = state.activeRunwayName
-        || getActiveRunwayNameForIcao(icao, rwyWind, getDeclinationForIcao(state.requestedIcao || state.lastParsed?.code));
+    // A9 (audit 27/09) : même garde que les 4 chemins de CALCUL — la piste
+    // « active » mémorisée doit appartenir au terrain AFFICHÉ, sinon repli
+    // sur la piste résolue pour ce terrain.
+    const activeRwy = (state.activeRunwayName
+        && runwayBelongsToAirport(getAirportByICAO(icao), state.activeRunwayName))
+        ? state.activeRunwayName
+        : getActiveRunwayNameForIcao(icao, rwyWind, getDeclinationForIcao(state.requestedIcao || state.lastParsed?.code));
     // Revêtement de la piste active + état (humide/contaminée) quand le
     // facteur majoré ne s'explique pas par le seul revêtement (herbe sèche).
     const surfInfo = getActiveRunwaySurfaceInfo(icao);

@@ -5,14 +5,16 @@
 // (core.js), CAT_COLORS (core.js), evaluateIcingRisk/fetchFreezingLevel (freezing-level.js).
 // IMPORTANT : aucun import depuis ui-module.js (évite le cycle d'import).
 
-import { state, I18N, CAT_COLORS, parseVisiToMeters, getCeiling, findActiveValueAtHour } from './core.js';
+import { state, I18N, CAT_COLORS, parseVisiToMeters, getCeiling, findActiveValueAtHour, escapeHtml } from './core.js';
 import { parseWindString } from './engine.js';
 import { evaluateIcingRisk, fetchFreezingLevel } from './freezing-level.js';
 import { evaluateCarbIcing } from './carb-icing.js';
 
 function _tr() { return I18N[state.lang]; }
 
-function _escAttr(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
+// S5 (audit 27/09) : l'échappement local (2 caractères) est remplacé par
+// core.escapeHtml (5 caractères) — une seule implémentation dans l'app.
+const _escAttr = escapeHtml;
 
 export function showDecryptedWidgets(show) {
     const el = document.getElementById('decrypted-widgets');
@@ -133,7 +135,8 @@ function _renderIcingPill(risk) {
     }
     const cls = risk.level === 'danger' ? 'icing-danger' : 'icing-caution';
     const msg = risk.message || '';
-    slot.innerHTML = `<span class="widget-pill ${cls}" title="${_escAttr(msg)}">${msg}</span>`;
+    // S5 (audit 27/09) : ${msg} était inséré BRUT dans le innerHTML.
+    slot.innerHTML = `<span class="widget-pill ${cls}" title="${_escAttr(msg)}">${escapeHtml(msg)}</span>`;
 }
 
 // Givrage carburateur : abaque T / Td (js/carb-icing.js) + estimation de la

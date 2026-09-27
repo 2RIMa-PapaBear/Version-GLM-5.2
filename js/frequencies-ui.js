@@ -226,7 +226,10 @@ function freqBlockHtml({ freqs, source, title }, isFr) {
     const freqRow = (f) => {
         const isPrimary = f.primary;
         const freqStr = f.freq.toFixed(3);
-        const hor = f.hor && HOR_CODES[f.hor] ? f.hor : null;
+        // A13 (audit 27/09) : un code d'horaire HORS tableau est affiché
+        // tel quel (infobulle générique) au lieu d'être silencieusement
+        // perdu — 324 « HOR ATS » restaient sans badge.
+        const hor = f.hor || null;
         const rem = f.rem ? String(f.rem).trim() : '';
         // ATIS : numéro d'écoute téléphonique publié dans l'observation →
         // lien tel: (appeler depuis un téléphone), rendu ENTIER donc
@@ -239,7 +242,7 @@ function freqBlockHtml({ freqs, source, title }, isFr) {
                 <span style="font-family:'DM Mono',monospace; font-size:13.5px; font-weight:700; color:${isPrimary ? '#38BDF8' : 'var(--text-color)'}; min-width:70px;">${freqStr}</span>
                 ${f.type ? `<span style="font-size:10px; background:rgba(255,255,255,0.08); color:var(--text-muted); padding:2px 7px; border-radius:3px; font-weight:700; letter-spacing:0.5px; min-width:40px; text-align:center;">${escapeHtml(f.type)}</span>` : ''}
                 <span style="font-size:12px; color:var(--text-muted); flex:1;">${escapeHtml(f.name || '')}</span>
-                ${hor ? `<span title="${escapeHtml(HOR_CODES[f.hor])}" style="font-size:10px; font-weight:700; font-family:'DM Mono',monospace; color:var(--text-dim); border:1px solid var(--border-color); border-radius:4px; padding:1px 6px;">${hor}</span>` : ''}
+                ${hor ? `<span title="${escapeHtml(HOR_CODES[f.hor] || (isFr ? 'Code horaire eAIP — détail dans le complément AIP' : 'eAIP schedule code — see AIP supplement'))}" style="font-size:10px; font-weight:700; font-family:'DM Mono',monospace; color:var(--text-dim); border:1px solid var(--border-color); border-radius:4px; padding:1px 6px;">${hor}</span>` : ''}
             </div>
             ${(rem || atisTel) ? `<div title="${escapeHtml(rem)}" style="font-size:11px; color:var(--text-muted); line-height:1.45; padding-left:80px; display:flex; align-items:center; flex-wrap:wrap; gap:2px 8px;">${atisTel ? `<a href="tel:${escapeHtml(atisTel.href)}" title="${isFr ? 'Appeler l’ATIS' : 'Call ATIS'}" style="display:inline-flex; align-items:center; gap:4px; color:var(--primary); text-decoration:none;">
                 <i data-lucide="phone" style="width:10px;height:10px;"></i>

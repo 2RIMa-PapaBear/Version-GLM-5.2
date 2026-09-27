@@ -22,7 +22,10 @@ const VAC_PROVIDERS = [
     },
     {
 
-        match: /^K?[A-Z]{3,4}$/,
+        // A11 (audit 27/09) : vrais préfixes cartographiés FAA (CONUS K,
+        // Alaska PA, Hawaï PH, Guam PG, Caraïbes TJ) — l'ancien /^K?[A-Z]{3,4}$/
+        // répondait « USA » pour EHGR, LOWW… (tout code 3-4 lettres).
+        match: /^(K[A-Z]{3}|PA[A-Z]{2}|PH[A-Z]{2}|PG[A-Z]{2}|TJ[A-Z]{2})$/,
         country: 'USA',
         url: () => 'https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/vfr/',
         label: { fr: 'VFR Charts (FAA)', en: 'VFR Charts (FAA)' },

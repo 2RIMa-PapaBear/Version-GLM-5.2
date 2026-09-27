@@ -1,5 +1,27 @@
 # P3/P4 du 2ᵉ audit multi-agents (27/09) — liste consolidée avec statut au 27/09 après-midi
 
+> **JOURNAL DES CORRECTIONS (mise à jour 27/09 soir)** — lire avec les statuts
+> ci-dessous, qui ne reflètent plus les derniers lots :
+> - **Lot 3 P3 (NON COMMITÉ à ce jour)** : A9-v4 (garde `runwayBelongsToAirport`
+>   à l'affichage), A10-v4 (setRunwayLength supprimée, messages « longueur de
+>   piste inconnue »), N4-v1 (GS=0 → repli TAS signalé par `gsFallback` + ⚠),
+>   A9-v5 (« FLxxx » seulement si la source publie un FL), A10-v5+S5 (escapeHtml
+>   de core unifié dans sup-sia/widgets/permalink/radio-points-layer/notam),
+>   A7-v5 (libellé rayon réel + section ADSur rendue en local), A5+A6-v5
+>   (crawler exporte `cl` + `horTxt`, base 09-03 régénérée — 681 classes /
+>   1402 horaires texte — cache IDB v4, popup « classe D », horTxt au profil).
+> - **P4 tranche 1 (NON COMMITÉE)** : W12 (SKC reconnu), W13 (VV/// préservé =
+>   plafond indéterminé, plus « illimité »), W14 (plus de phénomène fantôme —
+>   décomposition stricte en codes connus), N7 (carb-icing : Td > T → null),
+>   A11-v5 (repli « USA » restreint aux vrais préfixes FAA), A13-v5 (badge
+>   générique pour les codes horaires hors tableau), N17 (KML
+>   route/polygone/track jamais waypoint).
+> - **Reste P4 (ouvert)** : N5, N9, N10, N11, N12, N13 (WMM2025), N14, N16,
+>   A11-v4, A12-v4 (sourcage POH pilote), A13, A12-v5, A14-v5, A15-v5, S9, S10,
+>   S11, S12, S13, S14, S15, S16, S17, N6 (temps givrage go-nogo), W11
+>   (unification décodeurs — refonte M dédiée).
+> - npm 676/676 après tous ces lots.
+
 Statut vérifié dans le code après les campagnes B1-B3 / M1-M18 / fiches 1-29.
 Source : docs/audit-2026-09-27/volets/ (plans de volet P1-P4). « COUVERT » = réglé
 par un correctif déjà publié ; le reste est OUVERT.

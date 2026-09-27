@@ -59,7 +59,7 @@ function _parseNuage(seg) {
     const mN = [...seg.matchAll(new RegExp(RE_CLOUD.source, 'g'))];
     let valNuage = mN.map(m => {
         const s = m[0];
-        if (['CAVOK','NSC','NCD'].includes(s)) return s;
+        if (['CAVOK','NSC','NCD','SKC'].includes(s)) return s;   // W12 : SKC US
         const tMatch = s.match(/FEW|SCT|BKN|OVC|VV|\/{3}/);
         const aMatch = s.match(/\d{3}/);
         const cMatch = s.match(/CB|TCU/);
@@ -70,6 +70,10 @@ function _parseNuage(seg) {
         
         if (type === '///' && !alt) return cb;
         if (type === '///') return `/// ${alt} ${cb}`.trim();
+        // W13 (audit 27/09) : VV/// (visibilité verticale INCONNUE) est
+        // préservé tel quel — l'ancien `VV` sans altitude ressortait de
+        // getCeiling comme 999 (illimité) sur les TAF parsés.
+        if (type === 'VV' && !alt) return `VV/// ${cb}`.trim();
         return `${type} ${alt} ${cb}`.trim();
     }).filter(Boolean).join(' | ');
     if (seg.includes('CAVOK')) valNuage = 'CAVOK';
@@ -80,7 +84,19 @@ function _parsePhenomenes(seg, ignoreList) {
     const tr = I18N[state.lang], phenomenes = [];
     seg.split(/\s+/).forEach(tok => {
         if (ignoreList.some(i => tok.includes(i)) || /^(FM|TL|AT)\d{4}/.test(tok) || /^M?\d{2}\/M?\d{2}$/.test(tok) || /^Q\d{4}$/.test(tok) || /^A\d{4}$/.test(tok) || (/^\d/.test(tok) && !tok.includes('/')) || /^(BKN|OVC|SCT|FEW|VV)/.test(tok)) return;
-        if (Object.keys(tr.dicoMeteo).some(k => tok.includes(k))) phenomenes.push(tok);
+        // W14 (audit 27/09) : le token doit se décomposer ENTIÈREMENT en
+        // codes connus (+'-'/VC en tête) — « BC » contenu dans « XYZABC » ne
+        // fabrique plus un « bancs » fantôme.
+        const intens = (tok.match(/^[+\-]VC|^[+\-]|^VC/) || [''])[0];
+        let rest = tok.slice(intens.length);
+        let decomposable = !!rest;
+        while (rest) {
+            const hit = Object.keys(tr.dicoMeteo).find(k => rest === k
+                || (k.length === 2 && rest.startsWith(k)));
+            if (!hit) { decomposable = false; break; }
+            rest = rest.slice(hit.length);
+        }
+        if (decomposable) phenomenes.push(tok);
     });
     return traduireCode(phenomenes.join(' '));
 }

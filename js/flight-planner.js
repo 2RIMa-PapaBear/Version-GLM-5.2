@@ -333,11 +333,14 @@ export function computeDiversionLeg(destLat, destLon, divLat, divLon, fuelBurnLp
     if (!Number.isFinite(destLat) || !Number.isFinite(destLon)
         || !Number.isFinite(divLat) || !Number.isFinite(divLon)) return null;
     const distNm = greatCircleDistanceNm(destLat, destLon, divLat, divLon);
-    const out = { distNm: Math.round(distNm * 10) / 10, timeMin: null, fuelL: null };
-    let gsKt = 0;
+    const out = { distNm: Math.round(distNm * 10) / 10, timeMin: null, fuelL: null, gsFallback: false };
+    let gsKt = 0, gsFallback = false;
     if (tasKt > 0) {
         const wcDiv = windCorrection(trueCourseDeg(destLat, destLon, divLat, divLon), tasKt, wind);
-        gsKt = wcDiv.gsKt > 0 ? wcDiv.gsKt : tasKt;   // GS ≤ 0 (vent > TAS) : repli TAS, comme la route
+        // N4 (audit 27/09) : GS ≤ 0 (vent ≥ TAS) → repli TAS, comme la route —
+        // DÉSORMAIS SIGNALÉ (gsFallback) au lieu du repli silencieux.
+        gsFallback = !(wcDiv.gsKt > 0);
+        gsKt = gsFallback ? tasKt : wcDiv.gsKt;
     } else if (refGsKt > 0) {
         gsKt = refGsKt;
     }
@@ -499,6 +502,7 @@ export async function computeFlightPlan(fromIcao, toIcao, params) {
         trueHeading: Math.round(trueHdg),
         magHeading: magHdg,
         groundSpeed: gsKt,
+        gsFallback: !(wc.gsKt > 0),   // N4 : vent ≥ TAS → GS réduite à la TAS (signalé)
         legTimeMin: Math.round(legTimeMin),
         fuel,
         cruiseAltFt: params.cruiseAltFt,
@@ -595,7 +599,7 @@ export async function computeMultiLegFlightPlan(route, params) {
         const wc = windCorrection(tc, params.tasKt, wind);
         const trueHdg = (tc + wc.wcaDeg + 360) % 360;
         const magHdg = trueToMagneticHdg(trueHdg, declination);
-        const gsKt = wc.gsKt > 0 ? wc.gsKt : params.tasKt;
+        const gsKt = wc.gsKt > 0 ? wc.gsKt : params.tasKt;   // N4 : gsFallback sur le leg
         const legTimeMin = distNm / gsKt * 60;
         const fuel = computeFuel(legTimeMin, params.fuelBurnLph, reserveMin);
 
@@ -609,6 +613,7 @@ export async function computeMultiLegFlightPlan(route, params) {
             trueHeading: Math.round(trueHdg),
             magHeading: magHdg,
             groundSpeed: gsKt,
+            gsFallback: !(wc.gsKt > 0),   // N4 : vent ≥ TAS → GS réduite à la TAS
             legTimeMin: Math.round(legTimeMin),
             fuel,
         });

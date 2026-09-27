@@ -1244,6 +1244,8 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
     const declination = plan.declination ?? 0;
     const cruiseAltFt = plan.cruiseAltFt;
     const groundSpeed = isMulti ? firstLeg.groundSpeed : plan.groundSpeed;
+        // N4 (audit 27/09) : GS <= 0 (vent >= TAS) -> repli TAS SIGNALE.
+        const gsFallback = !!(isMulti ? firstLeg.gsFallback : plan.gsFallback);
     const legTimeMin = isMulti ? plan.totalTimeMin : plan.legTimeMin;
     const fuel = plan.fuel;
 
@@ -1297,7 +1299,7 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
                 ` : ''}
                 <div class="fp-cell">
                     <div class="fp-label">${isFr ? 'Vitesse sol (GS)' : 'Ground speed'}</div>
-                    <div class="fp-value">${groundSpeed} kt</div>
+                    <div class="fp-value"${gsFallback ? ` title="${isFr ? 'Vent ≥ TAS : GS réduite à la TAS (vent plus fort que la vitesse propre)' : 'Wind >= TAS: GS reduced to TAS'}"` : ''}>${groundSpeed} kt${gsFallback ? ' ⚠' : ''}</div>
                 </div>
                 <div class="fp-cell">
                     <div class="fp-label">${isFr ? 'Temps de vol' : 'Flight time'}</div>

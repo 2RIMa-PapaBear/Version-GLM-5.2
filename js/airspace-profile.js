@@ -148,9 +148,13 @@ export function serviceFreq(as) {
  *  TS×60, HJ×44, HN×1). Seuls les codes au sens ICAO documenté sont
  *  traduits ; toute autre valeur (« TS », horaire littéral…) est
  *  affichée telle quelle — jamais d'invention. */
-export function horLabel(hor, isFr = true) {
+export function horLabel(hor, isFr = true, horTxt = null) {
     const h = String(hor || '').trim().toUpperCase();
     if (!h) return '';
+    // A6 (audit 27/09) : code d'horaire inconnu du tableau → afficher le
+    // TEXTE officiel du XML (HorTxt, « 0700 - au plus tard de 1900 ou
+    // SS+30 ») plutôt que le sigle brut (« TS »).
+    const txtRaw = String(horTxt || '').trim();
     const L = {
         'H24':   { fr: 'H24 — jour et nuit', en: 'H24 — day & night' },
         'HJ':    { fr: 'HJ — jour (lever→coucher du soleil)', en: 'HJ — day (sunrise→sunset)' },
@@ -159,6 +163,7 @@ export function horLabel(hor, isFr = true) {
         'HX':    { fr: 'HX — horaires variables', en: 'HX — variable hours' },
         'NOTAM': { fr: 'Activation par NOTAM', en: 'Activation by NOTAM' },
     };
+    if (!L[h] && txtRaw) return txtRaw;
     return L[h] ? L[h][isFr ? 'fr' : 'en'] : h;
 }
 
@@ -253,7 +258,7 @@ export function computeRouteAirspaces(points, items, opts) {
         // d'horaire d'activation SIA (« H24 », « NOTAM »…) : portés au
         // segment pour l'infobulle du profil écran et les cadres du PDF.
         for (const [fa, fb] of ranges) {
-            g.segs.push({ fa, fb, up, zone, act: as.activity || null, hor: as.hor || null });
+            g.segs.push({ fa, fb, up, zone, act: as.activity || null, hor: as.hor || null, horTxt: as.horTxt || null });
         }
     }
 

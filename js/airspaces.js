@@ -300,7 +300,7 @@ async function _loadSiaItems() {
         // v3 : + champ hor (code d'horaire d'activation — H24, NOTAM…),
         // absent des caches v2 — nouveau clé = les clients re-téléchargent
         // sans attendre le TTL de 7 j.
-        const cached = await _idbGet('sia:airspaces:v3');
+        const cached = await _idbGet('sia:airspaces:v4');
         if (cached?.data && Date.now() - cached.ts < CELL_TTL_MS) { _siaItems = stamp(cached.data); _siaOk = true; return _siaItems; }
         try {
             const res = await fetch(`data/sia-airspaces.json?t=${cached?.ts || 0}`, { signal: AbortSignal.timeout(15000) });
@@ -308,7 +308,7 @@ async function _loadSiaItems() {
             const d = await res.json();
             _siaItems = stamp(d.items.map(_expandFileItem));
             _siaOk = true;
-            _idbPut('sia:airspaces:v3', _siaItems);
+            _idbPut('sia:airspaces:v4', _siaItems);
         } catch {
             // Échec réseau : repli sur le cache IDB s'il existe (base alors
             // encore disponible, périmée mais consultable) — sinon la base
@@ -716,7 +716,9 @@ export function _decodeType(as) {
 
 export function _decodeIcaoClass(as) {
     if (typeof as.icaoClass === 'number') return ICAO_CLASS_MAP[as.icaoClass] || '';
-    const c = String(as.icaoClass || '').toUpperCase();
+    // A5 (audit 27/09) : la base SIA exporte désormais la classe OACI
+    // du XML (`cl`) — 868 volumes (538 D, 152 E, 102 C, 26 A, 50 G).
+    const c = String(as.icaoClass || (as._sia ? as.cl : '') || '').toUpperCase();
     return /^[A-G]$/.test(c) ? c : '';
 }
 
@@ -739,7 +741,10 @@ export function _limitTxt(lim) {
     if (ft == null) return null;
     if (ft <= 0) return 'SFC';
     if (lim.ref === 'ASFC') return `${ft} ft sol`;
-    if (lim.unit === 6 || (ft >= 4000 && ft % 500 === 0)) {
+    // A9 (audit 27/09) : « FLxxx » SEULEMENT si la source publie un FL
+    // (unité 6) — l'ancienne heuristique « ft ≥ 4000 multiples de 500 »
+    // étiquetait FL des limites calées QNH (supposait TA 3000 partout).
+    if (lim.unit === 6) {
         return `FL${String(Math.round(ft / 100)).padStart(3, '0')}`;
     }
     return `${ft} ft AMSL`;
@@ -982,7 +987,7 @@ export function createAirspaceController(map) {
                 .join('<br>');
             const tooltip = `<strong>${escapeHtml(name)}</strong><br>
                 <span style="color:${st.color};font-weight:700;">${st.label}</span>${clsDisplay}<br>
-                ${as.activity ? `<span style="font-style:italic;">${escapeHtml(as.activity)}</span><br>` : ''}${as.hor ? `<span style="font-style:italic;">${escapeHtml(horLabel(as.hor, isFr))}</span><br>` : ''}${_activationLine(as, isFr)}${isFr ? 'Alt.' : 'Alt.'}: ${lower} → ${upper}
+                ${as.activity ? `<span style="font-style:italic;">${escapeHtml(as.activity)}</span><br>` : ''}${as.hor ? `<span style="font-style:italic;">${escapeHtml(horLabel(as.hor, isFr, as.horTxt))}</span><br>` : ''}${_activationLine(as, isFr)}${isFr ? 'Alt.' : 'Alt.'}: ${lower} → ${upper}
                 ${freqTxt ? `<br><span style="font-family:'DM Mono',monospace;">${freqTxt}</span>` : ''}`;
 
             rings.forEach((ring, ringIdx) => {

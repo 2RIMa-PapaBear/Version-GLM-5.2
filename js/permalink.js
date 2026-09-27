@@ -224,11 +224,8 @@ export function closeShareModal() {
     if (existing) existing.remove();
 }
 
+// S5 (audit 27/09) : core.escapeHtml (5 caractères) remplace l'implémentation
+// locale — une seule fonction d'échappement dans l'app.
 function escapeAttr(text) {
-    return String(text || '')
-        .replace(/&/g, '&amp;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+    return escapeHtml(text);
 }

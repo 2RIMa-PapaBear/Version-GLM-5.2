@@ -16,7 +16,7 @@
  *
  * Node-safe : DOM gardé par typeof document.
  */
-import { state } from './core.js';
+import { state, escapeHtml } from './core.js';
 
 import { makeCollapsible } from './collapsible.js';
 
@@ -297,7 +297,7 @@ function _render(data) {
 
     const nMatch = matched.filter(x => x.rel.n).length;
     _panel.querySelector('.sup-summary').innerHTML = isFr
-        ? `${items.length} Sup SIA en vigueur (maj ${new Date(data?.generatedAt || Date.now()).toLocaleDateString()})`
+        ? `${escapeHtml(items.length)} Sup SIA en vigueur (maj ${escapeHtml(new Date(data?.generatedAt || Date.now()).toLocaleDateString())})`
             + ` — affichées : ${matched.length}${nMatch ? ` dont <b style="color:#FBBF24;">${nMatch} pour votre vol</b>` : ''}`
         : `${items.length} SIA SUP in force — shown: ${matched.length}`;
 
@@ -306,8 +306,8 @@ function _render(data) {
         return `
         <div class="sup-row${rel.n ? ' sup-match' : ''}">
             <div class="sup-line1">
-                <b class="sup-num">${s.num}</b>
-                <span class="sup-dates">${s.start || '?'} → ${s.end || '?'}</span>
+                <b class="sup-num">${_esc(s.num)}</b>
+                <span class="sup-dates">${_esc(s.start || '?')} → ${_esc(s.end || '?')}</span>
                 <span class="sup-chips">${s.vfr ? '<i>VFR</i>' : ''}${s.ifr ? '<i>IFR</i>' : ''}${s.airac ? '<i>AIRAC</i>' : ''}</span>
                 ${rel.n ? `<span class="sup-plan">${isFr ? 'votre vol' : 'your flight'} · ${[...m, ...rg].join(' ')}</span>` : ''}
                 ${/^https:\/\/www\.sia\.aviation-civile\.gouv\.fr\//.test(s.url || '') ? `<a class="sup-pdf" href="${_esc(s.url)}" target="_blank" rel="noopener" title="${isFr ? 'PDF officiel SIA (nouvel onglet)' : 'Official SIA PDF (new tab)'}">PDF ↗</a>` : ''}

@@ -175,6 +175,10 @@ each('Volume', (attrs, body) => {
         f: freqMatch ? [{ value: freqMatch[1], name: whoMatch.toUpperCase() }] : null,
         act: actTxt || null,
         hor: txt(body, 'HorCode') || '',
+        // A5/A6 (audit 27/09) : classe OACI (A-G) + horaire en TEXTE
+        // (« 0700 - au plus tard de 1900 ou SS+30 ») publiés par le XML.
+        cl: (txt(body, 'Classe') || '').toUpperCase(),
+        horTxt: txt(body, 'HorTxt') || '',
         g: { t: 1, c: [partie.ring] },
     });
 });
