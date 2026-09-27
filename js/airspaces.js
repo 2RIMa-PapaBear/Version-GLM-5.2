@@ -866,6 +866,10 @@ function _pointInRing(lat, lng, ring) {
 export function createAirspaceController(map) {
     let layerGroup = L.layerGroup().addTo(map);
     let visible = false;
+    // Fiche/popup au clic sur une zone — EN RÉSERVE (désactivé par le
+    // pilote 27/09, réactivable à true).
+    const ZONE_POPUPS = false;
+
     // Retour pilote 27/09 : groupes d'espaces NON COCHÉS par défaut —
     // même comportement que VOR/NDB/Points VFR/Obstacles (on n'affiche
     // que ce que l'on coche dans le menu « Espaces »).
@@ -1125,6 +1129,11 @@ export function createAirspaceController(map) {
 
                 poly.on('click', (e) => {
                     L.DomEvent.stopPropagation(e);
+                    // FICHES DE ZONE DÉSACTIVÉES (retour pilote 27/09 :
+                    // « cadres à supprimer pour le moment »). RÉSERVE :
+                    // repasser ZONE_POPUPS à true rétablit fiche +
+                    // surbrillance + zones empilées telles quelles.
+                    if (!ZONE_POPUPS) return;
                     const latlng = e.latlng;
                     // 2e clic sur la même zone alors que sa fiche est
                     // ouverte → on la FERME (bascule), on ne la rouvre pas.
