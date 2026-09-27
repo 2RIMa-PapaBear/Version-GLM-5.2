@@ -47,7 +47,7 @@ const warn = (m) => console.log('  ⚠ ' + m);
 const ALLOWED = [
     'index.html', 'accueil.html', 'sw.js', 'manifest.webmanifest', 'favicon.ico', 'icon.svg',
     'notice-fr.html', 'notice-en.html',
-    'fonts/', 'icon-180.png',   // alignés sur deploy-ftp.mjs (les polices
+    'fonts/', 'icon-180.png', 'assets/oaci-symboles/',   // alignés sur deploy-ftp.mjs (les polices
                                     // auto-hébergées manquaient au canal test)
     'js/', 'css/', 'vendor/', 'data/', 'assets/accueil/',
 ];
