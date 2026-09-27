@@ -15,7 +15,7 @@ import { mountWindLayer } from './wind-layer.js';
 import { mountTemsiButton, closeTemsiViewer } from './temsi.js';
 import { mountFrontsButton, closeFrontsViewer } from './fronts.js';
 import { getAirportFreqs, loadFreqSources } from './freq-sia.js';
-import { classifyOaciSymbol, oaciRunwayBearing, oaciSymbolSvg, OACI_SYMBOL_SIZE } from './oaci-symbols.js';
+import { classifyOaciSymbol, classifyForeignSymbolOa, oaciRunwayBearing, oaciSymbolSvg, OACI_SYMBOL_SIZE } from './oaci-symbols.js';
 
 let _map = null;
 let _precip = null;
@@ -1372,6 +1372,55 @@ function _decodeMetarForPopup(raw) {
     return d;
 }
 
+// Pose (ou remplace) l'icône SVG OACI d'un aérodrome sur son marqueur.
+// Cap : seuils SIA (cap vrai) d'abord, sinon cap magnétique de la base.
+function _applyAirportSymbol(marker, lat, lon, icao, sym) {
+    if (!_map) return;
+    let bearing = oaciRunwayBearing(icao);
+    if (!Number.isFinite(bearing)) {
+        const paires = _parseRunwayPairs(getAirportByICAO(icao)?.runways || []);
+        if (paires.length) bearing = paires[0].hdg % 180;
+    }
+    const svg = oaciSymbolSvg(sym.icon, bearing);
+    if (!svg) return;
+    const icon = L.divIcon({
+        className: 'oaci-sym',
+        html: svg,
+        iconSize: [OACI_SYMBOL_SIZE, OACI_SYMBOL_SIZE],
+        iconAnchor: [OACI_SYMBOL_SIZE / 2, OACI_SYMBOL_SIZE / 2],
+    });
+    if (marker.oaciIcon) {
+        marker.oaciIcon.setIcon(icon);
+    } else {
+        marker.oaciIcon = L.marker([lat, lon], {
+            interactive: false,
+            keyboard: false,
+            icon,
+        }).addTo(_map);
+    }
+}
+
+const _foreignEnriched = new Set();   // icao déjà interrogés (session)
+async function _enrichForeignSymbolOa(marker, lat, lon, icao) {
+    const code = String(icao || '').toUpperCase();
+    if (_foreignEnriched.has(code)) return;
+    _foreignEnriched.add(code);
+    try {
+        const { fetchAirportByIcao, _mapAirport } = await import('./openaip.js');
+        const oa = await fetchAirportByIcao(code);
+        if (!oa || typeof oa.military === 'undefined') return;
+        const sym = classifyForeignSymbolOa(oa);
+        if (!sym) return;
+        // remplace si différent de l'icône en place (base locale)
+        const current = marker.oaciIcon?.getElement()?.querySelector('svg')?.innerHTML || '';
+        const next = oaciSymbolSvg(sym.icon, oaciRunwayBearing(code)
+            ?? (_parseRunwayPairs(getAirportByICAO(code)?.runways || [])[0]?.hdg % 180));
+        if (next && !current.startsWith(next.slice(0, 80))) {
+            _applyAirportSymbol(marker, lat, lon, code, sym);
+        }
+    } catch { /* sans clé openAIP : classement base conservé */ }
+}
+
 // ---- Étiquettes « carte OACI » --------------------------------------------
 // Mise en page de la légende SCAN-OACI (IGN) :
 //        LFBI           ← code OACI
@@ -1533,28 +1582,13 @@ function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null
     }).addTo(_map);
 
     if (sym) {
-        // Symbole DESSINÉ EN SVG (retour pilote 27/09 : la piste pivote au
-        // cap réel, les repères cardinaux N/E/S/W restent FIXES ; PNG
-        // extraits remplacés par des recompositions vectorielles).
-        // Cap : seuils SIA (cap vrai) d'abord, sinon cap magnétique base.
-        let bearing = oaciRunwayBearing(icao);
-        if (!Number.isFinite(bearing)) {
-            const paires = _parseRunwayPairs(getAirportByICAO(icao)?.runways || []);
-            if (paires.length) bearing = paires[0].hdg % 180;
-        }
-        const svg = oaciSymbolSvg(sym.icon, bearing);
-        if (svg) {
-            marker.oaciIcon = L.marker([lat, lon], {
-                interactive: false,
-                keyboard: false,
-                icon: L.divIcon({
-                    className: 'oaci-sym',
-                    html: svg,
-                    iconSize: [OACI_SYMBOL_SIZE, OACI_SYMBOL_SIZE],
-                    iconAnchor: [OACI_SYMBOL_SIZE / 2, OACI_SYMBOL_SIZE / 2],
-                }),
-            }).addTo(_map);
-        }
+        _applyAirportSymbol(marker, lat, lon, icao, sym);
+        // TERRAINS HORS FRANCE : le TYPE (militaire/héliport/fermé) vient
+        // d'openAIP (retour pilote 27/09) — fetch asynchrone (cache IDB),
+        // l'icône est remplacée si le classement openAIP diffère de la
+        // base locale. Sans clé API (canal /test/), le classement base
+        // reste.
+        if (!icao.toUpperCase().startsWith('LF')) _enrichForeignSymbolOa(marker, lat, lon, icao);
     }
     // Marqueur DOM léger superposé au cercle SVG : capte proprement les
     // clics (droit inclus) mÃªme quand le path est recouvert par d'autres

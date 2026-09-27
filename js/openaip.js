@@ -184,6 +184,7 @@ export function _mapAirport(aip) {
         runwaySurfaces,
         longestRunway: longestRunway || null,
         surface: dominantSurface,
+        military: !!aip.military,   // type d'aérodrome hors France (pilote 27/09)
         frequencies,
         type: aip.type,
         source: 'openaip',

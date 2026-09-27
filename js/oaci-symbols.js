@@ -196,7 +196,24 @@ export function oaciSymbolSvg(icon, bearing) {
 /** @deprecated — remplacé par oaciSymbolSvg (tous les symboles). */
 export function oaciDurSymbolSvg(icon, bearing) { return oaciSymbolSvg(icon, bearing); }
 
-/** Classe un terrain français.
+/** Classe un terrain ÉTRANGER depuis un objet openAIP mappé
+ *  (fetchAirportByIcao — type d'aérodrome hors France pris d'openAIP,
+ *  retour pilote 27/09) : militaire → rouge ; HELI → hélistation ;
+ *  fermé → désaffecté ; sinon civil. Revêtement dominant → dur/bande.
+ *  Null si l'objet ne permet pas de trancher (on garde le classement
+ *  de la base locale). */
+export function classifyForeignSymbolOa(oa) {
+    if (!oa) return null;
+    const surf = String(oa.surface || '').toUpperCase();
+    const surface = /^(GRS|GRASS|DIRT|DIR|GRVL|SAND|U)$/.test(surf) ? 'bande' : 'piste-dur';
+    const type = String(oa.type || '').toUpperCase();
+    if (oa.military) return { icon: 'militaire-' + surface, statut: 'MIL (openAIP)', surf: surf || null };
+    if (type.includes('CLSD') || type.includes('CLOSED')) return { icon: 'desaffecte', statut: 'FERMÉ (openAIP)', surf: surf || null };
+    if (type.includes('HELI')) return { icon: 'civil-helistation', statut: 'ÉTR (openAIP)', surf: null };
+    return { icon: 'civil-' + surface, statut: 'ÉTR (openAIP)', surf: surf || null };
+}
+
+/** Classe un terrain français./** Classe un terrain français.
  *  @returns {{icon: string, statut: string, surf: string|null}|null}
  *  siaAf/siaRws : injection pour les TESTS (sinon getters sia-data). */
 export function classifyOaciSymbol(icao, siaAf = null, siaRws = null, apt = null) {
