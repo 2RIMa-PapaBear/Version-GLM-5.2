@@ -866,8 +866,8 @@ function _pointInRing(lat, lng, ring) {
 export function createAirspaceController(map) {
     let layerGroup = L.layerGroup().addTo(map);
     let visible = false;
-    // Fiche/popup au clic sur une zone — EN RÉSERVE (désactivé par le
-    // pilote 27/09, réactivable à true).
+    // FICHE au clic sur une zone — EN RÉSERVE (désactivée par le pilote
+    // 27/09, réactivable à true). La SURBRILLANCE de clic reste active.
     const ZONE_POPUPS = false;
 
     // Retour pilote 27/09 : groupes d'espaces NON COCHÉS par défaut —
@@ -1129,10 +1129,11 @@ export function createAirspaceController(map) {
 
                 poly.on('click', (e) => {
                     L.DomEvent.stopPropagation(e);
-                    // FICHES DE ZONE DÉSACTIVÉES (retour pilote 27/09 :
-                    // « cadres à supprimer pour le moment »). RÉSERVE :
-                    // repasser ZONE_POPUPS à true rétablit fiche +
-                    // surbrillance + zones empilées telles quelles.
+                    // SURBRILLANCE conservée (retour pilote 27/09) ; la
+                    // FICHE est désactivée (« cadres à supprimer pour le
+                    // moment ») — RÉSERVE : ZONE_POPUPS=true rétablit la
+                    // fiche + zones empilées telles quelles.
+                    _highlightPoly(poly);
                     if (!ZONE_POPUPS) return;
                     const latlng = e.latlng;
                     // 2e clic sur la même zone alors que sa fiche est
@@ -1141,7 +1142,6 @@ export function createAirspaceController(map) {
                         map.closePopup(openZonePopup);
                         return;
                     }
-                    _highlightPoly(poly);
                     let stacked = _findStackedAt(latlng.lat, latlng.lng);
                     if (!stacked.length) stacked = [{ poly, ...(polyMeta.get(poly) || {}) }];
                     if (stacked.length) {
