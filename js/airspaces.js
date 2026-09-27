@@ -457,19 +457,23 @@ export function _geomStats(z) {
  *  simplifiés openAIP et densifiés SIA diffèrent un peu.) Exporté. */
 export function _geomDuplicate(a, b) {
     if (!a || !b) return false;
-    // Verticales : les deux connues et proches (sinon on ne conclut pas).
-    if (a.lo == null || b.lo == null || a.up == null || b.up == null) return false;
-    if (Math.abs(a.lo - b.lo) > 200 || Math.abs(a.up - b.up) > 200) return false;
+    // Verticales : les deux connues et proches. SINON (une source sans
+    // limites — cas des SIV doublés 27/09) : la GÉOMÉTRIE SEULE tranche,
+    // à tolérances SÉVÈRES — règle pilote « données France : SIA en
+    // priorité », la copie openAIP d'une zone SIA est écartée.
+    const vertConnus = a.lo != null && b.lo != null && a.up != null && b.up != null;
+    if (vertConnus && (Math.abs(a.lo - b.lo) > 200 || Math.abs(a.up - b.up) > 200)) return false;
+    const strict = !vertConnus;
     const [ax0, ay0, ax1, ay1] = a.bbox, [bx0, by0, bx1, by1] = b.bbox;
     const iw = Math.min(ax1, bx1) - Math.max(ax0, bx0);
     const ih = Math.min(ay1, by1) - Math.max(ay0, by0);
     if (iw <= 0 || ih <= 0) return false;
     const iArea = iw * ih;
     const uArea = (ax1 - ax0) * (ay1 - ay0) + (bx1 - bx0) * (by1 - by0) - iArea;
-    if (iArea / uArea < 0.55) return false;
-    if (Math.hypot(a.cx - b.cx, a.cy - b.cy) > 0.04) return false;
+    if (iArea / uArea < (strict ? 0.9 : 0.55)) return false;
+    if (Math.hypot(a.cx - b.cx, a.cy - b.cy) > (strict ? 0.015 : 0.04)) return false;
     const r = a.area > 0 && b.area > 0 ? Math.max(a.area / b.area, b.area / a.area) : Infinity;
-    return r <= 1.45;
+    return r <= (strict ? 1.06 : 1.45);
 }
 
 /** Écarte les zones openAIP déjà couvertes par la base SIA : par nom exact
@@ -1003,6 +1007,12 @@ export function createAirspaceController(map) {
 
         const isFr = state.lang === 'fr';
         let count = 0;
+        // Anti-superposition SIV (retour pilote 27/09) : la même limite
+        // dessinée deux fois (doublon SIA/openAIP du même SIV) double les
+        // tirets. Signature géométrique par anneau : un SIV dont le tracé
+        // est déjà dessiné (par lui-même ou une autre zone) est sauté.
+        const ringSigs = new Set();
+        const ringSig = ring => ring.map(pt => pt[0].toFixed(4) + ',' + pt[1].toFixed(4)).join(';');
 
         items.forEach(as => {
 
@@ -1062,6 +1072,9 @@ export function createAirspaceController(map) {
 
             rings.forEach((ring, ringIdx) => {
                 if (ring.length < 2) return;
+                const sig = ringSig(ring);
+                if (kind.kind === 'SIV' && ringSigs.has(sig)) return;   // doublon : déjà tracé
+                ringSigs.add(sig);
                 // Pointillé du jour (zones actives) : SIV court, CTR LONG ;
                 // zone NON active ce jour → pointillé court « 8 5 » (B2 v2).
                 const finalDash = activeToday ? st.dashArray : (st.dashArray || '8 5');

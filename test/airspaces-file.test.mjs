@@ -179,13 +179,16 @@ test('_dropOpenAipDuplicates : même EMPREINTE sous nom incomparable → doublon
         zone('TMA AU-DESSUS', 3000, 11500),
         // Même nom d'esprit MAIS emplacement différent → conservée.
         zone('AUTRE ZONE MILITAIRE', 0, 3000, [[2.0, 47.0], [2.2, 47.0], [2.2, 47.15], [2.0, 47.15], [2.0, 47.0]]),
-        // Sans verticales exploitables → jamais écartée géométriquement.
+        // Sans verticales exploitables : la GÉOMÉTRIE SEULE tranche
+        // désormais, à tolérances sévères (règle pilote 27/09 « données
+        // France : SIA en priorité » — les SIV doublés SIA/openAIP sans
+        // tranches comparables se dessinaient deux fois).
         { name: 'MYSTERE', geometry: { type: 'Polygon', coordinates: [RING] } },
     ];
     const out = _dropOpenAipDuplicates(oaip, sia);
     assert.deepEqual(out.map(z => z.name).sort(),
-        ['AUTRE ZONE MILITAIRE', 'MYSTERE', 'TMA AU-DESSUS'],
-        'seule la copie de même empreinte disparaît');
+        ['AUTRE ZONE MILITAIRE', 'TMA AU-DESSUS'],
+        'la copie SIA prime, verticales ou pas (géométrie stricte)');
 });
 
 // (20/09) Séparateurs de secteur : SIA « 2-1 » ≡ openAIP « 2.1 » — sinon la
