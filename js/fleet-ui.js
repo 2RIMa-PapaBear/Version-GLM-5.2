@@ -24,7 +24,7 @@ import {
 import { searchAircraft } from './aircraft-database.js';
 import {
     defaultStations, computeWb, resolveLoads, mountWbChart,
-    armToMm, armFromMm, massToKg, massFromKg, armDecimals, normalizeEnvelope,
+    armToMm, armFromMm, massToKg, massFromKg, armDecimals, envelopeSelfCrossings,
 } from './wb-core.js';
 
 let _onCloseCallback = null;
@@ -145,6 +145,7 @@ function _render() {
                         ${ac.cruiseSpeedKt ? `<span>·</span><span title="${isFr ? 'Vitesse de croisière (TAS)' : 'Cruise speed (TAS)'}">${ac.cruiseSpeedKt} kt</span>` : ''}
                         ${ac.fuelBurnLph ? `<span>·</span><span title="${isFr ? 'Consommation horaire' : 'Fuel burn'}">${ac.fuelBurnLph} L/h</span>` : ''}
                         ${ac.xwindLimitKt ? `<span>·</span><span title="${isFr ? 'Limite vent traversier' : 'Crosswind limit'}">Xw ${ac.xwindLimitKt} kt</span>` : ''}
+                        ${ac.isULM ? `<span>·</span><span title="${isFr ? 'ULM (arrêté du 17/02/2025) — réserve carburant jour 15 min au lieu de 30' : 'Microlight (17/02/2025 order) — day fuel reserve 15 min instead of 30'}">ULM</span>` : ''}
                         ${ac.reserveExtraMin ? `<span>·</span><span title="${isFr ? 'Majoration personnelle de réserve' : 'Personal reserve'}">+${ac.reserveExtraMin} min</span>` : ''}
                         ${ac.ldgRoll ? `<span>·</span><span title="${isFr ? 'Atterrissage POH (roulement / 50 ft)' : 'POH landing (roll / 50 ft)'}">${ac.ldgRoll}/${ac.ldgFifty} ft</span>` : ''}
                     </div>
@@ -211,7 +212,8 @@ function _render() {
             </div>
             <div class="fleet-form-row">
                 <label title="${isFr ? 'Limite vent traversier (manuel de vol / école) — le GO/NO-GO l\u2019utilise à la place des seuils génériques 12/15 kt' : 'Crosswind limit (POH/club) — used by GO/NO-GO instead of generic 12/15 kt'}">${isFr ? 'Limite traversier (kt)' : 'Crosswind limit (kt)'}<input type="number" id="fleet-xwind" placeholder="${isFr ? 'ex. 12' : 'e.g. 12'}" min="0" max="40" step="1"></label>
-                <label title="${isFr ? 'Minutes AJOUTÉES à la réserve réglementaire (30 jour / 45 nuit) dans le devis carburant' : 'Minutes ADDED to the legal reserve (30 day / 45 night) in the fuel plan'}">${isFr ? 'Réserve perso (min)' : 'Personal reserve (min)'}<input type="number" id="fleet-reserve-extra" placeholder="0" min="0" max="60" step="5"></label>
+                <label title="${isFr ? 'Minutes AJOUTÉES à la réserve réglementaire (jour : 15 ULM / 30 avion ; nuit : 45) dans le devis carburant' : 'Minutes ADDED to the legal reserve (day: 15 microlight / 30 aeroplane; night: 45) in the fuel plan'}">${isFr ? 'Réserve perso (min)' : 'Personal reserve (min)'}<input type="number" id="fleet-reserve-extra" placeholder="0" min="0" max="60" step="5"></label>
+                <label class="fleet-ulm" title="${isFr ? 'Aéronef ULM (arrêté du 17/02/2025, art. 4.1.4) — réserve carburant de jour du devis navigation : 15 min au lieu de 30' : 'Microlight (17/02/2025 order, art. 4.1.4) — day fuel reserve of the navigation plan: 15 min instead of 30'}"><input type="checkbox" id="fleet-ulm">${isFr ? 'ULM' : 'Microlight'}</label>
             </div>
             <div class="fleet-form-row">
                 <label title="${isFr ? 'Distances d\u2019atterrissage POH niveau mer/ISA (roulement et franchissement 50 ft) — alimentent la section Atterrissage quand le terrain observé est la destination' : 'POH landing distances at SL/ISA (roll and 50 ft) — feed the Landing section when the observed field is the destination'}">${isFr ? 'Atterr. roulement (ft)' : 'Landing roll (ft)'}<input type="number" id="fleet-ldg-roll" placeholder="725" min="0" step="10"></label>
@@ -482,6 +484,7 @@ function _fillForm(id) {
     document.getElementById('fleet-unusable').value = ac.unusableFuelL || '';
     document.getElementById('fleet-xwind').value = ac.xwindLimitKt || '';
     document.getElementById('fleet-reserve-extra').value = ac.reserveExtraMin || '';
+    document.getElementById('fleet-ulm').checked = !!ac.isULM;
     document.getElementById('fleet-ldg-roll').value = ac.ldgRoll || '';
     document.getElementById('fleet-ldg-50ft').value = ac.ldgFifty || '';
 
@@ -510,6 +513,7 @@ function _resetForm() {
     document.getElementById('fleet-unusable').value = '';
     document.getElementById('fleet-xwind').value = '';
     document.getElementById('fleet-reserve-extra').value = '';
+    document.getElementById('fleet-ulm').checked = false;
     document.getElementById('fleet-ldg-roll').value = '';
     document.getElementById('fleet-ldg-50ft').value = '';
     _wbDraft = _defaultWbDraft();
@@ -585,10 +589,10 @@ function _draftToWb() {
     const u = d.units;
     const em = _num(d.emptyMass), ea = _num(d.emptyArm);
     if (!isFinite(em) || em <= 0 || !isFinite(ea)) return null;
-    const envelope = normalizeEnvelope(d.envelope
+    const envelope = d.envelope
         .map(p => [_num(p[0]), _num(p[1])])
         .filter(p => isFinite(p[0]) && p[0] > 0 && isFinite(p[1]))
-        .map(p => [massToKg(p[0], u.mass), armToMm(p[1], u.arm)]));
+        .map(p => [massToKg(p[0], u.mass), armToMm(p[1], u.arm)]);
     if (envelope.length < 3) return null;
     // Les postes sans bras sont conservés (armMm null) : ignorés au calcul
     // par wb-core, la saisie partielle n'est jamais perdue. Le max du poste
@@ -662,7 +666,10 @@ function _renderWbSection() {
                 <div class="wb-tbl-head"><span>${isFr ? `masse (${u.mass})` : `mass (${u.mass})`}</span><span>${isFr ? `bras (${u.arm})` : `arm (${u.arm})`}</span><span></span></div>
                 <div id="wb-envelope">${envRows || `<div class="wb-empty-note">${isFr ? 'aucun point' : 'no point'}</div>`}</div>
                 <button class="wb-add" id="wb-add-point">+ ${isFr ? 'Point' : 'Point'}</button>
-                <div class="fleet-wb-note">${isFr ? 'polygone fermé (sens horaire)' : 'closed polygon (clockwise)'}</div>
+                <div class="fleet-wb-note">${isFr ? 'sommets dans l\u2019ordre du périmètre, comme tracés au manuel de vol (sens indifférent)' : 'vertices in perimeter order, as drawn in the POH (either direction)'}</div>
+                <div class="fleet-wb-note wb-env-warn" id="wb-env-warn" hidden>⚠ ${isFr
+                    ? 'polygone auto-croisé : suivez le périmètre de l\u2019enveloppe du manuel, point par point — pas ligne à ligne du tableau'
+                    : 'self-crossing polygon: follow the envelope perimeter point by point — not row by row from the table'}</div>
             </div>
         </div>
         <div class="fleet-wb-sub">${isFr ? 'Aperçu du centrogramme' : 'Centrogram preview'}</div>
@@ -779,6 +786,10 @@ function _refreshWbPreview() {
     const host = document.getElementById('wb-preview');
     const isFr = state.lang === 'fr';
     const internal = _draftToWb();
+    // Fiche 16 : l'ordre des sommets n'est jamais réordonné — un polygone
+    // auto-croisé (saisie ligne à ligne du tableau POH) est SIGNALÉ.
+    const warnEl = document.getElementById('wb-env-warn');
+    if (warnEl) warnEl.hidden = !(internal && envelopeSelfCrossings(internal.envelope) > 0);
     if (stateEl) {
         stateEl.textContent = internal
             ? (isFr ? '· configuré' : '· configured')
@@ -839,6 +850,7 @@ function _doSave() {
         unusableFuelL: unusable || null,
         xwindLimitKt: xwind || null,
         reserveExtraMin: reserveExtra || 0,
+        isULM: document.getElementById('fleet-ulm').checked,
         ldgRoll: ldgRoll || null,
         ldgFifty: ldgFifty || null,
     };

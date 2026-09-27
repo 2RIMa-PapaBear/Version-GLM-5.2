@@ -162,7 +162,13 @@ function _label(doc, txt, x, y, opt = {}) {
     doc.setFontSize(size);
     let t = String(txt);
     if (opt.maxW) {
-        while (t.length > 1 && doc.getTextWidth(t) > opt.maxW) t = t.slice(0, -1) + '…';
+        // Les points de suspension ont une largeur : ne garder que ce qui
+        // tient DANS maxW AVEC « … » — tronquer puis ajouter « … » ferait
+        // dépasser l étiquette (anti-collision) de la largeur du glyphe.
+        if (doc.getTextWidth(t) > opt.maxW) {
+            while (t.length > 1 && doc.getTextWidth(t + '…') > opt.maxW) t = t.slice(0, -1);
+            t += '…';
+        }
     }
     doc.setTextColor(..._hex(opt.color || INK));
     doc.text(t, x, y, { align: opt.align || 'left' });

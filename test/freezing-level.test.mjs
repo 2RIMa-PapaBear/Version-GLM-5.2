@@ -57,10 +57,10 @@ describe('freezing-level — analyse thermodynamique T / Td', () => {
     test('air très sec (spread > 5 °C) : ok même dans la zone critique', () => {
         // T = 0, Td = −8 → spread 8 > 5 → « trop sec » l'emporte sur la
         // zone critique. Plafond 1000 ft SOUS l'isotherme 3000 ft → ok,
-        // message « sous le plafond ».
+        // message « plafond sous l'isotherme ».
         const r = evaluateIcingRisk(3000, 'BKN010', 0, -8);
         assert.equal(r.level, 'ok');
-        assert.equal(r.message, 'Isotherme 0°C à 3000 ft — sous le plafond');
+        assert.equal(r.message, 'Isotherme 0°C à 3000 ft — plafond sous l\'isotherme');
     });
 
     test('zone modérée −15..−2 °C : caution en nuage, ok sinon ; hors zone → ok', () => {
@@ -84,7 +84,7 @@ describe('freezing-level — approche plafond vs isotherme 0°C', () => {
         // Plafond BKN010 = 1000 ft ≥ isotherme 800 ft, marge 200 < 2000.
         const d = evaluateIcingRisk(800, 'BKN010', null, null);
         assert.equal(d.level, 'danger');
-        assert.equal(d.message, 'GIVRAGE PROBABLE — plafond 1000 ft, Isotherme 0°C à 800 ft');
+        assert.equal(d.message, 'GIVRAGE PROBABLE — plafond 1000 ft au-dessus de l\'isotherme 0°C (800 ft)');
         // Marge EXACTEMENT 2000 ft : BKN030 = 3000 − 1000 = 2000, non < 2000
         // → caution (et pas danger).
         const c = evaluateIcingRisk(1000, 'BKN030', null, null);
@@ -93,10 +93,11 @@ describe('freezing-level — approche plafond vs isotherme 0°C', () => {
     });
 
     test('plafond sous l\'isotherme : vol possible en air positif → ok', () => {
-        // BKN010 = 1000 ft < isotherme 5000 ft : pas de chevauchement.
+        // BKN010 = 1000 ft < isotherme 5000 ft : tout le vol VFR sous plafond
+        // reste en air positif — message « plafond sous l'isotherme ».
         const r = evaluateIcingRisk(5000, 'BKN010', null, null);
         assert.equal(r.level, 'ok');
-        assert.equal(r.message, 'Isotherme 0°C à 5000 ft — sous le plafond');
+        assert.equal(r.message, 'Isotherme 0°C à 5000 ft — plafond sous l\'isotherme');
     });
 
     test('fusion des approches : thermo danger prioritaire, thermo caution rehaussée', () => {
@@ -111,6 +112,6 @@ describe('freezing-level — approche plafond vs isotherme 0°C', () => {
         // critique, un nuage significatif donnerait déjà thermo danger).
         const m = evaluateIcingRisk(800, 'BKN010', -10, null);
         assert.equal(m.level, 'danger');
-        assert.equal(m.message, 'GIVRAGE PROBABLE — plafond 1000 ft, Isotherme 0°C à 800 ft');
+        assert.equal(m.message, 'GIVRAGE PROBABLE — plafond 1000 ft au-dessus de l\'isotherme 0°C (800 ft)');
     });
 });

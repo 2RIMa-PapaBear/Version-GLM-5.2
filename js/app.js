@@ -18,7 +18,7 @@ import { initTheme, toggleTheme } from './night-mode.js';
 import { dataAgeUpdate, initDataAge } from './data-age.js';
 import { showFlightWindow, hideFlightWindow } from './flight-window.js';
 import { initFlightMode, setFlightMode, getFlightMode } from './flight-mode.js';
-import { renderGoNoGo, refreshPressureTrend, refreshSigmet, refreshFreezingLevel } from './go-nogo.js';
+import { renderGoNoGo, refreshPressureTrend, refreshSigmet, refreshFreezingLevel, refreshAirspaceCtx } from './go-nogo.js';
 import { toggleRegionalMap, showRegionalMapFor } from './regional-map.js';
 import { showAlternates } from './alternates.js';
 import { preloadDeclination } from './magvar.js';
@@ -481,6 +481,9 @@ export function telechargerMessage(typeMessage) {
         refreshSigmet(sigLat, sigLon, state.requestedIcao);
         // Récupère le niveau de gel / isotherme 0°C (alimente le GO/NO-GO).
         refreshFreezingLevel(state.requestedIcao);
+        // Contexte d'espace du terrain (classe C/D/E vs G — fiche n°3) :
+        // conditionne les minima VMC du verdict GO/NO-GO et du badge.
+        refreshAirspaceCtx(state.requestedIcao || codeOaciFinal);
         // Précharge la déclinaison magnétique (alimente rose des vents + GO/NO-GO).
         preloadDeclination(state.requestedIcao);
         // Enrichit les données du terrain via OpenAIP (arrière-plan, non-bloquant).
@@ -691,11 +694,14 @@ document.addEventListener('DOMContentLoaded', async function () {
     // Paternité de l'Information SIA réutilisée (pied de page), au format
     // recommandé par la licence de réutilisation du SIA : nom de la source,
     // URL de téléchargement et DATE DE DERNIÈRE MISE À JOUR de
-    // l'Information — ici le cycle AIRAC le plus récent parmi les bases
+    // l'Information — ici le cycle AIRAC le PLUS ANCIEN parmi les bases
     // chargées (eAIP fréquences, XML rubriques AD) — jamais saisi à la main.
+    // (M15, audit 27/09 : l'ancien affichait le MAX des cycles — une base
+    // en retard (freq-sia resté 23 j au 08-06) restait invisible ; le pilote
+    // doit voir la PIRE base, pas la meilleure.)
     Promise.all([loadFreqSources().catch(() => null), loadSiaAux().catch(() => null)]).then(() => {
         const dates = [getSiaAirac(), getSiaAuxAirac()].filter(Boolean).sort();
-        const airac = dates[dates.length - 1];
+        const airac = dates[0];
         const el = document.getElementById('sia-airac');
         if (el && airac) {
             el.textContent = `, mise à jour du ${airac.split('-').reverse().join('/')}`;
@@ -774,6 +780,13 @@ document.addEventListener('DOMContentLoaded', async function () {
         state.lastRenderState = null;   // force le redraw (garde anti-doublon)
         genererGraphique();
         refreshElevationChart();
+    });
+    // Contexte d'espace du terrain chargé (fiche n°3, audit 27/09) : la
+    // classe C/D/E vs G change les minima VMC (SERA.5005) — le badge et le
+    // verdict passent du pire-cas provisoire à l'évaluation réelle.
+    document.addEventListener('airspace-ctx-updated', () => {
+        state.lastRenderState = null;   // force le redraw (garde anti-doublon)
+        genererGraphique();
     });
     // Changement de langue : re-rend les panneaux dont les titres/contenus
     // dépendent de la langue (widgets repliables, alternates, planificateur,

@@ -18,7 +18,8 @@
 //   - ENREGISTREMENT AUTO de chaque session de suivi : points horodatés
 //     (lat, lon, alt GPS, vitesse, cap). Chrono de vol déclenché à la
 //     première vitesse > 35 kt (FT_START_MS). Vitesse/cap calculés entre
-//     fixations quand le téléphone ne les fournit pas.
+//     fixations quand le téléphone ne les fournit pas — dérivation bornée à
+//     10 s d'écart (fiche 13 audit 27/09 : au-delà, invalidée et signalée).
 //   - HISTORIQUE IndexedDB (« mt-gps-test/vols », 50 derniers) + panneau
 //     « Vols » : revoir les vols passés, exporter .GPX (1.1), .KML ou .CSV
 //     (G1000), supprimer. La route PRÉVUE du plan courant accompagne la
@@ -29,7 +30,7 @@
 import { state } from './core.js';
 import { vrForType, chronoThresholdKt } from './aircraft-database.js';
 import { getActiveAircraft } from './aircraft-fleet.js';
-import { volSave, volAll, volDel, volDurMs, volName, toGpx, toKml, toG1000Csv, download } from './gps-vols.js';
+import { volSave, volAll, volDel, volDurMs, volName, toGpx, toKml, toG1000Csv, download, deriveKinematics, DERIVE_MAX_MS } from './gps-vols.js';
 import { readCurrentPlan, planPoints } from './flight-plan-io.js';
 import { getRegisteredMap } from './map-registry.js';
 
@@ -60,6 +61,7 @@ const T = () => isFr() ? {
     voyantNoLock: 'Wake Lock indisponible sur ce navigateur',
     errDenied: 'Position indisponible : autorise la localisation de ce site dans ton navigateur (icône cadenas → Autorisations → Localisation).',
     errOther: 'Position GPS introuvable pour le moment — réessaie.',
+    errStale: 'Fixations GPS trop espacées (plus de 10 s) : vitesse et cap momentanément indisponibles.',
     rotNord: 'Nord', rotRoute: 'Route',
     rotTitleNord: 'Orientation Nord en haut — cliquer pour Route en haut (la carte suit ton cap)',
     rotTitleRoute: 'Route en haut : la carte tourne avec ton cap — cliquer pour revenir Nord en haut',
@@ -69,6 +71,7 @@ const T = () => isFr() ? {
     volsAucun: 'Aucun vol enregistré. Chaque session de suivi GPS est enregistrée automatiquement.',
     volsFermer: 'Fermer',
     volSuppr: 'Supprimer ce vol',
+    volSupprConf: 'Supprimer ce vol ? Les points enregistrés seront perdus définitivement (exportez GPX/CSV avant si besoin).',
     volTrace: 'Afficher ou masquer la trace de ce vol sur la carte',
     volCsvTitle: 'CSV format G1000 (Garmin) — le mieux reconnu par les analyseurs de vols',
     volSaveErr: 'Impossible d\'enregistrer le vol (stockage indisponible) — il reste exportable depuis cette page ouverte',
@@ -91,6 +94,7 @@ const T = () => isFr() ? {
     voyantNoLock: 'Wake Lock unavailable on this browser',
     errDenied: 'Position unavailable: allow location for this site in your browser (padlock icon → Permissions → Location).',
     errOther: 'GPS position not found right now — try again.',
+    errStale: 'GPS fixes too far apart (over 10 s): speed and heading temporarily unavailable.',
     rotNord: 'North', rotRoute: 'Track',
     rotTitleNord: 'North-up — click for Track-up (map follows your heading)',
     rotTitleRoute: 'Track-up: the map rotates with your heading — click to go back to North-up',
@@ -100,6 +104,7 @@ const T = () => isFr() ? {
     volsAucun: 'No recorded flight yet. Each GPS tracking session is recorded automatically.',
     volsFermer: 'Close',
     volSuppr: 'Delete this flight',
+    volSupprConf: 'Delete this flight? Recorded points will be lost for good (export GPX/CSV first if needed).',
     volTrace: 'Show or hide this flight\'s track on the map',
     volCsvTitle: 'G1000 (Garmin) CSV — best recognized by flight analyzers',
     volSaveErr: 'Flight cannot be saved (storage unavailable) — it remains exportable from this open page',
@@ -201,6 +206,7 @@ let marker = null, circle = null, traceLine = null, trace = [];
 let lastFix = null, lastFixT = 0, lastHdg = 0, haveHdg = false;
 let lastAcc = 8;
 let lastSpd = null, lastAltM = null;   // pour les infos vol au tap sur l'avion
+let staleWarned = false;              // signal « fixations espacées » déjà émis (fiche 13)
 let activeMap = null;
 let rotationOn = false;
 let curBearing = 0;               // bearing réellement appliqué à la carte
@@ -212,21 +218,8 @@ let replayLine = null, replayVolId = null;   // trace d'un vol sauvegardé rejou
 function rotationWanted() { try { return localStorage.getItem(ROT_KEY) === '1'; } catch (e) { return false; } }
 function rotationStore(v) { try { localStorage.setItem(ROT_KEY, v ? '1' : '0'); } catch (e) { /* indisponible */ } }
 
-function bearing(a, b) {
-    const toRad = d => d * Math.PI / 180;
-    const φ1 = toRad(a[0]), φ2 = toRad(b[0]), Δλ = toRad(b[1] - a[1]);
-    const y = Math.sin(Δλ) * Math.cos(φ2);
-    const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
-    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-}
-
-function distM(a, b) {
-    // Approximation équirectangulaire : largement suffisante entre 2 fixations rapprochées.
-    const toRad = d => d * Math.PI / 180;
-    const x = toRad(b[1] - a[1]) * Math.cos(toRad((a[0] + b[0]) / 2));
-    const z = toRad(b[0] - a[0]);
-    return Math.hypot(x, z) * 6371000;
-}
+// (bearing/distM vivent désormais dans gps-vols.js : bearingDeg et la
+// dérivation bornée deriveKinematics — fiche 13, audit 27/09.)
 
 function drawPlane(ll, hdg, accM) {
     if (!activeMap) return;
@@ -402,12 +395,27 @@ function onFix(pos) {
     const c = pos.coords;
     const ll = [c.latitude, c.longitude];
     const t = pos.timestamp || Date.now();
-    // Cap : capteur boussole s'il existe, sinon cap sol calculé entre deux fixations.
+    // Dérivation géométrique vitesse/cap (fiche 13 audit 27/09) : valide
+    // seulement entre deux fixations PROCHES (≤ 10 s). Au-delà — perte de
+    // signal prolongée, manœuvre serrée entre-temps — distance/temps n'est
+    // plus qu'une moyenne sur un trajet inconnu et le cap n'est que la
+    // corde : on invalide (null) plutôt que d'afficher/enregistrer du faux.
+    const prev = (lastFix && lastFixT) ? { ll: lastFix, t: lastFixT } : null;
+    const dtMs = prev ? t - prev.t : null;
+    const kin = deriveKinematics(prev, { ll, t });
+    // Cap : capteur boussole s'il existe, sinon cap sol dérivé.
     if (Number.isFinite(c.heading)) { lastHdg = c.heading; haveHdg = true; }
-    else if (lastFix && lastFixT && t > lastFixT) { lastHdg = bearing(lastFix, ll); haveHdg = true; }
-    // Vitesse : capteur s'il existe, sinon dérivée entre deux fixations.
-    let spd = Number.isFinite(c.speed) ? c.speed
-        : (lastFix && lastFixT && t > lastFixT ? distM(lastFix, ll) / ((t - lastFixT) / 1000) : null);
+    else if (kin) { lastHdg = kin.hdg; haveHdg = true; }
+    else if (dtMs == null || dtMs > DERIVE_MAX_MS) haveHdg = false;   // cap périmé après coupure
+    // (dt ≤ 0 : fixation en cache au même horodatage — dernier cap conservé, maximumAge 2 s)
+    // Vitesse : capteur s'il existe, sinon dérivée — JAMAIS la moyenne
+    // géométrique d'un grand écart de temps.
+    let spd = Number.isFinite(c.speed) ? c.speed : (kin ? kin.spdMs : null);
+    // Coupure longue sans aucun capteur : signalée au pilote une fois par épisode
+    // (retour capteur impossible = état « perte de signal », fiche 13).
+    if (dtMs != null && dtMs > DERIVE_MAX_MS && !Number.isFinite(c.speed) && !Number.isFinite(c.heading)) {
+        if (!staleWarned) { staleWarned = true; showErr(T().errStale); }
+    } else if (kin || Number.isFinite(c.speed) || Number.isFinite(c.heading)) staleWarned = false;
     lastFix = ll; lastFixT = t;
     lastSpd = Number.isFinite(spd) ? spd : null;
     lastAltM = Number.isFinite(c.altitude) ? c.altitude : null;
@@ -452,7 +460,7 @@ function start() {
     resetTrace();
     resetReplay();          // une nouvelle session repart d'une carte propre
     clearMarker();
-    lastFix = null; lastFixT = 0; haveHdg = false; lastHdg = 0;
+    lastFix = null; lastFixT = 0; haveHdg = false; lastHdg = 0; staleWarned = false;
     // Enregistrement automatique de la session — écrit EN BASE dès le départ,
     // puis autosave toutes les 3 MIN (réglage pilote) + sauvegarde immédiate
     // à l'arrière-plan et à la fermeture de la page.
@@ -554,6 +562,9 @@ async function openPanel() {
         row.querySelector('[data-x="kml"]').addEventListener('click', () => download(volName(v) + '.kml', toKml(v, routeAtClick(), t.routePrevue), 'application/vnd.google-earth.kml+xml'));
         row.querySelector('[data-x="csv"]').addEventListener('click', () => download(volName(v) + '.csv', toG1000Csv(v), 'text/csv'));
         row.querySelector('[data-x="del"]').addEventListener('click', async () => {
+            // M18 (audit 27/09) : confirmation avant suppression (comme la
+            // flotte) — le bouton ≈19 px se touchait par erreur sur téléphone.
+            if (!confirm(t.volSupprConf)) return;
             if (replayVolId === v.id) resetReplay();
             await volDel(v.id, updateVolsCount); openPanel();
         });

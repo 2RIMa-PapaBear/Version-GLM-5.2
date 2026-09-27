@@ -54,18 +54,18 @@ try {
         window.open('', '_blank');
         await new Promise((r) => setTimeout(r, 300));
         const hidden = document.visibilityState === 'hidden';
-        const { captureTafChartPng } = await import('./js/taf-chart-capture.js');
-        const capA = await captureTafChartPng(tafA);
-        const capB = await captureTafChartPng(tafB);
+        const { captureTafChart } = await import('./js/taf-chart-capture.js');
+        const capA = await captureTafChart(tafA);
+        const capB = await captureTafChart(tafB);
         return {
             hidden,
             avantLen: avant.length,
             aOk: !!capA, bOk: !!capB,
-            aLen: capA?.png?.length ?? 0,
-            bLen: capB?.png?.length ?? 0,
-            aDiffAvant: capA?.png !== avant,
-            bDiffAvant: capB?.png !== avant,
-            aDiffB: capA?.png !== capB?.png,
+            aLen: capA?.imgData?.length ?? 0,
+            bLen: capB?.imgData?.length ?? 0,
+            aDiffAvant: capA?.imgData !== avant,
+            bDiffAvant: capB?.imgData !== avant,
+            aDiffB: capA?.imgData !== capB?.imgData,
             apres: document.getElementById('tafInput').value.slice(0, 30),
         };
     }, TAF_A, TAF_B);

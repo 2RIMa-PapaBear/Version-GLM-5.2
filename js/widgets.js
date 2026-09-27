@@ -91,9 +91,14 @@ function _renderVisiWidget(visiStr, nuageStr) {
     const ceilUnlimited = ceilHund >= 999;
     if (!visiStr && !nuageStr) { _emptyWidget('widget-visi', 'eye', tr.lblWidgetVisi); return; }
     const visiLabel = visiStr ? (visiM >= 10000 ? '> 10 km' : `${(visiM / 1000).toFixed(1)} km`) : '--';
-    const visiColor = visiM < 4800 ? CAT_COLORS.IFR : (visiM <= 8000 ? CAT_COLORS.MVFR : CAT_COLORS.VFR);
+    // Seuils SERA.5005 (interprétation contrôlée, fiche n°3) : visi < 1500 m
+    // = sous les minima même en VFR spécial ; < 5 km = sous les minima VMC
+    // d'un espace contrôlé. Visi inconnue : neutre, jamais colorée au pire.
+    const visiColor = !visiStr ? 'var(--text-muted)' : (visiM < 1500 ? CAT_COLORS.IMC : (visiM < 5000 ? CAT_COLORS.MARGINAL : CAT_COLORS.VMC));
     const ceilLabel = nuageStr ? (ceilUnlimited ? tr.lblWidgetUnlimited : `${ceilFt} ft`) : '--';
-    const ceilColor = !ceilUnlimited && ceilFt < 1000 ? CAT_COLORS.LIFR : (!ceilUnlimited && ceilFt <= 3000 ? CAT_COLORS.MVFR : CAT_COLORS.VFR);
+    // Plafond : < 600 ft = sous les minima VFR spécial ; < 2500 ft = marge
+    // sous couche < 1000 ft (clairance verticale) — interprétation contrôlée.
+    const ceilColor = !nuageStr ? 'var(--text-muted)' : (!ceilUnlimited && ceilFt < 600 ? CAT_COLORS.IMC : (!ceilUnlimited && ceilFt < 2500 ? CAT_COLORS.MARGINAL : CAT_COLORS.VMC));
     el.innerHTML = `<i data-lucide="eye" class="widget-watermark"></i><div class="widget-title"><i data-lucide="eye" class="widget-title-icon"></i>${tr.lblWidgetVisi}</div><div class="widget-body"><div class="widget-value" style="color:${visiColor};">${visiLabel}</div><div class="widget-row"><span class="widget-label">${tr.lblWidgetCeiling}</span><span class="widget-data" style="color:${ceilColor};">${ceilLabel}</span></div></div>`;
     if (window.lucide) window.lucide.createIcons({ root: el });
 }

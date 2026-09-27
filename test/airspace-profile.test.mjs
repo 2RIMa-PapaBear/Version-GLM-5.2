@@ -73,7 +73,7 @@ test('serviceDisplayName / serviceFreq : INFORMATION → INFO, majuscules', () =
 test('computeRouteAirspaces : nichage, fusion de secteurs, tri conteneur d\u2019abord', () => {
     const items = [
         zone('LTA FRANCE', null, 0, 99999, SQ(0, 3)),                            // admin → ignoré
-        zone('HAUTE TMA', null, 8000, 99999, SQ(0, 3)),                          // plancher > 5000 → ignoré
+        zone('HAUTE TMA', null, 25000, 99999, SQ(0, 3)),                         // plancher > FL195 → ignoré
         zone('SANS PLAFOND', null, 0, null, SQ(0, 3)),                           // plafond absent → ignoré
         zone('PARIS OUEST', '129.625', 0, 19500, SQ(0.4, 2.6), 'PARIS OUEST INFORMATION'),   // conteneur
         zone('SEINE 6', '127.815', 0, 6500, SQ(0.6, 1.0), 'SEINE INFORMATION'),  // secteurs à bord
@@ -201,13 +201,31 @@ test('computeRouteAirspaces : filtre altitude du vol (croisière 3500 ft, tolér
     assert.ok(rdpNames.includes('LF-P23 LOINTAIN'), 'P survolée doit apparaître (graphie LF-)');
     assert.ok(!rdpNames.includes('COMPARABLE TWR'), 'CTR de plafond équivalent reste filtrée');
 
-    // Sans altitude (0/null) : tout est conservé (comportement antérieur —
-    // TMA HAUTE reste écartée par le filtre plancher > 5000 ft, sans rapport).
+    // Sans altitude (0/null) : tout ce qui passe le cap plancher FL195 est
+    // conservé — y compris TMA HAUTE (plancher 5500 ft), invisible avant
+    // l'audit 27/09 (ancien cap 5000 ft).
     const all = computeRouteAirspaces(ROUTE, items).map(g => g.name);
-    assert.equal(all.length, 5);
+    assert.equal(all.length, 6);
     assert.ok(all.includes('RENNES TWR'), 'sans altitude, la CTR est conservée');
+    assert.ok(all.includes('HAUTE INFO'), 'sans altitude, la TMA plancher 5500 ft est conservée (cap FL195)');
     const zero = computeRouteAirspaces(ROUTE, items, { cruiseAltFt: 0 }).map(g => g.name);
-    assert.equal(zero.length, 5);
+    assert.equal(zero.length, 6);
+});
+
+// (27/09, audit fiche 2 — BLOQUANT) Croisières VFR semi-circulaires
+// FL055–FL195 (SERA Appendice 3) : un appareil performant croisant au
+// FL085 doit VOIR une TMA C/D de plancher FL065 — l'ancien cap 5000 ft
+// la filtrait en amont (carte, profil et log de nav aveugles).
+test('computeRouteAirspaces : TMA plancher FL065 survolée au FL085 → visible ; plancher au-delà du FL195 → ignoré', () => {
+    const items = [
+        zone('TMA SECTEUR HAUT', '132.500', 6500, 19500, SQ(0.5, 1.5), 'SECTEUR HAUT INFORMATION'),
+        zone('CTA AU-DELA', null, 24500, 66000, SQ(0.5, 1.5)),                   // plancher FL245 → ignoré
+    ];
+    const at85 = computeRouteAirspaces(ROUTE, items, { cruiseAltFt: 8500 }).map(g => g.name);
+    assert.ok(at85.includes('SECTEUR HAUT INFO'), 'TMA plancher FL065, croisière FL085 : doit apparaître');
+    assert.ok(!at85.includes('CTA AU-DELA'), 'plancher au-dessus du FL195 : ignoré');
+    const noAlt = computeRouteAirspaces(ROUTE, items).map(g => g.name);
+    assert.equal(noAlt.length, 1, 'sans altitude : TMA conservée, CTA FL245 ignorée');
 });
 
 test('horLabel : codes SIA documentés traduits, valeur brute sinon', () => {

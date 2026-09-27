@@ -78,7 +78,7 @@ const PLOT_BG = [248, 250, 252];     // fond du graphique
 const SIV_MAP_LN = [56, 189, 248];   // limites des zones sur le profil — bleu IDENTIQUE à la carte (#38BDF8)
 const SIV_TX = [10, 80, 140];        // étiquettes des zones
 const CAT_PRINT = {                  // CAT_COLORS écran → équivalents papier
-    VFR: [5, 150, 105], MVFR: [2, 132, 199], IFR: [185, 28, 28], LIFR: [146, 22, 138],
+    VMC: [5, 150, 105], MARGINAL: [2, 132, 199], IMC: [185, 28, 28],
 };
 // Tailles de police harmonisées.
 const SZ = { body: 9, title: 10, doc: 11, thead: 8 };
@@ -221,7 +221,7 @@ function _alertBanner(doc, L, R, W, y, danger, text) {
  *     profile { fromIcao, toIcao, distTotalKm, minFt, maxFt, cruiseAltFt,
  *               points[{frac,elevFt}], waypoints[{icao,frac}] } | null,
  *     alternates { maxOffsetNm, rows[{code,name,cat,visiStr,ceilStr,
- *                 windStr,offsetNm,side}] } | null },
+ *                 windStr,offsetNm,side,ldgLevel}] } | null },
  *   centro (optionnel) → ajoute une 4e page « Centrage » (avion actif
  *   configuré dans la flotte) : { isFr, fromIcao, reg, type,
  *     wb { units{mass,arm}, emptyMassKg, emptyArmMm, mtowKg, fuelDensity,
@@ -928,7 +928,9 @@ function _drawPerfPage(doc, p) {
     let y = 56;
 
     // ---- Section 1 : performances de décollage (terrain de départ) ----
-    const rwyTxt = p.runway ? ` · RWY ${p.runway}` : '';
+    // Vent axial (fiche 14, 27/09) accolé à la piste : un décollage vent
+    // arrière doit se lire AVANT les distances majorées.
+    const rwyTxt = (p.runway ? ` · RWY ${p.runway}` : '') + (p.takeoff?.windTxt || '');
     y = section(fr ? `Performances de décollage — ${p.fromIcao}${rwyTxt}` : `Takeoff performance — ${p.fromIcao}${rwyTxt}`, y);
     const t = p.takeoff;
     if (t) {
@@ -1077,7 +1079,17 @@ function _drawPerfPage(doc, p) {
             const code = r.code ? r.code + (r.metarFrom ? '*' : '') : '';
             doc.setFont('courier', 'bold'); doc.setFontSize(8); _setInk(doc, INK);
             doc.text(code, L + 1.5, base);
-            const nameX = L + 1.5 + doc.getTextWidth(code) + 5;
+            let nameX = L + 1.5 + doc.getTextWidth(code) + 5;
+            // Marqueur performances d'atterrissage de l'avion actif
+            // (NCO.OP.105, audit 27/09) — même convention que la page de
+            // garde : « ! » piste limitative, « !! » atterrissage impossible.
+            if (r.ldgLevel === 'limitative' || r.ldgLevel === 'danger') {
+                const mark = r.ldgLevel === 'danger' ? '!!' : '!';
+                doc.setFont('courier', 'bold');
+                _setInk(doc, r.ldgLevel === 'danger' ? RED : AMBER);
+                doc.text(mark, nameX - 2, base);
+                nameX += doc.getTextWidth(mark) + 3;
+            }
             doc.setFont('helvetica', 'normal'); doc.setFontSize(7); _setInk(doc, MUTED);
             const maxW = CX.cat - 6 - nameX;
             const tag = r.metarFrom ? ` · METAR ${r.metarFrom}` : '';
@@ -1085,10 +1097,11 @@ function _drawPerfPage(doc, p) {
                 ? _trunc(doc, r.name, Math.max(14, maxW - doc.getTextWidth(tag))) + tag
                 : _trunc(doc, r.name, maxW);
             doc.text(nameTxt, nameX, base);
-            // Catégorie colorée (palette écran adaptée au papier).
+            // Catégorie colorée (palette écran adaptée au papier) — VMC /
+            // LIMITE (« MARGINAL » en anglais) / IMC (fiche n°3, audit 27/09).
             doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
             _setInk(doc, CAT_PRINT[r.cat] || MUTED);
-            doc.text(r.cat, CX.cat, base);
+            doc.text(r.cat === 'MARGINAL' ? (fr ? 'LIMITE' : 'MARGINAL') : r.cat, CX.cat, base);
             doc.setFont('courier', 'normal'); doc.setFontSize(7.5); _setInk(doc, INK);
             doc.text(r.visiStr, CX.visi, base);
             doc.text(r.ceilStr, CX.ceil, base);
@@ -1103,9 +1116,11 @@ function _drawPerfPage(doc, p) {
         y = headBot + al.rows.length * ROW_H + 4;
 
         doc.setFont('helvetica', 'italic'); doc.setFontSize(7); _setInk(doc, MUTED);
+        // Marqueurs !/!! mesurés pour tenir sur les 2 lignes de la note
+        // (largeur A5 paysage) — le détail des distances est à l'écran.
         const note = fr
-            ? `Terrains de dérivation à moins de ${al.maxOffsetNm} NM de la route, régulièrement espacés le long du trajet, dans l'ordre du vol. « * » : METAR de la station la plus proche.`
-            : `Diversion fields within ${al.maxOffsetNm} NM of the route, evenly spaced along the route, in flight order. "*": METAR from the nearest reporting station.`;
+            ? `Terrains de dérivation à moins de ${al.maxOffsetNm} NM de la route, régulièrement espacés le long du trajet, dans l'ordre du vol. « * » : METAR de la station la plus proche. « ! » : piste limitative pour l\u2019avion actif, « !! » : insuffisante.`
+            : `Diversion fields within ${al.maxOffsetNm} NM of the route, evenly spaced along the route, in flight order. "*": METAR from the nearest reporting station. "!": limiting runway for the active aircraft, "!!": insufficient.`;
         _wrap(doc, note, W - 4).slice(0, 2).forEach((l, i) => doc.text(l, L + 1.5, y + 7 + i * 8.5));
         y += 12;
     } else {
@@ -2147,9 +2162,14 @@ export function drawVacPages(doc, vacs, isFr = true) {
             doc.text(`${v.airac || ''} · ${isFr ? 'page' : 'p.'} ${i + 1}/${pages.length}`,
                 PAGE.w - M - 6, M + 10, { align: 'right' });
             const area = { x: M, y: M + B + 4, w: PAGE.w - 2 * M, h: PAGE.h - (M + B + 4) - M - 10 };
-            const w = p.w && p.h ? p.w : area.w;
-            const h = p.w && p.h ? p.h : area.h;
-            const sc = Math.min(area.w / w, area.h / h);
+            // Dimensions source VALIDÉES (fiche 21) : 0/NaN sont falsy mais
+            // Infinity ou négatif passent le test de vérité — sc devient
+            // NaN/négatif, addImage ne jette PAS et le flux « … NaN cm »
+            // corrompt TOUT le dossier. Repli : image posée pleine zone.
+            const dim = Number.isFinite(p.w) && p.w > 0 && Number.isFinite(p.h) && p.h > 0;
+            const w = dim ? p.w : area.w;
+            const h = dim ? p.h : area.h;
+            const sc = dim ? Math.min(area.w / w, area.h / h) : 1;
             try {
                 doc.addImage(p.data, p.fmt || 'JPEG',
                     area.x + (area.w - w * sc) / 2, area.y + (area.h - h * sc) / 2, w * sc, h * sc);
@@ -2269,8 +2289,15 @@ export function drawFileCover(doc, d) {
 function _metarSummary(raw, isFr) {
     const s = String(raw || '');
     const out = [];
-    const w = s.match(/\b(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?KT\b/);
-    if (w) out.push(`${isFr ? 'vent' : 'wind'} ${w[1] === 'VRB' ? (isFr ? 'variable' : 'variable') : w[1] + '\u00B0'} ${w[2]} kt${w[3] ? (isFr ? ', rafales ' : ', gusts ') + w[3] : ''}`);
+    // Fiche n°15 (audit 27/09) : unités OACI KT/MPS/KMH — conversion locale
+    // en kt (MPS ×1.94384, KMH ÷1.852), ce module étant volontairement sans
+    // import (même convention que parseMetarQnhOat recopié plus bas).
+    const w = s.match(/\b(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?(KT|MPS|KMH)\b/);
+    if (w) {
+        const k = w[4] === 'MPS' ? 1.94384 : w[4] === 'KMH' ? 1 / 1.852 : 1;
+        const cv = x => k === 1 ? parseInt(x, 10) : Math.round(parseInt(x, 10) * k);
+        out.push(`${isFr ? 'vent' : 'wind'} ${w[1] === 'VRB' ? (isFr ? 'variable' : 'variable') : w[1] + '\u00B0'} ${cv(w[2])} kt${w[3] ? (isFr ? ', rafales ' : ', gusts ') + cv(w[3]) : ''}`);
+    }
     if (/CAVOK/.test(s)) out.push('CAVOK');
     else {
         const v = s.match(/\s(\d{4})\s/);
@@ -2281,8 +2308,14 @@ function _metarSummary(raw, isFr) {
     }
     const t = s.match(/\s(M?\d{2})\/(M?\d{2})\s/);
     if (t) out.push(`${isFr ? 'température' : 'temp'} ${t[1].replace('M', '-')}\u00B0C / ${isFr ? 'point de rosée' : 'dew point'} ${t[2].replace('M', '-')}\u00B0C`);
-    const q = s.match(/\bQ(\d{4})\b/);
-    if (q) out.push(`QNH ${q[1]} hPa`);
+    // Fiche n°9 (audit 27/09) : altimètre nord-américain Axxxx (centièmes
+    // d'inHg) converti en hPa — même constante que parseMetarQnhOat
+    // (core.js), recopiée ici car ce module est volontairement sans import.
+    const q = s.match(/\bQ(\d{4})\b/) || s.match(/\bA(\d{4})\b/);
+    if (q) {
+        const hpa = q[0][0] === 'A' ? Math.round(parseInt(q[1], 10) / 100 * 33.8639) : parseInt(q[1], 10);
+        out.push(`QNH ${hpa} hPa`);
+    }
     return out.join(' \u00B7 ');
 }
 

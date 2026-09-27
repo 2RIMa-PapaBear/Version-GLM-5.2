@@ -235,10 +235,10 @@ const sample = {
         alternates: {
             maxOffsetNm: 25,
             rows: [
-                { code: 'LFRN', name: 'Rennes St Jacques', cat: 'VFR', visiStr: '>10 km', ceilStr: '—', windStr: '250° 12 kt', offsetNm: 22, side: 'E', metarFrom: '' },
-                { code: 'LFRD', name: 'Dinan Trelivan', cat: 'VFR', visiStr: '>10 km', ceilStr: '4500 ft', windStr: '250° 11 kt', offsetNm: 18, side: 'N', metarFrom: '' },
-                { code: 'LFRB', name: 'Brest Guipavas', cat: 'MVFR', visiStr: '8000 m', ceilStr: '2200 ft', windStr: '250° 16 kt', offsetNm: 48, side: 'O', metarFrom: '' },
-                { code: 'LFOH', name: 'Le Havre Octeville', cat: 'VFR', visiStr: '>10 km', ceilStr: '5000 ft', windStr: '250° 13 kt', offsetNm: 55, side: 'E', metarFrom: '' },
+                { code: 'LFRN', name: 'Rennes St Jacques', cat: 'VMC', visiStr: '>10 km', ceilStr: '—', windStr: '250° 12 kt', offsetNm: 22, side: 'E', metarFrom: '' },
+                { code: 'LFRD', name: 'Dinan Trelivan', cat: 'VMC', visiStr: '>10 km', ceilStr: '4500 ft', windStr: '250° 11 kt', offsetNm: 18, side: 'N', metarFrom: '' },
+                { code: 'LFRB', name: 'Brest Guipavas', cat: 'MARGINAL', visiStr: '8000 m', ceilStr: '2200 ft', windStr: '250° 16 kt', offsetNm: 48, side: 'O', metarFrom: '' },
+                { code: 'LFOH', name: 'Le Havre Octeville', cat: 'VMC', visiStr: '>10 km', ceilStr: '5000 ft', windStr: '250° 13 kt', offsetNm: 55, side: 'E', metarFrom: '' },
             ],
         },
     },

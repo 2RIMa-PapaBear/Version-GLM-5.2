@@ -2,7 +2,7 @@
  * WEATHER — Alertes météo : parsing, affichage, seuils
  * ================================================================ */
 
-import { I18N, parseVisiToMeters, getCeiling, findActiveValueAtHour } from './core.js';
+import { I18N, parseVisiToMeters, parseWindGroupToKt, getCeiling, findActiveValueAtHour } from './core.js';
 import { state } from './core.js';
 import { parseWindString } from './engine.js';
 
@@ -89,12 +89,21 @@ export function openThresholdsModal() {
     const btnSave = tr.btnSave || "Enregistrer";
     const btnReset = tr.btnReset || "Valeurs par défaut";
 
+    // M8 (audit 27/09) : marquage « seuils personnalisés » — dès qu'une
+    // valeur s'écarte des défauts, le pilote doit le VOIR (un seuil monté
+    // ou une alerte désactivée peut faire taire un « faux GO »).
+    const customized = JSON.stringify(th) !== JSON.stringify(DEFAULT_THRESHOLDS);
+    const customNote = customized
+        ? (tr.thCustomNote || 'Seuils personnalisés actifs — différents des valeurs par défaut.')
+        : '';
+
     modal.innerHTML = `
         <div class="modal-content">
             <div class="modal-header">
                 <h2 style="display:flex;align-items:center;gap:10px;"><i data-lucide="settings" class="icon-md"></i> ${title}</h2>
                 <button class="btn-close-modal" id="btn-close-th" title="Fermer" aria-label="Fermer"><i data-lucide="x"></i></button>
             </div>
+            ${customNote ? `<div style="margin:0 18px; padding:8px 12px; border-radius:8px; background:rgba(245,158,11,.14); color:#F59E0B; font-size:12px; font-weight:600;">⚠ ${customNote}</div>` : ''}
             <div class="modal-body">
                 <div class="threshold-section">
                     <div class="threshold-header">
@@ -223,27 +232,40 @@ export function openThresholdsModal() {
     });
 
     document.getElementById('btn-save-th').addEventListener('click', () => {
+        // M8 (audit 27/09) : PLANCHERS sur les seuils critiques — sans eux,
+        // un négatif ou un 0 acceptable laissait passer n'importe quoi et
+        // fabriquait des « faux GO » silencieux. La cohérence est forcée :
+        // plafond/visi = danger SOUS le préavis ; vent/rafales = danger
+        // AU-DESSUS du préavis.
+        const fl = (id, min, fb) => {
+            const n = parseInt(document.getElementById(id).value, 10);
+            return Number.isFinite(n) ? Math.max(min, n) : fb;
+        };
+        const ceilW = fl('ceiling-warning', 200, 1500);
+        const visiW = fl('visibility-warning', 1000, 5000);
+        const windW = fl('wind-warning', 1, 15);
+        const gustW = fl('gusts-warning', 1, 20);
         const newTh = {
             ...th,
             ceiling: {
                 enabled: document.getElementById('toggle-ceiling').checked,
-                warning: parseInt(document.getElementById('ceiling-warning').value, 10) || 1500,
-                danger: parseInt(document.getElementById('ceiling-danger').value, 10) || 500
+                warning: ceilW,
+                danger: Math.min(fl('ceiling-danger', 100, 500), ceilW)
             },
             visibility: {
                 enabled: document.getElementById('toggle-visibility').checked,
-                warning: parseInt(document.getElementById('visibility-warning').value, 10) || 5000,
-                danger: parseInt(document.getElementById('visibility-danger').value, 10) || 1500
+                warning: visiW,
+                danger: Math.min(fl('visibility-danger', 400, 1500), visiW)
             },
             wind: {
                 enabled: document.getElementById('toggle-wind').checked,
-                warning: parseInt(document.getElementById('wind-warning').value, 10) || 15,
-                danger: parseInt(document.getElementById('wind-danger').value, 10) || 25
+                warning: windW,
+                danger: Math.max(fl('wind-danger', 1, 25), windW)
             },
             gusts: {
                 enabled: document.getElementById('toggle-gusts').checked,
-                warning: parseInt(document.getElementById('gusts-warning').value, 10) || 20,
-                danger: parseInt(document.getElementById('gusts-danger').value, 10) || 30
+                warning: gustW,
+                danger: Math.max(fl('gusts-danger', 1, 30), gustW)
             },
             temperature: {
                 enabled: document.getElementById('toggle-temperature').checked,
@@ -322,8 +344,10 @@ export function analyzeWeatherAlerts(input) {
 
     const v = { windSpd: null, windGust: null, visi: null, ceiling: null, cb: false, tcu: false, ts: false, gr: false, fz: false };
     
-    const windMatch = text.match(/\b(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?KT\b/);
-    if (windMatch) { v.windSpd = parseInt(windMatch[2]); if (windMatch[3]) v.windGust = parseInt(windMatch[3]); }
+    // Fiche n°15 (audit 27/09) : vent en KT, MPS ou KMH selon la région —
+    // décodage canonique converti en KT (core.js).
+    const windGrp = parseWindGroupToKt(text);
+    if (windGrp) { v.windSpd = windGrp.speed; if (windGrp.gust != null) v.windGust = windGrp.gust; }
     
     // Visi : groupe de 4 chiffres EXACT (tolère suffixe ND/NDZ français).
     // Sans exiger de groupe vent devant (audit 26/09 : un METAR sans vent —
@@ -331,7 +355,14 @@ export function analyzeWeatherAlerts(input) {
     // peut être que la visi (heure \d{6}Z = 7 car., Q1013 = 5 car., RVR préfixé R).
     const visiMatch = text.match(/(?:^|\s)(\d{4})(?:NDZ|ND)?(?=\s|$)/);
     if (visiMatch) v.visi = parseInt(visiMatch[1], 10) >= 9999 ? 10000 : parseInt(visiMatch[1], 10);
-    else { const visiSM = text.match(/\b(\d+(?:\/\d+)?)SM\b/); if (visiSM) v.visi = Math.round((visiSM[1].includes('/') ? parseFloat(visiSM[1].split('/')[0]) / parseFloat(visiSM[1].split('/')[1]) : parseFloat(visiSM[1])) * 1609); }
+    else {
+        // Visi impériale (METAR US/Canada) : « 1 1/2SM » s'écrit en DEUX
+        // groupes, et le préfixe M (« moins de ») doit rester rattaché à sa
+        // valeur — l'ancienne regex y lisait « ½ SM » et « 4 SM ». Conversion
+        // par le parseur canonique de core (comme engine._parseVisi).
+        const smTok = text.match(/(?:^|\s)([PM]?\d+(?:\s\d+\/\d+)?(?:\/\d+)?)SM(?=\s|$)/);
+        if (smTok) v.visi = parseVisiToMeters(smTok[0].trim());
+    }
     
     const cloudMatches = [...text.matchAll(/\b(FEW|SCT|BKN|OVC)(\d{3})/g)];
     let lowestCeiling = null;

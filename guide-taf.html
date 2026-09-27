@@ -32,7 +32,7 @@
   "@type": "FAQPage",
   "mainEntity": [
     { "@type": "Question", "name": "À quelle fréquence le TAF est-il publié ?",
-      "acceptedAnswer": { "@type": "Answer", "text": "En France, le TAF est émis quatre fois par jour à 00, 06, 12 et 18 UTC, quelques dizaines de minutes avant le début de sa période de validité. Un TAF amendé (AMD) ou corrigé (COR) peut paraître à tout moment entre deux émissions dès que la prévision change de façon significative." } },
+      "acceptedAnswer": { "@type": "Answer", "text": "En France, les aérodromes principaux émettent leur TAF quatre fois par jour à 00, 06, 12 et 18 UTC, quelques dizaines de minutes avant le début de sa période de validité ; de nombreux terrains secondaires n'ont qu'un TAF court, valide 9 heures. Un TAF amendé (AMD) ou corrigé (COR) peut paraître à tout moment entre deux émissions dès que la prévision change de façon significative." } },
     { "@type": "Question", "name": "Que signifie TEMPO dans un TAF ?",
       "acceptedAnswer": { "@type": "Answer", "text": "TEMPO décrit des fluctuations temporaires : chaque épisode dure moins d'une heure, et leur total n'excède pas la moitié de la période indiquée. TEMPO 2012/2016 6000 signifie que la visibilité tombera par instants à 6 km entre 12 h et 16 h UTC le 20, sans que ce soit durable." } },
     { "@type": "Question", "name": "Que signifie PROB30 ou PROB40 ?",
@@ -61,7 +61,8 @@
         
         <a class="gd-brand" href="accueil.html"><svg style="width:14px;height:14px;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg> Prévol — Guides météo</a>
         <h1>Comment décoder un TAF</h1>
-        <p>Le TAF est la prévision météo de l'aérodrome sur 24 à 30 heures. Si vous savez
+        <p>Le TAF est la prévision météo de l'aérodrome : 24 à 30 heures de validité pour les
+           terrains principaux, 9 heures pour les TAF courts de nombreux terrains secondaires. Si vous savez
            <a href="guide-metar.html">lire un METAR</a>, vous savez déjà lire l'essentiel d'un TAF —
            il ne reste que les groupes d'évolution. C'est précisément eux qu'on décode ici.</p>
     </div>
@@ -70,8 +71,10 @@
 
         <h2>Qu'est-ce qu'un TAF ?</h2>
         <p>Le <strong>TAF</strong> (<em>Terminal Aerodrome Forecast</em>) est la prévision officielle
-           d'aérodrome. En France, il est émis <strong>quatre fois par jour</strong> (à 00, 06, 12 et
-           18 UTC) et couvre une période de <strong>24 à 30 heures</strong>. Entre deux émissions, un
+           d'aérodrome. En France, les aérodromes principaux l'émettent <strong>quatre fois par
+           jour</strong> (à 00, 06, 12 et 18 UTC) pour une période de <strong>24 à 30 heures</strong> ;
+           de nombreux terrains secondaires n'ont qu'un <strong>TAF court</strong>, valide
+           <strong>9 heures</strong>. Entre deux émissions, un
            TAF <strong>AMD</strong> (amendé) ou <strong>COR</strong> (corrigé) peut remplacer le
            précédent dès que la prévision bascule — d'où l'importance de vérifier l'heure d'émission
            avant le vol, comme sur tout message météo.</p>
@@ -129,7 +132,7 @@
         <table class="gd-t">
             <tr><th></th><th>METAR</th><th>TAF</th></tr>
             <tr><td>Nature</td><td>Observation — le temps réel</td><td>Prévision — le temps attendu</td></tr>
-            <tr><td>Horizon</td><td>L'instant présent</td><td>24 à 30 heures</td></tr>
+            <tr><td>Horizon</td><td>L'instant présent</td><td>24 à 30 heures (9 heures pour un TAF court)</td></tr>
             <tr><td>Émission</td><td>Toutes les 30 min ou 1 h (+ SPECI)</td><td>4 fois par jour (+ AMD, COR)</td></tr>
             <tr><td>Usage</td><td>Le GO/NO-GO du départ</td><td>La fenêtre horaire et le retour</td></tr>
         </table>

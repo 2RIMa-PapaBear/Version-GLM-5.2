@@ -4,14 +4,13 @@ export const UNIFIED_RED = "#BF360C";
 export const PALETTE = ["#1976D2", "#F57C00", "#00ACC1", "#5D4037", "#3949AB", "#455A64"];
 export const REGEX_BLOCKS_PATTERN = /(PROB\d{2}\s+TEMPO|PROB\d{2}|TEMPO|BECMG|NOSIG|FM\d{4,6}Z?|TL\d{4}Z?|AT\d{4}Z?)/g;
 
-// Source de vérité unique pour les couleurs de catégorie de vol.
+// Source de vérité unique pour les couleurs de catégorie VMC/IMC.
 // DOIT rester synchronisée avec les variables CSS --cat-* dans css/style.css :root.
 export const CAT_COLORS = {
-    VFR:  '#4ADE80',
-    MVFR: '#38BDF8',
-    IFR:  '#F87171',
-    LIFR: '#D946EF',
-    NONE: '#94A3B8',
+    VMC:      '#4ADE80',
+    MARGINAL: '#38BDF8',
+    IMC:      '#F87171',
+    NONE:     '#94A3B8',
 };
 // Variante rgba (pour fonds translucides de badges/cartes). alpha = opacité 0..1.
 export function catColorRgba(cat, alpha = 0.2) {
@@ -437,6 +436,30 @@ export function parseVisiToMeters(visiStr) {
     return mMatch ? parseInt(mMatch[1], 10) : 10000;
 }
 
+/* Groupe vent d'un METAR/TAF brut, toutes unités OACI (fiche n°15, audit
+ * 27/09) : KT, MPS (Russie, Chine…) ou KMH selon la région émettrice.
+ * Point d'entrée unique — tout est CONVERTI EN KT, unité attendue par
+ * l'ensemble de l'app (rose des vents, piste en service, go-nogo, perfs
+ * décollage) : MPS ×1.94384, KMH ÷1.852, arrondi à l'entier le plus proche.
+ * Retourne { variable, dir, speed, gust, varFrom, varTo } (kt) ou null. */
+export function parseWindGroupToKt(raw) {
+    const txt = String(raw || '').toUpperCase();
+    const m = txt.match(/\b(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?(KT|MPS|KMH)\b/);
+    if (!m) return null;
+    const k = m[4] === 'MPS' ? 1.94384 : m[4] === 'KMH' ? 1 / 1.852 : 1;
+    const toKt = v => k === 1 ? parseInt(v, 10) : Math.round(parseInt(v, 10) * k);
+    // Variation de direction METAR (« 180V240 ») collée derrière le groupe vent.
+    const vMatch = txt.match(/\b(?:\d{3}|VRB)\d{2,3}(?:G\d{2,3})?(?:KT|MPS|KMH)\s(\d{3})V(\d{3})\b/);
+    return {
+        variable: m[1] === 'VRB',
+        dir: m[1] === 'VRB' ? null : parseInt(m[1], 10),
+        speed: toKt(m[2]),
+        gust: m[3] ? toKt(m[3]) : null,
+        varFrom: vMatch ? parseInt(vMatch[1], 10) : null,
+        varTo: vMatch ? parseInt(vMatch[2], 10) : null
+    };
+}
+
 export function findActiveValueAtHour(blocks, targetHour) {
     if (!blocks || !blocks.length) return null;
     for (let i = blocks.length - 1; i >= 0; i--) {
@@ -467,11 +490,131 @@ export function getCeiling(nuageStr) {
     return lowest;
 }
 
-export function getFlightCategory(visiM, ceilHundFt) {
-    if (ceilHundFt < 5  || visiM < 1600) return { cat: 'LIFR', class: 'cat-lifr' };
-    if (ceilHundFt < 10 || visiM < 4800) return { cat: 'IFR',  class: 'cat-ifr'  };
-    if (ceilHundFt <= 30 || visiM <= 8000) return { cat: 'MVFR', class: 'cat-mvfr' };
-    return { cat: 'VFR', class: 'cat-vfr' };
+/* ----------------------------------------------------------------
+ * QNH (hPa) + TEMPÉRATURE (°C) numériques d'un METAR brut —
+ * extracteur UNIQUE (fiche n°9, audit 27/09 : le parsing local
+ * « Q uniquement » de la page Performances échouait silencieusement
+ * hors d'Europe). OACI Annexe 3 : la pression se publie Qxxxx (hPa)
+ * ou, spécificité régionale Amérique du Nord notamment, Axxxx en
+ * centièmes de pouce de mercure — converti ici en hPa avec la MÊME
+ * constante qu'analyserMETAR (engine.js) et pressure-trend.js.
+ * Groupe absent → null : jamais de valeur implicite.
+ */
+export function parseMetarQnhOat(raw) {
+    const s = String(raw || '');
+    const mQ = s.match(/\bQ(\d{4})\b/);
+    const mA = mQ ? null : s.match(/\bA(\d{4})\b/);
+    const mT = s.match(/\s(M?\d{2})\/M?\d{2}\s/);
+    return {
+        qnh: mQ ? parseInt(mQ[1], 10)
+            : mA ? Math.round(parseInt(mA[1], 10) / 100 * 33.8639)
+            : null,
+        oat: mT ? (mT[1].startsWith('M') ? -parseInt(mT[1].slice(1), 10) : parseInt(mT[1], 10)) : null,
+    };
+}
+
+/* ----------------------------------------------------------------
+ * CATÉGORIE DE VOL — VMC/IMC au sens SERA.5005 (fiche n°3, audit
+ * 27/09). Les acronymes FAA (MVFR/LIFR) ont été retirés : la règle
+ * européenne ne connaît que les conditions VMC/IMC, ÉVALUÉES SELON
+ * LA CLASSE DE L'ESPACE traversé (croisement airspace-profile /
+ * vfr-minima). Aviation légère sous FL100, Vi ≤ 140 kt :
+ *  - espace CONTRÔLÉ (classe C/D/E, dérogation française < FL100) :
+ *    visi ≥ 5 km et plafond ≥ 1500 ft ; règle pilote (clearance D) :
+ *    le « VMC » plein exige 1000 ft de marge SOUS la couche à
+ *    1500 ft, soit base ≥ 2500 ft — entre 1500 et 2500 ft : conforme
+ *    au réglementaire mais marge sous couche < 1000 ft ;
+ *  - en dessous : VFR SPÉCIAL possible sur clairance — visi ≥ 1500 m
+ *    et plafond ≥ 600 ft — INTERDIT DE NUIT ;
+ *  - espace NON CONTRÔLÉ (F/G, sous la surface S) : visi ≥ 1500 m et
+ *    plafond > 500 ft ; plafond 0–500 ft avec visi tenue : LÉGAL mais
+ *    très bas → MARGINAL (fiche n°8 : la classe G n'a PAS de plafond
+ *    numérique — « hors nuages, en vue de la surface » — la garde
+ *    500 ft relève de SERA.3105, hauteur minimale) ; la réduction à
+ *    1500 m est JOUR SEULEMENT
+ *    (SERA.5005(b)(2)) : de nuit, la visi de table (5 km) s'applique.
+ * null = donnée INCONNUE (jamais 10 km implicite — ré-audit 26/09) :
+ * le critère absent ne juge pas, l'autre décide seul.
+ * ---------------------------------------------------------------- */
+
+/** Minima VMC — source unique (vfr-minima.js délègue). */
+export const VMC_MINIMA = {
+    CTRL_VISI_M: 5000,          // contrôlé sous FL100 (dérogation FR, sinon 8 km)
+    CTRL_CEIL_FT: 1500,
+    CTRL_CLEARANCE_FT: 2500,    // règle pilote : base − 1000 ≥ 1500 (clearance D)
+    SP_VISI_M: 1500,            // VFR spécial (clairance, hors nuit)
+    SP_CEIL_FT: 600,
+    UNCTRL_VISI_M: 1500,        // non contrôlé sous surface S à Vi ≤ 140 kt (jour)
+    UNCTRL_CEIL_FT: 500,        // > 500 ft = OK ; ≤ 500 ft = MARGINAL (fiche n°8, SERA.3105)
+};
+
+const VMC_RANK = { ok: 0, caution: 1, danger: 2 };
+
+/**
+ * Évaluation VMC PURE (SERA.5005) pour un point et une classe d'espace.
+ * @param {{controlled:boolean, visiM?:number|null, ceilingFt?:number|null,
+ *          isNight?:boolean}} p
+ * @returns {{vmc:'VMC'|'MARGINAL'|'IMC', level:'ok'|'caution'|'danger', key:string}}
+ */
+export function evaluateVmc({ controlled, visiM = null, ceilingFt = null, isNight = false }) {
+    if (controlled) {
+        const visiOkCtrl = visiM == null || visiM >= VMC_MINIMA.CTRL_VISI_M;
+        const visiOkSp = visiM == null || visiM >= VMC_MINIMA.SP_VISI_M;
+        const ceilOkCtrl = ceilingFt == null || ceilingFt >= VMC_MINIMA.CTRL_CEIL_FT;
+        const ceilOkSp = ceilingFt == null || ceilingFt >= VMC_MINIMA.SP_CEIL_FT;
+        if (visiOkCtrl && ceilingFt != null && ceilingFt >= VMC_MINIMA.CTRL_CLEARANCE_FT) {
+            return { vmc: 'VMC', level: 'ok', key: 'ctrl_ok' };
+        }
+        if (visiOkCtrl && ceilOkCtrl) {
+            return { vmc: 'MARGINAL', level: 'caution', key: 'ctrl_clearance' };
+        }
+        if (visiOkSp && ceilOkSp) {
+            return isNight
+                ? { vmc: 'IMC', level: 'danger', key: 'sp_night' }
+                : { vmc: 'MARGINAL', level: 'caution', key: 'sp_needed' };
+        }
+        return { vmc: 'IMC', level: 'danger', key: 'ctrl_below' };
+    }
+    // Non contrôlé : la réduction de visi à 1500 m (Vi ≤ 140 kt) est jour
+    // seulement — de nuit, on retombe sur la visi de table 5 km.
+    const minVisiM = isNight ? VMC_MINIMA.CTRL_VISI_M : VMC_MINIMA.UNCTRL_VISI_M;
+    const visiOk = visiM == null || visiM >= minVisiM;
+    const ceilOk = ceilingFt == null || ceilingFt > VMC_MINIMA.UNCTRL_CEIL_FT;
+    if (visiOk && ceilOk) return { vmc: 'VMC', level: 'ok', key: 'unctrl_ok' };
+    // Fiche n°8 (audit 27/09) : la classe G n'exige PAS de plafond
+    // numérique (« hors nuages, en vue de la surface ») — plafond 0–500 ft
+    // avec visi tenue = situation LÉGALE mais très basse. La garde 500 ft
+    // relève de SERA.3105 (hauteur minimale de vol) : prudence, pas IMC.
+    if (visiOk && ceilingFt != null && ceilingFt <= VMC_MINIMA.UNCTRL_CEIL_FT) {
+        return { vmc: 'MARGINAL', level: 'caution', key: 'unctrl_lowceil' };
+    }
+    return { vmc: 'IMC', level: 'danger', key: 'unctrl_below' };
+}
+
+const CAT_CLASS = { VMC: 'cat-vmc', MARGINAL: 'cat-marginal', IMC: 'cat-imc' };
+
+/**
+ * Catégorie de vol affichée — POINT D'ENTRÉE UNIQUE (VFR/MVFR/IFR/LIFR
+ * retirés : vocabulaire européen VMC/MARGINAL/IMC).
+ * @param {number|null} visiM visibilité en mètres (null = inconnue).
+ * @param {number} ceilHundFt plafond en CENTAINES de ft (999 = illimité).
+ * @param {{controlled?:boolean, isNight?:boolean}|null} [ctx] classe de
+ *   l'espace du terrain affiché (state._airspaceCtx par défaut). SANS
+ *   contexte : pire-cas des deux interprétations (contrôlé/non contrôlé)
+ *   — jamais de verdict optimiste en attendant la classe réelle.
+ * @returns {{cat:'VMC'|'MARGINAL'|'IMC', class:string, verdict:object}}
+ */
+export function getFlightCategory(visiM, ceilHundFt, ctx = state._airspaceCtx ?? null) {
+    const ceilingFt = ceilHundFt == null ? null : (ceilHundFt >= 999 ? 99999 : ceilHundFt * 100);
+    let v;
+    if (ctx && typeof ctx.controlled === 'boolean') {
+        v = evaluateVmc({ controlled: ctx.controlled, visiM, ceilingFt, isNight: !!ctx.isNight });
+    } else {
+        const c = evaluateVmc({ controlled: true, visiM, ceilingFt });
+        const u = evaluateVmc({ controlled: false, visiM, ceilingFt });
+        v = (VMC_RANK[c.level] > VMC_RANK[u.level]) ? c : u;
+    }
+    return { cat: v.vmc, class: CAT_CLASS[v.vmc], verdict: v };
 }
 
 export function getWeatherIcon(nuageStr, tempsStr) {

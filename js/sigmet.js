@@ -113,24 +113,39 @@ function _isNearFromText(raw, lat, lon, radiusDeg) {
     );
 }
 
-function _extractCoords(raw) {
+// Extrait les paires lat/lon d'un texte SIGMET. Deux écritures coexistent :
+// OACI Annexe 3 Appendice 6 — lettre cardinale PUIS les chiffres —
+// « N4945 W00350 » (degrés+minutes) ou « N54 W020 » (degrés seuls) ; et
+// des flux non-OACI qui inversent — « 4800N 00400W », parfois collé
+// « 4800N00400W ». Le séparateur lat/lon est donc optionnel.
+export function _extractCoords(raw) {
     const coords = [];
+    const push = (latDigits, ns, lonDigits, ew) => {
+        const lat = _dmsToDeg(latDigits, 2);
+        const lon = _dmsToDeg(lonDigits, 3);
+        if (lat == null || lon == null) return;
+        coords.push({ lat: ns === 'S' ? -lat : lat, lon: ew === 'W' ? -lon : lon });
+    };
 
-    const re = /(\d{2,4})([NS])\s+(\d{2,5})([EW])/g;
+    const reIcao = /\b([NS])(\d{2,4})\s*([EW])(\d{2,5})/g;
+    const reInverse = /\b(\d{2,4})([NS])\s*(\d{2,5})([EW])/g;
     let m;
-    while ((m = re.exec(raw)) !== null) {
-        const latRaw = m[1];
-        const lonRaw = m[3];
-        const lat = parseInt(latRaw.slice(0, 2), 10) + (latRaw.length > 2 ? parseInt(latRaw.slice(2), 10) / 60 : 0);
-
-        const lonDegLen = lonRaw.length > 4 ? 3 : 2;
-        const lon = parseInt(lonRaw.slice(0, lonDegLen), 10) + (lonRaw.length > lonDegLen ? parseInt(lonRaw.slice(lonDegLen), 10) / 60 : 0);
-        coords.push({
-            lat: m[2] === 'S' ? -lat : lat,
-            lon: m[4] === 'W' ? -lon : lon,
-        });
-    }
+    while ((m = reIcao.exec(raw)) !== null) push(m[2], m[1], m[4], m[3]);
+    while ((m = reInverse.exec(raw)) !== null) push(m[1], m[2], m[3], m[4]);
     return coords;
+}
+
+// « 4800 » avec 2 chiffres de degrés → 48,5 ; « 00430 » avec 3 → 4,5.
+// OACI : lat Nnn/Nnnnn, lon Wnnn/Wnnnnn — les longueurs non standard
+// retombent sur 2 chiffres de degrés (héritage flux non-OACI, ex. lon à
+// 4 chiffres « 0733 » lue 7°33').
+function _dmsToDeg(digits, degLen) {
+    if (digits.length === degLen) return parseInt(digits, 10);
+    if (digits.length === degLen + 2) {
+        return parseInt(digits.slice(0, degLen), 10) + parseInt(digits.slice(degLen), 10) / 60;
+    }
+    const rest = digits.slice(2);
+    return parseInt(digits.slice(0, 2), 10) + (rest ? parseInt(rest, 10) / 60 : 0);
 }
 
 // Convertit une liste de {lat,lon} en anneau Leaflet [[lat,lon],...].
@@ -170,7 +185,55 @@ function _inferHazard(raw) {
     return 'OTHER';
 }
 
-export function evaluateSigmetAirmet(sigmets) {
+/* ---- M5 (audit 27/09) : filtre géographique du GO/NO-GO ------------------
+ * Sans lui, TOUT SIGMET national frappait le verdict : un orage SIGMÉT sur
+ * les Pyrénées mettait Lille en NO-GO — conservateur mais inutilisable les
+ * jours d'orage. Un SIGMET n'alerte que s'il approche le terrain affiché ou
+ * la route du plan (≤ SIGMET_ROUTE_NM d'un point, ou point DANS le
+ * polygone). Sans position fournie ou sans géométrie extraite : RETENU
+ * (conservateur). Pur — testé sous Node. */
+export const SIGMET_ROUTE_NM = 40;
+
+function _distNm(a, b) {
+    const R = 3440.065, rad = Math.PI / 180;
+    const dLat = (b.lat - a.lat) * rad, dLon = (b.lon - a.lon) * rad;
+    const s = Math.sin(dLat / 2) ** 2
+        + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+}
+
+function _ptInPoly(pt, coords) {
+    let inside = false;
+    for (let i = 0, j = coords.length - 1; i < coords.length; j = i++) {
+        const yi = coords[i].lat, xi = coords[i].lon, yj = coords[j].lat, xj = coords[j].lon;
+        if ((yi > pt.lat) !== (yj > pt.lat)
+            && pt.lon < ((xj - xi) * (pt.lat - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+}
+
+/** Le SIGMET concerne-t-il la position/la route (≤ maxNm d'un point, ou
+ *  point dans le polygone) ? true = alerte. Exporté pour les tests. */
+export function _sigmetNear(s, pts, maxNm = SIGMET_ROUTE_NM) {
+    if (!Array.isArray(pts) || !pts.length) return true;
+    const coords = s?.coords;
+    if (!Array.isArray(coords) || coords.length === 0) return true;   // sans géométrie → conservateur
+    // Sommets + MILIEUX des arêtes : sur un grand polygone, une arête peut
+    // s'approcher de la route alors que tous les sommets en sont loin.
+    const probes = [...coords];
+    for (let i = 0; i < coords.length; i++) {
+        const a = coords[i], b = coords[(i + 1) % coords.length];
+        probes.push({ lat: (a.lat + b.lat) / 2, lon: (a.lon + b.lon) / 2 });
+    }
+    for (const p of pts) {
+        if (p?.lat == null || p?.lon == null) continue;
+        if (_ptInPoly(p, coords)) return true;
+        for (const c of probes) if (_distNm(p, c) <= maxNm) return true;
+    }
+    return false;
+}
+
+export function evaluateSigmetAirmet(sigmets, pts = null, maxNm = SIGMET_ROUTE_NM) {
     if (!sigmets || sigmets.length === 0) return [];
     const isFr = state.lang === 'fr';
     const results = [];
@@ -188,6 +251,9 @@ export function evaluateSigmetAirmet(sigmets) {
 
     const seenHazards = new Set();
     for (const s of sigmets) {
+        // M5 : hors du couloir position/route → ce SIGMET ne concerne pas
+        // ce vol (le même phénomène national peut être actif ailleurs).
+        if (!_sigmetNear(s, pts, maxNm)) continue;
         if (seenHazards.has(s.hazard)) continue;
         seenHazards.add(s.hazard);
 

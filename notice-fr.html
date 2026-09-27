@@ -442,7 +442,7 @@
 <thead><tr><th>Cellule</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><strong><i data-lucide="wind" class="li-ic"></i> Boussole du vent</strong></td><td>Rose des vents avec vent moyen, rafales, direction. Sélection automatique de la meilleure piste. Cliquez sur une bulle de piste pour forcer le choix.</td></tr>
-<tr><td><strong><span class="pin" style="background:#4ADE80"></span> Catégorie de vol</strong></td><td>Badge VFR / MVFR / IFR / LIFR calculé à partir du plafond et de la visibilité.</td></tr>
+<tr><td><strong><span class="pin" style="background:#4ADE80"></span> Catégorie de vol</strong></td><td>Badge VMC / Limite / IMC (SERA.5005) calculé à partir du plafond et de la visibilité, selon la classe de l'espace du terrain (contrôlé C/D/E ou G).</td></tr>
 <tr><td><strong><i data-lucide="check-circle" class="li-ic" style="color:#4ADE80"></i> GO / NO-GO</strong></td><td>Verdict synthétique de décision de vol (voir « Aide à la décision »).</td></tr>
 </tbody>
 </table>
@@ -504,9 +504,9 @@
 <p><strong>Critères évalués automatiquement</strong> :</p>
 <ol>
 <li>Nuit aéronautique</li>
-<li>Conditions IFR / LIFR (plafond et visibilité)</li>
+<li>Conditions IMC — sous les minima VMC de la classe d'espace (plafond et visibilité)</li>
 <li>Alertes danger de vos minima perso (rouge) → NO-GO</li>
-<li>Conditions MVFR → PRUDENCE</li>
+<li>Minima VMC approchés (marge sous couche &lt; 1000 ft, ou VFR spécial nécessaire) → PRUDENCE</li>
 <li>Alertes warning de vos minima perso (orange) → PRUDENCE</li>
 <li>Densité altitude élevée (performance dégradée)</li>
 <li>Vent traversier (selon la piste active)</li>
@@ -564,7 +564,7 @@
 <tr><td><span class="demo-select">Satellite ▾</span></td><td><strong>Fond de carte</strong> : satellite, plan ou relief — sélecteur « Satellite » de la barre d'outils</td></tr>
 <tr><td><span class="demo-btn"><i data-lucide="cloud-rain"></i> Radar</span></td><td>Précipitations en temps réel — <strong>décoché par défaut</strong> ; bouton lecture/pause et curseur horloge une fois activé</td></tr>
 <tr><td><span class="pin" style="background:#FBBF24; width:15px; height:15px;"></span> <span class="rwy" style="background:#4ADE80"></span><span class="rwy" style="background:#94A3B8"></span><span class="rwy" style="background:#D6A24A"></span></td><td><strong>Terrain courant</strong> : pastille ambre au centre ; pistes tracées selon le revêtement (vert = herbe, gris = revêtu, ocre = terre)</td></tr>
-<tr><td><span class="pin" style="background:#4ADE80"></span> <span class="pin" style="background:#1E40AF"></span> <span class="pin" style="background:#F87171"></span> <span class="pin" style="background:#94A3B8"></span></td><td><strong>Terrains voisins</strong> : tous les terrains de la zone visible (jusqu'à l'échelle de la France, conservés quand vous vous déplacez) ; pastilles colorées VFR / MVFR / IFR / LIFR (vert, bleu, rouge, violet) pour les terrains qui émettent un METAR, <strong>pastilles grises</strong> pour les autres — dont le clic ouvre le METAR de la station la plus proche</td></tr>
+<tr><td><span class="pin" style="background:#4ADE80"></span> <span class="pin" style="background:#1E40AF"></span> <span class="pin" style="background:#F87171"></span> <span class="pin" style="background:#94A3B8"></span></td><td><strong>Terrains voisins</strong> : tous les terrains de la zone visible (jusqu'à l'échelle de la France, conservés quand vous vous déplacez) ; pastilles colorées VMC / Limite / IMC (vert, bleu, rouge — évaluation conservatrice « pire-cas contrôlé ») pour les terrains qui émettent un METAR, <strong>pastilles grises</strong> pour les autres — dont le clic ouvre le METAR de la station la plus proche</td></tr>
 <tr><td><span class="demo-btn"><i data-lucide="hexagon"></i> Espaces</span></td><td><strong>Espaces aériens</strong> : données officielles françaises (SIA), complétées à l'international — CTR, TMA, SIV, ATZ, zones R·P·D… sous-cases par famille dans le menu « Espaces » ; cliquez une zone pour la surligner et lire secteur, altitudes et fréquence (décoché par défaut)</td></tr>
 <tr><td><span class="rp-sym"><svg width="18" height="18" viewBox="0 0 18 18" style="vertical-align:middle"><polygon points="9,1 16.5,5.3 16.5,13.7 9,18 1.5,13.7 1.5,5.3" fill="none" stroke="#60A5FA" stroke-width="1.8"/><circle cx="9" cy="9" r="1.4" fill="#60A5FA"/></svg> <svg width="18" height="18" viewBox="0 0 18 18" style="vertical-align:middle"><path d="M9 0.8 L9 6" stroke="#4ADE80" stroke-width="1.6"/><circle cx="9" cy="11" r="5.2" fill="none" stroke="#4ADE80" stroke-width="1.8"/><circle cx="9" cy="11" r="1.6" fill="#4ADE80"/></svg> <svg width="18" height="18" viewBox="0 0 18 18" style="vertical-align:middle"><path d="M9 1.5 L16 14 L2 14 Z" fill="none" stroke="#2563EB" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 5.2 L13.3 12.4 L4.7 12.4 Z" fill="#2563EB" opacity="0.5"/></svg></span></td><td><strong>Radiophares &amp; points VFR</strong> : VOR, NDB et points de repère VFR — symboles des cartes aéro, case par case dans le menu « Espaces » ; utilisables comme waypoints du plan</td></tr>
 <tr><td><span class="rp-sym"><svg width="18" height="18" viewBox="0 0 18 18" style="vertical-align:middle"><path d="M9 7.5 L9 16.5" stroke="#F87171" stroke-width="1.6"/><path d="M9 7 L9 1.5 M9 7 L4 10 M9 7 L14 10" stroke="#F87171" stroke-width="1.7" stroke-linecap="round"/><circle cx="9" cy="7" r="1.3" fill="#F87171"/></svg></span></td><td><strong>Obstacles</strong> : éoliennes, pylônes, mâts, châteaux d'eau, cheminées… partout en France et outre-mer — icône par type ; au clic : hauteur, altitude du sommet et balisage lumineux (visible à partir d'un zoom régional, décoché par défaut)</td></tr>
@@ -572,7 +572,7 @@
 </table>
 <p><strong>Barre d'outils</strong> (une ligne) : Radar (lecture et curseur horloge inclus) · Espaces · Terrain · Cadrer plan · Plein cadre. Le radar et les couches s'allument à la demande — rien ne s'affiche sans votre clic.</p>
 <p><strong>Clic sur un terrain voisin</strong> : le popup montre son METAR décodé (vent, visibilité, plafond, T/Td, QNH) et propose trois actions — <strong>Charger ce terrain</strong> (change le terrain observé ; en mode Navigation il devient <strong>« Définir comme départ »</strong> et relance le plan), <strong>Définir comme destination</strong> et <strong>+ Waypoint</strong> (mode Navigation). <strong>Tout terrain est utilisable</strong> comme départ, arrivée ou étape : s'il n'a pas de station météo propre, le popup montre d'abord la station observée (<em>« Météo de LFxx · N NM »</em>) et son METAR.</p>
-<p><strong>Intérêt</strong> : si les terrains voisins tombent en MVFR/IFR, méfiance — le temps se ferme.</p>
+<p><strong>Intérêt</strong> : si les terrains voisins passent en Limite/IMC, méfiance — le temps se ferme.</p>
 <p><strong>Bouton « Terrain »</strong> : zoome directement sur le terrain courant pour voir les pistes en détail.</p>
 
 <h3>Suivi GPS de votre vol</h3>
@@ -700,7 +700,7 @@
 <thead><tr><th>Groupe</th><th>Signification</th><th>Points clés</th></tr></thead>
 <tbody>
 <tr><td><code>LFRV</code></td><td>Terrain</td><td>code OACI</td></tr>
-<tr><td><code>061230Z</code></td><td>Date-heure</td><td>le 6 du mois à 12 h 30 <strong>Z (UTC)</strong> — retranchez 1 h en hiver, 2 h en été, pour l'heure locale</td></tr>
+<tr><td><code>061230Z</code></td><td>Date-heure</td><td>le 6 du mois à 12 h 30 <strong>Z (UTC)</strong> — ajoutez 1 h en hiver, 2 h en été, pour l'heure légale en France métropolitaine</td></tr>
 <tr><td><code>24012KT</code></td><td>Vent</td><td>240° à 12 kt — <code>24015G25</code> = rafales à 25 kt, <code>00000</code> = vent calme, <code>VRB</code> = variable</td></tr>
 <tr><td><code>9999</code></td><td>Visibilité</td><td>en mètres : <code>9999</code> = 10 km ou plus, <code>8000</code> = 8 km… <code>CAVOK</code> = visi ≥ 10 km, pas de nuage sous 5 000 ft (ou l'altitude minimale de secteur si plus élevée), pas de CB ni TCU à quelque altitude que ce soit, pas de temps significatif</td></tr>
 <tr><td><code>-RA</code>, <code>TS</code>…</td><td>Temps présent</td><td>placé entre visi et nuages : <code>-RA</code> pluie faible, <code>RA</code> pluie, <code>TS</code> orage, <code>BR</code> brume, <code>FG</code> brouillard, <code>SN</code> neige (les plus courants)</td></tr>
@@ -851,7 +851,7 @@
 </div>
 <p>Au-dessus de FL100 (vitesse libre) : <strong>visibilité ≥ 8 km</strong>, mêmes espacements avec les nuages.</p>
 <h3>Espace aérien non contrôlé (classes F et G)</h3>
-<p>Sous la <strong>surface « S »</strong> — le plus haut des deux niveaux : <strong>3000 ft AMSL (QNH)</strong> ou <strong>1000 ft au-dessus du sol</strong> — à <strong>Vi ≤ 140 kt</strong> :</p>
+<p>Sous la <strong>surface « S »</strong> — le plus haut des deux niveaux : <strong>3000 ft AMSL (QNH)</strong> ou <strong>1000 ft au-dessus du sol</strong> — à <strong>Vi ≤ 140 kt</strong> et <strong>de jour uniquement</strong> :</p>
 <table>
 <thead>
 <tr>
@@ -862,7 +862,7 @@
 <tbody>
 <tr>
 <td><strong>Visibilité</strong></td>
-<td>≥ 1500 m (et ≥ 5000 m au-delà de 140 kt)</td>
+<td>≥ 1500 m de jour (et ≥ 5000 m au-delà de 140 kt ou la nuit)</td>
 </tr>
 <tr>
 <td><strong>Distance des nuages</strong></td>
@@ -875,7 +875,7 @@
 </tbody>
 </table>
 <div class="success">
-<p><strong>À retenir</strong> : proche du sol, la hauteur minimale de 500 ft impose un <strong>plafond minimum déduit &gt; 500 ft</strong>. Sous la surface « S » à Vi ≤ 140 kt : <strong>visibilité ≥ 1500 m et plafond &gt; 500 ft</strong>.</p>
+<p><strong>À retenir</strong> : proche du sol, la hauteur minimale de 500 ft impose un <strong>plafond minimum déduit &gt; 500 ft</strong>. Sous la surface « S » à Vi ≤ 140 kt <strong>de jour</strong> : <strong>visibilité ≥ 1500 m et plafond &gt; 500 ft</strong> — de nuit, la visibilité minimale repasse à <strong>5 km</strong> (la dérogation 1500 m est strictement diurne).</p>
 </div>
 <p>Au-dessus de la surface « S » et sous FL100 : <strong>visibilité ≥ 5 km</strong>, nuages à 1500 m horizontalement et 300 m (1000 ft) verticalement.</p>
 <h3>VFR spécial (SVFR)</h3>
@@ -921,8 +921,8 @@
 <tr>
 <td><strong>SVFR requis</strong></td>
 <td>1.5-5 km</td>
-<td>&lt; 1500 ft</td>
-<td>Autorisation ATC obligatoire</td>
+<td>600-1500 ft</td>
+<td>Autorisation ATC obligatoire — impossible de décoller, atterrir ou pénétrer en CTR sous 600 ft de plafond (SERA.5010c)</td>
 </tr>
 <tr>
 <td><strong>IFR</strong></td>
@@ -1255,10 +1255,10 @@
 </ul>
 <h3>Interprétation graphique</h3>
 <p><strong>Bandes colorées</strong> :
-- <i data-lucide="check-circle" class="li-ic" style="color:#4ADE80"></i> <strong>Vert (VFR)</strong> : Vol confortable
-- <span class="pin" style="background:#1E40AF"></span> <strong>Bleu (MVFR)</strong> : Vigilance accrue, prévoir plan B
-- <span class="pin" style="background:#F87171"></span> <strong>Rouge (IFR)</strong> : Vol VFR impossible
-- <span class="pin" style="background:#D946EF"></span> <strong>Magenta (LIFR)</strong> : Conditions très dégradées</p>
+- <i data-lucide="check-circle" class="li-ic" style="color:#4ADE80"></i> <strong>Vert (VMC)</strong> : conditions de vol à vue respectées
+- <span class="pin" style="background:#1E40AF"></span> <strong>Bleu (Limite)</strong> : minima VMC approchés, vigilance accrue, prévoir plan B
+- <span class="pin" style="background:#F87171"></span> <strong>Rouge (IMC)</strong> : sous les minima VMC — vol à vue interdit
+</p>
 <p><strong>Courbe solaire</strong> :
 - Lever/coucher du soleil visibles sur le graphique
 - Planifier pour éviter de voler au crépuscule (visibilité réduite)

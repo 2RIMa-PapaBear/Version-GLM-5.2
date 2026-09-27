@@ -52,13 +52,13 @@ export async function fetchRouteElevation(fromLat, fromLon, toLat, toLon, sample
 
     try {
 
-        const lats = [];
-        const lons = [];
-        for (let i = 0; i < n; i++) {
-            const t = i / (n - 1);
-            lats.push((fromLat + (toLat - fromLat) * t).toFixed(4));
-            lons.push((fromLon + (toLon - fromLon) * t).toFixed(4));
-        }
+        // Fiche 12 : échantillonnage le long du GRAND CERCLE — la navigation
+        // de l'app (greatCircleDistanceNm, trueCourseDeg) est orthodromique,
+        // le relief doit suivre la même trace (une droite lat/lon
+        // loxodromique s'en écarte de ~0,4 NM sur 100 NM à nos latitudes).
+        const gc = _greatCirclePoints(fromLat, fromLon, toLat, toLon, n);
+        const lats = gc.map(p => p.lat.toFixed(4));
+        const lons = gc.map(p => p.lon.toFixed(4));
 
         // SOURCE PRIMAIRE : tuiles Terrarium d'AWS (choix pilote 20/09) —
         // gratuites, sans clé ni quota. Repli n° 2 : Open-Meteo (quota
@@ -131,8 +131,10 @@ export async function fetchRouteElevation(fromLat, fromLon, toLat, toLon, sample
 }
 
 // Cache persistant IndexedDB des profils déjà calculés (mémoire seule
-// sinon) — lecture en tête de fetchRouteElevation.
-const _IDB_NAME = 'route-elevation:v1';
+// sinon) — lecture en tête de fetchRouteElevation. v2 (fiche 12) : les
+// profils v1 avaient été échantillonnés sur la loxodromie, on ne les
+// ressert pas.
+const _IDB_NAME = 'route-elevation:v2';
 async function _idbPutProfile(key, profile) {
     const db = await new Promise((res, rej) => {
         const r = indexedDB.open(_IDB_NAME, 1);
@@ -259,4 +261,31 @@ function _haversineNm(lat1, lon1, lat2, lon2) {
     const a = Math.sin(dLat / 2) ** 2 +
         Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
     return Math.round(2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) / 1852);
+}
+
+/** n points équirépartis (en angle) le long du grand cercle A→B :
+ *  combinaison sinusoïdale des vecteurs unitaires (SLERP sphérique).
+ *  Segment nul (A ≈ B) : A répété. Pur, testé sous Node. */
+export function _greatCirclePoints(lat1, lon1, lat2, lon2, n) {
+    if (!(n >= 2)) return n === 1 ? [{ lat: lat1, lon: lon1 }] : [];
+    const toRad = d => d * Math.PI / 180;
+    const toDeg = r => r * 180 / Math.PI;
+    const f1 = toRad(lat1), l1 = toRad(lon1), f2 = toRad(lat2), l2 = toRad(lon2);
+    const d = 2 * Math.asin(Math.min(1, Math.sqrt(
+        Math.sin((f2 - f1) / 2) ** 2 + Math.cos(f1) * Math.cos(f2) * Math.sin((l2 - l1) / 2) ** 2)));
+    const out = [];
+    for (let i = 0; i < n; i++) {
+        if (d < 1e-9) { out.push({ lat: lat1, lon: lon1 }); continue; }
+        const t = i / (n - 1);
+        const a = Math.sin((1 - t) * d) / Math.sin(d);
+        const b = Math.sin(t * d) / Math.sin(d);
+        const x = a * Math.cos(f1) * Math.cos(l1) + b * Math.cos(f2) * Math.cos(l2);
+        const y = a * Math.cos(f1) * Math.sin(l1) + b * Math.cos(f2) * Math.sin(l2);
+        const z = a * Math.sin(f1) + b * Math.sin(f2);
+        out.push({
+            lat: toDeg(Math.atan2(z, Math.hypot(x, y))),
+            lon: toDeg(Math.atan2(y, x)),
+        });
+    }
+    return out;
 }

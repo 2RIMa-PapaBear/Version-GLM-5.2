@@ -1,7 +1,7 @@
 // GPS-VOLS — exports et utilitaires purs (extrait de gps.js, item ⑥ 09/09).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { volName, toGpx, toKml, toG1000Csv, volDurMs, exportPts } from '../js/gps-vols.js';
+import { volName, toGpx, toKml, toG1000Csv, volDurMs, exportPts, deriveKinematics, derivableDt, bearingDeg, DERIVE_MAX_MS } from '../js/gps-vols.js';
 
 const VOL = {
     id: Date.UTC(2026, 8, 9, 14, 30),
@@ -171,4 +171,57 @@ test('toGpx/toKml portent le type + immatriculation de l avion actif', async () 
     assert.ok(k.includes('<description>WT9-LSA · F-QA01</description>'), 'description KML');
     // Les trkpts restent intacts (2 points, time/ele inchangés).
     assert.equal((g.match(/<trkpt /g) || []).length, 2);
+});
+
+// Dérivation géométrique vitesse/cap (fiche 13 audit 27/09) : bornée dans le
+// temps. Au-delà de 10 s entre deux fixations — perte de signal prolongée,
+// manœuvre serrée — distance/temps n'est qu'une moyenne sur un trajet
+// inconnu et le cap n'est que la corde : la dérivation renvoie null (données
+// invalidées, l'UI repasse aux capteurs ou signale la perte) au lieu d'une
+// valeur fausse et dangereuse.
+test('deriveKinematics : vitesse + cap dérivés entre fixations proches', () => {
+    // Vers l'est à la latitude de Vannes : Δlon 0,005° ≈ 366,5 m en 5 s.
+    const est = deriveKinematics({ ll: [48.769, 2.105], t: 0 }, { ll: [48.769, 2.110], t: 5000 });
+    assert.ok(est, 'dérivation valide à 5 s d écart');
+    assert.ok(Math.abs(est.spdMs - 73.3) < 0.3, '≈ 366,5 m / 5 s = 73,3 m/s');
+    assert.ok(Math.abs(est.hdg - 90) < 0.2, 'cap est ≈ 090°');
+    // Vers le nord : Δlat 0,001° ≈ 111,2 m en 2 s.
+    const nord = deriveKinematics({ ll: [48.769, 2.105], t: 0 }, { ll: [48.770, 2.105], t: 2000 });
+    assert.ok(Math.abs(nord.spdMs - 55.6) < 0.3, '≈ 111,2 m / 2 s = 55,6 m/s');
+    assert.ok(Math.abs(nord.hdg) < 0.2 || Math.abs(nord.hdg - 360) < 0.2, 'cap nord ≈ 000°');
+    // Vers le sud : cap 180°.
+    const sud = deriveKinematics({ ll: [48.770, 2.105], t: 0 }, { ll: [48.769, 2.105], t: 2000 });
+    assert.ok(Math.abs(sud.hdg - 180) < 0.2, 'cap sud ≈ 180°');
+});
+
+test('deriveKinematics : fenêtre de validité 10 s — au-delà, null (fiche 13)', () => {
+    const A = { ll: [48.769, 2.105], t: 0 }, B = { ll: [48.769, 2.110], t: 0 };
+    // Même déplacement sur 30 s : l ancienne formule aurait affiché une
+    // fausse « moyenne » de 12,2 m/s sur une coupure de signal.
+    assert.equal(deriveKinematics(A, { ...B, t: 30000 }), null, 'coupure 30 s → dérivation invalidée');
+    assert.equal(deriveKinematics(A, { ...B, t: 120000 }), null, 'coupure 2 min → invalidée');
+    // Bornes exactes : 10 s encore valide, 10,001 s invalide.
+    assert.ok(deriveKinematics(A, { ...B, t: DERIVE_MAX_MS }), 'borne haute incluse');
+    assert.equal(deriveKinematics(A, { ...B, t: DERIVE_MAX_MS + 1 }), null, 'borne haute + 1 ms → invalide');
+    // Horodatage dupliqué (cache géoloc) : division impossible → null.
+    assert.equal(deriveKinematics(A, { ...B, t: 0 }), null, 'dt = 0 → null');
+    assert.equal(deriveKinematics({ ll: A.ll, t: 5000 }, { ...B, t: 5000 }), null);
+    // Première fixation de la session (pas de précédent) → null.
+    assert.equal(deriveKinematics(null, { ll: A.ll, t: 1000 }), null);
+    // Le prédicat borne suit la même règle (utilisé par l UI pour distinguer
+    // coupure longue et horodatage dupliqué).
+    assert.equal(derivableDt(5000), true);
+    assert.equal(derivableDt(0), false);
+    assert.equal(derivableDt(-200), false);
+    assert.equal(derivableDt(NaN), false);
+    assert.equal(derivableDt(null), false);
+});
+
+test('bearingDeg : caps cardinaux exacts', () => {
+    const O = [48.769, 2.105];
+    const d = 0.01;
+    assert.ok(Math.abs(bearingDeg(O, [O[0] + d, O[1]])) < 0.01, 'nord → 0°');
+    assert.ok(Math.abs(bearingDeg(O, [O[0], O[1] + d]) - 90) < 0.01, 'est → 90°');
+    assert.ok(Math.abs(bearingDeg(O, [O[0] - d, O[1]]) - 180) < 0.01, 'sud → 180°');
+    assert.ok(Math.abs(bearingDeg(O, [O[0], O[1] - d]) - 270) < 0.01, 'ouest → 270°');
 });

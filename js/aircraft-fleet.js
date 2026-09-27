@@ -22,7 +22,7 @@
  * automatiquement vers la flotte lors du premier accès.
  * ================================================================ */
 
-import { normalizeEnvelope, DEFAULT_STATION_MAX_KG } from './wb-core.js';
+import { DEFAULT_STATION_MAX_KG } from './wb-core.js';
 
 const LS_FLEET = 'ac-fleet';
 const LS_ACTIVE = 'ac-active-id';
@@ -312,14 +312,15 @@ function _sanitizeWb(raw) {
     const emptyArmMm = num(raw.emptyArmMm);
     if (!(emptyMassKg > 0) || !isFinite(emptyArmMm)) return null;
 
-    // Enveloppe : 3 à 16 points [masse kg, bras mm] tous finis, RÉORDONNÉS
-    // en polygone simple (une saisie « ligne à ligne » du POH tracerait un
-    // zigzag auto-croisé — dessin aberrant et limites trompeuses).
-    const envelope = normalizeEnvelope(
-        (Array.isArray(raw.envelope) ? raw.envelope : [])
-            .map(p => (Array.isArray(p) ? [num(p[0]), num(p[1])] : [NaN, NaN]))
-            .filter(p => p[0] > 0 && isFinite(p[1]))
-            .slice(0, 16));
+    // Enveloppe : 3 à 16 points [masse kg, bras mm] tous finis, conservés
+    // dans l'ORDRE SAISI (périmètre certifié du manuel — fiche 16 : un
+    // réordonnancement automatique élargirait une enveloppe concave).
+    // Une saisie « ligne à ligne » qui s'auto-croise est signalée à la
+    // saisie dans la fenêtre Flotte, jamais réparée silencieusement.
+    const envelope = (Array.isArray(raw.envelope) ? raw.envelope : [])
+        .map(p => (Array.isArray(p) ? [num(p[0]), num(p[1])] : [NaN, NaN]))
+        .filter(p => p[0] > 0 && isFinite(p[1]))
+        .slice(0, 16);
     if (envelope.length < 3) return null;
 
     // Postes : 0 à 12 ; bras FACULTATIF (poste en cours de saisie, ignoré au
@@ -433,9 +434,14 @@ function _sanitize(data) {
         // Limite vent traversier (kt, manuel de vol/école) : OPTIONNELLE —
         // le GO/NO-GO garde ses seuils génériques 12/15 kt sans elle.
         xwindLimitKt: isNaN(xw) || xw <= 0 || xw > 40 ? null : xw,
-        // Majoration PERSONNELLE de la réserve (min, ajoutées aux 30/45
-        // réglementaires) : 0 par défaut, plafonnée à 60.
+        // Majoration PERSONNELLE de la réserve (min, ajoutées à la base
+        // réglementaire 15/30 jour selon ULM/avion, 45 nuit) : 0 par
+        // défaut, plafonnée à 60.
         reserveExtraMin: isNaN(rem) ? 0 : Math.max(0, Math.min(60, rem)),
+        // ULM (fiche 7, 27/09 — arrêté du 17/02/2025 art. 4.1.4) : réserve
+        // carburant de jour 15 min au lieu de 30 dans le devis navigation.
+        // Booléen explicite (updateAircraft remplace l'enregistrement).
+        isULM: data.isULM === true || data.isULM === 'true' || data.isULM === 1,
         // Références ATTERRISSAGE (ft) : optionnelles, section masquée sans.
         ldgRoll: isNaN(lr) || lr <= 0 ? null : lr,
         ldgFifty: isNaN(lf) || lf <= 0 ? null : lf,

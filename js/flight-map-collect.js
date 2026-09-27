@@ -3,7 +3,7 @@
 //   - normalizeZones() : items d espaces (cellules SIA/openAIP, format
 //     compact ou étendu) -> descripteurs normalisés pour le tracé PDF,
 //     avec les MÊMES filtres et la même sémantique AZBA que le rendu de
-//     la carte régionale (base > 5000 ft écartée, FIR/UIR/LTA exclues,
+//     la carte régionale (plancher > FL195 écarté, FIR/UIR/LTA exclues,
 //     pointillé = « par NOTAM » sans activation aujourd hui) ;
 //   - buildFlightMapData() : emprise + zoom + tuiles OpenTopoMap
 //     recomposées en une seule image JPEG (canvas) + zones, prêt pour

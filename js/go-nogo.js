@@ -1,4 +1,5 @@
-import { state, I18N, parseVisiToMeters, getCeiling, memoGet } from './core.js';
+import { state, I18N, parseVisiToMeters, getCeiling, memoGet, getFlightCategory, findActiveValueAtHour } from './core.js';
+import { airspaceContextFor } from './vfr-minima.js';
 import { parseWindString, selectBestRunway } from './engine.js';
 import { analyzeWeatherAlerts, analyzeForecastAlerts, openThresholdsModal } from './weather.js';
 import { getAirportByICAO } from './ui-module.js';
@@ -13,20 +14,35 @@ import { evaluateTakeoffPerformance } from './takeoff-performance.js';
 import { getLastMetarObsMs, metarAgeMin, ageLevel, fmtAge } from './data-age.js';
 import { getActiveAircraft } from './aircraft-fleet.js';
 
-function _currentCategory() {
+/* Catégorie VMC/IMC (fiche n°3, audit 27/09) : la table FAA
+ * VFR/MVFR/IFR/LIFR a été retirée — la règle européenne (SERA.5005)
+ * évalue les conditions SELON LA CLASSE DE L'ESPACE du terrain affiché
+ * (state._airspaceCtx, alimenté par refreshAirspaceCtx via
+ * vfr-minima/airspace-profile). Sans contexte encore chargé :
+ * pire-cas des deux interprétations (contrôlé/non contrôlé).
+ * TAF : valeurs à l'HEURE CIBLE, pas au premier groupe de base. */
+function _currentVmc(ctx) {
     const parsed = state.lastParsed;
     if (!parsed) return null;
-    const visiStr = parsed.base?.visi?.[0]?.val;
-    const nuageStr = parsed.base?.nuage?.[0]?.val;
+    let visiStr, nuageStr;
+    if (parsed.isMetar) {
+        visiStr = parsed.base?.visi?.[0]?.val;
+        nuageStr = parsed.base?.nuage?.[0]?.val;
+    } else {
+        const targetH = state.manualTargetHour === null
+            ? (new Date().getUTCHours() + new Date().getUTCMinutes() / 60)
+            : state.manualTargetHour;
+        visiStr = findActiveValueAtHour(parsed.base?.visi, targetH);
+        nuageStr = findActiveValueAtHour(parsed.base?.nuage, targetH);
+    }
     // Visi ABSENTE = null (ré-audit 26/09, même règle que le watchdog) :
     // ne pas supposer 10 km — seul le plafond juge alors, jamais de faux GO
     // optimiste sur une donnée manquante.
     const visiM = visiStr ? parseVisiToMeters(visiStr) : null;
     const ceilHund = getCeiling(nuageStr || '');
-    if (ceilHund < 5 || (visiM != null && visiM < 1600)) return { cat: 'LIFR' };
-    if (ceilHund < 10 || (visiM != null && visiM < 4800)) return { cat: 'IFR' };
-    if (ceilHund <= 30 || (visiM != null && visiM <= 8000)) return { cat: 'MVFR' };
-    return { cat: 'VFR' };
+    const catObj = getFlightCategory(visiM, ceilHund, ctx ?? undefined);
+    const ceilFt = ceilHund >= 999 ? null : ceilHund * 100;
+    return { catObj, visiM, ceilFt };
 }
 
 export function evaluateGoNoGo() {
@@ -38,7 +54,17 @@ export function evaluateGoNoGo() {
     const reasons = [];
     let verdict = 'GO';
 
-    const catObj = _currentCategory();
+    const memo = memoGet(parsed.code);
+    const apt = getAirportByICAO(icao);
+    const lat = memo?.lat ?? apt?.lat ?? null;
+    const lon = memo?.lon ?? apt?.lon ?? null;
+    const flightWin = (lat != null && lon != null) ? computeFlightWindow(lat, lon) : null;
+
+    // Contexte d'espace (classe du terrain) + nuit aéronautique locale :
+    // croisés avec la visi/le plafond pour le verdict VMC/IMC SERA.5005.
+    const ctx = state._airspaceCtx ? { ...state._airspaceCtx, isNight: flightWin?.status === 'night' } : null;
+    const vmc = _currentVmc(ctx);
+    const catObj = vmc?.catObj ?? { cat: 'VMC', verdict: { vmc: 'VMC', level: 'ok', key: 'unknown' } };
 
     // Âge du METAR observé (audit 26/09) : le badge d'âge existait déjà mais
     // le verdict l'ignorait — un « GO » sur une observation de 2 h devait
@@ -68,21 +94,36 @@ export function evaluateGoNoGo() {
         }
     }
 
-    if (catObj.cat === 'LIFR' || catObj.cat === 'IFR') {
+    // Verdict VMC/IMC (SERA.5005, conditionné par la classe d'espace).
+    const zoneLbl = ctx?.zone
+        ? ` (${ctx.zone}${ctx.classe ? ` · cl. ${ctx.classe}` : ''})`
+        : '';
+    const v = catObj.verdict;
+    if (v.level === 'danger') {
         verdict = 'NO-GO';
         reasons.push({
             level: 'danger',
             icon: 'cloud-fog',
             text: isFr
-                ? `Conditions ${catObj.cat} — sous les minimas VFR`
-                : `${catObj.cat} conditions — below VFR minima`,
+                ? `Conditions IMC — sous les minima VMC${zoneLbl} (SERA.5005)`
+                : `IMC conditions — below VMC minima${zoneLbl} (SERA.5005)`,
         });
-    } else if (catObj.cat === 'MVFR') {
+    } else if (v.level === 'caution') {
         if (verdict === 'GO') verdict = 'CAUTION';
         reasons.push({
             level: 'caution',
             icon: 'cloud-drizzle',
-            text: isFr ? `MVFR — marges VFR réduites` : `MVFR — reduced VFR margins`,
+            text: v.key === 'ctrl_clearance'
+                ? (isFr
+                    ? `Plafond ${vmc.ceilFt} ft — moins de 1000 ft sous la couche (clairance verticale SERA.5005)`
+                    : `Ceiling ${vmc.ceilFt} ft — less than 1000 ft below cloud (SERA.5005 vertical clearance)`)
+                : v.key === 'unctrl_lowceil'
+                ? (isFr
+                    ? `Plafond ${vmc.ceilFt} ft hors zone contrôlée — « hors nuages » légal (SERA.5005) mais très bas : garde 500 ft de hauteur minimale (SERA.3105)`
+                    : `Ceiling ${vmc.ceilFt} ft uncontrolled — “clear of cloud” legal (SERA.5005) but very low: 500 ft minimum-height guard (SERA.3105)`)
+                : (isFr
+                    ? `Sous les minima VMC de l'espace contrôlé — VFR spécial possible sur clairance (≥ 1500 m, ≥ 600 ft, jour)`
+                    : `Below VMC minima in controlled airspace — special VFR possible on clearance (≥ 1500 m, ≥ 600 ft, day)`),
         });
     }
 
@@ -115,30 +156,22 @@ export function evaluateGoNoGo() {
         });
     }
 
-    const memo = memoGet(parsed.code);
-    const apt = getAirportByICAO(icao);
-    const lat = memo?.lat ?? apt?.lat ?? null;
-    const lon = memo?.lon ?? apt?.lon ?? null;
-
-    if (lat != null && lon != null) {
-        const window = computeFlightWindow(lat, lon);
-        if (window && window.status === 'night') {
-            if (verdict !== 'NO-GO') verdict = 'NO-GO';
-            reasons.unshift({
-                level: 'danger',
-                icon: 'moon',
-                text: isFr ? 'Nuit aéronautique — qualification de nuit requise' : 'Aeronautical night — night rating required',
-            });
-        } else if (window && window.status === 'closing') {
-            if (verdict === 'GO') verdict = 'CAUTION';
-            reasons.push({
-                level: 'caution',
-                icon: 'sunset',
-                text: isFr
-                    ? `Fin de journée proche (${window.minutesLeft} min avant la nuit)`
-                    : `Daylight ending soon (${window.minutesLeft} min before night)`,
-            });
-        }
+    if (flightWin && flightWin.status === 'night') {
+        if (verdict !== 'NO-GO') verdict = 'NO-GO';
+        reasons.unshift({
+            level: 'danger',
+            icon: 'moon',
+            text: isFr ? 'Nuit aéronautique — qualification de nuit requise' : 'Aeronautical night — night rating required',
+        });
+    } else if (flightWin && flightWin.status === 'closing') {
+        if (verdict === 'GO') verdict = 'CAUTION';
+        reasons.push({
+            level: 'caution',
+            icon: 'sunset',
+            text: isFr
+                ? `Fin de journée proche (${flightWin.minutesLeft} min avant la nuit)`
+                : `Daylight ending soon (${flightWin.minutesLeft} min before night)`,
+        });
     }
 
     const perf = getPerformanceData();
@@ -173,7 +206,18 @@ export function evaluateGoNoGo() {
     }
 
     if (state._sigmets && state._sigmets.length > 0) {
-        const sigAlerts = evaluateSigmetAirmet(state._sigmets);
+        // M5 (audit 27/09) : le SIGMET ne frappe que s'il approche le
+        // terrain affiché OU la route du plan — sinon un orage SIGMÉT sur
+        // les Pyrénées mettait Lille en NO-GO national (conservateur mais
+        // inutilisable les jours d'orage). Sans géométrie : conservateur.
+        const routePts = [{ lat, lon }];
+        for (const c of (Array.isArray(state.route) ? state.route : [])) {
+            const code = String(c).toUpperCase();
+            const m = memoGet(code);
+            const a = m?.lat == null ? getAirportByICAO(code) : null;
+            if ((m?.lat ?? a?.lat) != null) routePts.push({ lat: m?.lat ?? a.lat, lon: m?.lon ?? a.lon });
+        }
+        const sigAlerts = evaluateSigmetAirmet(state._sigmets, routePts);
         sigAlerts.forEach(a => {
             if (a.level === 'danger') {
                 if (verdict !== 'NO-GO') verdict = 'NO-GO';
@@ -289,6 +333,40 @@ export async function refreshFreezingLevel(icao) {
         state._freezingLevel = fl.altFt;
         renderGoNoGo();
     }
+}
+
+let _ctxIcao = null;
+
+/**
+ * Contexte d'espace du terrain affiché (fiche n°3, audit 27/09) :
+ * alimente le verdict GO/NO-GO ET le badge VMC/IMC (classe C/D/E vs G
+ * → minima SERA.5005 différents). Réutilise le cache 30 min de
+ * vfr-minima (airspaceContextFor). À l'arrivée : re-rendu de la
+ * bannière + événement 'airspace-ctx-updated' pour le badge/graphique.
+ */
+export async function refreshAirspaceCtx(icao) {
+    if (!icao) return;
+    const apt = getAirportByICAO(icao);
+    const memo = memoGet(icao);
+    const lat = memo?.lat ?? apt?.lat ?? null;
+    const lon = memo?.lon ?? apt?.lon ?? null;
+    if (lat == null || lon == null) { _ctxIcao = null; state._airspaceCtx = null; return; }
+    if (icao === _ctxIcao && state._airspaceCtx) return;
+    _ctxIcao = icao;
+    state._airspaceCtx = null;
+    let ctx = null;
+    try { ctx = await airspaceContextFor(icao, lat, lon); } catch { /* cellules de zones indisponibles → pire-cas */ }
+    if (_ctxIcao !== icao) return;
+    let isNight = false;
+    try { isNight = computeFlightWindow(lat, lon)?.status === 'night'; } catch { /* SunCalc indisponible */ }
+    state._airspaceCtx = {
+        zone: ctx?.zone ?? null,
+        classe: ctx?.classe ?? '',
+        controlled: !!ctx?.controlled,
+        isNight,
+    };
+    renderGoNoGo();
+    document.dispatchEvent(new CustomEvent('airspace-ctx-updated', { detail: state._airspaceCtx }));
 }
 
 export function renderGoNoGo() {

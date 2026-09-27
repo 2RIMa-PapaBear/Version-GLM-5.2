@@ -139,6 +139,25 @@ test('fréquences A/A-AFIS des terrains : ligne posée sous le code (22/09)', ()
     ok(raw.includes('119.605 AFIS'), 'AFIS de l alternate posé');
 });
 
+// Régression 27/09 : l ancienne boucle t = t.slice(0, -1) + '…' ne
+// raccourcissait plus jamais (elle retirait l ellipse pour la remettre)
+// et gelait la génération dès qu il fallait couper plus d un caractère ;
+// et couper SANS payer la largeur de '…' faisait dépasser maxW.
+test('troncature maxW : nom d extrémité trop long coupé avec ses points de suspension (27/09)', () => {
+    const doc = new jsPDF({ unit: 'pt', format: 'a5' });
+    const b = computeMapBounds([LFRV, LFOO]);
+    const longName = 'DEPART AERODROME NAME VERY LONG STRING THAT MUST BE TRUNCATED HERE';
+    ok(drawFlightMapPage(doc, {
+        isFr: true, routeLabel: 'LFRV - LFOO', bounds: b, tiles: null,
+        route: [{ ...LFRV, name: longName }, LFOO], zones: [], alternates: [],
+    }), 'la génération termine (pas de gel de la boucle de troncature)');
+    const raw = Buffer.from(doc.output('arraybuffer')).toString('latin1');
+    ok(raw.includes('DEPART AERODROME'), 'début du nom conservé');
+    ok(!raw.includes('TRUNCATED HERE'), 'fin du nom coupée');
+    // « … » est encodé 0x85 (WinAnsi) dans les polices standard jsPDF.
+    ok(raw.includes('\u0085'), 'points de suspension présents');
+});
+
 test('repli vectoriel : sans tuiles, la carte reste tracée et le mentionne', () => {
     const doc = new jsPDF({ unit: 'pt', format: 'a5' });
     const b = computeMapBounds([LFRV, LFOO]);

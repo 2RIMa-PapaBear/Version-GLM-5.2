@@ -8,8 +8,11 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
     parseVisiToMeters,
+    parseWindGroupToKt,
     getCeiling,
     getFlightCategory,
+    evaluateVmc,
+    VMC_MINIMA,
     getWeatherIcon,
     findActiveValueAtHour
 } from '../js/core.js';
@@ -100,36 +103,110 @@ describe('getCeiling', () => {
     });
 });
 
-describe('getFlightCategory', () => {
-    test('LIFR : plafond < 500 ft OU visi < 1600 m', () => {
-        assert.deepEqual(getFlightCategory(1000, 3), { cat: 'LIFR', class: 'cat-lifr' });
-        assert.deepEqual(getFlightCategory(1500, 5), { cat: 'LIFR', class: 'cat-lifr' });
+describe('getFlightCategory (VMC/IMC — SERA.5005, fiche n°3 audit 27/09)', () => {
+    const G = { controlled: false };     // espace non contrôlé (classe G, jour)
+    const D = { controlled: true };      // espace contrôlé (TMA/CTR cl. D)
+
+    test('FICHE n°3 cas ① : classe G jour, visi 3000 m à ≤ 140 kt → VMC (plus de faux No-Go)', () => {
+        // Hors nuages, plafond 1500 ft > 500 ft : légal en G sous la
+        // surface S — la visi 1500 m (Vi ≤ 140 kt) suffit le jour.
+        const o = getFlightCategory(3000, 15, G);
+        assert.equal(o.cat, 'VMC');
+        assert.equal(o.class, 'cat-vmc');
+        assert.deepEqual(o.verdict, { vmc: 'VMC', level: 'ok', key: 'unctrl_ok' });
     });
 
-    test('IFR : plafond < 1000 ft OU visi < 4800 m', () => {
-        assert.deepEqual(getFlightCategory(2000, 8), { cat: 'IFR', class: 'cat-ifr' });
-        assert.deepEqual(getFlightCategory(3000, 12), { cat: 'IFR', class: 'cat-ifr' });
+    test('FICHE n°3 cas ② : TMA classe D, plafond 1200 ft → MARGINAL (VFR spécial), pas un banal « MVFR »', () => {
+        // La clairance verticale de 1000 ft sous BKN012 est irrrespectable
+        // en pratique : reste le VFR spécial (visi ≥ 1500 m, ≥ 600 ft, jour).
+        const o = getFlightCategory(9999, 12, D);
+        assert.equal(o.cat, 'MARGINAL');
+        assert.equal(o.verdict.key, 'sp_needed');
+        assert.equal(o.verdict.level, 'caution');
     });
 
-    test('MVFR : plafond <= 3000 ft OU visi <= 8000 m', () => {
-        // ceil=2500ft (25) ET visi=6000m → MVFR
-        assert.deepEqual(getFlightCategory(6000, 25), { cat: 'MVFR', class: 'cat-mvfr' });
-        // ceil=3000ft (30) exact, visi=5000m → MVFR (borne <= incluse)
-        assert.deepEqual(getFlightCategory(5000, 30), { cat: 'MVFR', class: 'cat-mvfr' });
+    test('contrôlé : visi ≥ 5 km et base ≥ 2500 ft (clearance D) → VMC plein', () => {
+        assert.deepEqual(getFlightCategory(5000, 25, D).verdict, { vmc: 'VMC', level: 'ok', key: 'ctrl_ok' });
     });
 
-    test('VFR : conditions claires', () => {
-        // ceil=5000ft (>3000) ET visi=10000m (>8000) → VFR
-        assert.deepEqual(getFlightCategory(10000, 50), { cat: 'VFR', class: 'cat-vfr' });
+    test('contrôlé : plafond 1500–2500 ft → MARGINAL (marge sous couche < 1000 ft)', () => {
+        assert.equal(getFlightCategory(9999, 20, D).verdict.key, 'ctrl_clearance');
+        assert.equal(getFlightCategory(9999, 15, D).cat, 'MARGINAL');
+        // 2499 ft → encore caution ; 2500 ft exact → ok (borne incluse)
+        assert.equal(getFlightCategory(9999, 24, D).verdict.key, 'ctrl_clearance');
+        assert.equal(getFlightCategory(9999, 25, D).verdict.key, 'ctrl_ok');
     });
 
-    test('frontières exactes', () => {
-        // Plafond = 900ft (9) → IFR (< 1000ft strict)
-        assert.equal(getFlightCategory(10000, 9).cat, 'IFR');
-        // Plafond = 1000ft (10) exact → MVFR (< est strict, <= MVFR)
-        assert.equal(getFlightCategory(10000, 10).cat, 'MVFR');
-        // Visi = 1600m exact → IFR (< 4800m) — pas LIFR car < 1600 est strict
-        assert.equal(getFlightCategory(10000, 25).cat, 'MVFR');
+    test('contrôlé : visi 1500–5000 m → MARGINAL (VFR spécial jour), IMC la nuit', () => {
+        const jour = getFlightCategory(3000, 50, D);
+        assert.equal(jour.cat, 'MARGINAL');
+        assert.equal(jour.verdict.key, 'sp_needed');
+        const nuit = getFlightCategory(3000, 50, { controlled: true, isNight: true });
+        assert.equal(nuit.cat, 'IMC');
+        assert.equal(nuit.verdict.key, 'sp_night');
+    });
+
+    test('IMC : sous les minima même en VFR spécial', () => {
+        // Plafond 400 ft < 600 ft en contrôlé (VFR spécial impossible)
+        assert.equal(getFlightCategory(9999, 4, D).cat, 'IMC');
+        // Visi 1200 m < 1500 m (G jour) — fiche n°8 : sans visi tenue,
+        // le plafond haut ne sauve rien.
+        assert.equal(getFlightCategory(1200, 50, G).cat, 'IMC');
+        assert.equal(getFlightCategory(1200, 3, G).cat, 'IMC');
+    });
+
+    test('G NUIT : la dérogation 1500 m est jour seulement — 5 km requis (SERA.5005(b)(2))', () => {
+        assert.equal(getFlightCategory(3000, 50, { controlled: false, isNight: true }).cat, 'IMC');
+        assert.equal(getFlightCategory(5000, 50, { controlled: false, isNight: true }).cat, 'VMC');
+    });
+
+    test('FICHE n°8 : G, plafond 0–500 ft avec visi tenue → MARGINAL (pas de plafond numérique en classe G)', () => {
+        // SERA.5005 classe G : « hors nuages, en vue de la surface » —
+        // la garde 500 ft relève de SERA.3105 (hauteur minimale de vol) :
+        // situation LÉGALE mais très basse → prudence, pas IMC.
+        assert.equal(getFlightCategory(9999, 4, G).cat, 'MARGINAL');
+        assert.equal(getFlightCategory(9999, 4, G).verdict.key, 'unctrl_lowceil');
+        assert.equal(getFlightCategory(9999, 5, G).verdict.key, 'unctrl_lowceil'); // 500 ft exact inclus
+        assert.equal(getFlightCategory(9999, 6, G).cat, 'VMC');
+        // Nuit : même logique dès que la visi de table (5 km) est tenue.
+        assert.equal(getFlightCategory(6000, 3, { controlled: false, isNight: true }).cat, 'MARGINAL');
+        assert.equal(getFlightCategory(4000, 3, { controlled: false, isNight: true }).cat, 'IMC'); // < 5 km nuit
+    });
+
+    test('visi ABSENTE (null) : seul le plafond juge — jamais de 10 km implicite', () => {
+        // Contrôlé, BKN003 (300 ft) : IMC quand même sans connaître la visi.
+        assert.equal(getFlightCategory(null, 3, D).cat, 'IMC');
+        // Contrôlé, plafond 4000 ft : VMC — mais 2000 ft → caution (marge),
+        // la donnée manquante ne fabrique ni GO ni NO-GO optimiste.
+        assert.equal(getFlightCategory(null, 40, D).cat, 'VMC');
+        assert.equal(getFlightCategory(null, 20, D).cat, 'MARGINAL');
+    });
+
+    test('SANS contexte (ctx null) : pire-cas contrôlé — jamais de VMC optimiste en attente', () => {
+        // Visi 3000 m + CAVOK : en G ce serait VMC, en contrôlé MARGINAL —
+        // en attendant la classe réelle on affiche le pire (caution).
+        assert.equal(getFlightCategory(3000, 999, null).cat, 'MARGINAL');
+        // 9999 + CAVOK : VMC dans les deux lectures.
+        assert.equal(getFlightCategory(10000, 999, null).cat, 'VMC');
+        // BKN002 : IMC en contrôlé, MARGINAL en G (fiche n°8) — pire-cas IMC.
+        assert.equal(getFlightCategory(10000, 2, null).cat, 'IMC');
+    });
+});
+
+describe('evaluateVmc (table SERA.5005 pure — source unique)', () => {
+    test('les constantes minima ne bougent pas (vfr-minima délègue)', () => {
+        assert.equal(VMC_MINIMA.CTRL_VISI_M, 5000);
+        assert.equal(VMC_MINIMA.CTRL_CLEARANCE_FT, 2500);
+        assert.equal(VMC_MINIMA.SP_VISI_M, 1500);
+        assert.equal(VMC_MINIMA.SP_CEIL_FT, 600);
+        assert.equal(VMC_MINIMA.UNCTRL_VISI_M, 1500);
+        assert.equal(VMC_MINIMA.UNCTRL_CEIL_FT, 500);
+    });
+
+    test('CAVOK en contrôlé → VMC (plafond illimité)', () => {
+        assert.deepEqual(
+            evaluateVmc({ controlled: true, visiM: 10000, ceilingFt: 99999 }),
+            { vmc: 'VMC', level: 'ok', key: 'ctrl_ok' });
     });
 });
 
@@ -322,6 +399,30 @@ describe('fetchAvecRelais — corps vide', () => {
     });
 });
 
+// Fiche n°9 (audit 27/09) : QNH + OAT numériques d'un METAR, Qxxxx (hPa)
+// ET Axxxx (inHg, spécificité Amérique du Nord — OACI Annexe 3) → hPa.
+test('parseMetarQnhOat : Qxxxx hPa, Axxxx inHg converti, M=négatif, absents → null', async () => {
+    const { parseMetarQnhOat } = await import('../js/core.js');
+    // Format européen.
+    assert.deepEqual(parseMetarQnhOat('LFPB 260800Z 27010KT 9999 FEW040 22/12 Q1018'), { qnh: 1018, oat: 22 });
+    assert.deepEqual(parseMetarQnhOat('AAAA 190830Z 28012KT 6000 RA BKN010 M05/M07 Q1002'), { qnh: 1002, oat: -5 });
+    // Format nord-américain : altimètre A2992 (29,92 inHg → 1013 hPa),
+    // visibilité en SM, RMK avec groupes additionnels (SLP, Txxxxxx).
+    assert.deepEqual(
+        parseMetarQnhOat('KLAX 261953Z 27012KT 10SM FEW250 22/12 A2992 RMK AO2 SLP132 T02210172'),
+        { qnh: 1013, oat: 22 });
+    assert.deepEqual(
+        parseMetarQnhOat('CYUL 261400Z 30015G25KT 15SM -SN BKN008 OVC015 M05/M12 A3001 RMK SC3SC5 SLP201'),
+        { qnh: 1016, oat: -5 });
+    // Températures seules dans RMK (Txxxxxx) : pas de paire nn/nn → null.
+    assert.deepEqual(
+        parseMetarQnhOat('KDEN 261753Z 09008KT 10SM CLR A3040 RMK AO2 T01721017'),
+        { qnh: 1029, oat: null });
+    // Groupes absents → null (jamais de valeur implicite).
+    assert.deepEqual(parseMetarQnhOat('AAAA 190830Z 28012KT 6000 BKN010'), { qnh: null, oat: null });
+    assert.deepEqual(parseMetarQnhOat(''), { qnh: null, oat: null });
+});
+
 // Sécurité (audit 26/09) : escapeHtml doit être sûr EN ATTRIBUT — les
 // guillemets échappés, sinon « a"onmouseover="x » sort de value="…"/data-*.
 test('escapeHtml : échappe les guillemets (usage attribut) et reste pur sous Node', async () => {
@@ -330,4 +431,66 @@ test('escapeHtml : échappe les guillemets (usage attribut) et reste pur sous No
     assert.equal(escapeHtml("l'oiseau <b>&</b>"), 'l&#39;oiseau &lt;b&gt;&amp;&lt;/b&gt;');
     assert.equal(escapeHtml(null), '');
     assert.equal(escapeHtml(42), '42');
+});
+
+// Fiche n°15 (audit 27/09) : le groupe vent OACI peut être en KT, MPS
+// (Russie, Chine…) ou KMH selon la région émettrice. parseWindGroupToKt est
+// le décodeur canonique — tout est converti en nœuds (MPS ×1.94384,
+// KMH ÷1.852), unité de travail de toute l'app.
+describe('parseWindGroupToKt', () => {
+    test('KT : pass-through sans conversion', () => {
+        const w = parseWindGroupToKt('LFPG 270800Z 24008KT 9999 FEW030 Q1013');
+        assert.equal(w.variable, false);
+        assert.equal(w.dir, 240);
+        assert.equal(w.speed, 8);
+        assert.equal(w.gust, null);
+    });
+
+    test('KT avec rafales et variation de direction', () => {
+        const w = parseWindGroupToKt('17015G25KT 150V200');
+        assert.equal(w.speed, 15);
+        assert.equal(w.gust, 25);
+        assert.equal(w.varFrom, 150);
+        assert.equal(w.varTo, 200);
+    });
+
+    test('MPS : 20004MPS → 8 kt (4 × 1.94384 = 7.78 arrondi)', () => {
+        const w = parseWindGroupToKt('ULAA 270800Z 20004MPS 9999 SCT025 Q1013');
+        assert.equal(w.dir, 200);
+        assert.equal(w.speed, 8);
+        assert.equal(w.gust, null);
+    });
+
+    test('MPS : 31012MPS → 23 kt, rafales 24MPS → 47 kt', () => {
+        const w = parseWindGroupToKt('31012G24MPS');
+        assert.equal(w.speed, 23);   // 12 × 1.94384 = 23.33
+        assert.equal(w.gust, 47);    // 24 × 1.94384 = 46.65
+    });
+
+    test('KMH : 31012KMH → 6 kt (12 ÷ 1.852 = 6.48 arrondi)', () => {
+        const w = parseWindGroupToKt('ZBAA 270800Z 31012KMH 9999 NSW Q1008');
+        assert.equal(w.dir, 310);
+        assert.equal(w.speed, 6);
+    });
+
+    test('VRB en MPS : direction null, vitesse convertie', () => {
+        const w = parseWindGroupToKt('VRB03MPS');
+        assert.equal(w.variable, true);
+        assert.equal(w.dir, null);
+        assert.equal(w.speed, 6);    // 3 × 1.94384 = 5.83
+    });
+
+    test('variation de direction collée à un groupe MPS', () => {
+        const w = parseWindGroupToKt('24008MPS 180V300');
+        assert.equal(w.speed, 16);   // 8 × 1.94384 = 15.55
+        assert.equal(w.varFrom, 180);
+        assert.equal(w.varTo, 300);
+    });
+
+    test('pas de groupe vent lisible → null (jamais de vent implicite)', () => {
+        assert.equal(parseWindGroupToKt('CAVOK'), null);
+        assert.equal(parseWindGroupToKt('/////KT'), null);
+        assert.equal(parseWindGroupToKt(''), null);
+        assert.equal(parseWindGroupToKt(null), null);
+    });
 });

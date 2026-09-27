@@ -1,7 +1,7 @@
 import { state, I18N, fetchAvecRelais, memoGet, memoSet, surfaceLabel, escapeHtml } from './core.js';
 import { getAirportByICAO, getAirportsInBbox, enrichAirport, forgetAirport } from './ui-module.js';
 import { parseWaypointsField, formatWaypointsField, registerFreeWpResolver, _wpDisplayName } from './flight-planner-ui.js';
-import { parseVisiToMeters, getCeiling } from './core.js';
+import { parseVisiToMeters, parseWindGroupToKt, getCeiling, getFlightCategory, parseMetarQnhOat } from './core.js';
 import { HAZARD_COLORS } from './sigmet.js';
 import { showRouteWeather, resetRouteFit, waypointLabelHtml } from './route-weather.js';
 import { greatCircleDistanceNm } from './flight-planner.js';
@@ -213,16 +213,15 @@ function _ensureMapReady(lat, lon) {
             // jamais (retour pilote 20/09).
             window.dispatchEvent(new CustomEvent('prevol:map-ready'));
 
-            // Rejoue les repères libres reçus avant l'init (import d'un plan avec
-            // panneau carte jamais ouvert) : leurs codes (noms) sont annoncés,
-            // puis la route est retracée complète.
-            if (_pendingFreeWps.length) {
-                const pending = _pendingFreeWps.splice(0);
-                for (const w of pending) {
-                    _createFreeWaypoint(w.lat, w.lon, String(w.name || 'WPT').slice(0, 24));
-                }
-                window.dispatchEvent(new CustomEvent('route-changed'));
+            // Monte les couches des repères libres ENREGISTRÉS avant l'init
+            // (import d'un plan avec panneau carte jamais ouvert) : registre
+            // et plan sont déjà en place, seule la carte manquait — puis la
+            // route est retracée complète.
+            let lateMounted = 0;
+            for (const [code, wp] of _freeWaypoints) {
+                if (!wp.marker) { _mountFreeWpLayers(code, wp); lateMounted++; }
             }
+            if (lateMounted) window.dispatchEvent(new CustomEvent('route-changed'));
 
             _runwayLayer = L.layerGroup().addTo(_map);
             _map.on('zoomend', _updateRunwayVisibility);
@@ -771,7 +770,13 @@ function _createFreeWaypoint(lat, lon, name, freq, kind) {
     memoSet(code, { name, lat, lon, freeWp: true, ...extras });
 
     const wp = { lat, lon, name };
-    _mountFreeWpLayers(code, wp);
+    // Couches uniquement si la carte existe : l'ENREGISTREMENT (registre
+    // « terrains », plan, annonce du code) reste valable carte fermée.
+    // Avant, un import avant la 1re ouverture du panneau mettait les
+    // repères en file d'attente — leurs codes n'étaient jamais annoncés
+    // à temps et le plan perdait les étapes correspondantes (fiche 19).
+    // Sans carte, _ensureMapReady montera les couches à l'init.
+    if (_map) _mountFreeWpLayers(code, wp);
     _freeWaypoints.set(code, wp);
 
     // Insertion intelligente + recalcul du plan (handler add-waypoint d'app.js)
@@ -963,16 +968,17 @@ if (typeof document !== 'undefined') {
 }
 
 // Restauration de repères libres (import d'un plan, flight-plan-io.js) :
-// écouteur AU NIVEAU MODULE — il existe dès le chargement de l'app. Avant la
-// 1re init de la carte (panneau jamais ouvert), les points sont mis en file
-// d'attente puis rejoués à l'init ; sinon un plan importé perdait ses
-// repères libres et son tracé était incomplet.
-const _pendingFreeWps = [];
+// écouteur AU NIVEAU MODULE — il existe dès le chargement de l'app. Le
+// repère est créé IMMÉDIATEMENT, carte ouverte ou non : registre
+// « terrains » + insertion au plan + annonce SYNCHRONE de son code —
+// l'index _createdCodes de l'import est rempli avant buildSeq (fiche 19 :
+// la file d'attente d'antan laissait .filter(Boolean) supprimer des
+// étapes sans prévenir, et un GPX/KML à extrémité libre échouait en
+// silence). Seules les couches carte attendent l'init (_ensureMapReady).
 if (typeof document !== 'undefined') {
     document.addEventListener('restore-free-waypoint', (e) => {
         const { lat, lon, name } = e.detail || {};
         if (typeof lat !== 'number' || typeof lon !== 'number') return;
-        if (!_map) { _pendingFreeWps.push({ lat, lon, name }); return; }
         _createFreeWaypoint(lat, lon, String(name || 'WPT').slice(0, 24));
     });
 }
@@ -1245,8 +1251,10 @@ let _neighborRetryDone = false;
 // module js/pireps.js retiré avec ses marqueurs et son fetch.
 
 function _categoryFromMetar(raw) {
-    const visiMatch = raw.match(/KT(?:\s+\d{3}V\d{3})?\s+(\d{4})\b/);
-    const visiM = visiMatch ? (parseInt(visiMatch[1], 10) === 9999 ? 10000 : parseInt(visiMatch[1], 10)) : parseVisiToMeters('');
+    // Fiche n°15 (audit 27/09) : ancre vent aux 3 unités OACI (KT/MPS/KMH).
+    const visiMatch = raw.match(/(?:KT|MPS|KMH)(?:\s+\d{3}V\d{3})?\s+(\d{4})\b/);
+    // Visi absente du groupe = null (pas de 10 km implicite — ré-audit 26/09).
+    const visiM = visiMatch ? (parseInt(visiMatch[1], 10) === 9999 ? 10000 : parseInt(visiMatch[1], 10)) : null;
 
     let ceilHund = 999;
     const cloudMatches = [...raw.matchAll(/\b(BKN|OVC)(\d{3})/g)];
@@ -1258,17 +1266,16 @@ function _categoryFromMetar(raw) {
     if (vvMatch) ceilHund = parseInt(vvMatch[1], 10);
     if (/CAVOK|NSC|SKC|NCD/.test(raw)) ceilHund = 999;
 
-    if (ceilHund < 5 || visiM < 1600) return { cat: 'LIFR' };
-    if (ceilHund < 10 || visiM < 4800) return { cat: 'IFR' };
-    if (ceilHund <= 30 || visiM <= 8000) return { cat: 'MVFR' };
-    return { cat: 'VFR' };
+    // Pins = TENDANCE comparative (fiche n°3, audit 27/09) : table SERA.5005
+    // en pire-cas contrôlé SANS contexte par terrain (boucle synchrone) —
+    // la classe réelle du terrain affiché est évaluée dans le go-nogo/badge.
+    return getFlightCategory(visiM, ceilHund, null);
 }
 
 const CAT_PIN_COLORS = {
-    VFR: '#4ADE80',
-    MVFR: '#38BDF8',
-    IFR: '#F87171',
-    LIFR: '#D946EF',
+    VMC:      '#4ADE80',
+    MARGINAL: '#38BDF8',
+    IMC:      '#F87171',
 };
 
 // Extrait les valeurs clés d'un METAR brut pour le popup "clic sur un aéroport".
@@ -1277,15 +1284,16 @@ function _decodeMetarForPopup(raw) {
     if (!raw) return null;
     const d = { wind: null, visi: null, ceiling: null, temp: null, dew: null, qnh: null };
 
-    const wm = raw.match(/\b(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?KT\b/);
-    if (wm) {
-        const dir = wm[1] === 'VRB' ? 'VRB' : wm[1] + '°';
-        d.wind = `${dir} ${parseInt(wm[2], 10)} kt` + (wm[3] ? ` (G ${parseInt(wm[3], 10)})` : '');
+    // Vent décodé par le parseur canonique (KT/MPS/KMH → kt, fiche n°15).
+    const wg = parseWindGroupToKt(raw);
+    if (wg) {
+        const dir = wg.variable ? 'VRB' : wg.dir + '°';
+        d.wind = `${dir} ${wg.speed} kt` + (wg.gust != null ? ` (G ${wg.gust})` : '');
     }
 
     if (/\bCAVOK\b/.test(raw)) d.visi = 'CAVOK';
     else {
-        const vm = raw.match(/KT(?:\s+\d{3}V\d{3})?\s+(\d{4})\b/);
+        const vm = raw.match(/(?:KT|MPS|KMH)(?:\s+\d{3}V\d{3})?\s+(\d{4})\b/);
         if (vm) {
             const m = parseInt(vm[1], 10);
             d.visi = m >= 9999 ? '10 km+' : (m >= 1000 ? (m / 1000).toFixed(m % 1000 ? 1 : 0) + ' km' : m + ' m');
@@ -1312,8 +1320,9 @@ function _decodeMetarForPopup(raw) {
         d.dew = parseT(tm[2]);
     }
 
-    const qm = raw.match(/\bQ(\d{4})\b/);
-    if (qm) d.qnh = parseInt(qm[1], 10) + ' hPa';
+    // Fiche n°9 : altimètre nord-américain Axxxx (inHg) aussi converti.
+    const qnhVal = parseMetarQnhOat(raw).qnh;
+    if (qnhVal != null) d.qnh = qnhVal + ' hPa';
 
     return d;
 }

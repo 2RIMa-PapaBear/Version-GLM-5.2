@@ -58,7 +58,7 @@ for (const route of ROUTES) {
         tiers.every(n => n >= 1) ? ok(`chaque tiers couvert ${JSON.stringify(tiers)}`) : ko(`tiers non couverts ${JSON.stringify(tiers)}`);
     }
     res.rows.every(r => r.off <= 25) ? ok('tous dans le couloir ±25 NM') : ko('hors couloir');
-    res.rows.every(r => ['VFR', 'MVFR', 'IFR', 'LIFR'].includes(r.cat)) ? ok('tous catégorisés (propre ou substitué)') : ko('sans catégorie');
+    res.rows.every(r => ['VMC', 'MARGINAL', 'IMC'].includes(r.cat)) ? ok('tous catégorisés (propre ou substitué)') : ko('sans catégorie');
 }
 
 await browser.close();

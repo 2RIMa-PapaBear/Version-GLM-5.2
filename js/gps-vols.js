@@ -121,6 +121,44 @@ export function exportPts(pts) {
     return out;
 }
 
+// ---- Dérivation vitesse / cap entre fixations (fiche 13, audit 27/09) --------
+// Vitesse et cap « géométriques » quand le récepteur ne fournit ni c.speed
+// ni c.heading : distance/temps et cap initial entre DEUX fixations. Cette
+// dérivation n'a de sens que si les fixations sont PROCHES : au-delà de
+// DERIVE_MAX_MS (perte de signal prolongée, manœuvre serrée entre-temps),
+// la « vitesse moyenne » et le cap de la corde ne représentent plus rien —
+// on renvoie null (données invalidées) plutôt qu'une valeur fausse et
+// dangereuse ; l'UI repasse aux capteurs ou affiche l'indisponibilité.
+
+/** Fenêtre de validité de la dérivation géométrique (ms). */
+export const DERIVE_MAX_MS = 10000;
+
+/** Cap vrai initial (°, 0–360) d'un point a vers un point b, [lat, lon]. */
+export function bearingDeg(a, b) {
+    const rad = Math.PI / 180;
+    const φ1 = a[0] * rad, φ2 = b[0] * rad, Δλ = (b[1] - a[1]) * rad;
+    const y = Math.sin(Δλ) * Math.cos(φ2);
+    const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+    return (Math.atan2(y, x) / rad + 360) % 360;
+}
+
+/** L'écart entre fixations permet-il une dérivation ? > 0 s (un horodatage
+ *  dupliqué — cache géoloc — ne se divise pas) et ≤ DERIVE_MAX_MS. */
+export function derivableDt(dtMs) {
+    return Number.isFinite(dtMs) && dtMs > 0 && dtMs <= DERIVE_MAX_MS;
+}
+
+/** Vitesse sol (m/s) + cap (°) dérivés entre prev et cur ({ ll: [lat,lon],
+ *  t: ms }) — null quand la dérivation est invalidée. Les valeurs capteur
+ *  (c.speed / c.heading) restent prioritaires chez l'appelant. */
+export function deriveKinematics(prev, cur) {
+    // (gps.js transmet null quand il n'y a pas de fixation précédente — pas
+    // de convention sentinelle t = 0 ici, un horodatage 0 est légitime.)
+    const dtMs = prev ? cur.t - prev.t : null;
+    if (!derivableDt(dtMs)) return null;
+    return { spdMs: _distM(prev.ll, cur.ll) / (dtMs / 1000), hdg: bearingDeg(prev.ll, cur.ll) };
+}
+
 /** Vario dérivé (m/s) : moyenne des pentes d'altitude sur une fenêtre ±2
  *  points — lissée pour un profil lisible dans les lecteurs de traces. */
 function varioMs(pts) {

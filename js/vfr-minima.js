@@ -15,7 +15,11 @@
  *  - en dessous, VFR SPÉCIAL possible sur clairance : visi ≥ 1500 m et
  *    plafond ≥ 600 ft — INTERDIT DE NUIT ;
  *  - espace NON CONTRÔLÉ (F-G, sous la surface S) : visi ≥ 1500 m et
- *    plafond > 500 ft.
+ *    plafond > 500 ft — plafond 0–500 ft avec visi tenue : légal mais
+ *    très bas, PRUDENCE (fiche n°8 : pas de plafond numérique en classe
+ *    G, la garde 500 ft relève de SERA.3105) — la réduction à 1500 m
+ *    est JOUR SEULEMENT, de nuit la visi de table SERA.5005 (5 km)
+ *    s'applique ;
  *
  * Périmètre : DÉPART (METAR du moment), DESTINATION et DÉGAGEMENT
  * (TAF à l'heure d'arrivée estimée). Pas d'analyse en route par tronçon
@@ -26,20 +30,16 @@
  * imports dynamiques pour garder le module importable par les tests.
  * ================================================================ */
 
-import { state, memoGet, parseVisiToMeters, getCeiling, findActiveValueAtHour } from './core.js';
+import { state, memoGet, parseVisiToMeters, getCeiling, findActiveValueAtHour, evaluateVmc, VMC_MINIMA } from './core.js';
 
-export const VFR_MINIMA = {
-    CTRL_VISI_M: 5000,     // espace contrôlé sous FL100
-    CTRL_CEIL_FT: 1500,
-    CTRL_CLEARANCE_FT: 2500,   // règle pilote : base − 1000 ≥ 1500 (clearance D)
-    SP_VISI_M: 1500,       // VFR spécial (clairance, hors nuit)
-    SP_CEIL_FT: 600,
-    UNCTRL_VISI_M: 1500,   // non contrôlé sous surface S à Vi ≤ 140 kt
-    UNCTRL_CEIL_FT: 500,   // plafond strictement SUPÉRIEUR à 500 ft
-};
+// Source unique dans core.js (fiche n°3, audit 27/09) — alias pour le
+// périmètre « minima par terrain » de ce module.
+export const VFR_MINIMA = VMC_MINIMA;
 
 /**
- * Évaluation PURE des minima pour un terrain.
+ * Évaluation PURE des minima pour un terrain — délègue à evaluateVmc
+ * (core.js, source unique SERA.5005) en conservant la sémantique
+ * « données complètes sinon ligne grisée » du tableau minima.
  * @param {{controlled:boolean, visiM:number|null, ceilingFt:number|null,
  *          isNight?:boolean}} p
  * @returns {{level:'ok'|'caution'|'danger'|'unknown', key:string}}
@@ -48,26 +48,8 @@ export function evaluateVfrMinima({ controlled, visiM, ceilingFt, isNight = fals
     if (visiM == null || ceilingFt == null || !Number.isFinite(visiM) || !Number.isFinite(ceilingFt)) {
         return { level: 'unknown', key: 'unknown' };
     }
-    if (controlled) {
-        // OK plein : minima réglementaire + règle pilote « clearance D »
-        // (1000 ft sous la couche à 1500 ft → base ≥ 2500 ft).
-        if (visiM >= VFR_MINIMA.CTRL_VISI_M && ceilingFt >= VFR_MINIMA.CTRL_CLEARANCE_FT) {
-            return { level: 'ok', key: 'ctrl_ok' };
-        }
-        // Conforme au réglementaire mais < 1000 ft de marge sous couche :
-        // prudence, jamais une suggestion de passer AU-DESSUS (règle BKN).
-        if (visiM >= VFR_MINIMA.CTRL_VISI_M && ceilingFt >= VFR_MINIMA.CTRL_CEIL_FT) {
-            return { level: 'caution', key: 'ctrl_clearance' };
-        }
-        if (visiM >= VFR_MINIMA.SP_VISI_M && ceilingFt >= VFR_MINIMA.SP_CEIL_FT) {
-            return isNight ? { level: 'danger', key: 'sp_night' } : { level: 'caution', key: 'sp_needed' };
-        }
-        return { level: 'danger', key: 'ctrl_below' };
-    }
-    if (visiM >= VFR_MINIMA.UNCTRL_VISI_M && ceilingFt > VFR_MINIMA.UNCTRL_CEIL_FT) {
-        return { level: 'ok', key: 'unctrl_ok' };
-    }
-    return { level: 'danger', key: 'unctrl_below' };
+    const v = evaluateVmc({ controlled, visiM, ceilingFt, isNight });
+    return { level: v.level, key: v.key };
 }
 
 /**
@@ -78,12 +60,13 @@ export function evaluateVfrMinima({ controlled, visiM, ceilingFt, isNight = fals
  */
 export function metarVisiCeiling(raw) {
     if (!raw) return null;
-    const tokens = String(raw).replace(/=+\s*$/, '').split(/\s+/);
+    const cleaned = String(raw).replace(/=+\s*$/, '');
+    const tokens = cleaned.split(/\s+/);
     let visiM = null;
     const clouds = [];
     let seenWind = false;
     for (const t of tokens) {
-        if (/(KT|MPS)$/.test(t) && (/^\d{3}/.test(t) || /^VRB/.test(t) || /^\/{3,}/.test(t))) { seenWind = true; continue; }
+        if (/(KT|MPS|KMH)$/.test(t) && (/^\d{3}/.test(t) || /^VRB/.test(t) || /^\/{3,}/.test(t))) { seenWind = true; continue; }
         if (t === 'CAVOK') { visiM = 10000; continue; }
         if (visiM == null && /^\d{4}(NDZ|ND)?$/.test(t)) { visiM = parseInt(t.slice(0, 4), 10); continue; }
         if (/^(FEW|SCT|BKN|OVC|VV)\d{3}/.test(t)) {
@@ -94,8 +77,11 @@ export function metarVisiCeiling(raw) {
         }
     }
     if (visiM == null) {
-        const sm = String(raw).match(/\b(\d{1,2})SM\b/);
-        if (sm) visiM = Math.round(parseInt(sm[1], 10) * 1609.34);
+        // Visi impériale (US/Canada) : nombre mixte « 1 1/2SM » en deux
+        // groupes, préfixe M = « moins de » — M1/4SM n'est PAS « 4 SM ».
+        // Conversion par le parseur canonique de core.
+        const sm = cleaned.match(/(?:^|\s)([PM]?\d+(?:\s\d+\/\d+)?(?:\/\d+)?)SM(?=\s|$)/);
+        if (sm) visiM = parseVisiToMeters(sm[0].trim());
     }
     if (visiM == null) return null;
     const hund = getCeiling(clouds.join(' '));   // centaines de ft ; 999 = illimité
@@ -110,15 +96,38 @@ function _tafHourFor(tafData, dateMs) {
     return (dateMs - anchor) / 3600000;
 }
 
-/** Visi/plafond d'un TAF à l'heure donnée (null si TAF illisible). */
+/** Visi/plafond d'un TAF à l'heure donnée (null si TAF illisible OU heure
+ *  hors validité — M4, audit 27/09 : l'ancienne fabrication « >10 km /
+ *  CAVOK » quand aucun bloc ne couvrait l'heure donnait des « ctrl_ok »
+ *  sur des TAF périmés et désarmait le repli METAR du caller). */
 export function tafVisiCeilingAt(tafData, dateMs) {
     if (!tafData?.base) return null;
     const h = _tafHourFor(tafData, dateMs);
-    const visiStr = findActiveValueAtHour(tafData.base.visi, h) || '> 10 km';
-    const nuageStr = findActiveValueAtHour(tafData.base.nuage, h) || 'CAVOK';
-    const visiM = parseVisiToMeters(visiStr);
-    const hund = getCeiling(nuageStr);
-    return { visiM, ceilingFt: (hund === 999) ? 99999 : hund * 100, hour: Math.round(h * 10) / 10 };
+    const visiStr = findActiveValueAtHour(tafData.base.visi, h) || null;
+    const nuageStr = findActiveValueAtHour(tafData.base.nuage, h) || null;
+    // Aucun groupe actif à cette heure : INCONNU, pas du beau temps.
+    if (!visiStr && !nuageStr) return null;
+
+    let visiM = visiStr ? parseVisiToMeters(visiStr) : null;
+    let hund = nuageStr ? getCeiling(nuageStr) : null;
+
+    // M7 (audit 27/09) : TEMPO/PROB actifs à l'heure cible — on retient le
+    // plus PÉNALISANT base ↔ TEMPO : « TEMPO 4000 RA BKN012 » sur la fenêtre
+    // d'arrivée ne doit pas laisser un verdict OK (miroir du M9 décollage).
+    for (const b of (tafData.tempo || [])) {
+        if (h >= b.start && h < b.end) {
+            const tVisi = b.visi ? parseVisiToMeters(b.visi) : null;
+            if (tVisi != null && (visiM == null || tVisi < visiM)) visiM = tVisi;
+            const tHund = b.nuage ? getCeiling(b.nuage) : null;
+            if (tHund != null && (hund == null || tHund < hund)) hund = tHund;
+        }
+    }
+    if (visiM == null && hund == null) return null;
+    return {
+        visiM,
+        ceilingFt: hund == null ? null : (hund === 999 ? 99999 : hund * 100),
+        hour: Math.round(h * 10) / 10,
+    };
 }
 
 // ----------------------------------------------------------------
@@ -126,6 +135,16 @@ export function tafVisiCeilingAt(tafData, dateMs) {
 // ----------------------------------------------------------------
 const _ctxCache = new Map();   // icao → { zone, classe, controlled, ts }
 const CTX_TTL = 30 * 60 * 1000;
+
+/**
+ * Contexte d'espace aérien POSÉ AU SOL d'un terrain (fiche n°3, audit
+ * 27/09) : { zone, type, classe, controlled } — CTR/TMA/CTA ou classe
+ * ICAO A-E → contrôlé (minima SERA.5005 « contrôlés »), sinon G.
+ * Cache 30 min par terrain ; réutilisé par le go-nogo et le badge.
+ */
+export async function airspaceContextFor(icao, lat, lon) {
+    return _airspaceContext(icao, lat, lon);
+}
 
 async function _airspaceContext(icao, lat, lon) {
     const key = icao || `${lat.toFixed(3)}|${lon.toFixed(3)}`;

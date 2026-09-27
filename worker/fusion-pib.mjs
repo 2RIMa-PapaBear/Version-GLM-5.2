@@ -55,17 +55,27 @@ export function mergePibChunks(chunks) {
     L.ADDep = first.listnotams.ADDep || {};
     L.ADDes = last.listnotams.ADDes || {};
 
-    // ADDeg / ADSur / Other : listes de blocs par terrain.
+    // ADDeg / ADSur / Other : fusion par terrain (dédup par id via
+    // mergeAdBlock), puis APLATIS en {catégorie: [NOTAM]} — la MÊME FORME
+    // que le dossier direct (M14, audit 27/09 : le client notam.js énumère
+    // les CATÉGORIES de listnotams.ADDeg/ADSur/Other ; l'ancien rendu en
+    // blocs [{code, cat: […]}] affichait « 0 NOTAM », cassait le compteur
+    // et privait l'annexe PDF et l'AZBA des dégagements/survolés/autres —
+    // les tests encodeaient les deux formes contradictoires).
     for (const key of ['ADDeg', 'ADSur', 'Other']) {
-        const acc = [];
+        const blocks = [];
         for (const c of valid) {
             for (const blk of (c.listnotams[key] || [])) {
-                const ex = acc.find(x => (x.code || '') === (blk.code || ''));
+                const ex = blocks.find(x => (x.code || '') === (blk.code || ''));
                 if (ex) mergeAdBlock(ex, blk);
-                else acc.push(blk);
+                else blocks.push(blk);
             }
         }
-        L[key] = acc;
+        const cat = {};
+        for (const blk of blocks)
+            for (const [k, list] of Object.entries(blk))
+                if (Array.isArray(list)) cat[k] = mergeNotamLists(cat[k] || [], list);
+        L[key] = cat;
     }
 
     // FIR : {catégorie: [{code23, sortedNotamsByImpactedAerodromes: […]}]}
@@ -103,7 +113,7 @@ export function mergePibChunks(chunks) {
     tally(Object.values(L.ADDep).flat());
     tally(Object.values(L.ADDes).flat());
     for (const key of ['ADDeg', 'ADSur', 'Other'])
-        L[key].forEach(b => tally(Object.values(b).flat()));
+        tally(Object.values(L[key]).flat());
     for (const groups of Object.values(fir))
         for (const grp of groups)
             for (const ae of (grp.sortedNotamsByImpactedAerodromes || [])) {

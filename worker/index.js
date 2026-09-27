@@ -586,7 +586,14 @@ async function sigmetFrance(request, env, ctx) {
     const sortie = reponse(200, xml, 'text/xml; charset=ISO-8859-1');
     try {
         ctx.waitUntil(caches.default.put(cle, new Response(xml, {
-            headers: { 'Content-Type': 'text/xml; charset=ISO-8859-1' },
+            // M17 (audit 27/09) : sans Cache-Control, l'edge garde la
+            // réponse ~2 h par défaut — un SIGMET fraîchement émis restait
+            // invisible des heures. TTL edge = 4 min (le client a son
+            // propre cache de fraîcheur).
+            headers: {
+                'Content-Type': 'text/xml; charset=ISO-8859-1',
+                'Cache-Control': 'public, s-maxage=240',
+            },
         })));
     } catch {   }
     return sortie;

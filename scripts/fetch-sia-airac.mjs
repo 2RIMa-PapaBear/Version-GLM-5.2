@@ -139,10 +139,17 @@ each('Volume', (attrs, body) => {
     // valeur BRUTE dans son unité (FL115 → [115,6]) — y glisser des PIEDS
     // (l'ancien [11500,6]) faisait relire ×100 par les consommateurs
     // (plafond 1 150 000 ft au profil, zones à plancher FL invisibles).
-    const compactLimit = (val, unit, ft) =>
-        (/^FL/i.test(unit) && Number.isFinite(parseFloat(String(val).replace(',', '.'))))
-            ? [parseFloat(String(val).replace(',', '.')), 6]
-            : [ft, 1];
+    // 3ᵉ élément = 1 : limite « FT ASFC » (au-dessus du SOL — M13, audit
+    // 27/09 : fréquentes en montagne, CTR CALVI, CTA TOULON, R 158 B… ;
+    // lues AMSL avant, une zone CONTENANT l'altitude de vol était exclue du
+    // profil). Le client (airspaces.js lim) le fait voyager en ref:'ASFC'
+    // et le profil convertit avec le relief de la route.
+    const compactLimit = (val, unit, ft) => {
+        if (/^FL/i.test(unit) && Number.isFinite(parseFloat(String(val).replace(',', '.'))))
+            return [parseFloat(String(val).replace(',', '.')), 6];
+        if (/ASFC/i.test(unit)) return [ft, 1, 1];
+        return [ft, 1];
+    };
 
     const partie = esp.parties.find(p => p.nom && partieLk.endsWith(`[${p.nom}]`)) || esp.parties[0];
     // Activite « APP MELUN#SEINE INFO 134.300 » → organisme + fréquence ;

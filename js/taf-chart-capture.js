@@ -1,5 +1,5 @@
 /* ================================================================
- * TAF CHART CAPTURE — Graphique TAF → PNG pour le PDF dossier (B1)
+ * TAF CHART CAPTURE — Graphique TAF → image JPEG pour le PDF dossier (B1)
  * ================================================================
  *
  * Option 1 (arbitrage pilote 13/09) : le graphique des messages TAF
@@ -13,7 +13,7 @@
  *      est rendu en haute résolution d'impression (dessinerGraphique
  *      dimensionne le canvas par dpr) ;
  *   3. le message du terrain est posé dans le champ, genererGraphique
- *      rend le graphique → toDataURL('image/png') + ratio hauteur/largeur ;
+ *      rend le graphique → toDataURL('image/jpeg') + ratio hauteur/largeur ;
  *   4. restauration COMPLÈTE puis re-rendu du message d'origine.
  *
  * Effet de bord assumé : les widgets suivent le terrain substitué
@@ -24,10 +24,11 @@ import { state } from './core.js';
 
 /**
  * @param {string} rawTaf message TAF brut (ou METAR) du terrain à grapher.
- * @returns {Promise<{png:string, ratio:number}|null>} image PNG data-URL +
- *   ratio hauteur/largeur du canvas rendu ; null silencieux en échec.
+ * @returns {Promise<{imgData:string, ratio:number, fmt:string}|null>} image
+ *   data-URL (JPEG) + ratio hauteur/largeur du canvas rendu + format pour
+ *   jsPDF ; null silencieux en échec.
  */
-export async function captureTafChartPng(rawTaf) {
+export async function captureTafChart(rawTaf) {
     let mod = null;
     try {
         // Import dynamique : app.js importe le générateur du PDF, l'inverse
@@ -98,10 +99,10 @@ export async function captureTafChartPng(rawTaf) {
 
         // JPEG fin : un graphe TAF riche en PNG pèse ~600 Ko (dégradés du
         // soleil),JPEG 0.92 le ramène ~200 Ko pour un dossier ~1 Mo.
-        const png = canvas.toDataURL('image/jpeg', 0.92);
+        const imgData = canvas.toDataURL('image/jpeg', 0.92);
         const ratio = canvas.width > 0 ? canvas.height / canvas.width : 0.4;
-        if (!png || png.length < 200 || ratio <= 0 || ratio > 2) return null;
-        return { png, ratio, fmt: 'JPEG' };
+        if (!imgData || imgData.length < 200 || ratio <= 0 || ratio > 2) return null;
+        return { imgData, ratio, fmt: 'JPEG' };
     } catch (e) {
         console.warn('capture graphique TAF ignorée :', e.message);
         return null;

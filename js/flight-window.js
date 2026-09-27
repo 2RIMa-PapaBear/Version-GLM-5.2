@@ -4,11 +4,16 @@
  *
  * CONTEXTE RÉGLEMENTAIRE (France / EASA)
  * ---------------------------------------
- * En France, le VFR de jour s'exerce entre les "heures aéronautiques"
- * définies comme : du lever du soleil -30 min au coucher du soleil
- * +30 min (Crépuscules civils). Hors de cette fenêtre, le vol VFR
- * de jour n'est pas autorisé (réservé au VFR de nuit, très encadré :
+ * Le VFR de jour s'exerce entre les crépuscules civils : du début de
+ * l'aube civile du matin à la fin du crépuscule civil du soir (soleil
+ * entre 0° et 6° sous l'horizon). La NUIT aéronautique, au sens
+ * FCL.010 / SERA.2010, couvre le reste — hors de cette fenêtre, le vol
+ * VFR de jour n'est pas autorisé (le VFR de nuit est très encadré :
  * terrains habilités, qualification spécifique).
+ * (M6, audit 27/09 : l'ancien « lever −30 min / coucher +30 min »
+ * déviait du crépuscule civil jusqu'à ~4 min aux équinoxes, dans les
+ * DEUX sens — dont des minutes de « fenêtre ouverte » affichées alors
+ * que la nuit réglementaire avait commencé.)
  *
  * FONCTIONNALITÉ
  * --------------
@@ -85,9 +90,16 @@ export function computeFlightWindow(lat, lon, now = new Date()) {
     const times = SunCalc.getTimes(now, lat, lon);
     if (!times.sunrise || !times.sunset || isNaN(times.sunrise.getTime())) return null;
 
-    // Heures aéronautiques : lever -30min / coucher +30min.
-    const aeroStart = new Date(times.sunrise.getTime() - 30 * 60000);
-    const aeroEnd = new Date(times.sunset.getTime() + 30 * 60000);
+    // Fenêtre de jour = crépuscules civils (M6) : aube civile du matin →
+    // fin du crépuscule civil du soir, soleil à −6° (FCL.010/SERA.2010).
+    // Repli « heures aéronautiques » ±30 min si SunCalc ne fournit pas
+    // dawn/dusk à cette date/latitude (Invalid Date en hautes latitudes).
+    const _ok = (d) => d && !isNaN(d.getTime());
+    const civil = _ok(times.dawn) && _ok(times.dusk);
+    const aeroStart = civil ? times.dawn
+        : new Date(times.sunrise.getTime() - 30 * 60000);
+    const aeroEnd = civil ? times.dusk
+        : new Date(times.sunset.getTime() + 30 * 60000);
 
     let status;
     let minutesLeft = null;
@@ -107,7 +119,7 @@ export function computeFlightWindow(lat, lon, now = new Date()) {
         status = 'closing';
     }
 
-    return { sunrise: times.sunrise, sunset: times.sunset, aeroStart, aeroEnd, status, minutesLeft };
+    return { sunrise: times.sunrise, sunset: times.sunset, aeroStart, aeroEnd, civil, status, minutesLeft };
 }
 
 /**
@@ -169,9 +181,13 @@ function render(lat, lon) {
 
     const cfg = configs[w.status] || configs.open;
 
-    const srLabel = isFr ? 'Lever civil' : 'Civil sunrise';
-    const ssLabel = isFr ? 'Coucher civil' : 'Civil sunset';
-    const aeroLabel = isFr ? 'Heures aéro' : 'Aero hours';
+    const srLabel = isFr ? 'Lever' : 'Sunrise';
+    const ssLabel = isFr ? 'Coucher' : 'Sunset';
+    // Fenêtre de jour = aube → fin du crépuscule civil (repli ±30 min
+    // quand SunCalc ne fournit pas dawn/dusk, ex. hautes latitudes).
+    const aeroLabel = !w.civil
+        ? (isFr ? 'Heures aéro*' : 'Aero hours*')
+        : (isFr ? 'Crépuscules civils' : 'Civil twilight');
 
     container.innerHTML = `
         <div class="flight-window-content" style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">

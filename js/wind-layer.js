@@ -8,13 +8,15 @@
  * où VA le vent (origine → déplacement), couleur par force :
  *   <10 kt gris · <20 vert · <30 ambre · ≥30 rouge.
  *
- * SOURCE : Open-Meteo multi-points (une seule requête pour toute la
- * grille), niveaux 80/180/1000/1500/2000/3000 m AGL interpolés à
- * l'altitude demandée — mêmes conventions que js/winds-aloft.js.
+ * SOURCE : socle commun js/winds-aloft.js — UNE requête Open-Meteo
+ * multi-points pour toute la grille, surfaces ISOBARIQUES en `hourly`
+ * (B1, audit 27/09 : les niveaux en mètres de `current` ne sont jamais
+ * servis — null silencieux ≥ 1000 m) interpolées à l'altitude demandée.
+ * Calque « maintenant » : créneau horaire courant.
  * ================================================================ */
 
 import { state } from './core.js';
-import { getWindAtAltitude } from './winds-aloft.js';
+import { getWindAtAltitude, fetchWindsAloftMulti } from './winds-aloft.js';
 import { escapeHtml } from './core.js';
 
 const MIN_ZOOM = 6;          // sous z6 : grille trop dense ou trop large
@@ -85,46 +87,24 @@ export function buildWindGrid(minLat, minLon, maxLat, maxLon, cells = GRID_CELLS
     return pts;
 }
 
-/** Niveaux AGL d'Open-Meteo (mètres) — mêmes que winds-aloft.js. */
-const LEVELS_M = [80, 180, 1000, 1500, 2000, 3000];
-const FT_PER_M = 3.28084;
-
 /**
  * UNE SEULE requête Open-Meteo multi-points pour toute la grille (le fetch
  * point-par-point de la v1 mettait ~48 requêtes sérialisées = des secondes
- * d'attente et rien ne s'affichait — retour pilote 14/09). CORS natif,
- * donc fetch direct, hors de la file du relais.
+ * d'attente et rien ne s'affichait — retour pilote 14/09). Passe par le
+ * socle winds-aloft (isobare/horaire, B1/M1 audit 27/09) — calque live :
+ * créneau horaire courant. CORS natif, donc hors de la file du relais
+ * dans winds-aloft ; timeout couvert par fetchOpenMeteo.
  * @returns {Promise<Array<{lat,lon,speedKt,dir}>|null>}
  */
 export async function fetchWindGrid(pts, altFt) {
     if (!Array.isArray(pts) || !pts.length) return null;
     try {
-        const vars = LEVELS_M.flatMap(h => [`windspeed_${h}m`, `winddirection_${h}m`]).join(',');
-        const url = 'https://api.open-meteo.com/v1/forecast'
-            + '?latitude=' + pts.map(p => p.lat).join(',')
-            + '&longitude=' + pts.map(p => p.lon).join(',')
-            + '&current=' + vars + '&timezone=auto';
-        const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
-        if (!res.ok) return null;
-        const arr = await res.json();
-        if (!Array.isArray(arr)) return null;
-
+        const arr = await fetchWindsAloftMulti(pts);
+        if (!arr) return null;
         const out = [];
-        arr.forEach((d, i) => {
+        arr.forEach((winds, i) => {
             const p = pts[i];
-            if (!p || !d?.current) return;
-            const winds = LEVELS_M
-                .map(h => {
-                    const s = d.current['windspeed_' + h + 'm'], dir = d.current['winddirection_' + h + 'm'];
-                    return (typeof s === 'number' && typeof dir === 'number')
-                        ? { altFt: Math.round(h * FT_PER_M), speedKt: Math.round(s / 1.852), dir } : null;
-                })
-                .filter(Boolean);
-            if (!winds.length) return;
-            // Croisière AMSL → AGL par l'élévation du point (incluse dans la
-            // réponse) : même correction que le planificateur.
-            const elevFt = Math.round((d.elevation || 0) * FT_PER_M);
-            winds.groundElevFt = elevFt;
+            if (!p || !winds) return;
             const w = getWindAtAltitude(winds, altFt);
             if (w) out.push({ lat: p.lat, lon: p.lon, speedKt: w.speedKt, dir: w.dir });
         });

@@ -352,15 +352,26 @@ export function restorePlan(planOrPoints, settings = null) {
     if (!plan?.dep || !plan?.dest) return false;
     _createdCodes = [];
 
-    // Repères libres d'abord : chaque dispatch crée le marqueur et annonce
-    // son code (nom) dans l'ordre (événement synchrone 'free-waypoint-created'
-    // — ou file d'attente de la carte si elle n'est pas encore initialisée).
+    // Repères libres d'abord : chaque dispatch ENREGISTRE le repère et
+    // annonce son code (nom) dans l'ordre — événement SYNCHRONE
+    // 'free-waypoint-created', carte ouverte ou non (fiche 19 : quand la
+    // carte attendait son init, les codes tardaient et .filter(Boolean)
+    // supprimait les étapes sans prévenir ; les extrémités libres des
+    // GPX/KML faisaient même échouer l'import en silence).
+    const freeCount = (plan.wps || [])
+        .filter(w => w && typeof w.lat === 'number' && typeof w.lon === 'number').length;
     for (const w of (plan.wps || [])) {
         if (w && typeof w.lat === 'number' && typeof w.lon === 'number') {
             document.dispatchEvent(new CustomEvent('restore-free-waypoint', {
                 detail: { lat: w.lat, lon: w.lon, name: _safeWptName(w.name) },
             }));
         }
+    }
+    // Intégrité : chaque repère dispatché doit avoir été annoncé. Sinon
+    // (regional-map non chargé…), les étapes correspondantes seront omises
+    // par buildSeq — on le dit au lieu de laisser le filtre agir en silence.
+    if (_createdCodes.length < freeCount) {
+        console.warn(`restorePlan : ${freeCount - _createdCodes.length} repère(s) libre(s) non créé(s) — étape(s) omise(s) de la route.`);
     }
 
     _setDeparture(plan.dep);

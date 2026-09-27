@@ -19,25 +19,21 @@ import { state, escapeHtml } from './core.js';
 import { makeCollapsible } from './collapsible.js';
 import { getFlightMode } from './flight-mode.js';
 import { getActiveAircraft, usableFuelOf } from './aircraft-fleet.js';
-import { TAXI_MIN_DEP, TAXI_MIN_ARR } from './flight-planner.js';
+import { computeLocalFuelDevis } from './flight-planner.js';
 import {
     computeWb, resolveLoads, writeWbLoads, mountWbChart,
     armFromMm, massFromKg, massToKg, armDecimals,
 } from './wb-core.js';
 
 let _chartDispose = null;
-// Réserve finale d'un vol LOCAL de jour en vue du terrain : 10 min
-// (30 min en navigation de jour, 45 de nuit — cf. devis du planificateur).
-const LOCAL_RESERVE_MIN = 10;
 // Pop-up « carburant insuffisant » déjà affiché pour l'épisode courant
 // (reset dès que l'embarqué atteint le requis, re-alerte ensuite si rechute).
 let _fuelWarnActive = false;
 
 /** Carburant requis. En navigation : plan actif {totalL, tripFuelL, reserveL}.
- *  En vol local (A4) : durée estimée saisie dans le widget + réserve finale
- *  10 min (vol local de jour en vue du terrain), majorée de la réserve perso
- *  de l'avion et du carburant INUTILISABLE du manuel de vol (jamais
- *  consommable mais embarqué — 19/09, retour pilote) — null sans durée. */
+ *  En vol local (A4) : devis partagé computeLocalFuelDevis (flight-planner.js)
+ *  — durée + roulage + réserve finale légale 20 min / 15 ULM (+perso) +
+ *  INUTILISABLE du manuel de vol — null sans durée. */
 function _requiredFuel() {
     if (getFlightMode() === 'nav') {
         const f = state._lastNavPlan?.plan?.fuel;
@@ -45,27 +41,10 @@ function _requiredFuel() {
     }
     const min = parseInt(document.getElementById('wb-local-min')?.value, 10);
     if (!Number.isFinite(min) || min <= 0) return null;
-    const ac = getActiveAircraft();
-    const burn = ac?.fuelBurnLph ?? 35;
-    // Forfaits roulage départ + arrivée (mêmes constantes que la navigation
-    // — le requis local les inclut depuis le 18/09, retour pilote).
-    const groundMin = TAXI_MIN_DEP + TAXI_MIN_ARR;
-    const reserveMin = LOCAL_RESERVE_MIN + (ac?.reserveExtraMin || 0);
-    const tripL = Math.round(min / 60 * burn * 10) / 10;
-    const groundL = Math.round(groundMin / 60 * burn * 10) / 10;
-    const reserveL = Math.round(reserveMin / 60 * burn * 10) / 10;
-    // Inutilisable du manuel de vol : jamais consommable, il doit être dans
-    // le réservoir EN PLUS du besoin utilisable (ex. WT9 : 6 L → un vol
-    // local d'1 h à 18 L/h requiert 18 + 3 + 4,5 + 6 = 31,5 L embarqués).
-    const unusableL = Math.round(((ac?.unusableFuelL > 0) ? ac.unusableFuelL : 0) * 10) / 10;
-    return {
-        local: true, tripMin: min, tripFuelL: tripL,
-        groundMin, groundL,
-        reserveL, reserveMin,
-        reserveBaseMin: LOCAL_RESERVE_MIN, reserveExtraMin: ac?.reserveExtraMin || 0,
-        unusableL,
-        totalL: Math.round((tripL + groundL + reserveL + unusableL) * 10) / 10,
-    };
+    // Fiche 26 : le devis local n'est PLUS recodé ici — la même fonction
+    // alimente la tuile Carburant du dossier et le log PDF local, pour que
+    // l'inutilisable ne puisse plus manquer quelque part.
+    return computeLocalFuelDevis(min, getActiveAircraft());
 }
 
 /** Masse affichée (unité de l'avion) → chaîne arrondie. */
@@ -184,7 +163,7 @@ function _render(body, ac, isFr) {
     let savedMin = '';
     try { savedMin = String(parseInt(localStorage.getItem('wb-local-min'), 10) || ''); } catch {   }
     const durationGroup = (fuelSt && !isNav) ? `
-        <div class="wb-duration-group" title="${isFr ? 'Carburant requis = durée de vol prévue + roulage 10 min (départ et arrivée) + réserve finale 10 min (vol local de jour en vue du terrain) + réserve perso et carburant inutilisable de l\u2019avion (fenêtre Flotte).' : 'Required fuel = planned duration + 10 min taxi (out and in) + 10 min final reserve (day local flight in sight of the field) + the aircraft\u2019s personal reserve and unusable fuel (Fleet window).'}">
+        <div class="wb-duration-group" title="${isFr ? 'Carburant requis = durée de vol prévue + roulage 10 min (départ et arrivée) + réserve finale légale 20 min, 15 min en ULM (vol local de jour en vue du terrain) + réserve perso et carburant inutilisable de l\u2019avion (fenêtre Flotte).' : 'Required fuel = planned duration + 10 min taxi (out and in) + final legal reserve 20 min, 15 min for microlights (day local flight in sight of the field) + the aircraft\u2019s personal reserve and unusable fuel (Fleet window).'}">
             <div class="wb-duration-head">
                 <span class="lab">${isFr ? 'Durée de vol prévue (min)' : 'Planned flight duration (min)'}</span>
                 <div class="wb-duration-ctl">
@@ -225,7 +204,7 @@ function _render(body, ac, isFr) {
             ${isFr
                 ? (isNav
                     ? 'Carburant embarqué pré-rempli du plan de nav (modifiable) ; essence consommée = trajet du plan de vol (non modifiable). Point Arrivée = carburant embarqué − essence consommée. Enveloppe, postes et masse à vide : fenêtre Flotte.'
-                    : 'Durée prévue → devis carburant = durée estimée + roulage 10 min + réserve finale 10 min + réserve perso + inutilisable du manuel de vol (fenêtre Flotte) ; le champ embarqué passe en rouge s\u2019il est insuffisant. Enveloppe, postes et masse à vide : fenêtre Flotte.')
+                    : 'Durée prévue → devis carburant = durée estimée + roulage 10 min + réserve finale légale 20 min (15 min en ULM) + réserve perso + inutilisable du manuel de vol (fenêtre Flotte) ; le champ embarqué passe en rouge s\u2019il est insuffisant. Enveloppe, postes et masse à vide : fenêtre Flotte.')
                 : (isNav
                     ? 'Fuel on board pre-filled from the nav plan (editable); fuel burned = flight plan trip (read-only). Landing point = fuel on board − fuel burned. Envelope, stations and empty weight: Fleet window.'
                     : 'Planned duration → required fuel (duration + taxi + reserve + unusable fuel from the POH); the fuel field turns red when short. Envelope, stations and empty weight: Fleet window.')}
@@ -367,8 +346,9 @@ function _recalc(body, ac, isFr) {
         fuelIn.classList.toggle('wb-under', under);
         if (!under) _fuelWarnActive = false;
         // Vol local (18/09) : DEVIS détaillé sous la durée — durée + roulage
-        // 10 min + réserve finale 10 min (+perso) + inutilisable du manuel
-        // de vol (19/09), comme les olives du devis de navigation.
+        // 10 min + réserve finale légale 20 min / 15 ULM (+perso) +
+        // inutilisable du manuel de vol (19/09), comme les olives du devis
+        // de navigation.
         const devisEl = body.querySelector('#wb-local-devis');
         if (devisEl) {
             if (req && req.local) {

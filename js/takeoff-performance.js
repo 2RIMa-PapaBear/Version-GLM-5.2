@@ -40,7 +40,7 @@
  * l'avion (POH) reste la seule référence légale.
  * ================================================================ */
 
-import { state, fetchAvecRelais } from './core.js';
+import { state, fetchAvecRelais, parseMetarQnhOat, parseWindGroupToKt, findActiveValueAtHour } from './core.js';
 import { densityAltitude, getPerformanceData } from './density-altitude.js';
 import { getAirportByICAO } from './ui-module.js';
 import { getActiveAircraft } from './aircraft-fleet.js';
@@ -202,15 +202,24 @@ export function getAircraftRef() {
  *   2. TEMPÉRATURE       : ×1,10 par +10 °C au-dessus d'ISA
  *   3. REVÊTEMENT        : herbe ×1,20/1,30 ; dur contaminé ×1,25 ; mouillé ×1,00
  *   4. MASSE             : ×1,20 par +10 % au-dessus de la masse de référence
- *   5. PENTE             : ×1,05 par 1 % de pente (montante ou descendante)
+ *   5. PENTE             : ×1,05 par 1 % MONTANTE (descendante favorable
+ *                          non créditée — fiche 6, 27/09 : le POH ne publie
+ *                          pas de réduction pour pente descendante)
+ *   6. VENT ARRIÈRE      : ×1,10 par 2 kt dans le dos (fiche 14, 27/09 :
+ *                          pénalité stricte) ; vent de face NON crédité
+ *                          (×1,00 — même règle « pas de crédit favorable »)
  *
  *   La MARGE +20 % avant piste disponible est appliquée dans le verdict (_takeoffVerdict).
  *
  * @param {number} pressureAltFt Altitude PRESSION (ft).
  * @param {number} oatDegC Température extérieure (°C).
- * @param {Object} [opts] { surfaceCode, wet, contaminated, massRatio, slopePct }
+ * @param {Object} [opts] { surfaceCode, wet, contaminated, massRatio, slopePct, headwindKt }
  *   massRatio = masse décollage / masse de référence POH (1,10 = +10 %).
- *   slopePct = pente de piste en % (1 = montante 1 %, -1 = descendante 1 %).
+ *   slopePct = pente de piste en % (1 = montante 1 %, -1 = descendante 1 %)
+ *   dans le sens du décollage : seule la montante majore, la descendante
+ *   (favorable) ne se crédite pas.
+ *   headwindKt = composante axiale du vent sur la piste en service
+ *   (+ = de face, − = dans le dos) : seule la négative majore.
  */
 export function correctedTakeoffDistance(pressureAltFt, oatDegC, opts = {}) {
     const ref = getAircraftRef();
@@ -239,14 +248,25 @@ export function correctedTakeoffDistance(pressureAltFt, oatDegC, opts = {}) {
         massFactor = Math.pow(1.20, excessPct / 10);
     }
 
-    // ---- 4. Pente : ×1,05 par 1 % (montante OU descendante, méthode de référence) ----
+    // ---- 4. Pente : ×1,05 par 1 % MONTANTE. Le Math.abs initial pénalisait
+    // aussi la pente descendante, FAVORABLE au décollage (fiche 6, 27/09) :
+    // sens différencié — pas de crédit POH pour la descendante (×1,00). ----
     let slopeFactor = 1;
-    if (Number.isFinite(opts.slopePct) && Math.abs(opts.slopePct) > 0.05) {
-        slopeFactor = Math.pow(1.05, Math.abs(opts.slopePct));
+    if (Number.isFinite(opts.slopePct) && opts.slopePct > 0.05) {
+        slopeFactor = Math.pow(1.05, opts.slopePct);
     }
 
+    // ---- 5. Vent : seul le vent DANS LE DOS majore — ×1,10 par 2 kt
+    // (fiche 14, 27/09 : l'omettre validait un décollage vent arrière avec
+    // une distance faussement courte). Le vent de face n'est PAS crédité
+    // (×1,00) : la méthode de référence ne crédite jamais un facteur
+    // favorable (même règle que la pente descendante, fiche 6). ----
+    let windFactor = 1;
+    const hwKt = Number.isFinite(opts.headwindKt) ? opts.headwindKt : 0;
+    if (hwKt < 0) windFactor = 1 + Math.abs(hwKt) * 0.05;
+
     const factor = paFactor * tempFactor;
-    const totalFactor = factor * surfaceFactor * massFactor * slopeFactor;
+    const totalFactor = factor * surfaceFactor * massFactor * slopeFactor * windFactor;
     return {
         groundRoll: Math.round(ref.groundRoll * totalFactor),
         fiftyFt: Math.round(ref.fiftyFt * totalFactor),
@@ -254,8 +274,13 @@ export function correctedTakeoffDistance(pressureAltFt, oatDegC, opts = {}) {
         paFactor,
         tempFactor,
         surfaceFactor,
+        // M10 (audit 27/09) : l'état RÉEL (entrées du calcul), pas un
+        // décodage du facteur — sur herbe, mouillée ×1,30 était affichée
+        // « contaminée » et contaminée ×1,25 « humide ».
+        surfaceState: opts.contaminated ? 'contaminated' : (opts.wet ? 'wet' : 'dry'),
         massFactor,
         slopeFactor,
+        windFactor,
     };
 }
 
@@ -267,7 +292,8 @@ export function correctedTakeoffDistance(pressureAltFt, oatDegC, opts = {}) {
  *   3. VENT LONGITUDINAL : −10 %/10 kt face (plancher −30 %) ; +20 %/10 kt arrière (plafond +60 %)
  *   4. REVÊTEMENT        : dure sèche ×1,00 ; mouillée ×1,15 ; herbe ×1,20/1,30 ; contaminé ×1,25
  *   5. MASSE             : ×1,10 par +10 % (méthode de référence atterrissage)
- *   6. PENTE             : ×1,05 par 1 %
+ *   6. PENTE             : ×1,05 par 1 % DESCENDANTE (montante favorable
+ *                          non créditée — fiche 6, 27/09)
  *
  *   Marge +20 % avant LDA appliquée dans le verdict.
  */
@@ -300,9 +326,11 @@ export function correctedLandingDistance(pressureAltFt, oatDegC, refRollFt, refF
         massFactor = Math.pow(1.10, ((opts.massRatio - 1) * 100) / 10);
     }
 
+    // Pente dans le sens du ROLL OUT : seule la DESCENDANTE pénalise
+    // (freinage défavorable) — la montante, favorable, n'est pas créditée.
     let slopeFactor = 1;
-    if (Number.isFinite(opts.slopePct) && Math.abs(opts.slopePct) > 0.05) {
-        slopeFactor = Math.pow(1.05, Math.abs(opts.slopePct));
+    if (Number.isFinite(opts.slopePct) && opts.slopePct < -0.05) {
+        slopeFactor = Math.pow(1.05, -opts.slopePct);
     }
 
     const f = paFactor * tempFactor * windFactor * surfaceFactor * massFactor * slopeFactor;
@@ -310,6 +338,7 @@ export function correctedLandingDistance(pressureAltFt, oatDegC, refRollFt, refF
         rollFt: Math.round(refRollFt * f),
         fiftyFt: Math.round(refFiftyFt * f),
         paFactor, tempFactor, windFactor, surfaceFactor, massFactor, slopeFactor,
+        surfaceState: opts.contaminated ? 'contaminated' : (opts.wet ? 'wet' : 'dry'),
     };
 }
 
@@ -318,12 +347,16 @@ function _surfaceNote(corr, surfaceCode, isFr) {
     if (corr.surfaceFactor <= 1) return '';
     const surfLbl = surfaceCode ? surfaceLabel(surfaceCode) : '';
     const pct = Math.round((corr.surfaceFactor - 1) * 100);
+    // M10 (audit 27/09) : libellé déduit de l'ÉTAT réel (corr.surfaceState),
+    // jamais du facteur (l'ancien décodage inversait les libellés sur herbe).
+    const st = corr.surfaceState;
     if (isSoftSurface(surfaceCode)) {
-        const wet = corr.surfaceFactor === 1.25, contaminated = corr.surfaceFactor >= 1.30;
-        if (contaminated) return isFr ? ` (revêtement ${surfLbl} contaminé +${pct}%)` : ` (${surfLbl} contaminated +${pct}%)`;
-        if (wet) return isFr ? ` (revêtement ${surfLbl} humide +${pct}%)` : ` (wet ${surfLbl} +${pct}%)`;
+        if (st === 'contaminated') return isFr ? ` (revêtement ${surfLbl} contaminé +${pct}%)` : ` (${surfLbl} contaminated +${pct}%)`;
+        if (st === 'wet') return isFr ? ` (revêtement ${surfLbl} humide +${pct}%)` : ` (wet ${surfLbl} +${pct}%)`;
         return isFr ? ` (revêtement ${surfLbl} +${pct}%)` : ` (${surfLbl} +${pct}%)`;
     }
+    if (st === 'contaminated') return isFr ? ` (piste contaminée +${pct}%)` : ` (contaminated runway +${pct}%)`;
+    if (st === 'wet') return isFr ? ` (piste humide +${pct}%)` : ` (wet runway +${pct}%)`;
     return isFr ? ` (piste humide/contaminée +${pct}%)` : ` (wet/contaminated +${pct}%)`;
 }
 
@@ -340,11 +373,19 @@ export function runwayLevel(rawFt, marginedFt, rwyLenFt, cautionPct = 20) {
     return (margin / rwyLenFt) * 100 < cautionPct ? 'caution' : 'ok';
 }
 
-function _takeoffVerdict(icao, daResult, corr, surfaceCode) {
+function _takeoffVerdict(icao, daResult, corr, surfaceCode, headwindKt = null) {
     const acRef = getAircraftRef();
     const rwyLen = getRunwayLength(icao);
     const isFr = state.lang === 'fr';
     const surfaceNote = _surfaceNote(corr, surfaceCode, isFr);
+    // Note vent arrière (fiche 14, 27/09) : seule composante qui majore le
+    // décollage — rendue visible pour que la distance majorée s'explique
+    // d'elle-même (même style que la mention vent de l'atterrissage).
+    const windNote = (headwindKt != null && headwindKt < 0)
+        ? (isFr
+            ? ` · vent arrière ${Math.abs(headwindKt)} kt +${Math.round((corr.windFactor - 1) * 100)} %`
+            : ` · tailwind ${Math.abs(headwindKt)} kt +${Math.round((corr.windFactor - 1) * 100)}%`)
+        : '';
 
     // MARGE +20 % avant piste disponible (méthode de référence, arbitrage 15/09) : la distance
     // « factorisée » est multipliée par 1,20 AVANT comparaison à la piste.
@@ -365,8 +406,8 @@ function _takeoffVerdict(icao, daResult, corr, surfaceCode) {
             aircraftName: acRef.name,
             surfaceNote,
             message: isFr
-                ? `Roulement estimé ${ftToM(corr.groundRoll)} m (DA ${Math.round(daResult.da)} ft)${surfaceNote} — renseignez la longueur de piste`
-                : `Est. roll ${ftToM(corr.groundRoll)} m (DA ${Math.round(daResult.da)} ft)${surfaceNote} — set runway length`,
+                ? `Roulement estimé ${ftToM(corr.groundRoll)} m (DA ${Math.round(daResult.da)} ft)${surfaceNote}${windNote} — renseignez la longueur de piste`
+                : `Est. roll ${ftToM(corr.groundRoll)} m (DA ${Math.round(daResult.da)} ft)${surfaceNote}${windNote} — set runway length`,
         };
     }
 
@@ -377,17 +418,17 @@ function _takeoffVerdict(icao, daResult, corr, surfaceCode) {
 
     const messages = {
         ok: isFr
-            ? `Décollage OK — ${acRef.name}: 50 ft ${ftToM(fiftyMargined)} m (+20 %), piste ${ftToM(rwyLen)} m (marge ${ftToM(margin)} m)${surfaceNote}`
-            : `Takeoff OK — ${acRef.name}: 50 ft ${ftToM(fiftyMargined)} m (+20%), rwy ${ftToM(rwyLen)} m (margin ${ftToM(margin)} m)${surfaceNote}`,
+            ? `Décollage OK — ${acRef.name}: 50 ft ${ftToM(fiftyMargined)} m (+20 %), piste ${ftToM(rwyLen)} m (marge ${ftToM(margin)} m)${surfaceNote}${windNote}`
+            : `Takeoff OK — ${acRef.name}: 50 ft ${ftToM(fiftyMargined)} m (+20%), rwy ${ftToM(rwyLen)} m (margin ${ftToM(margin)} m)${surfaceNote}${windNote}`,
         caution: isFr
-            ? `Marge faible — ${acRef.name}: 50 ft ${ftToM(fiftyMargined)} m (+20 %), piste ${ftToM(rwyLen)} m${surfaceNote}`
-            : `Tight margin — ${acRef.name}: 50 ft ${ftToM(fiftyMargined)} m (+20%), rwy ${ftToM(rwyLen)} m${surfaceNote}`,
+            ? `Marge faible — ${acRef.name}: 50 ft ${ftToM(fiftyMargined)} m (+20 %), piste ${ftToM(rwyLen)} m${surfaceNote}${windNote}`
+            : `Tight margin — ${acRef.name}: 50 ft ${ftToM(fiftyMargined)} m (+20%), rwy ${ftToM(rwyLen)} m${surfaceNote}${windNote}`,
         limitative: isFr
-            ? `PISTE LIMITATIVE (décollage) — brut ${ftToM(corr.fiftyFt)} m tient dans ${ftToM(rwyLen)} m, mais +20 % (${ftToM(fiftyMargined)} m) dépasse${surfaceNote} : utilisable en respectant exactement les vitesses du manuel — pleins gaz sur freins, rotation au bon moment`
-            : `LIMITING RUNWAY (takeoff) — raw ${ftToM(corr.fiftyFt)} m fits in ${ftToM(rwyLen)} m but +20% (${ftToM(fiftyMargined)} m) does not${surfaceNote}: fly the book speeds — full power before brake release, rotate on speed`,
+            ? `PISTE LIMITATIVE (décollage) — brut ${ftToM(corr.fiftyFt)} m tient dans ${ftToM(rwyLen)} m, mais +20 % (${ftToM(fiftyMargined)} m) dépasse${surfaceNote}${windNote} : utilisable en respectant exactement les vitesses du manuel — pleins gaz sur freins, rotation au bon moment`
+            : `LIMITING RUNWAY (takeoff) — raw ${ftToM(corr.fiftyFt)} m fits in ${ftToM(rwyLen)} m but +20% (${ftToM(fiftyMargined)} m) does not${surfaceNote}${windNote}: fly the book speeds — full power before brake release, rotate on speed`,
         danger: isFr
-            ? `DÉCOLLAGE IMPOSSIBLE — ${acRef.name}: même sans marge, brut ${ftToM(corr.fiftyFt)} m > piste ${ftToM(rwyLen)} m (manque ${ftToM(corr.fiftyFt - rwyLen)} m)${surfaceNote}`
-            : `TAKEOFF NOT POSSIBLE — ${acRef.name}: even raw ${ftToM(corr.fiftyFt)} m > rwy ${ftToM(rwyLen)} m (short by ${ftToM(corr.fiftyFt - rwyLen)} m)${surfaceNote}`,
+            ? `DÉCOLLAGE IMPOSSIBLE — ${acRef.name}: même sans marge, brut ${ftToM(corr.fiftyFt)} m > piste ${ftToM(rwyLen)} m (manque ${ftToM(corr.fiftyFt - rwyLen)} m)${surfaceNote}${windNote}`
+            : `TAKEOFF NOT POSSIBLE — ${acRef.name}: even raw ${ftToM(corr.fiftyFt)} m > rwy ${ftToM(rwyLen)} m (short by ${ftToM(corr.fiftyFt - rwyLen)} m)${surfaceNote}${windNote}`,
     };
 
     return {
@@ -402,6 +443,8 @@ function _takeoffVerdict(icao, daResult, corr, surfaceCode) {
         surfaceFactor: corr.surfaceFactor,
         massFactor: corr.massFactor ?? 1,
         slopeFactor: corr.slopeFactor ?? 1,
+        headwindKt,
+        windFactor: corr.windFactor ?? 1,
         message: messages[level],
     };
 }
@@ -438,13 +481,20 @@ export function evaluateTakeoffPerformance(icao) {
     // Piste active de la rose DES VENTS : ne sert QUE si elle appartient au
     // terrain calculé (ré-audit 26/09 : une piste d'un autre terrain matchait
     // une paire secondaire du terrain visé → pente/longueur désynchronisées).
+    const apt = getAirportByICAO(icao);
+    // Vent de la vue courante (même vent que celui qui a publié la piste de
+    // la rose) → fallback de piste COHÉRENT face au vent.
+    const wind = _parseWindForAxial(_windForActiveRunway());
     const roseRwy = state.activeRunwayName;
-    const activeRwy = (roseRwy && runwayBelongsToAirport(getAirportByICAO(icao), roseRwy) ? roseRwy : null)
-        || getActiveRunwayNameForIcao(icao, null, getDeclinationForIcao(icao));
-    const extra = { surfaceCode, wet, contaminated, ..._massAndSlope(ac, icao, activeRwy) };
+    const activeRwy = (roseRwy && runwayBelongsToAirport(apt, roseRwy) ? roseRwy : null)
+        || getActiveRunwayNameForIcao(icao, wind, getDeclinationForIcao(icao));
+    // Composante axiale sur CETTE piste (fiche 14, 27/09) : négative =
+    // vent dans le dos → majoration stricte dans correctedTakeoffDistance.
+    const headwindKt = _headwindOnEnd(icao, apt, activeRwy, wind);
+    const extra = { surfaceCode, wet, contaminated, headwindKt, ..._massAndSlope(ac, icao, activeRwy) };
 
     const corr = correctedTakeoffDistance(daResult.pa, daResult.oat, extra);
-    return _takeoffVerdict(icao, daResult, corr, surfaceCode);
+    return _takeoffVerdict(icao, daResult, corr, surfaceCode, headwindKt);
 }
 
 /**
@@ -466,13 +516,24 @@ export function evaluateTakeoffFromRaw(icao, metar) {
     const { wet, contaminated } = _wetFromTokens(metar.raw || '');
     const ac = getActiveAircraft();
     // Piste de la rose : seulement si elle appartient au terrain calculé
-    // (même garde que _getActiveRunwayName — ré-audit 26/09).
+    // (même garde que _getActiveRunwayName — ré-audit 26/09). Fallback sur
+    // le vent du METAR brut : piste PRÉVUE face au vent — le paramètre
+    // vent de getActiveRunwayNameForIcao existe pour ce cas précis (avant,
+    // le premier numéro de la chaîne était pris arbitrairement).
+    const apt = getAirportByICAO(icao);
+    // Fiche n°15 (audit 27/09) : vent en KT, MPS ou KMH selon la région —
+    // décodage canonique converti en KT (core.js).
+    const windGrp = parseWindGroupToKt(metar.raw);
+    const wind = windGrp ? { dir: windGrp.dir, speed: windGrp.speed } : null;
     const roseRwy = state.activeRunwayName;
-    const activeRwy = (roseRwy && runwayBelongsToAirport(getAirportByICAO(icao), roseRwy) ? roseRwy : null)
-        || getActiveRunwayNameForIcao(icao, null, getDeclinationForIcao(icao));
+    const activeRwy = (roseRwy && runwayBelongsToAirport(apt, roseRwy) ? roseRwy : null)
+        || getActiveRunwayNameForIcao(icao, wind, getDeclinationForIcao(icao));
+    // Composante axiale sur la piste retenue (fiche 14, 27/09) : un vent
+    // dans le dos majore la distance au lieu de la valider à faux.
+    const headwindKt = _headwindOnEnd(icao, apt, activeRwy, wind);
     const corr = correctedTakeoffDistance(daResult.pa, daResult.oat,
-        { surfaceCode, wet, contaminated, ..._massAndSlope(ac, icao, activeRwy) });
-    return _takeoffVerdict(icao, daResult, corr, surfaceCode);
+        { surfaceCode, wet, contaminated, headwindKt, ..._massAndSlope(ac, icao, activeRwy) });
+    return _takeoffVerdict(icao, daResult, corr, surfaceCode, headwindKt);
 }
 
 /** MASSE (W&B → massRatio) + PENTE (calculée SIA) — méthode de référence 15/09.
@@ -493,6 +554,69 @@ function _massAndSlope(ac, icao, activeRwyName) {
     const slope = _calcRunwaySlopePct(icao, activeRwyName);
     if (slope != null) out.slopePct = slope;
     return out;
+}
+
+/** Pente pour l'ATTERRISSAGE (fiche 6, 27/09) : même calcul SIA que le
+ *  décollage, dans le sens du numéro de piste d'atterrissage (roll out) —
+ *  correctedLandingDistance n majore que la descendante, défavorable. */
+function _slopeForLanding(icao, rwyName) {
+    const slope = _calcRunwaySlopePct(icao, rwyName);
+    return slope == null ? {} : { slopePct: slope };
+}
+
+/** Cap magnétique (°) d'une EXTRÉMITÉ de piste (« 04 », « 08L ») dans la
+ *  liste des pistes du terrain — même parse que selectBestRunway (engine) :
+ *  cap explicite porté par la paire (« 08L 084°/26R 264° »), sinon
+ *  numéro × 10. Exporté pour les tests (fiche 14).
+ *  @returns {number|null} null si l'extrémité est introuvable. */
+export function _rwyEndHeading(apt, rwyName) {
+    if (!apt || !rwyName || !Array.isArray(apt.runways)) return null;
+    const want = String(rwyName).replace(/[^\dLRC]/g, '');
+    if (!want) return null;
+    for (const rwyStr of apt.runways) {
+        const parts = String(rwyStr).split('/');
+        if (parts.length < 2) continue;
+        for (const part of parts) {
+            const m = part.match(/(\d{2}[LRC]?)(?:.*?(\d{3})°?)?/);
+            if (!m) continue;
+            if (m[1].replace(/[^\dLRC]/g, '') === want) {
+                return m[2] ? parseInt(m[2], 10) : parseInt(want, 10) * 10;
+            }
+        }
+    }
+    return null;
+}
+
+/** Vent de la vue courante, COHÉRENT avec celui qui a publié la piste de
+ *  la rose (publishActiveRunway) : METAR → vent de base ; TAF → vent à
+ *  l'heure ciblée, TEMPO prioritaire. La composante axiale du décollage
+ *  (fiche 14) doit être calculée sur CE vent-là, sinon piste et vent se
+ *  désynchronisent (pente sur une extrémité, vent sur l'autre). */
+function _windForActiveRunway() {
+    const parsed = state.lastParsed;
+    if (!parsed?.base) return null;
+    if (parsed.isMetar) return parsed.base.vent?.[0]?.val || null;
+    const h = state.manualTargetHour;
+    if (h == null) return parsed.base.vent?.[0]?.val || null;
+    let w = findActiveValueAtHour(parsed.base.vent, h);
+    const tempos = parsed.tempo || [];
+    for (let i = tempos.length - 1; i >= 0; i--) {
+        if (h >= tempos[i].start && h < tempos[i].end && tempos[i].vent) { w = tempos[i].vent; break; }
+    }
+    return w || null;
+}
+
+/** Composante axiale du vent (kt, + = de face, − = dans le dos) sur une
+ *  EXTRÉMITÉ de piste donnée — null si indéterminable (VRB, cap inconnu).
+ *  Même trigonométrie que l'atterrissage : le vent est VRAI, la piste
+ *  MAGNÉTIQUE (correction de déclinaison). */
+function _headwindOnEnd(icao, apt, rwyName, wind) {
+    if (!wind || wind.dir == null || !rwyName) return null;
+    const hdg = _rwyEndHeading(apt, rwyName);
+    if (hdg == null) return null;
+    const dec = getDeclinationForIcao(icao) || 0;
+    const magWindDir = (((wind.dir - dec) % 360) + 360) % 360;
+    return Math.round(wind.speed * Math.cos((magWindDir - hdg) * Math.PI / 180));
 }
 
 /**
@@ -551,6 +675,7 @@ function _landingVerdict(icao, daResult, corr, headwindKt, activeName, isForecas
         crosswindSide: extra.crosswindSide ?? null,
         surfaceFactor: corr.surfaceFactor,
         windFactor: corr.windFactor,
+        slopeFactor: corr.slopeFactor ?? 1,
     };
 
     const rwyLen = getRunwayLength(icao);
@@ -632,8 +757,13 @@ export function evaluateLandingPerformance(icao) {
 
     const surfaceCode = getRunwaySurface(icao);
     const { wet, contaminated } = _detectWetFromMetar();
+    // Pente dans le sens du roll out (fiche 6) : piste prévue au vent, sinon
+    // celle de la rose SI elle appartient à CE terrain (même garde 26/09).
+    const slopeRwy = activeName
+        || (state.activeRunwayName && runwayBelongsToAirport(apt, state.activeRunwayName) ? state.activeRunwayName : null);
     const corr = correctedLandingDistance(daResult.pa, daResult.oat, ac.ldgRoll, ac.ldgFifty, {
         headwindKt: headwindKt ?? 0, surfaceCode, wet, contaminated,
+        ..._slopeForLanding(icao, slopeRwy),
     });
     if (!corr) return null;
     return _landingVerdict(icao, daResult, corr, headwindKt, activeName || state.activeRunwayName, false, { crosswindKt, crosswindSide });
@@ -677,8 +807,10 @@ export function evaluateLandingFromRaw(icao, metar) {
     let crosswindKt = null;
     let crosswindSide = null;
     let activeName = null;
-    const mW = String(metar.raw || '').match(/\b(\d{3}|VRB)(\d{2,3})(?:G\d{2,3})?KT\b/);
-    const wind = mW ? { dir: mW[1] === 'VRB' ? null : parseInt(mW[1], 10), speed: parseInt(mW[2], 10) } : null;
+    // Fiche n°15 (audit 27/09) : vent en KT, MPS ou KMH selon la région —
+    // décodage canonique converti en KT (core.js).
+    const windGrp = parseWindGroupToKt(metar.raw);
+    const wind = windGrp ? { dir: windGrp.dir, speed: windGrp.speed } : null;
     const apt = getAirportByICAO(icao);
     if (wind && wind.dir != null && apt?.runways) {
         const dec = getDeclinationForIcao(icao) || 0;
@@ -698,8 +830,11 @@ export function evaluateLandingFromRaw(icao, metar) {
 
     const surfaceCode = getRunwaySurface(icao);
     const { wet, contaminated } = _wetFromTokens(metar.raw || '');
+    // Piste PRÉVUE au vent du METAR → pente dans le sens du roll out
+    // (fiche 6 : la descendante majore l'atterrissage).
     const corr = correctedLandingDistance(daResult.pa, daResult.oat, ac.ldgRoll, ac.ldgFifty, {
         headwindKt: headwindKt ?? 0, surfaceCode, wet, contaminated,
+        ..._slopeForLanding(icao, activeName),
     });
     if (!corr) return null;
     return _landingVerdict(icao, daResult, corr, headwindKt, activeName, true, { crosswindKt, crosswindSide });
@@ -807,11 +942,11 @@ export async function evaluateLandingAtDestination(destIcao) {
         const fb = await fetchMetarWithFallback(code);
         if (fb) { raw = fb.raw; metarFrom = fb.from; metarDistNm = fb.distNm; }
 
-        const mQ = raw ? raw.match(/\bQ(\d{4})\b/) : null;
-        // Température : paire T/Td juste avant le QNH (22/12 Q1018).
-        const mT = raw ? raw.match(/\b(M?\d{2})\/M?\d{2}\s+Q\d{4}\b/) : null;
-        const qnh = mQ ? parseInt(mQ[1], 10) : null;
-        const oat = mT ? (mT[1][0] === 'M' ? -parseInt(mT[1].slice(1), 10) : parseInt(mT[1], 10)) : null;
+        // QNH/OAT via l'extracteur UNIQUE de core (fiche n°9, audit 27/09) :
+        // les METAR nord-américains publient l'altimètre en inHg (A2992) —
+        // l'ancien parsing « Q uniquement » laissait les performances
+        // d'atterrissage à destination vides sans aucun signal.
+        const { qnh, oat } = parseMetarQnhOat(raw);
         let landing = null;
         if (qnh != null && oat != null) {
             const elevFt = getSiaAirfield(code)?.elevFt ?? getAirportByICAO(code)?.elevation ?? 0;

@@ -118,12 +118,16 @@ export function evaluateIcingRisk(freezingLevelFt, nuageStr, tempC = null, tdC =
     // Approche plafond vs isotherme : on ne l'applique que si la thermo n'a pas déjà
     // remonté un danger (pour éviter un double signal dans le message).
     if (ceilingFt != null && ceilingFt >= freezingLevelFt && level !== 'danger') {
+        // Plafond AU-DESSUS de l'isotherme 0°C : sous ce plafond, le vol VFR peut
+        // se faire en air négatif à proximité de l'eau surfondue du nuage (c'est
+        // LA configuration de givrage cellule du VFR). Un plafond sous l'isotherme
+        // maintient au contraire tout le vol en air positif — pas de danger.
         const margin = ceilingFt - freezingLevelFt;
         if (margin < 2000) {
             level = 'danger';
             detail = isFr
-                ? `GIVRAGE PROBABLE — plafond ${ceilingFt} ft, ${fl0Msg}`
-                : `LIKELY ICING — ceiling ${ceilingFt} ft, ${fl0Msg}`;
+                ? `GIVRAGE PROBABLE — plafond ${ceilingFt} ft au-dessus de l'isotherme 0°C (${flLabel} ft)`
+                : `LIKELY ICING — ceiling ${ceilingFt} ft above freezing level (${flLabel} ft)`;
         } else if (level !== 'caution') {
             level = 'caution';
             detail = isFr
@@ -136,7 +140,7 @@ export function evaluateIcingRisk(freezingLevelFt, nuageStr, tempC = null, tdC =
     let message;
     if (level === 'ok') {
         message = ceilingFt != null && ceilingFt < freezingLevelFt
-            ? (isFr ? `${fl0Msg} — sous le plafond` : `${fl0Msg} — below ceiling`)
+            ? (isFr ? `${fl0Msg} — plafond sous l'isotherme` : `${fl0Msg} — ceiling below freezing level`)
             : (isFr ? `${fl0Msg} — pas de risque détecté` : `${fl0Msg} — no risk detected`);
     } else {
         message = detail;

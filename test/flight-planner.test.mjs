@@ -23,9 +23,11 @@ import {
     computeDiversionLeg,
     cheapestWaypointInsertion,
     RESERVES,
+    regulatoryReserveMin,
     TAXI_MIN_DEP, TAXI_MIN_ARR, INTEGRATION_MIN,
     computeLeg2Fuel,
     withUnusableFuel,
+    computeLocalFuelDevis, localReserveMin,
     _fallbackProfile,
 } from '../js/flight-planner.js';
 
@@ -59,15 +61,42 @@ describe('computeDiversionLeg (branche dégagement du devis carburant)', () => {
     test('distance / temps / carburant depuis la destination (0,5° lat ≈ 30 NM)', () => {
         const d = computeDiversionLeg(47.0, -3.0, 47.5, -3.0, 30, 100);
         assert.equal(d.distNm, 30);   // 0,5° × 60 NM
+        assert.equal(d.gsKt, 100);    // sans vent : GS = TAS
         assert.equal(d.timeMin, 23);  // 30 NM / 100 kt × 60 + 5 min d'intégration
         assert.equal(d.fuelL, 11.5);  // 23 min / 60 × 30 L/h
     });
 
-    test('sans GS ni conso → distance seule ; coordonnées invalides → null', () => {
-        const d = computeDiversionLeg(47, -3, 47.5, -3, 0, 0);
+    test('fiche 27/09 NCO.OP.125 : GS recalculée sur le CAP dégagement — vent DE FACE', () => {
+        // Cap dégagement 000 (47 → 47,5 le long du méridien), vent du 000/30 :
+        // GS = 100 − 30. L'ancien calcul reprenait la GS de la route (ce même
+        // vent y est ARRIÈRE → 130 kt) et n'accordait que 19 min / 9,4 L.
+        const d = computeDiversionLeg(47.0, -3.0, 47.5, -3.0, 30, 100, { dir: 0, speedKt: 30 });
+        assert.equal(d.gsKt, 70);
+        assert.equal(d.timeMin, 31);  // 30/70 × 60 + 5 = 30,7 → 31
+        assert.equal(d.fuelL, 15.4);  // ~40 % de carburant de plus que l'ancien 9,4 L
+    });
+
+    test('fiche 27/09 NCO.OP.125 : dégagement vent ARRIÈRE — GS majorée', () => {
+        const d = computeDiversionLeg(47.0, -3.0, 47.5, -3.0, 30, 100, { dir: 180, speedKt: 30 });
+        assert.equal(d.gsKt, 130);
+        assert.equal(d.timeMin, 19);  // 30/130 × 60 + 5 = 18,8 → 19
+        assert.equal(d.fuelL, 9.4);
+    });
+
+    test('vent de face > TAS (GS ≤ 0) : repli TAS, même règle que la route', () => {
+        const d = computeDiversionLeg(47.0, -3.0, 47.5, -3.0, 30, 100, { dir: 0, speedKt: 150 });
+        assert.equal(d.gsKt, 100);
+        assert.equal(d.timeMin, 23);
+    });
+
+    test('sans TAS : repli GS de référence ; sans GS ni conso → distance seule ; coordonnées invalides → null', () => {
+        const d = computeDiversionLeg(47, -3, 47.5, -3, 30, 0, null, 100);
         assert.equal(d.distNm, 30);
-        assert.equal(d.timeMin, null);
-        assert.equal(d.fuelL, null);
+        assert.equal(d.timeMin, 23);  // 100 kt de GS de référence
+        const d0 = computeDiversionLeg(47, -3, 47.5, -3, 0, 0);
+        assert.equal(d0.distNm, 30);
+        assert.equal(d0.timeMin, null);
+        assert.equal(d0.fuelL, null);
         assert.equal(computeDiversionLeg(null, -3, 47.5, -3, 30, 100), null);
     });
 });
@@ -341,6 +370,87 @@ describe('_fallbackProfile (repli sans relief, 20/09)', () => {
         ]);
         assert.equal(pr.maxFt, 400);
         const mid = pr.points.find(p => Math.abs(p.elevFt - 400) < 1 && p.frac > 0.2 && p.frac < 0.8);
-        assert.ok(mid, 'sommet = l’étape intermédiaire');
+        assert.ok(mid, 'sommet = l\u2019étape intermédiaire');
+    });
+});
+
+// Réserve réglementaire de base selon l'aéronef (fiche 7, 27/09) : ULM
+// 15 min de jour (arrêté du 17/02/2025, art. 4.1.4) ; avion certifié
+// conservé à 30/45 (minimum réglementaire 20/45 — l'app reste au-dessus).
+describe('regulatoryReserveMin (fiche 7 — ULM vs avion certifié)', () => {
+    test('avion certifié : 30 min jour, 45 min nuit', () => {
+        assert.equal(regulatoryReserveMin({}), RESERVES.DAY_MIN);
+        assert.equal(regulatoryReserveMin({ isNight: true }), RESERVES.NIGHT_MIN);
+        assert.equal(regulatoryReserveMin(), RESERVES.DAY_MIN, 'sans arguments : avion de jour');
+    });
+
+    test('ULM : 15 min de jour ; la nuit reste 45 min (par prudence)', () => {
+        assert.equal(regulatoryReserveMin({ isULM: true }), RESERVES.DAY_MIN_ULM);
+        assert.equal(RESERVES.DAY_MIN_ULM, 15);
+        assert.equal(regulatoryReserveMin({ isULM: true, isNight: true }), RESERVES.NIGHT_MIN);
+    });
+
+    test('computeFuel inchangé : la réserve ULM traverse le devis (15 min à 18 L/h)', () => {
+        const f = computeFuel(60, 18, regulatoryReserveMin({ isULM: true }));
+        assert.equal(f.reserveL, 4.5);
+        assert.equal(f.totalL, 22.5);
+    });
+});
+
+describe('computeLocalFuelDevis — devis vol local partagé (fiche 26 : le refresh de la tuile Carburant oubliait l\u2019inutilisable)', () => {
+    test('avion : 1 h à 18 L/h + inutilisable 6 L → 18 + 3 + 6 + 6 = 33 L (F1 : réserve jour avion 20 min)', () => {
+        const d = computeLocalFuelDevis(60, { fuelBurnLph: 18, unusableFuelL: 6 });
+        assert.equal(d.local, true);
+        assert.equal(d.tripMin, 60);
+        assert.equal(d.tripFuelL, 18);
+        assert.equal(d.groundMin, TAXI_MIN_DEP + TAXI_MIN_ARR);
+        assert.equal(d.groundL, 3);
+        assert.equal(d.reserveMin, 20);
+        assert.equal(d.reserveL, 6);
+        assert.equal(d.unusableL, 6);
+        assert.equal(d.totalL, 33);
+    });
+
+    test('localReserveMin (F1, audits 26+27/09) : 20 avion jour / 15 ULM jour / 45 nuit', () => {
+        assert.equal(localReserveMin({}), 20);
+        assert.equal(localReserveMin({ isULM: true }), 15);
+        assert.equal(localReserveMin({}, true), 45);
+        assert.equal(localReserveMin({ isULM: true }, true), 45);
+        // Devis local ULM : réserve 15 min à 18 L/h = 4,5 L → 18+3+4,5+6 = 31,5.
+        const d = computeLocalFuelDevis(60, { fuelBurnLph: 18, unusableFuelL: 6, isULM: true });
+        assert.equal(d.reserveBaseMin, 15);
+        assert.equal(d.reserveL, 4.5);
+        assert.equal(d.totalL, 31.5);
+    });
+
+    test("l'inutilisable est TOUJOURS dans le total (0 si absent/nul) — cœur de la fiche 26", () => {
+        const sans = computeLocalFuelDevis(60, {});
+        assert.equal(sans.unusableL, 0);
+        assert.equal(sans.totalL, 52.5); // 35 + 5,8 + 11,7 (conso repli 35 L/h, réserve 20 min)
+        const avec = computeLocalFuelDevis(60, { unusableFuelL: 6.25 });
+        assert.equal(avec.unusableL, 6.3); // arrondi au dixième
+        assert.equal(avec.totalL, Math.round((52.5 + 6.3) * 10) / 10);
+    });
+
+    test('réserve perso de l\u2019avion majorée (reserveExtraMin)', () => {
+        const d = computeLocalFuelDevis(60, { fuelBurnLph: 35, reserveExtraMin: 5 });
+        assert.equal(d.reserveMin, 25);
+        assert.equal(d.reserveL, 14.6);
+        assert.equal(d.reserveBaseMin, 20);
+        assert.equal(d.reserveExtraMin, 5);
+        assert.equal(d.totalL, 55.4); // 35 + 5,8 + 14,6
+    });
+
+    test('arrondi au dixième OLIVE PAR OLIVE (plus d\u2019écart 0,1 L entre rendu complet et refresh à la frappe)', () => {
+        // 45 min à 25 L/h : trip 18,75 → 18,8 ; roulage 4,1667 → 4,2 ;
+        // réserve 20 min 8,3333 → 8,3 ; + inutilisable 2 → 33,3.
+        // Le total EST la somme des olives publiées (source unique fiche 26) :
+        // l\u2019ancienne copie du rendu complet arrondissait tout d\u2019un bloc.
+        const d = computeLocalFuelDevis(45, { fuelBurnLph: 25, unusableFuelL: 2 });
+        assert.equal(d.tripFuelL, 18.8);
+        assert.equal(d.groundL, 4.2);
+        assert.equal(d.reserveL, 8.3);
+        assert.equal(d.totalL, 33.3);
+        assert.equal(d.totalL, Math.round((d.tripFuelL + d.groundL + d.reserveL + d.unusableL) * 10) / 10);
     });
 });

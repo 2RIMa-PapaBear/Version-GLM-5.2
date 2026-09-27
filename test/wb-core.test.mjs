@@ -80,43 +80,51 @@ describe('wb — géométrie de l\'enveloppe', () => {
     });
 });
 
-describe('wb — normalisation de l\'enveloppe (saisie « ligne à ligne »)', () => {
+describe('wb — enveloppe : ordre des sommets certifié (fiche 16)', () => {
     // Saisie naturelle du tableau POH : pour chaque masse, [avant, arrière].
     const ZIG = [[740, 180], [740, 520], [1000, 228], [1000, 505], [1100, 245], [1100, 490]];
-    const orient = (a, b, c) => Math.sign((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
-    const segCross = (p1, p2, p3, p4) =>
-        orient(p1, p2, p3) !== orient(p1, p2, p4) && orient(p3, p4, p1) !== orient(p3, p4, p2);
-    const selfCrossings = (pts) => {
-        let n = 0;
-        for (let i = 0; i < pts.length; i++)
-            for (let j = i + 2; j < pts.length; j++) {
-                if (i === 0 && j === pts.length - 1) continue;
-                if (segCross(pts[i], pts[(i + 1) % pts.length], pts[j], pts[(j + 1) % pts.length])) n++;
-            }
-        return n;
-    };
+    // Enveloppe CONCAVE certifiée : rectangle 700–1100 kg × bras 200–500 mm
+    // avec échancrure (bras 300–400, masses 900–1100) sur l'arête haute.
+    // Un tri angulaire autour du centroïde comblerait l'échancrure.
+    const NOTCH = [
+        [700, 200], [700, 500], [1100, 500], [1100, 400],
+        [900, 400], [900, 300], [1100, 300], [1100, 200],
+    ];
+    const NOTCH_WB = () => ({ ...AC_WB, envelope: NOTCH });
 
-    test('le zigzag brut s\'auto-croise ; normalisé, plus aucun croisement', () => {
-        assert.ok(selfCrossings(ZIG) > 0);          // le problème est réel
-        const norm = wb.normalizeEnvelope(ZIG);
-        assert.equal(norm.length, ZIG.length);
-        assert.deepEqual(norm.map(p => p.join(',')).sort(), ZIG.map(p => p.join(',')).sort());
-        assert.equal(selfCrossings(norm), 0);
+    test('envelopeSelfCrossings : 0 sur un périmètre certifié (même concave), > 0 sur le zigzag', () => {
+        assert.equal(wb.envelopeSelfCrossings(AC_WB.envelope), 0);
+        assert.equal(wb.envelopeSelfCrossings(NOTCH), 0);
+        assert.ok(wb.envelopeSelfCrossings(ZIG) > 0);
     });
-    test('une enveloppe déjà parcourue en périmètre reste identique', () => {
-        const norm = wb.normalizeEnvelope(AC_WB.envelope);
-        assert.deepEqual(norm, AC_WB.envelope);
-    });
-    test('la flotte STOCKE l\'enveloppe normalisée (idem aperçu et PDF)', () => {
+    test('la flotte conserve l\'ordre des sommets TEL QUEL (aucun réordonnancement)', () => {
         const ac = fleet.addAircraft({
             name: 'Z', groundRoll: 500, fiftyFt: 1100,
             wb: { ...AC_WB, envelope: ZIG },
         });
-        assert.equal(selfCrossings(ac.wb.envelope), 0);
-        assert.deepEqual(ac.wb.envelope[0], [740, 180]);   // départ coin bas-avant
-        // Verdicts cohérents sur l'enveloppe réparée.
-        const r = wb.computeWb(ac.wb, LOADS);
-        assert.equal(r.level, 'ok');
+        assert.deepEqual(ac.wb.envelope, ZIG);   // zigzag non réparé : la fenêtre Flotte signale, ne réécrit pas
+    });
+    test('enveloppe concave : un point dans l\'échancrure est HORS enveloppe', () => {
+        assert.equal(wb.pointInEnvelope(NOTCH, 1000, 350), false);   // dans l'échancrure
+        assert.equal(wb.pointInEnvelope(NOTCH, 800, 350), true);     // sous l'échancrure
+        assert.equal(wb.pointInEnvelope(NOTCH, 1000, 250), true);    // jambe gauche
+        // armLimitsAt reste min/max global ([200,500]) : c'est le
+        // pointInEnvelope qui protège le verdict dans l'échancrure.
+        const { fwdMm, aftMm } = wb.armLimitsAt(NOTCH, 1000);
+        assert.equal(fwdMm, 200);
+        assert.equal(aftMm, 500);
+    });
+    test('enveloppe concave : verdict computeWb = danger pour un CG dans l\'échancrure', () => {
+        // vide 628@295 + pilote 82@340 + pax 70@340 + carburant 144@300
+        // → décollage 924 kg @ ≈303 mm : DANS l'échancrure (interdit POH).
+        const r = wb.computeWb(NOTCH_WB(), { masses: { 'Pilote': 82, 'Passager 1': 70 }, fuelL: 200, burnL: 0 });
+        assert.equal(r.takeoff.massKg, 924);
+        assert.ok(Math.abs(r.takeoff.cgMm - 303.2) < 0.1);
+        assert.equal(r.points.takeoff.inside, false);
+        assert.equal(r.points.zfw.inside, true);      // 780 kg @ ≈304 : bande pleine
+        assert.equal(r.level, 'danger');
+        const svg = wb.wbChartSvg(NOTCH_WB(), r, true, 340);
+        assert.ok(svg.includes('<polygon') && !svg.includes('NaN'));
     });
 });
 

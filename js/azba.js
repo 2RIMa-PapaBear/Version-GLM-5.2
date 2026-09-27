@@ -19,20 +19,27 @@
  *   "0600-1900" · "0630-1530" · "06 12 20 0700-1600, 09 16 0700-1030"
  *   "SR-SS" · "MON-FRI 1200-SS"
  *
- * LIMITES ASSUMÉES (v1) : les plages item D sont lues en HEURE LOCALE
- * du navigateur (un pilote qui vole en France lit des NOTAM en heure
- * locale de terrain) ; SR/SS sont fournis par l'appelant (leverages/
- * couchers calculés à la position de la zone via SunCalc). Un NOTAM
- * sans item D = activation permanente pendant sa validité.
+ * FUSEAU HORAIRE (correctif 27/09, fiche audit n°1) : les heures
+ * numériques de l'item D sont UTC (OACI Annexe 15) ; elles sont
+ * converties en heure locale du navigateur pour la comparaison ET
+ * l'affichage — tout le module travaille en minutes locales. SR/SS
+ * sont fournis par l'appelant (levers/couchers calculés à la position
+ * de la zone via SunCalc, déjà en minutes locales : pas de conversion)
+ * ; les jours de l'item D restent appariés sur la date locale.
+ * Un NOTAM sans item D = activation permanente pendant sa validité.
  * ================================================================ */
 
 const WEEKDAYS = { MON: 1, TUE: 2, WED: 3, THU: 4, FRI: 5, SAT: 6, SUN: 7 };
 
-/** « HHMM » → minutes depuis minuit ; SR/SS via sunTimes (minutes). */
-function _toMin(token, sunTimes) {
+/** « HHMM » UTC → minutes locales (tzShift = -getTimezoneOffset() en
+ *  minutes) ; SR/SS via sunTimes (minutes locales, déjà converties).
+ *  Bouclage [0,1440) (fiche n°27) : 2300Z en UTC+2 = 00:50 le
+ *  lendemain — un retour ≥ 1440 (ou < 0 en fuseau ouest) serait hors
+ *  de portée du nowMin local et rendrait la plage jamais active. */
+function _toMin(token, sunTimes, tzShift = 0) {
     if (token === 'SR') return sunTimes?.sr ?? 6 * 60 + 30;
     if (token === 'SS') return sunTimes?.ss ?? 19 * 60 + 45;
-    if (/^\d{4}$/.test(token)) return parseInt(token.slice(0, 2), 10) * 60 + parseInt(token.slice(2), 10);
+    if (/^\d{4}$/.test(token)) return (((parseInt(token.slice(0, 2), 10) * 60 + parseInt(token.slice(2), 10) + tzShift) % 1440) + 1440) % 1440;
     return null;
 }
 
@@ -128,15 +135,17 @@ function _statusToday(groups, nowD, sunTimes) {
     const dom = nowD.getDate();
     const wd = nowD.getDay() === 0 ? 7 : nowD.getDay();   // 1=LUN..7=DIM
     const nowMin = nowD.getHours() * 60 + nowD.getMinutes();
-    const hhmm = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}${String(min % 60).padStart(2, '0')}`;
+    // Item D numérique = UTC (Annexe 15) : décalage UTC → heure locale.
+    const tzShift = -nowD.getTimezoneOffset();
+    const hhmm = (min) => { min = ((min % 1440) + 1440) % 1440; return `${String(Math.floor(min / 60)).padStart(2, '0')}${String(min % 60).padStart(2, '0')}`; };
 
     let upcoming = null;
     for (const g of groups) {
         if (g.days && !g.days.has(dom)) continue;
         if (g.weekdays && !g.weekdays.has(wd)) continue;
 
-        let a = g.from ? _toMin(g.from, sunTimes) : 0;
-        let b = g.to ? _toMin(g.to, sunTimes) : 24 * 60;
+        let a = g.from ? _toMin(g.from, sunTimes, tzShift) : 0;
+        let b = g.to ? _toMin(g.to, sunTimes, tzShift) : 24 * 60;
         if (a == null || b == null) continue;
         if (b <= a) {   // plage traversant minuit (1900-0600)
             if (nowMin >= a || nowMin < b) return { state: 'active', detail: `${hhmm(a)}-${hhmm(b)}` };

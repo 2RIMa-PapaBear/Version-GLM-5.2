@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#F4EEDB">
 <title>Mentions légales | Prévol</title>
-<meta name="description" content="Mentions légales de Prévol : éditeur non professionnel, hébergement Free et crédits des sources de données (SIA, METAR, openAIP, Open-Meteo).">
+<meta name="description" content="Mentions légales de Prévol : éditeur non professionnel, hébergement Free et relais technique Cloudflare, crédits des sources de données (SIA, METAR, openAIP, Open-Meteo, OurAirports).">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://papabear56.pages-perso.free.fr/mentions-legales.html">
 <link rel="icon" href="favicon.ico" type="image/x-icon">
@@ -33,7 +33,11 @@
 
         <h2>Hébergement</h2>
         <p>Ce site est hébergé par <strong>Free SAS</strong> — 16 rue de la Ville l'Évêque, 75008 Paris —
-           <a href="https://free.fr" rel="noopener">free.fr</a>.</p>
+           <a href="https://free.fr" rel="noopener">free.fr</a>. Certains flux de données (météo
+           aéronautique, NOTAM, TEMSI) transitent en outre par un relais technique exploité sur
+           <strong>Cloudflare Workers</strong> — Cloudflare, Inc., 101 Townsend Street, San Francisco,
+           CA 94107, États-Unis — <a href="https://www.cloudflare.com" rel="noopener">cloudflare.com</a>,
+           qui relaie les requêtes sans conserver vos données.</p>
 
         <h2>Sources de données et conditions de réutilisation</h2>
         <p>Prévol agrège et présente des données publiées par des tiers, réutilisées selon les conditions
@@ -46,8 +50,11 @@
             <tr><td>Météo-France (AEROWEB)</td><td>TEMSI, fronts et isobares, SIGMET</td><td>Réutilisation non commerciale avec mention de la source.</td></tr>
             <tr><td>Open-Meteo</td><td>Vents en altitude, givrage, température, QNH, tendance</td><td>Usage non commercial avec attribution (CC-BY).</td></tr>
             <tr><td>openAIP</td><td>Base des terrains, espaces aériens</td><td>CC-BY-NC-SA — attribution obligatoire, usage non commercial.</td></tr>
+            <tr><td>OurAirports (David Megginson — davidmegginson.github.io)</td><td>Seuils et caractéristiques de pistes</td><td>Données mises dans le domaine public par leur auteur (ourairports.com).</td></tr>
             <tr><td>RainViewer</td><td>Radar de précipitations</td><td>Service gratuit avec attribution.</td></tr>
             <tr><td>OpenStreetMap / OpenTopoMap / Esri / AWS Terrain Tiles</td><td>Fonds de carte et relief</td><td>© OpenStreetMap contributors (ODbL) · OpenTopoMap (CC-BY-SA) · Esri, Maxar, Earthstar Geographics · Mapzen / AWS Open Data.</td></tr>
+            <tr><td>goQR (api.qrserver.com)</td><td>Génération du QR code du lien de partage</td><td>API gratuite (goqr.me) ; elle ne reçoit que l'URL de partage, c'est-à-dire les terrains du plan.</td></tr>
+            <tr><td>cdnjs (cdnjs.cloudflare.com)</td><td>Distribution de la bibliothèque de calcul solaire SunCalc</td><td>CDN gratuit de bibliothèques open source ; SunCalc reste sous sa licence d'origine.</td></tr>
         </table>
 
         <h2>Propriété intellectuelle</h2>

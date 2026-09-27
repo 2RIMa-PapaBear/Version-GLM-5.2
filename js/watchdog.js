@@ -7,7 +7,7 @@
  * Tant que l'application est ouverte (onglet actif), un minuteur
  * vérifie périodiquement la météo des terrains favoris et alerte le
  * pilote si :
- *   - Un terrain passe en NO-GO (IFR/LIFR, vent trop fort...).
+ *   - Un terrain passe en NO-GO (IMC, vent trop fort...).
  *   - Un terrain jusqu'alors vert se dégrade (passe en CAUTION).
  *   - Un terrain était vert et devient rouge sur les minimas perso.
  *
@@ -29,7 +29,7 @@
  * - Minuteur réglable (défaut 15 min, min 5 min).
  * - Recalcule la catégorie de vol de chaque favori.
  * - Compare avec l'état précédent pour ne pas spammer (n'alerte que
- *   sur les transitions : VFR→IFR, GO→NO-GO).
+ *   sur les transitions : VMC→IMC, GO→NO-GO).
  * - Notification navigateur + badge visuel sur les favoris concernés.
  * ================================================================ */
 
@@ -375,8 +375,8 @@ export function openWatchdogPanel() {
                 <div style="font-size:10px; color:var(--text-muted); line-height:1.5; margin-top:4px;">
                     <i data-lucide="info" style="width:11px;height:11px;vertical-align:middle;"></i>
                     ${isFr
-                        ? 'Seuls les changements d\'état (ex: VFR → IFR) déclenchent une alerte pour éviter le spam.'
-                        : 'Only state changes (e.g. VFR → IFR) trigger an alert to avoid spam.'}
+                        ? 'Seuls les changements d\'état (ex: VMC → IMC) déclenchent une alerte pour éviter le spam.'
+                        : 'Only state changes (e.g. VMC → IMC) trigger an alert to avoid spam.'}
                 </div>
             </div>
         </div>

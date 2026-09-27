@@ -37,6 +37,45 @@ test('getAirportFreqs : overrides > SIA > openAIP', () => {
     assert.equal(oa.freqs.length, 1);
 });
 
+test('openAIP sans drapeau primary : une fréquence promue, objets sources intacts', () => {
+    // Terrain hors France défini par openAIP seul, sans AUCUN drapeau
+    // primary (données communautaires) : le widget attend une fréquence
+    // mise en avant — promotion TWR d'abord (fiche 23).
+    const r1 = getAirportFreqs('EGHH', [
+        { freq: 118.205, name: 'ATIS', type: 'ATIS', primary: false },
+        { freq: 125.85, name: 'TOWER', type: 'TWR', primary: false },
+        { freq: 122.6, name: 'A/A', type: 'A/A', primary: false },
+    ]);
+    assert.equal(r1.source, 'openaip');
+    assert.deepEqual(r1.freqs.filter(f => f.primary).map(f => f.type), ['TWR']);
+
+    // Aucune TWR/AFIS/APP : la première de la liste est promue.
+    const r2 = getAirportFreqs('EGBX', [
+        { freq: 119.0, name: 'INFO', type: 'INFO', primary: false },
+        { freq: 123.5, name: 'A/A', type: 'A/A', primary: false },
+    ]);
+    assert.deepEqual(r2.freqs.filter(f => f.primary).map(f => f.type), ['INFO']);
+
+    // La VOLMET (diffusion météo) n'est jamais la fréquence promue.
+    const r3 = getAirportFreqs('EGOV', [
+        { freq: 125.25, name: 'VOLMET', type: 'VOLMET', primary: false },
+        { freq: 123.45, name: 'A/A', type: 'A/A', primary: false },
+    ]);
+    assert.deepEqual(r3.freqs.filter(f => f.primary).map(f => f.type), ['A/A']);
+
+    // openAIP flaggue déjà une primary : rien de promu en plus.
+    const r4 = getAirportFreqs('EGJJ', [
+        { freq: 119.9, name: 'JERSEY', type: 'TWR', primary: true },
+        { freq: 121.5, name: 'ATIS', type: 'ATIS', primary: false },
+    ]);
+    assert.deepEqual(r4.freqs.filter(f => f.primary).map(f => f.freq), [119.9]);
+
+    // Les objets passés (index runtime partagé) ne sont pas mutés.
+    const shared = [{ freq: 119.0, name: 'INFO', type: 'INFO', primary: false }];
+    getAirportFreqs('ZZZZ', shared);
+    assert.equal(shared[0].primary, false);
+});
+
 test('getServiceFreq : correction SIV par indicatif (insensible à la casse)', () => {
     assert.equal(getServiceFreq('RENNES INFORMATION'), '134.000');
     assert.equal(getServiceFreq('rennes information'), '134.000');

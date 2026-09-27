@@ -286,6 +286,30 @@ describe('flotte — limites par avion (A3)', () => {
     });
 });
 
+// ---- Base avions (js/aircraft-database.js) : B2 audit 27/09 — famille ----
+// Robin/CAP/Rallye : plus de distances de décollage optimistes d'un facteur ≈2.
+// Ancres : POH DR400/135 CDI (787/1 444 ft, 980 kg SL/ISA sans vent) et
+// AOPA 1994 DR400/180 (1 034/2 001 ft, 1 100 kg). CAP 10/Rallye/ATL :
+// plancher conservateur = ancre 135 CDI en attendant les POH.
+describe('base avions — B2 : famille Robin/CAP/Rallye ≥ ancres POH (plus de ÷2)', () => {
+    test('tous les types visés par l\u2019audit A1 du volet 4 dépassent l\u2019ancre POH 135 CDI', () => {
+        const byType = Object.fromEntries(acdb.AIRCRAFT_DB.map(a => [a.type, a]));
+        for (const t of ['DR400-120', 'DR400-140', 'DR400-160', 'DR400-180',
+                         'DR400-200', 'DR400-220', 'DR401', 'DR500',
+                         'R2120', 'CAP10', 'MS880', 'MS883', 'MS893']) {
+            const a = byType[t];
+            assert.ok(a, `type ${t} présent en base`);
+            assert.ok(a.groundRoll >= 787, `${t} : roulement ${a.groundRoll} ft ≥ ancre 787`);
+            assert.ok(a.fiftyFt >= 1444, `${t} : 50 ft ${a.fiftyFt} ft ≥ ancre 1 444`);
+        }
+        // Les deux ancres sourcées, telles quelles :
+        assert.equal(byType['DR400-140'].groundRoll, 787);
+        assert.equal(byType['DR400-140'].fiftyFt, 1444);
+        assert.equal(byType['DR400-180'].groundRoll, 1034);
+        assert.equal(byType['DR400-180'].fiftyFt, 2001);
+    });
+});
+
 // ---- Base avions (js/aircraft-database.js) : fiche complète Dynamic WT9 ----
 // Intégrée le 17/09 depuis la config flotte du pilote (export JSON, version
 // LSA 600 kg), sans l'immatriculation. La fiche étendue pré-remplit TOUT le
@@ -341,5 +365,29 @@ describe('base avions — Dynamic WT9 LSA (fiche complète)', () => {
         assert.equal(acdb.VR_KT['WT9-LSA'], 50, 'VR WT9 LSA (pilote)');
         assert.equal(acdb.vrForType('WT9'), 50, 'rétro-compat : flotte existante type WT9');
         assert.equal(acdb.VR_KT.BULLDOG, 60, 'régression BULLOG/BULLDOG corrigée');
+    });
+});
+
+// Drapeau ULM (fiche 7, 27/09) : réserve carburant de jour 15 min au lieu
+// de 30 dans le devis navigation (arrêté du 17/02/2025, art. 4.1.4).
+describe('flotte — drapeau ULM (fiche 7)', () => {
+    test('addAircraft enregistre isULM ; faux par défaut', () => {
+        const ulm = fleet.addAircraft({ name: 'WT9 Dynamic', groundRoll: 300, fiftyFt: 800, isULM: true });
+        assert.equal(ulm.isULM, true);
+        const plane = fleet.addAircraft({ name: 'DR400', groundRoll: 500, fiftyFt: 1100 });
+        assert.equal(plane.isULM, false);
+    });
+
+    test('updateAircraft partiel préserve isULM ; isULM:false le retire', () => {
+        const ac = fleet.addAircraft({ name: 'WT9', groundRoll: 300, fiftyFt: 800, isULM: true });
+        const keep = fleet.updateAircraft(ac.id, { cruiseSpeedKt: 110 });
+        assert.equal(keep.isULM, true, 'mise à jour d\u2019un autre champ : conservé');
+        const off = fleet.updateAircraft(ac.id, { isULM: false });
+        assert.equal(off.isULM, false, 'décoché explicitement');
+    });
+
+    test('import JSON : chaîne "true" acceptée (exports/imports de fichiers)', () => {
+        const ac = fleet.addAircraft({ name: 'Sky Ranger', groundRoll: 200, fiftyFt: 600, isULM: 'true' });
+        assert.equal(ac.isULM, true);
     });
 });

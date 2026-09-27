@@ -13,115 +13,207 @@
  * SOURCE
  * ------
  * Open-Meteo forecast endpoint — gratuit, sans clé, CORS natif.
- * Variables disponibles à 10/80/180 mètres et à des altitudes
- * isobariques (1000 hPa, 975 hPa, 950 hPa... jusqu'à 50 hPa) :
- *   - windspeed_<alt>m       : vitesse en km/h
- *   - winddirection_<alt>m   : direction en degrés (origine, vraie)
+ * NIVEAUX ISOBARIQUES en `hourly` (B1, audit 27/09 : les niveaux
+ * « altitude » en mètres de `current` — windspeed_1000m… — ne sont
+ * JAMAIS servis par l'API, null silencieux ≥ 1000 m : tout le plan
+ * était extrapolé depuis le 180 m AGL, dérive/GS fausses) :
+ *   - windspeed_<p>hPa / winddirection_<p>hPa, p ∈ 1000…700 hPa
+ *     (≈ 360 à 9 880 ft AMSL — couvre toute la plage VFR de transit) ;
+ *   - une surface isobare sous le niveau du sol (plateau) revient null
+ *     et est filtrée : l'interpolation se fait entre surfaces valides.
+ * Et `hourly` résout AUSSI M1 (audit 27/09) : le vent est pris à
+ * l'HEURE DE VOL (créneau horaire le plus proche de l'heure estimée
+ * du milieu de tronçon), pas à l'heure de la requête.
  *
- * On interroge les altitudes 80 m, 180 m, 1000 m, 1500 m, 2000 m,
- * 3000 m (≈ AGL 250/600/3300/5000/6500/10000 ft au-dessus du sol)
- * — couvre toute la plage VFR de transit.
+ * Les niveaux sont des altitudes PRESSION ≈ AMSL : la croisière du
+ * plan (AMSL/QNH) se compare DIRECTEMENT — plus de conversion par
+ * l'élévation du sol (l'ancien décalage AGL n'a plus d'objet).
  *
- * On interpole linéairement entre les niveaux pour obtenir le vent
- * à n'importe quelle altitude. ATTENTION : les niveaux demandés sont
- * au-dessus du SOL (AGL) alors que l'altitude de croisière du plan est
- * AMSL/QNH — la réponse Open-Meteo porte l'élévation du modèle au point
- * interrogé, qui sert à convertir (cf. getWindAtAltitude).
+ * On interpole linéairement entre les surfaces pour obtenir le vent
+ * à n'importe quelle altitude.
  *
  * CACHE
  * -----
- * Cache session mémoire (Map) par coordonnées arrondies au 0.1°.
- * TTL 1 heure (les vents évoluent sur cette échelle).
+ * Cache session mémoire (Map) par coordonnées arrondies au 0.1° ET
+ * par créneau horaire ciblé (une heure bucket) — un plan à 14 h et un
+ * plan à 17 h ne se servent pas le même vent. TTL 1 heure.
  * ================================================================ */
 
 import { fetchOpenMeteo } from './core.js';
 
 const ENDPOINT = 'https://api.open-meteo.com/v1/forecast';
 
-// Niveaux altimétriques interrogés (mètres au-dessus du sol).
-const LEVELS_M = [80, 180, 1000, 1500, 2000, 3000];
-const FT_PER_M = 3.28084;
+// Niveaux isobariques interrogés (hPa) — B1/M1, audit 27/09.
+const LEVELS_HPA = [1000, 975, 950, 925, 900, 850, 800, 700];
+// Altitude géométrique approchée (atmosphère ISA, ft AMSL) de chaque
+// surface isobare — la pression ≠ géomètre, l'écart ISA/réel reste
+// faible devant la résolution d'un vent interpolé.
+const HPA_TO_FT = { 1000: 363, 975: 1061, 950: 1775, 925: 2503, 900: 3246, 850: 4786, 800: 6396, 700: 9880 };
+const KT_PER_KMH = 1 / 1.852;
 
-// Cache session : clé "lat,lon" arrondie → { winds, ts }.
+// Cache session : clé "lat,lon@heure" → { winds, ts }.
 const _cache = new Map();
 const TTL_MS = 60 * 60 * 1000;  // 1 heure.
 
-/**
- * Récupère les vents en altitude pour une position.
- * @param {number} lat Latitude.
- * @param {number} lon Longitude.
- * @returns {Promise<Array<{altFt:number, speedKt:number, dir:number}>|null>}
- *   Liste des vents par niveau (ft MSL, kt, degrés vrais d'origine).
- */
-export async function fetchWindsAloft(lat, lon) {
-    if (lat == null || lon == null) return null;
+/** Heure cible d'un point (targetMs scalaire ou tableau aligné). */
+function _targetMsFor(targetMs, idx) {
+    if (Array.isArray(targetMs)) {
+        const t = targetMs[idx];
+        return Number.isFinite(t) ? t : Date.now();
+    }
+    return Number.isFinite(targetMs) ? targetMs : Date.now();
+}
 
-    const key = `${lat.toFixed(1)},${lon.toFixed(1)}`;
-    const cached = _cache.get(key);
-    if (cached && Date.now() - cached.ts < TTL_MS) return cached.winds;
+// Décode UNE location de la réponse Open-Meteo ({ hourly, … }) en liste
+// de vents par surface isobare, au créneau horaire le plus proche de
+// l'heure de vol. Commune au point-à-point et au multi-points.
+function _parseWindsLocation(d, targetMs) {
+    const h = d?.hourly;
+    if (!h || !Array.isArray(h.time) || h.time.length === 0) return null;
+
+    // M1 : créneau horaire le plus proche de l'heure de vol (timezone=UTC
+    // demandé → suffixe Z au parse ; sans Z, Date.parse lit l'heure locale
+    // du runner et décalerait la sélection).
+    let i = 0, best = Infinity;
+    for (let k = 0; k < h.time.length; k++) {
+        const t = Date.parse(String(h.time[k]) + (String(h.time[k]).endsWith('Z') ? '' : 'Z'));
+        if (!Number.isFinite(t)) continue;
+        const dd = Math.abs(t - targetMs);
+        if (dd < best) { best = dd; i = k; }
+    }
+
+    const winds = [];
+    for (const p of LEVELS_HPA) {
+        const speedKmh = h[`windspeed_${p}hPa`]?.[i];
+        const dir = h[`winddirection_${p}hPa`]?.[i];
+        // null = surface sous le niveau du sol (relief) → ignorée.
+        if (typeof speedKmh !== 'number' || typeof dir !== 'number') continue;
+        winds.push({ altFt: HPA_TO_FT[p], speedKt: Math.round(speedKmh * KT_PER_KMH), dir });
+    }
+    return winds.length ? winds : null;
+}
+
+/**
+ * Récupère les vents en altitude pour PLUSIEURS positions en UNE SEULE
+ * requête multi-points (fiche 20, audit 27/09 : hétérogénéité spatiale
+ * des masses d'air — un plan multi-étapes doit avoir un vent par tronçon,
+ * pas un vent unique au milieu global de la route). Les points déjà en
+ * cache session ne sont pas redemandés ; les points de même clé (0.1° +
+ * créneau horaire) sont dédoublonnés dans la requête.
+ * @param {Array<{lat:number, lon:number}>} points Positions demandées.
+ * @param {number|Array<number>} [targetMs] Heure(s) de vol visée(s) —
+ *   scalaire pour toute la requête, ou tableau aligné sur `points`
+ *   (ETA du milieu de chaque tronçon, M1). Défaut : maintenant.
+ * @returns {Promise<Array<Array<{altFt,speedKt,dir}>|null>|null>}
+ *   Tableau ALIGNÉ sur l'entrée (vents par surface isobare, ou null par
+ *   point inconnu/échec) ; null si l'entrée est vide.
+ */
+export async function fetchWindsAloftMulti(points, targetMs) {
+    if (!Array.isArray(points) || points.length === 0) return null;
+
+    const out = new Array(points.length).fill(null);
+    const todo = new Map();   // clé cache → { lat, lon, idxs, targetMs }
+    points.forEach((p, idx) => {
+        if (p?.lat == null || p?.lon == null) return;
+        const tMs = _targetMsFor(targetMs, idx);
+        const key = `${p.lat.toFixed(1)},${p.lon.toFixed(1)}@${Math.floor(tMs / 3600000)}`;
+        const cached = _cache.get(key);
+        if (cached && Date.now() - cached.ts < TTL_MS) { out[idx] = cached.winds; return; }
+        const t = todo.get(key);
+        if (t) t.idxs.push(idx);
+        else todo.set(key, { key, lat: p.lat, lon: p.lon, idxs: [idx], targetMs: tMs });
+    });
+    if (todo.size === 0) return out;
 
     try {
-        // Construction de la liste des variables à demander.
-        const speedVars = LEVELS_M.map(h => `windspeed_${h}m`);
-        const dirVars = LEVELS_M.map(h => `winddirection_${h}m`);
-        const vars = [...speedVars, ...dirVars].join(',');
+        // Variables isobariques (B1) — servies en `hourly` uniquement.
+        const vars = LEVELS_HPA.flatMap(p => [`windspeed_${p}hPa`, `winddirection_${p}hPa`]).join(',');
 
-        const url = `${ENDPOINT}?latitude=${lat}&longitude=${lon}` +
-            `&current=${vars}&timezone=auto`;
+        const list = [...todo.values()];
+        const url = `${ENDPOINT}?latitude=${list.map(t => t.lat).join(',')}` +
+            `&longitude=${list.map(t => t.lon).join(',')}` +
+            `&hourly=${vars}&forecast_days=2&timezone=UTC`;
 
         let data;
-        try { data = await fetchOpenMeteo(url); } catch { return null; }
-        if (!data) return null;
+        try { data = await fetchOpenMeteo(url); } catch { return out; }
+        // Un seul point demandé → objet simple ; plusieurs → tableau
+        // (une entrée par location, dans l'ordre des coordonnées).
+        const arr = Array.isArray(data) ? data : (data ? [data] : null);
+        if (!arr) return out;
 
-        const cur = data?.current;
-        if (!cur) return null;
-
-        // Élévation du modèle au point (m) : les niveaux sont AGL, la
-        // croisière du plan est AMSL — sans cette conversion, le vent
-        // au-dessus d'un relief était pris trop haut de l'élévation du sol.
-        const groundElevFt = Number.isFinite(data.elevation)
-            ? Math.round(data.elevation * FT_PER_M) : null;
-
-        // Assemble la liste des vents par niveau.
-        const winds = LEVELS_M.map(h => {
-            const speedKmh = cur[`windspeed_${h}m`];
-            const dir = cur[`winddirection_${h}m`];
-            if (typeof speedKmh !== 'number' || typeof dir !== 'number') return null;
-            // km/h → kt (1 kt = 1.852 km/h).
-            const speedKt = Math.round(speedKmh / 1.852);
-            return { altFt: Math.round(h * FT_PER_M), speedKt, dir };
-        }).filter(Boolean);
-
-        if (winds.length === 0) return null;
-
-        if (groundElevFt != null) winds.groundElevFt = groundElevFt;
-
-        _cache.set(key, { winds, ts: Date.now() });
-        return winds;
+        list.forEach((t, i) => {
+            const winds = _parseWindsLocation(arr[i], t.targetMs);
+            if (!winds) return;
+            _cache.set(t.key, { winds, ts: Date.now() });
+            for (const idx of t.idxs) out[idx] = winds;
+        });
+        return out;
     } catch (e) {
-        console.warn('Winds aloft fetch failed:', e.message);
-        return null;
+        console.warn('Winds aloft multi fetch failed:', e.message);
+        return out;
     }
 }
 
 /**
+ * Récupère les vents en altitude pour une position (cas particulier du
+ * multi-points — même parsing, même cache).
+ * @param {number} lat Latitude.
+ * @param {number} lon Longitude.
+ * @param {number} [targetMs] Heure de vol visée (défaut : maintenant).
+ * @returns {Promise<Array<{altFt:number, speedKt:number, dir:number}>|null>}
+ *   Liste des vents par surface isobare (ft AMSL, kt, degrés vrais d'origine).
+ */
+export async function fetchWindsAloft(lat, lon, targetMs) {
+    if (lat == null || lon == null) return null;
+    const arr = await fetchWindsAloftMulti([{ lat, lon }], targetMs);
+    return arr ? arr[0] : null;
+}
+
+/**
+ * Vent moyen d'un plan multi-tronçons : moyenne VECTORIELLE pondérée par
+ * la distance (fiche 20). Une moyenne arithmétique des direction ferait
+ * « 270° et 090° → 180° » — un vent de travers fantôme là où deux
+ * tronçons opposés s'annulent en réalité.
+ * @param {Array<{wind:{speedKt:number,dir:number}|null, weight:number}>} entries
+ *   Une entrée par tronçon ; vent indisponible → ignoré.
+ * @returns {{speedKt:number, dir:number}|null} null si aucune entrée valable.
+ */
+export function weightedMeanWind(entries) {
+    if (!Array.isArray(entries)) return null;
+    let u = 0, v = 0, w = 0;
+    for (const e of entries) {
+        const wt = Number(e?.weight);
+        const wind = e?.wind;
+        if (!wind || !(wt > 0) || !Number.isFinite(wind.speedKt) || !Number.isFinite(wind.dir)) continue;
+        const rad = wind.dir * Math.PI / 180;
+        // Direction météorologique = d'ORIGINE : le vecteur va VERS dir+180.
+        u -= Math.sin(rad) * wind.speedKt * wt;
+        v -= Math.cos(rad) * wind.speedKt * wt;
+        w += wt;
+    }
+    if (!w) return null;
+    const speedKt = Math.round(Math.hypot(u, v) / w);
+    if (speedKt === 0) return { speedKt: 0, dir: 0 };
+    const dir = ((Math.round(Math.atan2(-u, -v) * 180 / Math.PI) + 360) % 360) % 360;
+    return { speedKt, dir };
+}
+
+/**
  * Obtient le vent interpolé à l'altitude de croisière du plan.
- * Interpolation linéaire entre les niveaux connus (AGL).
- * @param {Array} winds Liste issue de fetchWindsAloft — porte
- *   winds.groundElevFt (élévation du modèle au point) quand elle est connue.
+ * Interpolation linéaire entre les surfaces isobariques connues.
+ * @param {Array} winds Liste issue de fetchWindsAloft — altFt en ft AMSL
+ *   (altitudes pression ISA des surfaces, cf. HPA_TO_FT).
  * @param {number} altFt Altitude cible (ft AMSL/QNH).
  * @returns {{speedKt:number, dir:number}|null}
  */
 export function getWindAtAltitude(winds, altFt) {
     if (!Array.isArray(winds) || winds.length === 0) return null;
 
-    // Croisière AMSL → AGL quand l'élévation du sol est connue : les niveaux
-    // Open-Meteo (80 m…3000 m) sont donnés au-dessus du sol. Sur un plateau
-    // à 1500 ft, « 3000 ft AMSL » = 1500 ft AGL — sans conversion le vent
-    // était lu ~1500 ft trop haut (dérive/GS fausses en zone de relief).
-    if (Number.isFinite(winds.groundElevFt)) altFt -= winds.groundElevFt;
+    // Niveaux et croisière dans le MÊME référentiel (≈ AMSL) : lecture
+    // directe. (L'ancienne conversion AGL par groundElevFt n'a plus
+    // d'objet avec des surfaces isobariques.)
 
-    // Sous le niveau le plus bas → on renvoie le plus bas.
+    // Sous la surface la plus basse → on renvoie la plus basse.
     if (altFt <= winds[0].altFt) return { speedKt: winds[0].speedKt, dir: winds[0].dir };
     // Au-dessus du plus haut → le plus haut.
     const last = winds[winds.length - 1];

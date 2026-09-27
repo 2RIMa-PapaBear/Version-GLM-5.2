@@ -1,8 +1,9 @@
 import { state, I18N, fetchAvecRelais, memoGet, escapeHtml } from './core.js';
 import { getAirportByICAO } from './ui-module.js';
-import { parseVisiToMeters, CAT_COLORS } from './core.js';
+import { parseVisiToMeters, CAT_COLORS, getFlightCategory } from './core.js';
 import { greatCircleDistanceNm, trueCourseDeg } from './flight-planner.js';
 import { getDeclinationForIcao } from './magvar.js';
+import { _distToSegmentNm } from './alternates.js';
 
 let _routeLayer = null;
 let _routeMarkers = [];
@@ -178,10 +179,23 @@ if (typeof document !== 'undefined') {
 // Pastilles météo du COULOIR : suivent TOUS les tronçons du plan (étapes
 // comprises — et l'aller-retour, dont la « ligne directe » départ→arrivée
 // serait de longueur nulle). routePoints = [lat, lon, icao] de chaque étape.
-function _distToRoute(lat, lon, routePoints) {
+// Largeur du couloir en NM : 48 = 0.8° de latitude, la largeur historique du
+// filtre (exprimée en degrés) — désormais isotrope en NM, voir _distToRouteNm.
+const CORRIDOR_NM = 48;
+
+// Distance d'une station à la POLYLIGNE de la route (NM) : minimum de
+// l'écart de route (cross-track) sphérique sur tous les tronçons.
+// Fiche n°17 (audit 27/09) : l'ancienne version mesurait en degrés bruts sur
+// un plan cartésien — sans le facteur 1/cos(lat) sur la composante
+// est-ouest, le couloir était une ellipse (~48 NM N-S pour ~32 NM E-O en
+// France) qui pouvait masquer un METAR latéral. Exporté pour les tests.
+export function _distToRouteNm(lat, lon, routePoints) {
+    const p = { lat, lon };
     let best = Infinity;
     for (let i = 1; i < routePoints.length; i++) {
-        const d = _pointToSegmentDist(lat, lon, routePoints[i - 1][0], routePoints[i - 1][1], routePoints[i][0], routePoints[i][1]);
+        const a = { lat: routePoints[i - 1][0], lon: routePoints[i - 1][1] };
+        const b = { lat: routePoints[i][0], lon: routePoints[i][1] };
+        const d = _distToSegmentNm(p, a, b).nm;
         if (d < best) best = d;
     }
     return best;
@@ -202,22 +216,33 @@ async function _loadCorridorMetars(map, routePoints, opts = {}) {
             minLat = Math.min(minLat, p[0]); maxLat = Math.max(maxLat, p[0]);
             minLon = Math.min(minLon, p[1]); maxLon = Math.max(maxLon, p[1]);
         }
-        minLat -= 1; maxLat += 1; minLon -= 1; maxLon += 1;
+        // Marges de la bbox DÉRIVÉES du couloir en NM : 1° de longitude ne
+        // vaut que 60·cos(lat) NM, la marge est-ouest doit donc être élargie
+        // d'autant pour ne pas couper le couloir AVANT le filtre par distance.
+        const midLat = (minLat + maxLat) / 2;
+        const latMarginDeg = CORRIDOR_NM / 60 + 0.05;
+        const lonMarginDeg = CORRIDOR_NM / (60 * Math.max(0.2, Math.cos(midLat * Math.PI / 180))) + 0.05;
+        minLat -= latMarginDeg; maxLat += latMarginDeg;
+        minLon -= lonMarginDeg; maxLon += lonMarginDeg;
 
         const stationsUrl = `https://aviationweather.gov/api/data/stationinfo?bbox=${minLat},${minLon},${maxLat},${maxLon}&format=json`;
         const stations = await fetchAvecRelais(stationsUrl, 'json', 3600);
         if (!Array.isArray(stations)) return;
 
-        const corridorStations = stations
-            .filter(s => {
-                if (!s.icaoId || !/^[A-Z][A-Z0-9]{3}$/.test(s.icaoId)) return false;
-                const code = s.icaoId.toUpperCase();
-                if (routeCodes.has(code)) return false;
-                if (skip(code)) return false;
-                return _distToRoute(s.lat, s.lon, routePoints) < 0.8;
-            })
-            .sort((a, b) => _distToRoute(a.lat, a.lon, routePoints) - _distToRoute(b.lat, b.lon, routePoints))
-            .slice(0, 10);
+        // Distance au couloir calculée UNE fois par station (l'ancien
+        // filter+sort la recalculait à chaque comparaison du tri).
+        const candidates = [];
+        for (const s of stations) {
+            if (!s.icaoId || !/^[A-Z][A-Z0-9]{3}$/.test(s.icaoId)) continue;
+            const code = s.icaoId.toUpperCase();
+            if (routeCodes.has(code) || skip(code)) continue;
+            const distNm = _distToRouteNm(s.lat, s.lon, routePoints);
+            if (distNm < CORRIDOR_NM) candidates.push({ s, distNm });
+        }
+        const corridorStations = candidates
+            .sort((x, y) => x.distNm - y.distNm)
+            .slice(0, 10)
+            .map(x => x.s);
 
         if (corridorStations.length === 0) return;
 
@@ -425,18 +450,11 @@ function _clearRoute(map) {
     _legLabelMarkers = [];
 }
 
-function _pointToSegmentDist(px, py, x1, y1, x2, y2) {
-    const dx = x2 - x1, dy = y2 - y1;
-    const len2 = dx * dx + dy * dy;
-    if (len2 === 0) return Math.hypot(px - x1, py - y1);
-    let t = ((px - x1) * dx + (py - y1) * dy) / len2;
-    t = Math.max(0, Math.min(1, t));
-    return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
-}
-
 function _categoryFromMetar(raw) {
-    const visiMatch = raw.match(/KT(?:\s+\d{3}V\d{3})?\s+(\d{4})\b/);
-    const visiM = visiMatch ? (parseInt(visiMatch[1], 10) === 9999 ? 10000 : parseInt(visiMatch[1], 10)) : parseVisiToMeters('');
+    // Fiche n°15 (audit 27/09) : ancre vent aux 3 unités OACI (KT/MPS/KMH).
+    const visiMatch = raw.match(/(?:KT|MPS|KMH)(?:\s+\d{3}V\d{3})?\s+(\d{4})\b/);
+    // Visi absente du groupe = null (pas de 10 km implicite — ré-audit 26/09).
+    const visiM = visiMatch ? (parseInt(visiMatch[1], 10) === 9999 ? 10000 : parseInt(visiMatch[1], 10)) : null;
 
     let ceilHund = 999;
     const cloudMatches = [...raw.matchAll(/\b(BKN|OVC)(\d{3})/g)];
@@ -448,8 +466,8 @@ function _categoryFromMetar(raw) {
     if (vvMatch) ceilHund = parseInt(vvMatch[1], 10);
     if (/CAVOK|NSC|SKC|NCD/.test(raw)) ceilHund = 999;
 
-    if (ceilHund < 5 || visiM < 1600) return 'LIFR';
-    if (ceilHund < 10 || visiM < 4800) return 'IFR';
-    if (ceilHund <= 30 || visiM <= 8000) return 'MVFR';
-    return 'VFR';
+    // Couloir = tendance comparative : table SERA.5005 en pire-cas contrôlé
+    // (fiche n°3, audit 27/09) — la classe réelle par tronçon n'est pas
+    // modélisée ici, le go-nogo/minima par terrain portent l'évaluation.
+    return getFlightCategory(visiM, ceilHund, null).cat;
 }

@@ -1,7 +1,7 @@
 import { config } from './config.js';
 import { state, escapeHtml } from './core.js';
 import { getServiceFreq } from './freq-sia.js';
-import { horLabel } from './airspace-profile.js';
+import { horLabel, MAX_BASE_FT } from './airspace-profile.js';
 import { bigDataUrl } from './data-base.js';
 import { getCurrentNotams } from './notam.js';
 import { zoneActivation, zoneActiveToday } from './azba.js';
@@ -23,7 +23,7 @@ const MIN_ZOOM = 4;
 // continentales) — une vue France z6 en fait ~70, ce cap ne la touche pas.
 const MAX_VIEW_CELLS = 300;
 
-export const MAX_BASE_FT = 5000;
+export { MAX_BASE_FT };   // FL195 — défini dans airspace-profile.js (audit 27/09, fiche 2)
 
 // Numérotation openAIP BRUTE (cellules data/airspaces/cells/) — vérifiée
 // sur le corpus servi : RMZ CHERBOURG=6, TMZ SEINE=5, ZARAGOZA ATZ=13,
@@ -224,7 +224,12 @@ export function _expandFileItem(c) {
         else if (g.t === 2) geometry = { type: 'MultiPolygon', coordinates: g.c };
         else if (g.t === 3) geometry = { type: 'LineString', coordinates: g.c };
     }
-    const lim = (l) => (Array.isArray(l) ? { value: l[0], unit: l[1] } : null);
+    // 3ᵉ élément du tuple = 1 → limite SIA « FT ASFC » (M13, audit 27/09) :
+    // la valeur voyage avec son marqueur, le profil la convertit avec le
+    // relief de la route et les libellés disent « ft sol », pas « AMSL ».
+    const lim = (l) => (Array.isArray(l)
+        ? { value: l[0], unit: l[1], ...(l[2] === 1 ? { ref: 'ASFC' } : {}) }
+        : null);
     return {
         _id: c.i, name: c.n, type: c.ty, icaoClass: c.ic,
         lowerLimit: lim(c.lo), upperLimit: lim(c.up),
@@ -704,13 +709,15 @@ export function _limitFt(lim) {
     return Math.round(lim.value);                                    // ft
 }
 
-/** Texte d'une borne : « SFC », « FL065 », « 2500 ft AMSL »… (les limites
- *  verticales des zones sont publiées AMSL ; le referenceDatum openAIP
- *  « AGL » est erroné sur les CTR/TMA — retour utilisateur 2026-08-26). */
+/** Texte d'une borne : « SFC », « FL065 », « 2500 ft AMSL », « 1500 ft sol »…
+ *  (les limites verticales des zones sont publiées AMSL ; le referenceDatum
+ *  openAIP « AGL » est erroné sur les CTR/TMA — retour utilisateur
+ *  2026-08-26. ref:'ASFC' = données SIA « FT ASFC » — M13, audit 27/09.) */
 export function _limitTxt(lim) {
     const ft = _limitFt(lim);
     if (ft == null) return null;
     if (ft <= 0) return 'SFC';
+    if (lim.ref === 'ASFC') return `${ft} ft sol`;
     if (lim.unit === 6 || (ft >= 4000 && ft % 500 === 0)) {
         return `FL${String(Math.round(ft / 100)).padStart(3, '0')}`;
     }
@@ -742,8 +749,9 @@ function _zoneSunTimes(as) {
 }
 
 /** Activation NOTAM de la zone (B2/AZBA) : croise le désignateur de la
- *  zone avec les NOTAM du dossier courant (plages de l'item D, heure
- *  locale ; SR/SS calculés à la position de la zone). null sans info. */
+ *  zone avec les NOTAM du dossier courant (plages de l'item D en UTC,
+ *  converties en heure locale par azba.js ; SR/SS calculés à la
+ *  position de la zone). null sans info. */
 function _activationLine(as, isFr) {
     try {
         const key = _rdpKey(as.name);

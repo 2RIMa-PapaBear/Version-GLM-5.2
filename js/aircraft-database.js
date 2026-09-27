@@ -47,17 +47,31 @@ export const AIRCRAFT_DB = [
     { name: 'Piper PA-44 Seminole', type: 'PA44', groundRoll: 1150, fiftyFt: 2200 },
     { name: 'Piper Super Cub', type: 'PA18', groundRoll: 300, fiftyFt: 700 },
 
-    // --- Robin / CAP ---
-    { name: 'Robin DR400-120', type: 'DR400-120', groundRoll: 400, fiftyFt: 760 },
-    { name: 'Robin DR400-140', type: 'DR400-140', groundRoll: 400, fiftyFt: 770 },
-    { name: 'Robin DR400-160', type: 'DR400-160', groundRoll: 420, fiftyFt: 800 },
-    { name: 'Robin DR400-180', type: 'DR400-180', groundRoll: 430, fiftyFt: 850 },
-    { name: 'Robin DR400-200', type: 'DR400-200', groundRoll: 460, fiftyFt: 880 },
-    { name: 'Robin DR400-220', type: 'DR400-220', groundRoll: 480, fiftyFt: 900 },
-    { name: 'Robin DR401', type: 'DR401', groundRoll: 440, fiftyFt: 840 },
-    { name: 'Robin DR500', type: 'DR500', groundRoll: 480, fiftyFt: 920 },
-    { name: 'Robin ATR.72', type: 'R2120', groundRoll: 520, fiftyFt: 1000 },
-    { name: 'Robin Cap 10', type: 'CAP10', groundRoll: 380, fiftyFt: 700 },
+    // --- Robin / CAP / Rallye : reprise B2 (audit 27/09, volet 4 A1) ---
+    // Toute cette famille était optimiste d'un facteur ≈2 vs constructeur
+    // (DR400-140 : 400/770 ft codés). DEUX ANCRES SOURCÉES :
+    //  • POH Robin DR400/135 CDI, doc 1002879 rév. 1 — 980 kg, piste dure
+    //    sèche, sans vent, SL/ISA : roulement 240 m = 787 ft, distance 15 m
+    //    (50 ft) 440 m = 1 444 ft ;
+    //  • AOPA 1994, DR400/180 — 1 100 kg : roulement 315 m = 1 034 ft,
+    //    50 ft 610 m = 2 001 ft.
+    // Variantes sans POH publié : ancre de leur classe, JAMAIS en dessous
+    // (conservateur, même règle que pente/vent — fiches 6/14) :
+    // ≤ 160 ch / ≤ 1 000 kg → ancre 135 CDI ; ≥ 180 ch / ≥ 1 100 kg →
+    // ancre AOPA /180. CAP 10, Rallye et ATL : POH non publiés en ligne,
+    // PLANCHER conservateur = ancre 135 CDI en attendant les manuels.
+    // (« Robin ATR.72 » était un libellé erroné : R2120 = ATL, Avion Très
+    // Léger 2 places école.)
+    { name: 'Robin DR400-120', type: 'DR400-120', groundRoll: 787, fiftyFt: 1444 },
+    { name: 'Robin DR400-140', type: 'DR400-140', groundRoll: 787, fiftyFt: 1444 },   // = POH 135 CDI
+    { name: 'Robin DR400-160', type: 'DR400-160', groundRoll: 787, fiftyFt: 1444 },
+    { name: 'Robin DR400-180', type: 'DR400-180', groundRoll: 1034, fiftyFt: 2001 },  // = AOPA 1994
+    { name: 'Robin DR400-200', type: 'DR400-200', groundRoll: 1034, fiftyFt: 2001 },
+    { name: 'Robin DR400-220', type: 'DR400-220', groundRoll: 1034, fiftyFt: 2001 },
+    { name: 'Robin DR401', type: 'DR401', groundRoll: 1034, fiftyFt: 2001 },
+    { name: 'Robin DR500', type: 'DR500', groundRoll: 1034, fiftyFt: 2001 },
+    { name: 'Robin ATL (R2120)', type: 'R2120', groundRoll: 787, fiftyFt: 1444 },
+    { name: 'Robin Cap 10', type: 'CAP10', groundRoll: 787, fiftyFt: 1444 },
 
     // --- Diamond ---
     { name: 'Diamond DA20 Katana', type: 'DA20', groundRoll: 560, fiftyFt: 1080 },
@@ -76,9 +90,13 @@ export const AIRCRAFT_DB = [
     { name: 'Socata TB-10 Tobago', type: 'TB10', groundRoll: 920, fiftyFt: 1700 },
     { name: 'Socata TB-20 Trinidad', type: 'TB20', groundRoll: 1050, fiftyFt: 1980 },
     { name: 'Socata TB-21 Trinidad TC', type: 'TB21', groundRoll: 1100, fiftyFt: 2050 },
-    { name: 'Socata Rallye', type: 'MS880', groundRoll: 420, fiftyFt: 800 },
-    { name: 'Socata Rallye 100', type: 'MS883', groundRoll: 450, fiftyFt: 850 },
-    { name: 'Socata Rallye 150', type: 'MS893', groundRoll: 480, fiftyFt: 900 },
+    // Rallye : citées par l'audit B2 parmi les fiches ÷2 — POH non publié
+    // en ligne, plancher conservateur = ancre POH DR400/135 CDI (787/1 444 ft,
+    // voir bloc Robin) en attendant les manuels ; le Rallye (becs) fait
+    // probablement mieux — à affiner à la saisie depuis le POH de l'appareil.
+    { name: 'Socata Rallye', type: 'MS880', groundRoll: 787, fiftyFt: 1444 },
+    { name: 'Socata Rallye 100', type: 'MS883', groundRoll: 787, fiftyFt: 1444 },
+    { name: 'Socata Rallye 150', type: 'MS893', groundRoll: 787, fiftyFt: 1444 },
     { name: 'TBM 700', type: 'TBM700', groundRoll: 1620, fiftyFt: 2540 },
     { name: 'TBM 850', type: 'TBM850', groundRoll: 1700, fiftyFt: 2680 },
     { name: 'TBM 900', type: 'TBM900', groundRoll: 1750, fiftyFt: 2760 },

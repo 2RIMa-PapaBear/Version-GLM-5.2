@@ -11,14 +11,18 @@
  * ================================================================ */
 
 let _sentinel = null;
+let _isAcquiring = false;
 
 async function _acquire() {
     try {
+        if (_isAcquiring) return;   // requête en vol : pointerdown peut mitrailler avant la résolution
         if (typeof navigator === 'undefined' || !('wakeLock' in navigator)) return;
         if (_sentinel && _sentinel.released === false) return;   // déjà tenu
+        _isAcquiring = true;
         _sentinel = await navigator.wakeLock.request('screen');
         _sentinel?.addEventListener?.('release', () => { _sentinel = null; });
     } catch { /* refus système : silencieux, ré-essayé au prochain signal */ }
+    finally { _isAcquiring = false; }
 }
 
 /** À appeler une fois à l'init de l'app. */

@@ -1,9 +1,9 @@
 // Tests de la méthode RÉFÉRENCE (js/takeoff-performance.js, arbitrage
 // 15/09) — altitude pression + température séparées, facteurs ×, revêtement
-// sur la distance totale, vent axial conservé (atterrissage).
+// sur la distance totale, vent axial au décollage ET à l'atterrissage.
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { correctedTakeoffDistance, correctedLandingDistance , runwayLevel, _calcRunwaySlopePct } from '../js/takeoff-performance.js';
+import { correctedTakeoffDistance, correctedLandingDistance, runwayLevel, _calcRunwaySlopePct, _rwyEndHeading } from '../js/takeoff-performance.js';
 import { _importForTests as _siaForTests } from '../js/sia-data.js';
 
 // Stub localStorage — lu PAR APPEL par la flotte (getFleet), pas au chargement.
@@ -157,5 +157,87 @@ describe('_calcRunwaySlopePct (seuils SIA)', () => {
         assert.equal(_calcRunwaySlopePct('LZZZ', '04'), null);
         assert.equal(_calcRunwaySlopePct('', '04'), null);
         _siaForTests({});   // vide le registre pour les autres tests
+    });
+});
+
+// ③ (27/09, fiche 6) — SIGNE DE LA PENTE DIFFÉRENCIÉ : le Math.abs pénalisait
+// aussi les pentes FAVORABLES (décollage en descendant, atterrissage en
+// montant). Seul le sens DÉFAVORABLE majore (×1,05/1 %) ; le favorable n'est
+// pas crédité (×1,00) — le POH ne publie pas de réduction pour pente favorable.
+describe('Pente — signe différencié décollage/atterrissage (fiche 6)', () => {
+    test('DÉCOLLAGE montante 2 % : ×1,05² (comportement inchangé)', () => {
+        const c = correctedTakeoffDistance(0, 15, { slopePct: 2 });
+        assert.ok(Math.abs(c.slopeFactor - 1.1025) < 0.001, `slopeFactor ${c.slopeFactor}`);
+    });
+    test('DÉCOLLAGE descendante 2 % : ×1,00 — plus de fausse pénalité', () => {
+        const c = correctedTakeoffDistance(0, 15, { slopePct: -2 });
+        assert.equal(c.slopeFactor, 1);
+        assert.equal(c.fiftyFt, 1400);
+    });
+    test('DÉCOLLAGE pente négligeable |≤0,05 %| : ×1,00 des deux côtés', () => {
+        assert.equal(correctedTakeoffDistance(0, 15, { slopePct: 0.04 }).slopeFactor, 1);
+        assert.equal(correctedTakeoffDistance(0, 15, { slopePct: -0.04 }).slopeFactor, 1);
+    });
+    test('ATTERRISSAGE descendante 2 % : ×1,05² (roll out défavorable)', () => {
+        const l = correctedLandingDistance(0, 15, 1000, 2000, { slopePct: -2 });
+        assert.ok(Math.abs(l.slopeFactor - 1.1025) < 0.001, `slopeFactor ${l.slopeFactor}`);
+    });
+    test('ATTERRISSAGE montante 2 % : ×1,00 — plus de fausse pénalité', () => {
+        const l = correctedLandingDistance(0, 15, 1000, 2000, { slopePct: 2 });
+        assert.equal(l.slopeFactor, 1);
+        assert.equal(l.fiftyFt, 2000);
+    });
+});
+
+// ④ (27/09, fiche 14) — VENT AU DÉCOLLAGE : le facteur vent était OMIS de
+// correctedTakeoffDistance — un décollage avec le vent DANS LE DOS (piste
+// publiée par la rose sur un autre terrain/METAR, log de nav calculé sur un
+// METAR brut) était validé avec une distance faussement courte. Règle
+// arbitée : ×1,10 par 2 kt de vent arrière (stricte) ; vent de face NON
+// crédité (×1,00 — même règle « jamais de crédit favorable » que la pente).
+describe('Vent — décollage (fiche 14)', () => {
+    test('vent ARRIÈRE 10 kt : ×1,50 (règle +10 % par 2 kt)', () => {
+        const c = correctedTakeoffDistance(0, 15, { headwindKt: -10 });
+        assert.equal(c.windFactor, 1.5);
+        assert.equal(c.fiftyFt, 2100);   // 1400 × 1,5
+        assert.equal(c.groundRoll, Math.round(830 * 1.5));
+    });
+    test('vent ARRIÈRE 2 kt : ×1,10 — palier minimal de la règle', () => {
+        const c = correctedTakeoffDistance(0, 15, { headwindKt: -2 });
+        assert.ok(Math.abs(c.windFactor - 1.10) < 1e-9, `windFactor ${c.windFactor}`);
+    });
+    test('vent DE FACE 15 kt : ×1,00 — PAS de crédit, marge conservée', () => {
+        const c = correctedTakeoffDistance(0, 15, { headwindKt: 15 });
+        assert.equal(c.windFactor, 1);
+        assert.equal(c.fiftyFt, 1400);
+    });
+    test('headwindKt absent ou null : ×1,00 (compatibilité appelants)', () => {
+        assert.equal(correctedTakeoffDistance(0, 15, {}).windFactor, 1);
+        assert.equal(correctedTakeoffDistance(0, 15, { headwindKt: null }).windFactor, 1);
+    });
+    test('vent arrière × pente montante se MULTIPLIENT (10 kt + 2 %)', () => {
+        const c = correctedTakeoffDistance(0, 15, { headwindKt: -10, slopePct: 2 });
+        const attendu = 1.5 * Math.pow(1.05, 2);
+        assert.ok(Math.abs(c.fiftyFt - 1400 * attendu) <= 1, `fiftyFt ${c.fiftyFt}`);
+    });
+});
+
+// Cap d'une EXTRÉMITÉ de piste — socle de la composante axiale vent du
+// décollage (fiche 14) : même parse que selectBestRunway (engine), cap
+// explicite porté par la paire sinon numéro × 10.
+describe("Cap d'extrémité — _rwyEndHeading (fiche 14)", () => {
+    const apt = { runways: ['08L 084°/26R 264°', '04/22', '18/36'] };
+    test('cap explicite : 08L → 084, 26R → 264', () => {
+        assert.equal(_rwyEndHeading(apt, '08L'), 84);
+        assert.equal(_rwyEndHeading(apt, '26R'), 264);
+    });
+    test('cap implicite : numéro × 10 (04 → 040, 36 → 360)', () => {
+        assert.equal(_rwyEndHeading(apt, '04'), 40);
+        assert.equal(_rwyEndHeading(apt, '36'), 360);
+    });
+    test('extrémité inconnue / terrain vide / sans terrain → null', () => {
+        assert.equal(_rwyEndHeading(apt, '05'), null);
+        assert.equal(_rwyEndHeading({ runways: [] }, '04'), null);
+        assert.equal(_rwyEndHeading(null, '04'), null);
     });
 });

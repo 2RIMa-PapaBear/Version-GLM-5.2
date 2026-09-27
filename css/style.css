@@ -19,6 +19,12 @@
     --focus-ring: #E2554A;
     --focus-ring-width: 3px;
 
+    /* Catégories VMC/IMC (SERA.5005, fiche n°3 audit 27/09) — synchronisées
+       avec CAT_COLORS (js/core.js). */
+    --cat-vmc: #4ADE80;
+    --cat-marginal: #38BDF8;
+    --cat-imc: #F87171;
+
     --border-color: rgba(125, 158, 212, 0.25);
     --border-hover: rgba(125, 158, 212, 0.55);
 
@@ -263,9 +269,9 @@ header.card {
 .widget-arrow { display: inline-flex; align-items: center; transition: transform 0.3s ease; }
 .widget-arrow svg { display: block; width: 30px; height: 30px; }
 .widget-pill { display: inline-flex; align-items: center; max-width: 100%; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; line-height: 1.3; }
-.widget-pill.icing-ok      { background: rgba(74, 222, 128, 0.15);  color: var(--cat-vfr); }
+.widget-pill.icing-ok      { background: rgba(74, 222, 128, 0.15);  color: var(--cat-vmc); }
 .widget-pill.icing-caution { background: rgba(251, 191, 36, 0.18);  color: #FBBF24; }
-.widget-pill.icing-danger  { background: rgba(248, 113, 113, 0.18); color: var(--cat-ifr); }
+.widget-pill.icing-danger  { background: rgba(248, 113, 113, 0.18); color: var(--cat-imc); }
 .widget-pill.icing-descent { background: rgba(249, 115, 22, 0.18);  color: #F97316; }
 .widget-footnote { font-size: 10.5px; color: var(--text-muted); line-height: 1.35; }
 .widget-empty { color: var(--text-dim); font-style: italic; font-size: 13px; }
@@ -607,6 +613,16 @@ body.mode-nav .dep-dest-toggle { display: flex; }
     text-transform: uppercase; letter-spacing: 0.5px; color: #F59E0B;
     text-align: center; line-height: 1;
 }
+
+/* Marqueur performances d'atterrissage de l'avion actif (NCO.OP.105,
+   audit 27/09) : ⚠ ambré = piste limitative, ⚠ rouge = atterrissage
+   impossible — jamais proposé comme dégagement. Le verdict complet
+   (distances, marge, vent axial) est dans le title au survol. */
+.alt-ldg-warn {
+    font-size: 12px; font-weight: 800; line-height: 1;
+    color: #F59E0B; cursor: help;
+}
+.alt-ldg-warn.danger { color: #F87171; }
 
 @media (max-width: 700px) {
     .alternates-grid { grid-template-columns: 1.5fr 1fr 1fr; }
@@ -1172,10 +1188,10 @@ body.map-overlay-open { overflow: hidden; }
 #btn-theme .icon-sm { margin: 0; }
 
 /* ---- Filtrage du CANVAS vers le rouge ----
- * Le canvas météo utilise des couleurs codées en dur (vert=VFR, etc.).
+ * Le canvas météo utilise des couleurs codées en dur (vert=VMC, etc.).
  * On applique une rotation de teinte + sépia + saturation qui pousse
  * TOUT le spectre vers le rouge/ambre. Les rapports de luminosité entre
- * catégories sont préservés (le LIFR reste plus saturé que le VFR). */
+ * catégories sont préservés (l'IMC reste plus saturé que le VMC). */
 
 /* La grille et le fond du canvas sont repeints en rouge sombre par
  * dessinerGraphique (qui lit ctx.fillStyle = '#0F172A' en dur).
@@ -1435,6 +1451,21 @@ body.map-overlay-open { overflow: hidden; }
 }
 .fleet-form-row input:focus { border-color: var(--primary); }
 
+/* Case « ULM » (fiche 7, 27/09) : libellé en ligne, case non étirée,
+   alignée sur la ligne des champs numériques de la rangée. */
+.fleet-form-row label.fleet-ulm {
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-color, #F8FAFC);
+    padding-top: 19px;
+    cursor: pointer;
+    user-select: none;
+}
+.fleet-form-row label.fleet-ulm input { width: 15px; height: 15px; accent-color: var(--primary); cursor: pointer; }
+
 /* Champ nom avec autocomplétion (base d'avions). */
 .fleet-name-field { position: relative; }
 .fleet-suggest {
@@ -1600,6 +1631,7 @@ body.map-overlay-open { overflow: hidden; }
 .fleet-wb-units { align-items: flex-end; }
 .fleet-wb-units label { flex: 0 0 auto; min-width: 108px; }
 .fleet-wb-note { font-size: 10px; color: var(--text-muted); font-style: italic; align-self: center; }
+.wb-env-warn { color: var(--danger, #EF4444); font-style: normal; font-weight: 600; }
 .fleet-wb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .fleet-wb-sub {
     font-size: 10px;

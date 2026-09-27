@@ -17,10 +17,12 @@
 //   2. node scripts/fetch-sia-airac.mjs --xml="telechargement AIRAC/XML_SIA_<date>.xml" ;
 //   3. publier (npm run pub -- "base SIA AIRAC <date>").
 //
-// Référence du « cycle courant » : l'AIRAC de data/freq-sia.json — c'est la
-// vérité terrain (probed chaque jour par fetch-freq-sia.mjs sur le site du
-// SIA). À défaut (fichier absent) : la série SIA ancrée au 2026-07-09,
-// pas de 28 j, en vigueur aujourd'hui.
+// Référence du « cycle courant » (M15, audit 27/09) : la SÉRIE AIRAC du
+// calendrier (ancrée 2026-07-09, pas de 28 j) — déterministe, impossible à
+// retarder. L'ancienne référence = l'AIRAC de data/freq-sia.json rendait la
+// garde AVEUGLE au retard de freq-sia lui-même (reste 23 j au cycle 08-06
+// sans aucune alerte, le 03/09/2026) : freq-sia est désormais une base
+// CONTRÔLÉE comme les autres.
 // ============================================================================
 import fs from 'node:fs';
 import path from 'node:path';
@@ -32,13 +34,15 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const AIRAC_ANCHOR = Date.UTC(2026, 6, 9);
 const AIRAC_DAY_MS = 28 * 86400000;
 
-/** AIRAC en vigueur aujourd'hui selon la série SIA (repli sans freq-sia.json). */
+/** AIRAC en vigueur aujourd'hui selon la série SIA (référence du contrôle). */
 export function airacInForce(now = Date.now()) {
     const k = Math.max(0, Math.floor((now - AIRAC_ANCHOR) / AIRAC_DAY_MS));
     return new Date(AIRAC_ANCHOR + k * AIRAC_DAY_MS).toISOString().slice(0, 10);
 }
 
-/** Bases issues du XML bd SIA et leur fichier data/ respectif. */
+/** Bases issues du XML bd SIA et leur fichier data/ respectif — plus
+ *  freq-sia (sondage quotidien fetch-freq-sia.mjs), contrôlée comme les
+ *  autres depuis M15 : son retard doit ÉCHOUER la garde, pas la définir. */
 export const SIA_XML_BASES = {
     'sia-airfields': 'terrains (identité, horaires ATS, avitaillement, tél)',
     'sia-runways': 'pistes officielles',
@@ -48,18 +52,20 @@ export const SIA_XML_BASES = {
     // data/vac-sia/index.json : cartes « Atterrissage à vue » de l'Atlas-VAC
     // (ZIP eAIP complet, téléchargement manuel) — même dépendance AIRAC.
     'vac-sia/index': 'cartes VAC (Atlas-VAC)',
+    'freq-sia': 'fréquences eAIP (sondage quotidien fetch-freq-sia)',
 };
 
 /**
  * Contrôle de fraîcheur (pur, testable).
  * @param {Object<string,Object|null>} bases Contenus des fichiers data/ (clé = nom base).
- * @param {Object|null} freqSia Contenu data/freq-sia.json (référence).
  * @param {number} [now] Horloge injectable.
  * @returns {{ok:boolean, level:'ok'|'alerte', details:Array, reference:string, message:string}}
  */
-export function checkSiaAirac(bases, freqSia, now = Date.now()) {
-    const reference = freqSia?.airac || airacInForce(now);
-    const srcRef = freqSia?.airac ? 'freq-sia.json (édition sondée)' : 'série SIA 28 j (repli)';
+export function checkSiaAirac(bases, now = Date.now()) {
+    // M15 : référence = SÉRIE CALENDAIRE (déterministe) — jamais freq-sia,
+    // qui peut être la base en retard (c'était le seul angle mort).
+    const reference = airacInForce(now);
+    const srcRef = 'série AIRAC 28 j (calendrier)';
     const details = [];
     let ok = true;
 
@@ -91,7 +97,7 @@ if (isMain) {
     const read = (f) => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, 'data', f + '.json'), 'utf8')); } catch { return null; } };
     const bases = {};
     for (const file of Object.keys(SIA_XML_BASES)) bases[file] = read(file);
-    const r = checkSiaAirac(bases, read('freq-sia'));
+    const r = checkSiaAirac(bases);
     if (process.env.GITHUB_STEP_SUMMARY) {
         fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
             `### Garde-fou base XML SIA (terrains/horaires/pistes/espaces)\n\n| Base | AIRAC | État |\n|---|---|---|\n`

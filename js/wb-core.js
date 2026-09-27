@@ -97,27 +97,29 @@ export function armLimitsAt(envelope, mass) {
 }
 
 /**
- * Réordonne les points d'une enveloppe en polygone SIMPLE (tri angulaire
- * autour du centroïde). Neutralise les saisies « ligne à ligne » du tableau
- * du manuel de vol (masse par masse : avant, arrière, avant, arrière…)
- * qui traceraient un polygone en zigzag auto-croisé — dessin aberrant et
- * limites avant/arrière trompeuses. Sans effet sur une enveloppe déjà
- * parcourue en périmètre.
+ * Nombre d'auto-croisements du polygone fermé (diagnostic de saisie).
+ * Une saisie « ligne à ligne » du tableau du manuel (masse par masse :
+ * avant, arrière, avant, arrière…) trace un zigzag auto-croisé : dessin
+ * aberrant et limites trompeuses. L'ordre des sommets n'est JAMAIS
+ * réordonné par le système (fiche 16) — une enveloppe concave certifiée
+ * serait silencieusement élargie par un tri angulaire, donc fausses
+ * marges de sécurité ; la saisie doit suivre le périmètre, et c'est ce
+ * diagnostic qui alerte le pilote dans la fenêtre Flotte.
  */
-export function normalizeEnvelope(points) {
-    if (!Array.isArray(points) || points.length < 3) return points ? points.slice() : [];
-    const pts = points.slice();
-    const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
-    const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
-    // Départ stable : sommet le plus bas-gauche, puis parcours angulaire.
-    pts.sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]));
-    const p0 = pts[0];
-    const ref = Math.atan2(p0[1] - cy, p0[0] - cx);
-    const rel = (p) => {
-        const a = Math.atan2(p[1] - cy, p[0] - cx) - ref;
-        return ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-    };
-    return pts.slice().sort((a, b) => rel(a) - rel(b));
+export function envelopeSelfCrossings(points) {
+    if (!Array.isArray(points) || points.length < 4) return 0;
+    const orient = (a, b, c) =>
+        Math.sign((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
+    const segCross = (p1, p2, p3, p4) =>
+        orient(p1, p2, p3) !== orient(p1, p2, p4) && orient(p3, p4, p1) !== orient(p3, p4, p2);
+    const n = points.length;
+    let crossings = 0;
+    for (let i = 0; i < n; i++)
+        for (let j = i + 2; j < n; j++) {
+            if (i === 0 && j === n - 1) continue;   // arête de fermeture, adjacente
+            if (segCross(points[i], points[(i + 1) % n], points[j], points[(j + 1) % n])) crossings++;
+        }
+    return crossings;
 }
 
 // ----------------------------------------------------------------
@@ -374,8 +376,9 @@ export function wbChartSvg(wb, calc, isFr = true, width = 340, opts = {}) {
             `<text x="${(l.x + (l.side === 'left' ? -8 : 8)).toFixed(1)}" y="${(l.y + 3).toFixed(1)}" text-anchor="${l.side === 'left' ? 'end' : 'start'}" fill="${l.col}" font-size="10">${l.text}</text>`).join('');
     }
 
-    // Enveloppe (polygone fermé) — points réordonnés en polygone simple.
-    const envPts = normalizeEnvelope(wb.envelope)
+    // Enveloppe (polygone fermé) — sommets dans l'ORDRE SAISI (périmètre
+    // certifié du manuel, jamais réordonné — fiche 16).
+    const envPts = wb.envelope
         .map(([m, a]) => `${L.xOf(a).toFixed(1)},${L.yOf(m).toFixed(1)}`).join(' ');
     // Ligne MTOW (rouge pointillée) — étiquette À GAUCHE de la ligne
     // (même arbitrage que le PDF 03/09 : à droite elle écrase le coin de

@@ -34,6 +34,7 @@ import { evaluateTakeoffPerformance, evaluateLandingPerformance, evaluateLanding
 import { getCurrentNotams, getLastNotamFetchTs, getSelectedNotams } from './notam.js';
 import { hasVac, openVac, getVacConsultedTs } from './vac-viewer.js';
 import { getLastMetarObsMs } from './data-age.js';
+import { computeLocalFuelDevis } from './flight-planner.js';
 
 // Mode courant sans importer flight-mode (module à effet de bord DOM au
 // chargement) — même détection par classe body que takeoff-performance.
@@ -177,14 +178,12 @@ export async function collectFileInputs() {
     } else {
         const min = parseInt(document.getElementById('wb-local-min')?.value, 10);
         if (Number.isFinite(min) && min > 0) {
-            const burn = ac.fuelBurnLph ?? 35;
-            // Vol local : durée + roulage 10 min (départ+arrivée) + réserve
-            // finale 10 min (jour, vue du terrain) + inutilisable du manuel
-            // de vol — même formule que le devis du widget Centrage
-            // (18/09, inutilisable ajouté le 19/09).
-            const reserveMin = 10 + (ac.reserveExtraMin || 0);
-            const unusable = (ac.unusableFuelL > 0) ? ac.unusableFuelL : 0;
-            fuelRequired = Math.round(((min + 10 + reserveMin) / 60 * burn + unusable) * 10) / 10;
+            // Vol local : devis PARTAGÉ (flight-planner.js) — durée + roulage
+            // 10 min + réserve finale légale 20 min / 15 ULM (+perso) +
+            // inutilisable du manuel de vol. Fiche 26 : plus aucune copie de
+            // la formule ici, le rendu complet et le refresh à la frappe ne
+            // peuvent plus diverger (le refresh oubliait l'inutilisable).
+            fuelRequired = computeLocalFuelDevis(min, ac).totalL;
         }
     }
 
@@ -453,7 +452,7 @@ if (typeof document !== 'undefined') {
 }
 
 /** Mise à jour IMMÉDIATE de la seule tuile Carburant (synchrone) :
- *  requis (plan actif ou formule locale) vs embarqué du widget Centrage. */
+ *  requis (plan actif ou devis local partagé) vs embarqué du widget Centrage. */
 function _refreshFuelTileNow() {
     if (typeof document === 'undefined') return;
     const tiles = [...document.querySelectorAll('.ff-tile')];
@@ -476,8 +475,9 @@ function _refreshFuelTileNow() {
     } else {
         const min = parseInt(document.getElementById('wb-local-min')?.value, 10);
         if (Number.isFinite(min) && min > 0) {
-            const burn = ac.fuelBurnLph ?? 35;
-            req = Math.round(((min + 10 + 10 + (ac.reserveExtraMin || 0)) / 60 * burn) * 10) / 10;
+            // Fiche 26 : la formule était recodée ici SANS l'inutilisable —
+            // la tuile affichait moins que le widget Centrage à la frappe.
+            req = computeLocalFuelDevis(min, ac).totalL;
             detail = `${isFr ? 'Requis' : 'Req.'} ${req} L · ${isFr ? 'embarqué' : 'on board'} ${onBoard ?? '—'} L`;
         }
     }

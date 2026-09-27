@@ -29,7 +29,7 @@ const target = (u) => {
     } catch { return u; }
 };
 
-// METAR d'une station mock : catégorie VFR ou MVFR selon la parité du code.
+// METAR d'une station mock : catégorie VMC ou MARGINAL selon la parité du code.
 const metarFor = (code) => {
     const n = parseInt(code.slice(2), 10);
     return (n % 2 === 0)
@@ -99,7 +99,7 @@ const pins = await page.evaluate(() => {
         const pop = (l.getPopup && l.getPopup()) ? l.getPopup().getContent() : '';
         const popStr = typeof pop === 'string' ? pop : '';
         const m = th.match(/^<strong>([A-Z0-9]{4})(\*?)<\/strong>/);
-        const cat = th.match(/font-weight:700;">(VFR|MVFR|IFR|LIFR|Sans METAR|No METAR)</);
+        const cat = th.match(/font-weight:700;">(VMC|MARGINAL|IMC|Sans METAR|No METAR)</);
         const ll = (l.getLatLng && l.getLatLng()) || {};
         // Substitution détectée par le POPUP (l'étiquette ne porte plus l'étoile).
         out.push({ code: m[1], sub: popStr.includes('Météo de') || popStr.includes('Weather from'), cat: cat ? cat[1] : null, tooltip: th, popup: popStr, lat: ll.lat, lon: ll.lng });

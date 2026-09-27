@@ -141,7 +141,23 @@ export function getAirportFreqs(icao, openaipFreqs) {
             primary: /^(TWR|AFIS|APP)$/i.test(f.type || ''),
         })) };
     }
-    return { source: 'openaip', freqs: (openaipFreqs || []).filter(f => !_isGonio(f)) };
+    // Contrat « forme du widget » comme les deux sources officielles :
+    // COPIES des objets openAIP (ils sont partagés avec l'index runtime des
+    // terrains — la promotion ne doit pas s'y répercuter), puis drapeau
+    // primary garanti : openAIP n'en fournit souvent AUCUN (données
+    // communautaires) et le widget n'aurait alors aucune fréquence mise en
+    // avant. Promotion : TWR puis AFIS puis APP (hiérarchie de _legMainFreq,
+    // flight-planner-ui.js), sinon la première de la liste — jamais une
+    // VOLMET (diffusion météo à écouter, pas un organisme à contacter).
+    const oaFreqs = (openaipFreqs || []).filter(f => !_isGonio(f)).map(f => ({ ...f }));
+    if (oaFreqs.length && !oaFreqs.some(f => f.primary)) {
+        let pick = null;
+        for (const t of ['TWR', 'AFIS', 'APP']) {
+            pick ??= oaFreqs.find(f => (f.type || '').toUpperCase() === t);
+        }
+        (pick || oaFreqs.find(f => (f.type || '').toUpperCase() !== 'VOLMET') || oaFreqs[0]).primary = true;
+    }
+    return { source: 'openaip', freqs: oaFreqs };
 }
 
 /** Correction manuelle d'une fréquence de SERVICE (SIV/APP…), par nom

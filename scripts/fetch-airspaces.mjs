@@ -23,7 +23,9 @@
 // à une seule tuile 5° → pas de fusion ambiguë).
 //
 // Filtres à l'export (identiques au client) : FIR/UIR/LTA et planchers
-// > 5000 ft écartés. Coordonnées arrondies à 4 décimales (~10 m).
+// > FL195 écartés (pas de VFR au-dessus — audit 27/09, fiche 2 : les
+// cellules déjà crawlées avec l'ancien cap 5000 ft se re-remplissent au
+// fil du cron quotidien). Coordonnées arrondies à 4 décimales (~10 m).
 // Clé API : env OPENAIP_API_KEY (GitHub Actions), à défaut config.local.js.
 // ============================================================================
 import fs from 'node:fs';
@@ -36,6 +38,9 @@ const CELLS_DIR = path.join(DIR, 'cells');
 const CRAWL_STATE = path.join(DIR, '.crawl.json');
 const BASE = 'https://api.core.openaip.net/api/airspaces';
 const LIMIT = 200;
+// Même valeur que MAX_BASE_FT de js/airspace-profile.js (FL195 : croisières
+// VFR FL055–FL195, rien au-dessus — audit 27/09, fiche 2).
+const MAX_BASE_FT = 19500;
 const DELAY_MS = 2500;
 
 const args = Object.fromEntries(process.argv.slice(2).map(a => a.replace(/^--/, '').split('=')));
@@ -212,7 +217,7 @@ async function collectBbox(key, bbox, byCell) {
         for (const it of items) {
             const nm = String(it.name || it.designator || '').toUpperCase();
             if (ADMIN_RE.test(nm)) continue;
-            if ((limitToFt(it.lowerLimit) ?? 0) > 5000) continue;
+            if ((limitToFt(it.lowerLimit) ?? 0) > MAX_BASE_FT) continue;
             if (limitToFt(it.upperLimit) == null) continue;
             const cell = cellOf(it);
             if (!cell) continue;

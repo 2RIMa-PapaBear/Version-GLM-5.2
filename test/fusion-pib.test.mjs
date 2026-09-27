@@ -51,18 +51,25 @@ test('mergePibChunks : FIR fusionnée, NOTAM communs aux 2 tronçons comptés un
     assert.equal(out.nbNotams, 2, 'recompte = NOTAM distincts');
 });
 
-test('mergePibChunks : ADDeg fusionnés par terrain, tronçons vides tolérés', () => {
+test('mergePibChunks : ADDeg fusionnés, tronçons vides tolérés', () => {
     const avecDeg = chunk('A', 'B', [1], {
         ADDeg: [{ code: 'LFRE', name: 'ROCHE', procedures: [notam(5)] }],
     });
     const out = mergePibChunks([avecDeg, chunk('B', 'C', [2], {
         ADDeg: [{ code: 'LFRE', name: 'ROCHE', balisage: [notam(5), notam(6)] }],
     }), null]);
+    // M14 (audit 27/09) : forme APLATIE {catégorie: [NOTAM]} — la même que
+    // le dossier direct, celle qu'énumère notam.js (l'ancienne forme en
+    // blocs [{code, cat}] affichait « 0 NOTAM » à l'écran).
     const deg = out.listnotams.ADDeg;
-    assert.equal(deg.length, 1, 'un seul bloc LFRE');
-    const ids = Object.values(deg[0]).filter(Array.isArray).flat().map(n => n.id).sort();
-    assert.deepEqual(ids, ['5', '6'], 'dégagements dédupliqués');
+    const ids = Object.values(deg).flat().map(n => n.id).sort();
+    assert.deepEqual(ids, ['5', '6'], 'dégagements dédupliqués par id');
+    // Règle du module : un NOTAM figure dans la catégorie de sa PREMIÈRE
+    // apparition (le 5 restant en « procedures », le 6 en « balisage »).
+    assert.ok(deg.procedures?.length === 1 && deg.balisage?.length === 1, 'catégories fusionnées');
     assert.equal(out.pibUid, 'uid-A', 'en-tête du premier tronçon');
+    // nbNotams (recompte global dédupliqué) : 1, 2, 5, 6.
+    assert.equal(out.nbNotams, 4);
 });
 
 test('mergePibChunks : aucun chunk exploitable → erreur explicite', () => {

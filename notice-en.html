@@ -410,7 +410,7 @@
 <thead><tr><th>Cell</th><th>Description</th></tr></thead>
 <tbody>
 <tr><td><strong><i data-lucide="wind" class="li-ic"></i> Wind Compass</strong></td><td>Wind rose with average wind, gusts, direction. Automatic best-runway selection. Click a runway bubble to force a choice.</td></tr>
-<tr><td><strong><span class="pin" style="background:#4ADE80"></span> Flight Category</strong></td><td>VFR / MVFR / IFR / LIFR badge computed from ceiling and visibility.</td></tr>
+<tr><td><strong><span class="pin" style="background:#4ADE80"></span> Flight Category</strong></td><td>VMC / Marginal / IMC badge (SERA.5005) computed from ceiling and visibility, according to the airspace class of the airfield (controlled C/D/E or G).</td></tr>
 <tr><td><strong><i data-lucide="check-circle" class="li-ic" style="color:#4ADE80"></i> GO / NO-GO</strong></td><td>Synthetic flight decision verdict (see "Decision Support").</td></tr>
 </tbody>
 </table>
@@ -472,9 +472,9 @@
 <p><strong>Criteria automatically evaluated</strong>:</p>
 <ol>
 <li>Aeronautical night</li>
-<li>IFR / LIFR conditions (ceiling and visibility)</li>
+<li>IMC conditions — below the VMC minima of the airspace class (ceiling and visibility)</li>
 <li>Personal minima danger alerts (red) → NO-GO</li>
-<li>MVFR conditions → CAUTION</li>
+<li>VMC minima approached (under-cloud margin &lt; 1000 ft, or special VFR required) → CAUTION</li>
 <li>Personal minima warning alerts (orange) → CAUTION</li>
 <li>High density altitude (degraded performance)</li>
 <li>Crosswind (based on active runway)</li>
@@ -532,7 +532,7 @@
 <tr><td><span class="demo-select">Satellite ▾</span></td><td><strong>Basemap</strong>: satellite, map or terrain — "Satellite" selector in the toolbar</td></tr>
 <tr><td><span class="demo-btn"><i data-lucide="cloud-rain"></i> Radar</span></td><td>Real-time precipitation — <strong>off by default</strong>; play/pause button and time slider once enabled</td></tr>
 <tr><td><span class="pin" style="background:#FBBF24; width:15px; height:15px;"></span> <span class="rwy" style="background:#4ADE80"></span><span class="rwy" style="background:#94A3B8"></span><span class="rwy" style="background:#D6A24A"></span></td><td><strong>Current airfield</strong>: amber pin at the centre; runways drawn by surface (green = grass, grey = paved, ochre = dirt)</td></tr>
-<tr><td><span class="pin" style="background:#4ADE80"></span> <span class="pin" style="background:#1E40AF"></span> <span class="pin" style="background:#F87171"></span> <span class="pin" style="background:#94A3B8"></span></td><td><strong>Nearby airfields</strong>: every airfield in the visible area (up to France-wide scale, kept as you pan); coloured pins VFR / MVFR / IFR / LIFR (green, blue, red, violet) for airfields that report a METAR, <strong>grey pins</strong> for the others — clicking those opens the METAR of the nearest reporting station</td></tr>
+<tr><td><span class="pin" style="background:#4ADE80"></span> <span class="pin" style="background:#1E40AF"></span> <span class="pin" style="background:#F87171"></span> <span class="pin" style="background:#94A3B8"></span></td><td><strong>Nearby airfields</strong>: every airfield in the visible area (up to France-wide scale, kept as you pan); coloured pins VMC / Marginal / IMC (green, blue, red — conservative "controlled worst-case" evaluation) for airfields that report a METAR, <strong>grey pins</strong> for the others — clicking those opens the METAR of the nearest reporting station</td></tr>
 <tr><td><span class="demo-btn"><i data-lucide="hexagon"></i> Airspaces</span></td><td><strong>Airspaces</strong>: official French data (SIA), extended worldwide — CTR, TMA, FIS, ATZ, R·P·D zones… per-family sub-ticks in the "Airspaces" menu; click a zone to highlight it and read sector, altitudes and frequency (off by default)</td></tr>
 <tr><td><span class="rp-sym"><svg width="18" height="18" viewBox="0 0 18 18" style="vertical-align:middle"><polygon points="9,1 16.5,5.3 16.5,13.7 9,18 1.5,13.7 1.5,5.3" fill="none" stroke="#60A5FA" stroke-width="1.8"/><circle cx="9" cy="9" r="1.4" fill="#60A5FA"/></svg> <svg width="18" height="18" viewBox="0 0 18 18" style="vertical-align:middle"><path d="M9 0.8 L9 6" stroke="#4ADE80" stroke-width="1.6"/><circle cx="9" cy="11" r="5.2" fill="none" stroke="#4ADE80" stroke-width="1.8"/><circle cx="9" cy="11" r="1.6" fill="#4ADE80"/></svg> <svg width="18" height="18" viewBox="0 0 18 18" style="vertical-align:middle"><path d="M9 1.5 L16 14 L2 14 Z" fill="none" stroke="#2563EB" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 5.2 L13.3 12.4 L4.7 12.4 Z" fill="#2563EB" opacity="0.5"/></svg></span></td><td><strong>Radio nav aids &amp; VFR points</strong>: VOR, NDB and VFR reporting points — standard chart symbols, ticked per layer in the "Airspaces" menu; usable as flight-plan waypoints</td></tr>
 <tr><td><span class="rp-sym"><svg width="18" height="18" viewBox="0 0 18 18" style="vertical-align:middle"><path d="M9 7.5 L9 16.5" stroke="#F87171" stroke-width="1.6"/><path d="M9 7 L9 1.5 M9 7 L4 10 M9 7 L14 10" stroke="#F87171" stroke-width="1.7" stroke-linecap="round"/><circle cx="9" cy="7" r="1.3" fill="#F87171"/></svg></span></td><td><strong>Obstacles</strong>: wind turbines, pylons, masts, water towers, chimneys… all over France and overseas — icon per type; click for height, top elevation and lighting (visible from regional zoom, off by default)</td></tr>
@@ -540,7 +540,7 @@
 </table>
 <p><strong>Toolbar</strong> (single line): Radar (play and clock slider included) · Airspaces · Terrain · Fit plan · Full screen. The radar and layers only switch on when you ask — nothing displays without your click.</p>
 <p><strong>Clicking a nearby airfield</strong>: the popup shows its decoded METAR (wind, visibility, ceiling, T/Td, QNH) and offers three actions — <strong>Load this airport</strong> (changes the observed airfield; in Navigation mode it becomes <strong>"Set as departure"</strong> and recomputes the plan), <strong>Set as destination</strong> and <strong>+ Waypoint</strong> (Navigation mode). <strong>Every airfield can be used</strong> as departure, destination or waypoint: if it has no weather station of its own, the popup first shows the reporting station (<em>"Weather from LFxx · N NM"</em>) and its METAR.</p>
-<p><strong>Value</strong>: if nearby fields drop to MVFR/IFR, beware — the weather is closing in.</p>
+<p><strong>Value</strong>: if nearby fields drop to Marginal/IMC, beware — the weather is closing in.</p>
 <p><strong>"Airfield" button</strong>: zooms directly to the current airfield to see runway details.</p>
 
 <h3>GPS flight tracking</h3>
@@ -620,7 +620,7 @@
 <p>The folder button in the "Departure → Destination" bar offers <strong>Save (JSON)</strong> — a 100% faithful native format (named markers, altitude, TAS, fuel burn, night flight) — plus <strong>GPX export</strong> (universal GPS: SkyDemon, Garmin…) and <strong>KML</strong> (Google Earth), then <strong>Import a plan</strong> (.json, .gpx, .kml). The save folder is chosen on first use and remembered. On import, any point carrying a known ICAO code becomes that airfield; others become named free markers, and the file's order is preserved.</p>
 
 <h3>Weather along the route</h3>
-<p>This is the <strong>regional map</strong> (below the airfield's METAR) doing it, automatically: every nearby airfield — including those along your route in Navigation mode — carries a <strong>coloured round pin</strong> showing its flight category computed from its METAR: <strong>green</strong> = VFR, <strong>blue</strong> = marginal VFR, <strong>red</strong> = IFR conditions, <strong>grey</strong> = no weather station of its own (clicking shows the METAR of the nearest reporting station). The displayed airfield has a larger amber pin. <strong>Click a pin</strong> to open that airfield's METAR — handy to spot deteriorating weather toward your next leg. In that panel, the <strong>"VAC chart"</strong> button opens the airfield's visual approach chart inside the app. And a <strong>right-click on a pin</strong> adds that airfield to the flight plan as a waypoint (once a destination exists).</p>
+<p>This is the <strong>regional map</strong> (below the airfield's METAR) doing it, automatically: every nearby airfield — including those along your route in Navigation mode — carries a <strong>coloured round pin</strong> showing its flight category computed from its METAR: <strong>green</strong> = VMC, <strong>blue</strong> = marginal, <strong>red</strong> = IMC (below VMC minima), <strong>grey</strong> = no weather station of its own (clicking shows the METAR of the nearest reporting station). The displayed airfield has a larger amber pin. <strong>Click a pin</strong> to open that airfield's METAR — handy to spot deteriorating weather toward your next leg. In that panel, the <strong>"VAC chart"</strong> button opens the airfield's visual approach chart inside the app. And a <strong>right-click on a pin</strong> adds that airfield to the flight plan as a waypoint (once a destination exists).</p>
 
 <h3>Elevation Profile</h3>
 <p>Samples the <strong>terrain elevation profile</strong> along the route to verify compliance with VFR clearance rules (500 ft / 1000 ft). <strong>Airspaces crossed</strong> are shown too: on screen, hover the altitude band to read the sector and its frequency; on the PDF nav log, each crossing is bounded by vertical lines (same blue as the map) with the <strong>sector name and frequency</strong> written vertically between the bounds.</p>
@@ -668,7 +668,7 @@
 <thead><tr><th>Group</th><th>Meaning</th><th>Key points</th></tr></thead>
 <tbody>
 <tr><td><code>LFRV</code></td><td>Airfield</td><td>ICAO code</td></tr>
-<tr><td><code>061230Z</code></td><td>Date-time</td><td>6th of the month at 12:30 <strong>Z (UTC)</strong> — for French local time, subtract 1 h in winter, 2 h in summer</td></tr>
+<tr><td><code>061230Z</code></td><td>Date-time</td><td>6th of the month at 12:30 <strong>Z (UTC)</strong> — for legal time in metropolitan France, add 1 h in winter (CET), 2 h in summer (CEST)</td></tr>
 <tr><td><code>24012KT</code></td><td>Wind</td><td>240° at 12 kt — <code>24015G25</code> = gusts 25 kt, <code>00000</code> = calm, <code>VRB</code> = variable</td></tr>
 <tr><td><code>9999</code></td><td>Visibility</td><td>in metres: <code>9999</code> = 10 km or more, <code>8000</code> = 8 km… <code>CAVOK</code> = vis ≥ 10 km, no cloud below 5 000 ft (or the minimum sector altitude if higher), no CB or TCU at any altitude, no significant weather</td></tr>
 <tr><td><code>-RA</code>, <code>TS</code>…</td><td>Present weather</td><td>between visibility and clouds: <code>-RA</code> light rain, <code>RA</code> rain, <code>TS</code> thunderstorm, <code>BR</code> mist, <code>FG</code> fog, <code>SN</code> snow (most common)</td></tr>
@@ -770,19 +770,19 @@
 </code></pre>
 <p><strong>Translation</strong> :</p>
 <p><strong>Day 06 06h → Day 06 09h</strong> : Wind 270° 15kt, vis ≥10km, scattered clouds 4000 ft<br />
-→ <i data-lucide="check" class="li-ic"></i> <strong>Excellent VFR</strong></p>
+→ <i data-lucide="check" class="li-ic"></i> <strong>Excellent VMC</strong></p>
 <p><strong>Day 06 09h → Day 06 11h</strong> : Gradual change toward broken clouds 2000 ft<br />
-→ <i data-lucide="triangle-alert" class="li-ic"></i> <strong>Marginal VFR</strong> (ceiling lowering)</p>
+→ <i data-lucide="triangle-alert" class="li-ic"></i> <strong>Marginal</strong> (ceiling lowering)</p>
 <p><strong>Day 06 11h → Day 06 15h</strong> : BKN clouds 2000 ft (maintained)<br />
-→ <i data-lucide="triangle-alert" class="li-ic"></i> <strong>Marginal VFR</strong></p>
+→ <i data-lucide="triangle-alert" class="li-ic"></i> <strong>Marginal</strong></p>
 <p><strong>Day 06 15h → Day 06 18h</strong> : Temporarily: vis 4000m, showers, BKN 1200 ft, CB 2000 ft<br />
-→ <i data-lucide="x" class="li-ic"></i> <strong>IFR</strong> (ceiling &lt; 1500 ft + vis &lt; 5km + thunderstorms)</p>
+→ <i data-lucide="x" class="li-ic"></i> <strong>IMC</strong> (ceiling &lt; 1500 ft + vis &lt; 5 km + thunderstorms)</p>
 <p><strong>Day 06 18h → Day 07 02h</strong> : Return to BKN 2000 ft (no showers)<br />
-→ <i data-lucide="triangle-alert" class="li-ic"></i> <strong>Marginal VFR</strong></p>
+→ <i data-lucide="triangle-alert" class="li-ic"></i> <strong>Marginal</strong></p>
 <p><strong>Day 07 02h → Day 07 04h</strong> : Change: wind 340° 10kt, vis 8km, BKN 1400 ft<br />
-→ <i data-lucide="x" class="li-ic"></i> <strong>IFR</strong> (ceiling &lt; 1500 ft)</p>
+→ <i data-lucide="x" class="li-ic"></i> <strong>IMC</strong> (ceiling &lt; 1500 ft)</p>
 <p><strong>Day 07 04h → Day 07 12h</strong> : These conditions maintained<br />
-→ <i data-lucide="x" class="li-ic"></i> <strong>IFR</strong></p>
+→ <i data-lucide="x" class="li-ic"></i> <strong>IMC</strong></p>
 <hr />
 <h2 id="vfr-minima"><i data-lucide="gauge"></i> VFR MINIMA (VMC)</h2>
 <p><strong>VMC</strong> = Visual Meteorological Conditions (weather conditions for visual flight)</p>
@@ -819,7 +819,7 @@
 </div>
 <p>Above FL100 (no speed limit): <strong>visibility ≥ 8 km</strong>, same cloud separations.</p>
 <h3>Uncontrolled airspace (classes F and G)</h3>
-<p>Below the <strong>"S" surface</strong> — the higher of the two levels: <strong>3000 ft AMSL (QNH)</strong> or <strong>1000 ft above the ground</strong> — at <strong>IAS ≤ 140 kt</strong>:</p>
+<p>Below the <strong>"S" surface</strong> — the higher of the two levels: <strong>3000 ft AMSL (QNH)</strong> or <strong>1000 ft above the ground</strong> — at <strong>IAS ≤ 140 kt</strong> and <strong>by day only</strong>:</p>
 <table>
 <thead>
 <tr>
@@ -830,7 +830,7 @@
 <tbody>
 <tr>
 <td><strong>Visibility</strong></td>
-<td>≥ 1500 m (and ≥ 5000 m beyond 140 kt)</td>
+<td>≥ 1500 m by day (and ≥ 5000 m beyond 140 kt or at night)</td>
 </tr>
 <tr>
 <td><strong>Cloud distance</strong></td>
@@ -843,7 +843,7 @@
 </tbody>
 </table>
 <div class="success">
-<p><strong>Remember</strong>: near the ground, the 500 ft minimum height implies a <strong>deduced minimum ceiling &gt; 500 ft</strong>. Below the "S" surface at IAS ≤ 140 kt: <strong>visibility ≥ 1500 m and ceiling &gt; 500 ft</strong>.</p>
+<p><strong>Remember</strong>: near the ground, the 500 ft minimum height implies a <strong>deduced minimum ceiling &gt; 500 ft</strong>. Below the "S" surface at IAS ≤ 140 kt <strong>by day</strong>: <strong>visibility ≥ 1500 m and ceiling &gt; 500 ft</strong> — at night the minimum visibility returns to <strong>5 km</strong> (the 1500 m alleviation is strictly a day provision).</p>
 </div>
 <p>Above the "S" surface and below FL100: <strong>visibility ≥ 5 km</strong>, clouds at 1500 m horizontally and 300 m (1000 ft) vertically.</p>
 <h3>Special VFR (SVFR)</h3>
@@ -889,8 +889,8 @@
 <tr>
 <td><strong>SVFR required</strong></td>
 <td>1.5-5 km</td>
-<td>&lt; 1500 ft</td>
-<td>ATC clearance mandatory</td>
+<td>600-1500 ft</td>
+<td>ATC clearance mandatory — none can be issued below a 600 ft ceiling for take-off, landing or entering a CTR (SERA.5010c)</td>
 </tr>
 <tr>
 <td><strong>IFR</strong></td>
@@ -1223,10 +1223,10 @@
 </ul>
 <h3>Chart interpretation</h3>
 <p><strong>Colored bands</strong> :
-- <span class="pin" style="background:#4ADE80"></span> <strong>VFR (Green)</strong> : Comfortable flight
-- <span class="pin" style="background:#1E40AF"></span> <strong>MVFR (Blue)</strong> : Increased vigilance, plan a backup plan
-- <span class="pin" style="background:#F87171"></span> <strong>IFR (Red)</strong> : IFR conditions, VFR flight impossible
-- <span class="pin" style="background:#D946EF"></span> <strong>LIFR (Magenta)</strong> : Very poor conditions</p>
+- <span class="pin" style="background:#4ADE80"></span> <strong>VMC (Green)</strong> : visual meteorological conditions met
+- <span class="pin" style="background:#1E40AF"></span> <strong>Marginal (Blue)</strong> : VMC minima approached, increased vigilance, plan a backup plan
+- <span class="pin" style="background:#F87171"></span> <strong>IMC (Red)</strong> : below VMC minima — visual flight prohibited
+</p>
 <p><strong>Solar curve</strong> :
 - Sunrise/sunset visible on the chart
 - Plan to avoid flying at dusk (reduced visibility)

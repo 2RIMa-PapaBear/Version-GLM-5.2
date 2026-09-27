@@ -11,6 +11,18 @@ const N = (over = {}) => ({
     itemD: '', itemE: '', ...over,
 });
 
+// Item D numérique = UTC (OACI Annexe 15) : azba.js convertit les plages
+// en heure locale pour la comparaison ET le détail → l'attendu dépend du
+// fuseau du runner (décalage = -getTimezoneOffset() à l'instant testé).
+const locRange = (a, b, at) => {
+    const shift = -new Date(at).getTimezoneOffset();
+    const f = (s) => {
+        const min = ((parseInt(s.slice(0, 2), 10) * 60 + parseInt(s.slice(2), 10) + shift) % 1440 + 1440) % 1440;
+        return `${String(Math.floor(min / 60)).padStart(2, '0')}${String(min % 60).padStart(2, '0')}`;
+    };
+    return `${f(a)}-${f(b)}`;
+};
+
 describe('parseItemD (formats réels SOFIA 12/09)', () => {
     test('plage quotidienne simple (« 0600-1900 », « 0630-1530 »)', () => {
         for (const s of ['0600-1900', '0630-1530']) {
@@ -70,14 +82,14 @@ describe('zoneActivation (statut du jour)', () => {
     test('plage quotidienne couvrant 10h → ACTIVE 0600-1900', () => {
         const r = zoneActivation('R71', [N({ itemD: '0600-1900', itemE: 'R 71' })], now);
         assert.equal(r.status, 'ACTIVE');
-        assert.equal(r.detail, '0600-1900');
+        assert.equal(r.detail, locRange('0600', '1900', now));
         assert.equal(r.notam.series, 'P');
     });
 
     test('plage à venir aujourd\u2019hui → PLANIFIEE', () => {
         const r = zoneActivation('R71', [N({ itemD: '1400-1700', itemE: 'R 71' })], now);
         assert.equal(r.status, 'PLANIFIEE');
-        assert.equal(r.detail, '1400-1700');
+        assert.equal(r.detail, locRange('1400', '1700', now));
     });
 
     test('jour du mois non prévu (13 absent de 06 12 20) → null', () => {
@@ -104,6 +116,72 @@ describe('zoneActivation (statut du jour)', () => {
     test('zone sans NOTAM correspondant dans le dossier → null', () => {
         assert.equal(zoneActivation('D99', [N({ itemD: '0600-1900', itemE: 'R 71' })], now), null);
         assert.equal(zoneActivation('R71', [], now), null);
+    });
+});
+
+describe('zoneActivation — item D en UTC (fiche audit n°1, 27/09)', () => {
+    // Instants UTC FIXES (suffixe Z) : le statut ne doit dépendre que de
+    // l'heure UTC, jamais du fuseau du runner. Avant correctif, un runner
+    // UTC+2 déclarait une zone 0800-1000Z « libre » dès 08:01Z (heure
+    // locale 10:01 ≥ fin lue comme locale).
+    const Z = (s) => Date.parse(`2026-09-13T${s}:00Z`);
+
+    test('0800-1000Z : ACTIVE à 08:30Z', () => {
+        const r = zoneActivation('R71', [N({ itemD: '0800-1000', itemE: 'R 71' })], Z('08:30'));
+        assert.equal(r?.status, 'ACTIVE');
+    });
+
+    test('0800-1000Z : terminée à 10:30Z → null', () => {
+        assert.equal(zoneActivation('R71', [N({ itemD: '0800-1000', itemE: 'R 71' })], Z('10:30')), null);
+    });
+
+    test('1400-1700Z à 08:30Z → PLANIFIEE', () => {
+        const r = zoneActivation('R71', [N({ itemD: '1400-1700', itemE: 'R 71' })], Z('08:30'));
+        assert.equal(r?.status, 'PLANIFIEE');
+    });
+
+    test('plage traversant minuit UTC (1900-0600Z) : ACTIVE à 20:00Z', () => {
+        const r = zoneActivation('R71', [N({ itemD: '1900-0600', itemE: 'R 71' })], Z('20:00'));
+        assert.equal(r?.status, 'ACTIVE');
+    });
+
+    test('SR-SS : sunTimes en minutes locales → ACTIVE en pleine journée, détail local', () => {
+        const r = zoneActivation('R71', [N({ itemD: 'SR-SS', itemE: 'R 71' })],
+            new Date('2026-09-13T12:00:00').getTime(), { sr: 6 * 60 + 10, ss: 21 * 60 + 20 });
+        assert.equal(r?.status, 'ACTIVE');
+        assert.equal(r.detail, '0610-2120');
+    });
+});
+
+describe('zoneActivation — bouclage minuit local (fiche audit n°27)', () => {
+    // Instants UTC FIXES : une plage UTC tardive (précoce) devient une
+    // plage locale du lendemain (de la veille) dès que |tzShift| > 0.
+    // Avant correctif, 2300-2350Z en runner UTC+2 donnait a = 1500 :
+    // nowMin ∈ [0,1440) ne pouvait jamais l'atteindre → zone vue
+    // PLANIFIEE pendant toute son activation réelle (et clip en fuseau
+    // négatif : a < 0). Les assertions tiennent dans TOUT fuseau.
+    const Z = (s) => Date.parse(`2026-09-13T${s}:00Z`);
+
+    test('2300-2350Z : ACTIVE à 23:15Z (heures locales du lendemain)', () => {
+        const r = zoneActivation('R71', [N({ itemD: '2300-2350', itemE: 'R 71' })], Z('23:15'));
+        assert.equal(r?.status, 'ACTIVE');
+        assert.equal(r.detail, locRange('2300', '2350', Z('23:15')));
+    });
+
+    test('0000-0050Z : ACTIVE à 00:15Z (heures locales de la veille)', () => {
+        const r = zoneActivation('R71', [N({ itemD: '0000-0050', itemE: 'R 71' })], Z('00:15'));
+        assert.equal(r?.status, 'ACTIVE');
+    });
+
+    test('2200-0200Z : ACTIVE à 23:00Z (traversée minuit après bouclage)', () => {
+        const r = zoneActivation('R71', [N({ itemD: '2200-0200', itemE: 'R 71' })], Z('23:00'));
+        assert.equal(r?.status, 'ACTIVE');
+    });
+
+    test('2300-2350Z : PLANIFIEE à 22:30Z, terminée (null) à 23:55Z', () => {
+        const avant = zoneActivation('R71', [N({ itemD: '2300-2350', itemE: 'R 71' })], Z('22:30'));
+        assert.equal(avant?.status, 'PLANIFIEE');
+        assert.equal(zoneActivation('R71', [N({ itemD: '2300-2350', itemE: 'R 71' })], Z('23:55')), null);
     });
 });
 

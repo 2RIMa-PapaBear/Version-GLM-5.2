@@ -1,4 +1,4 @@
-import { I18N, PALETTE, UNIFIED_RED, REGEX_BLOCKS_PATTERN, parseVisiToMeters, getCeiling, findActiveValueAtHour, CAT_COLORS, catColorRgba, getNearestAirport } from './core.js';
+import { I18N, PALETTE, UNIFIED_RED, REGEX_BLOCKS_PATTERN, parseVisiToMeters, getCeiling, findActiveValueAtHour, CAT_COLORS, catColorRgba, getNearestAirport, getFlightCategory } from './core.js';
 import { state, memoGet } from './core.js';
 import { escapeHtml } from './core.js';
 import { dessinerGraphique, updateWindCompass, calculateFlightCategoryRobust, parseWindString, selectBestRunway, getForecastAtHour } from './engine.js';
@@ -210,8 +210,8 @@ export function updateFinalUI(res, raw, forcedId) {
                 const tNuage = b.nuage || res.base?.nuage?.[0]?.val;
                 const tCatObj = calculateFlightCategoryRobust(tVisi, tNuage);
 
-                if (tCatObj.cat !== 'VFR') {
-                    const getSev = (c) => c === 'LIFR' ? 4 : (c === 'IFR' ? 3 : (c === 'MVFR' ? 2 : 1));
+                if (tCatObj.cat !== 'VMC') {
+                    const getSev = (c) => c === 'IMC' ? 3 : (c === 'MARGINAL' ? 2 : 1);
                     if (!tempoCatObj || getSev(tCatObj.cat) > getSev(tempoCatObj.cat)) {
                         tempoCatObj = tCatObj;
                         let p = b.prob || '';
@@ -235,11 +235,19 @@ export function updateFinalUI(res, raw, forcedId) {
             let labelTime = diffH === 0 ? "H+0" : (diffH > 0 ? `H+${diffH}h` : `H${diffH}h`);
 
             updateWindCompass(res, targetH, labelTime, runways, forcedId, apt);
-            const forecast = getForecastAtHour(res, targetH);
+            // M4 (audit 27/09) : heure HORS validité du TAF (TAF périmé ou
+            // cible au-delà de la fenêtre) → badge INCONNU — jamais un
+            // « VMC » fabriqué sur les défauts « >10 km / CAVOK » de
+            // getForecastAtHour (le même optimisme donnait des minima
+            // « ctrl_ok » sur des prévisions expirées, cf. tafVisiCeilingAt).
+            const inValidity = targetH >= res.startH && targetH <= res.endH;
+            const forecast = inValidity
+                ? getForecastAtHour(res, targetH)
+                : { catObj: getFlightCategory(null, null), icon: 'help-circle', tempoCatObj: null, tempoProb: '' };
 
-            let windStr = findActiveValueAtHour(res.base?.vent, targetH);
-            let visiStr = findActiveValueAtHour(res.base?.visi, targetH);
-            let nuageStr = findActiveValueAtHour(res.base?.nuage, targetH);
+            let windStr = inValidity ? findActiveValueAtHour(res.base?.vent, targetH) : null;
+            let visiStr = inValidity ? findActiveValueAtHour(res.base?.visi, targetH) : null;
+            let nuageStr = inValidity ? findActiveValueAtHour(res.base?.nuage, targetH) : null;
 
             updateFlightCategoryBadge(forecast.catObj, forecast.icon, true, false, false, runways, forcedId, windStr, visiStr, nuageStr, forecast.tempoCatObj, forecast.tempoProb);
             updateDecryptedWidgets(res, targetH);
@@ -305,18 +313,25 @@ export function updateFlightCategoryBadge(catObj, iconName, showAnim, isMetar, i
     let lblVisi = isFr ? 'Visibilité' : 'Visibility';
     let lblCeil = isFr ? 'Plafond' : 'Ceiling';
 
+    // Vocabulaire européen (fiche n°3) : VMC / MARGINAL / IMC — libellé
+    // étiquette raccourci (« LIMITE » en français) et police réduite pour
+    // tenir dans la carte à côté des deux sigles de 3 lettres.
+    const catLabel = (c) => (c === 'MARGINAL' ? (isFr ? 'LIMITE' : 'MARGINAL') : c);
+    const catFont = (lbl) => lbl.length > 4 ? 34 : 52;
+
     let tempoHtml = '';
-    if (tempoCatObj && tempoCatObj.cat !== 'VFR') {
+    if (tempoCatObj && tempoCatObj.cat !== 'VMC') {
         const tCol = CAT_COLORS[tempoCatObj.cat] || CAT_COLORS.NONE;
-        tempoHtml = `<div style="color:${tCol}; font-size:18px; font-weight:800; margin-top:4px; letter-spacing: 0.5px;">${tempoProbLabel} ${tempoCatObj.cat}</div>`;
+        tempoHtml = `<div style="color:${tCol}; font-size:18px; font-weight:800; margin-top:4px; letter-spacing: 0.5px;">${tempoProbLabel} ${catLabel(tempoCatObj.cat)}</div>`;
     }
 
+    const bigLbl = catLabel(catObj.cat);
     let html = `
         <i data-lucide="${iconName}" class="vfr-watermark-icon"></i>
         <div style="display:flex; flex-direction:column; height:100%; position:relative; z-index:1;">
             <div style="flex:1;">
                 <div class="dash-title" style="color:rgba(255,255,255,0.9); margin-bottom:8px;">${isMetar ? I18N[state.lang].lblObservation : I18N[state.lang].lblWeather}</div>
-                <div class="vfr-cat" style="color:${borderCol}; font-size: 52px;">${catObj.cat}</div>
+                <div class="vfr-cat" style="color:${borderCol}; font-size:${catFont(bigLbl)}px;">${bigLbl}</div>
                 ${tempoHtml}
             </div>
             <div style="display:flex; flex-direction:column; gap:6px; margin-top:15px; width: 100%;">

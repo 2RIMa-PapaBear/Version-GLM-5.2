@@ -1,10 +1,12 @@
 // Tests de la géométrie « alternates le long de la route », de la
-// substitution METAR (terrain sans émission → station la plus proche) et de
-// la détection humidité/contamination par tokens METAR (page 3 du log de nav).
+// substitution METAR (terrain sans émission → station la plus proche), de
+// la détection humidité/contamination par tokens METAR (page 3 du log de
+// nav) et des performances d'atterrissage de l'avion actif dans le score
+// de dégagement (audit 27/09 — NCO.OP.105).
 import test from 'node:test';
 import { ok, equal } from 'node:assert';
 import assert from 'node:assert/strict';
-import { _distToSegmentNm, _attachMetars, _pickEvenSpread, _diversionScore } from '../js/alternates.js';
+import { _distToSegmentNm, _attachMetars, _pickEvenSpread, _diversionScore, _parseMetarQnhOat } from '../js/alternates.js';
 import { _wetFromTokens } from '../js/takeoff-performance.js';
 
 // ---------------------------------------------------------------- géométrie
@@ -161,15 +163,15 @@ test('_pickEvenSpread : une grappe dense ne colonise pas plusieurs secteurs', ()
 });
 
 test('_pickEvenSpread : la météo ne joue AUCUN rôle — le plus proche de l’ancre gagne', () => {
-    // Dans le même secteur : un IFR à 2 NM de la route et un VFR à 10 NM.
+    // Dans le même secteur : un IMC à 2 NM de la route et un VMC à 10 NM.
     // L'ancien tri par viabilité préférait le VFR ; la sélection pilote veut
     // le terrain le PLUS PROCHE, sa catégorie n'est qu'une info affichée.
     const rows = [
-        { code: 'IFR1', cat: { cat: 'IFR' }, offsetNm: 2, atdNm: 120 },
-        { code: 'VFR1', cat: { cat: 'VFR' }, offsetNm: 10, atdNm: 125 },
+        { code: 'IMC1', cat: { cat: 'IMC' }, offsetNm: 2, atdNm: 120 },
+        { code: 'VMC1', cat: { cat: 'VMC' }, offsetNm: 10, atdNm: 125 },
     ];
     const picks = _pickEvenSpread(rows, 8, 200);
-    ok(picks.some(r => r.code === 'IFR1'), 'le terrain le plus proche est retenu même IFR');
+    ok(picks.some(r => r.code === 'IMC1'), 'le terrain le plus proche est retenu même IMC');
 });
 
 test('_pickEvenSpread : moins de candidats que de secteurs → tout est retenu', () => {
@@ -195,28 +197,84 @@ test('_pickEvenSpread : alternates équidistants sur trajet équilibré', () => 
 
 // ---- Score de praticabilité comme terrain de DÉGAGEMENT (①=C du 13/09 :
 // proposition auto, JAMAIS la météo seule — cat + distance/destination +
-// H24 + privé) -----------------------------------------------------------------
-test('_diversionScore : un VFR un peu plus loin bat un IFR plus proche', () => {
+// H24 + privé ; vocabulaire VMC/MARGINAL/IMC SERA.5005, fiche n°3 27/09) ---------
+test('_diversionScore : un VMC un peu plus loin bat un IMC plus proche', () => {
     const dest = { lat: 47.5, lon: -3 };
-    const vfr = { code: 'LFRE', lat: 47.6, lon: -3.1, cat: { cat: 'VFR' } };       // ~ 7 NM
-    const ifr = { code: 'LFRZ', lat: 47.55, lon: -3.02, cat: { cat: 'IFR' } };     // ~ 3.5 NM
-    const sVfr = _diversionScore(vfr, dest, { horAtsCode: 'H24', prive: false });
-    const sIfr = _diversionScore(ifr, dest, { horAtsCode: 'H24', prive: false });
-    ok(sVfr.score < sIfr.score, 'IFR sous les minimas = pénalité qui domine la distance');
-    equal(sVfr.h24, true);
-    equal(sVfr.prive, false);
+    const vmc = { code: 'LFRE', lat: 47.6, lon: -3.1, cat: { cat: 'VMC' } };       // ~ 7 NM
+    const imc = { code: 'LFRZ', lat: 47.55, lon: -3.02, cat: { cat: 'IMC' } };     // ~ 3.5 NM
+    const sVmc = _diversionScore(vmc, dest, { horAtsCode: 'H24', prive: false });
+    const sImc = _diversionScore(imc, dest, { horAtsCode: 'H24', prive: false });
+    ok(sVmc.score < sImc.score, 'IMC sous les minimas = pénalité qui domine la distance');
+    equal(sVmc.h24, true);
+    equal(sVmc.prive, false);
 });
 
 test('_diversionScore : pénalités privé (+6) et horaires non H24 (+2)', () => {
     const dest = { lat: 47.5, lon: -3 };
-    const r = { code: 'LFXX', lat: 47.6, lon: -3.1, cat: { cat: 'VFR' } };
+    const r = { code: 'LFXX', lat: 47.6, lon: -3.1, cat: { cat: 'VMC' } };
     const base = _diversionScore(r, dest, { horAtsCode: 'H24', prive: false });
     const penal = _diversionScore(r, dest, { horAtsCode: 'HX', prive: true });
     ok(Math.abs((penal.score - base.score) - 8) < 0.001, `écart attendu 8, obtenu ${penal.score - base.score}`);
 });
 
-test('_diversionScore : ordre des catégories VFR < MVFR < IFR', () => {
+test('_diversionScore : ordre des catégories VMC < MARGINAL < IMC', () => {
     const dest = { lat: 47.5, lon: -3 };
     const mk = (cat) => _diversionScore({ code: 'LF' + cat, lat: 47.6, lon: -3.1, cat: { cat } }, dest, null);
-    ok(mk('VFR').score < mk('MVFR').score && mk('MVFR').score < mk('IFR').score && mk('IFR').score < mk('LIFR').score);
+    ok(mk('VMC').score < mk('MARGINAL').score && mk('MARGINAL').score < mk('IMC').score);
+});
+
+// ---- Performances ATTERRISSAGE de l'avion actif dans le score de
+// dégagement (audit 27/09 — NCO.OP.105 : un aérodrome de dégagement doit
+// d'abord répondre aux performances de l'aéronef ; le plancher générique
+// de piste de la base locale ne suffit pas, ex. herbe + chaud > 450 m) ---
+test('_parseMetarQnhOat : QNH et température extraits du METAR brut', () => {
+    assert.deepEqual(
+        _parseMetarQnhOat('LFPB 260800Z 27010KT 9999 FEW040 22/12 Q1018'),
+        { qnh: 1018, oat: 22 });
+    assert.deepEqual(
+        _parseMetarQnhOat('AAAA 190830Z 28012KT 6000 RA BKN010 M05/M07 Q1002'),
+        { qnh: 1002, oat: -5 });
+    // Fiche n°9 (audit 27/09) : l'alias délègue à parseMetarQnhOat (core)
+    // → l'altimètre nord-américain Axxxx (inHg) est converti en hPa.
+    assert.deepEqual(
+        _parseMetarQnhOat('KLAX 261953Z 27012KT 10SM FEW250 22/12 A2992 RMK AO2'),
+        { qnh: 1013, oat: 22 });
+    assert.deepEqual(_parseMetarQnhOat('AAAA 190830Z 28012KT 6000 BKN010'), { qnh: null, oat: null });
+});
+
+test('_diversionScore : sans verdict atterrissage, le score reste neutre', () => {
+    const dest = { lat: 47.5, lon: -3 };
+    const af = { horAtsCode: 'H24', prive: false };
+    const r = { code: 'LFXX', lat: 47.6, lon: -3.1, cat: { cat: 'VMC' } };
+    equal(_diversionScore({ ...r, ldg: null }, dest, af).score, _diversionScore(r, dest, af).score);
+    equal(_diversionScore(r, dest, af).ldg, null);
+});
+
+test('_diversionScore : attérissable = pas de pénalité, marge faible = +1', () => {
+    const dest = { lat: 47.5, lon: -3 };
+    const af = { horAtsCode: 'H24', prive: false };
+    const base = { code: 'LFXX', lat: 47.6, lon: -3.1, cat: { cat: 'VMC' }, ldg: null };
+    const sOk = _diversionScore({ ...base, ldg: { level: 'ok' } }, dest, af);
+    equal(sOk.score, _diversionScore(base, dest, af).score, 'ok = neutre');
+    equal(sOk.ldg, 'ok');
+    const sCaution = _diversionScore({ ...base, ldg: { level: 'caution' } }, dest, af).score;
+    ok(Math.abs(sCaution - _diversionScore(base, dest, af).score - 1) < 1e-9, 'caution = +1');
+});
+
+test('_diversionScore : piste limitative = +8, perd contre un terrain attérissable plus loin', () => {
+    const dest = { lat: 47.5, lon: -3 };
+    const af = { horAtsCode: 'H24', prive: false };
+    const proche = { code: 'LFC1', lat: 47.55, lon: -3.02, cat: { cat: 'VMC' }, ldg: { level: 'limitative' } };
+    const loin = { code: 'LFC2', lat: 47.7, lon: -3.2, cat: { cat: 'VMC' }, ldg: { level: 'ok' } };
+    ok(Math.abs(_diversionScore(proche, dest, af).score - _diversionScore({ ...proche, ldg: null }, dest, af).score - 8) < 1e-9, 'limitative = +8');
+    ok(_diversionScore(loin, dest, af).score < _diversionScore(proche, dest, af).score,
+        'un dégagement attérissable plus loin bat une limitative plus proche');
+});
+
+test('_diversionScore : atterrissage impossible → score infini, jamais proposé', () => {
+    const dest = { lat: 47.5, lon: -3 };
+    const r = { code: 'LFXX', lat: 47.6, lon: -3.1, cat: { cat: 'VMC' }, ldg: { level: 'danger' } };
+    const s = _diversionScore(r, dest, { horAtsCode: 'H24', prive: false });
+    equal(s.ldg, 'danger');
+    ok(!Number.isFinite(s.score), 'score infini → exclu de la proposition « Recommandé »');
 });

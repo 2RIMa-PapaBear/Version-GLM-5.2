@@ -1,7 +1,9 @@
 import { state, I18N, fetchAvecRelais, memoGet, escapeHtml } from './core.js';
 import { getAirportByICAO, getAirportsInBbox } from './ui-module.js';
-import { parseVisiToMeters, getCeiling, CAT_COLORS } from './core.js';
+import { parseVisiToMeters, parseWindGroupToKt, getCeiling, CAT_COLORS, getFlightCategory, parseMetarQnhOat } from './core.js';
 import { getSiaAirfield } from './sia-data.js';
+import { evaluateLandingFromRaw } from './takeoff-performance.js';
+import { airspaceContextFor } from './vfr-minima.js';
 
 // ====================================================================
 // ALTERNATES DE ROUTE — TOUS les aérodromes à ± maxOffsetNm de la route
@@ -94,20 +96,65 @@ export function _attachMetars(candidates, metarByCode, pool) {
 }
 
 /**
+ * QNH (hPa) et température (°C) extraits d'un METAR brut — null si le
+ * groupe est absent. Alias de l'extracteur UNIQUE de core.js (fiche n°9,
+ * audit 27/09 : gère aussi l'altimètre nord-américain Axxxx inHg → hPa ;
+ * mêmes expressions que la page Performances du log de nav). Pur —
+ * testé sous Node.
+ */
+export const _parseMetarQnhOat = parseMetarQnhOat;
+
+/**
+ * Verdict d'ATTERRISSAGE de l'avion ACTIF sur chaque alternate (audit
+ * 27/09 — NCO.OP.105 : la suggestion de dégagement doit d'abord répondre
+ * aux performances de l'aéronef, pas seulement au plancher générique de
+ * piste de la base locale). Reprend TEL QUEL le calcul de la destination
+ * du log de nav (evaluateLandingFromRaw : densité-altitude au METAR de
+ * l'alternate — ou de la station de substitution —, vent axial sur la
+ * piste prévue, revêtement/humidité, marge +20 %). Le résultat atterrit
+ * dans `row.ldg` : {level: ok|caution|limitative|danger|unknown, message…}
+ * ou null (références atterrissage flotte absentes, METAR sans QNH/temp).
+ */
+function _attachLandingPerf(rows) {
+    return rows.map(row => {
+        const { qnh, oat } = _parseMetarQnhOat(row.raw);
+        if (!row.code || qnh == null || oat == null) return { ...row, ldg: null };
+        const elevationFt = getSiaAirfield(row.code)?.elevFt
+            ?? getAirportByICAO(row.code)?.elevation ?? null;
+        return { ...row, ldg: evaluateLandingFromRaw(row.code, { raw: row.raw, qnh, oat, elevationFt }) };
+    });
+}
+
+/**
  * Score de praticabilité d'un alternate comme terrain de DÉGAGEMENT
  * (arbitrage ①=C du 13/09 : proposition automatique + choix du pilote —
  * JAMAIS la météo seule). Composantes : catégorie de vol (pénalité forte
- * IFR/LIFR), distance à la DESTINATION, ouverture H24 (SIA horAtsCode),
- * terrain privé (pénalité). `afInfo` injectable pour les tests.
- * @returns {{score:number, distNm:number, h24:boolean, prive:boolean}}
+ * IMC), distance à la DESTINATION, ouverture H24 (SIA horAtsCode),
+ * terrain privé (pénalité) et PERFORMANCES D'ATTERRISSAGE de l'avion
+ * actif (audit 27/09 — NCO.OP.105 : un dégagement doit d'abord être
+ * attérissable par l'appareil, le plancher de piste générique ne suffit
+ * pas). `afInfo` injectable pour les tests.
+ * @returns {{score:number, distNm:number, h24:boolean, prive:boolean, ldg:string|null}}
+ *   score = Infinity quand l'atterrissage est impossible (brut > piste) :
+ *   le terrain reste listé mais n'est JAMAIS proposé.
  */
 export function _diversionScore(r, destPt, afInfo = null) {
-    const catPenalty = { VFR: 0, MVFR: 3, IFR: 12, LIFR: 25 }[r.cat?.cat] ?? 8;
+    const catPenalty = { VMC: 0, MARGINAL: 3, IMC: 12 }[r.cat?.cat] ?? 8;
+    // Verdict atterrissage (r.ldg, posé par _attachLandingPerf depuis
+    // evaluateLandingFromRaw) : ok 0 · marge faible +1 · piste limitative +8
+    // (utilisable aux vitesses exactes du manuel) · atterrissage impossible
+    // → Infinity. null (références flotte absentes, METAR sans QNH/temp,
+    // piste de longueur inconnue) → neutre.
+    const ldgPenalty = { ok: 0, caution: 1, limitative: 8, danger: Infinity }[r.ldg?.level] ?? 0;
     const distNm = _haversineNm(destPt.lat, destPt.lon, r.lat, r.lon);
     const af = afInfo !== null ? afInfo : getSiaAirfield(r.code);
     const h24 = /H24/i.test(String(af?.horAtsCode || af?.horAts || ''));
     const prive = !!af?.prive;
-    return { score: catPenalty + distNm * 0.15 + (h24 ? 0 : 2) + (prive ? 6 : 0), distNm: Math.round(distNm), h24, prive };
+    return {
+        score: catPenalty + ldgPenalty + distNm * 0.15 + (h24 ? 0 : 2) + (prive ? 6 : 0),
+        distNm: Math.round(distNm), h24, prive,
+        ldg: r.ldg?.level ?? null,
+    };
 }
 
 /** Tous les aérodromes du couloir — depuis la BASE LOCALE des terrains
@@ -271,15 +318,26 @@ export async function getEnRouteAlternates(routePts, maxOffsetNm = 25, maxRows =
             if (code) metarByCode[code] = m.rawOb || m.rawMetar || m.rawText || '';
         });
 
+        // Contexte d'espace PAR TERRAIN (fiche n°3, audit 27/09) : la classe
+        // C/D/E vs G conditionne les minima VMC (SERA.5005) — un dégagement
+        // en classe G garde droit à la visi 1500 m, un terrain en TMA non.
+        const ctxByCode = {};
+        await Promise.all(picked.map(async c => {
+            if (!c.code || c.lat == null) return;
+            try { ctxByCode[c.code] = await airspaceContextFor(c.code, c.lat, c.lon); } catch { /* pire-cas */ }
+        }));
+
         const rows = _attachMetars(picked, metarByCode, pool)
             .map(s => {
-                const cat = _categoryFromMetar(s.raw);
+                const cat = _categoryFromMetar(s.raw, ctxByCode[s.code] ?? null);
                 if (!cat) return null;
                 return { ...s, cat, raw: s.raw };
             })
             .filter(Boolean);
         if (!rows.length) return null;
-        return rows;   // _pickEvenSpread a déjà établi l'ordre du vol
+        // Verdict atterrissage de l'avion actif par terrain (NCO.OP.105) —
+        // purement local (SIA + base terrains en mémoire), zéro requête.
+        return _attachLandingPerf(rows);   // _pickEvenSpread a déjà établi l'ordre du vol
     } catch (e) {
         console.warn('En-route alternates load failed:', e);
         return null;
@@ -358,11 +416,19 @@ export async function showAlternates(icao) {
             if (code) metarByCode[code] = m.rawOb || m.rawMetar || m.rawText || '';
         });
 
+        // Contexte d'espace PAR TERRAIN (fiche n°3) : minima VMC selon la
+        // classe C/D/E vs G (SERA.5005) — cache 30 min, pire-cas si absent.
+        const ctxByCode = {};
+        await Promise.all(nearby.map(async s => {
+            if (!s.code || s.lat == null) return;
+            try { ctxByCode[s.code.toUpperCase()] = await airspaceContextFor(s.code, s.lat, s.lon); } catch { /* pire-cas */ }
+        }));
+
         const rows = nearby
             .map(s => {
                 const raw = metarByCode[s.code.toUpperCase()];
                 if (!raw) return null;
-                const cat = _categoryFromMetar(raw);
+                const cat = _categoryFromMetar(raw, ctxByCode[s.code.toUpperCase()] ?? null);
                 if (!cat) return null;
                 return { ...s, cat, raw };
             })
@@ -370,7 +436,7 @@ export async function showAlternates(icao) {
 
         if (rows.length === 0) { container.style.display = 'none'; return; }
 
-        const catPriority = { VFR: 0, MVFR: 1, IFR: 2, LIFR: 3 };
+        const catPriority = { VMC: 0, MARGINAL: 1, IMC: 2 };
         rows.sort((a, b) => (catPriority[a.cat.cat] ?? 9) - (catPriority[b.cat.cat] ?? 9) || a.dist - b.dist);
 
         _render(rows.slice(0, 6), icao, { mode: 'local' });
@@ -442,17 +508,23 @@ function _render(rows, depIcao, ctx = { mode: 'local' }) {
         state.diversionIcao = null;
     }
     // Proposition (①=C) : le plus praticable à défaut de choix du pilote —
-    // IFR/LIFR jamais proposés (terrain sous les minimas = pas un dégagement).
+    // IMC jamais proposé (terrain sous les minima VMC = pas un dégagement),
+    // pas plus qu'un terrain où l'atterrissage est IMPOSSIBLE pour l'avion
+    // actif (NCO.OP.105 : score infini posé par _diversionScore).
     let recoCode = null;
     if (isRoute && ctx.destPt && !state.diversionIcao) {
         let best = null;
         for (const r of rows) {
-            if (r.cat.cat === 'IFR' || r.cat.cat === 'LIFR') continue;
+            if (r.cat.cat === 'IMC') continue;
             const s = _diversionScore(r, ctx.destPt);
+            if (!Number.isFinite(s.score)) continue;
             if (!best || s.score < best.score) best = { code: r.code, s };
         }
         recoCode = best?.code ?? null;
     }
+
+    // Libellé de catégorie (fiche n°3) : VMC / LIMITE (MARGINAL) / IMC.
+    const catLbl = (c) => (c === 'MARGINAL' ? (isFr ? 'LIMITE' : 'MARGINAL') : c);
 
     rows.forEach(r => {
         const color = catColors[r.cat.cat];
@@ -460,7 +532,7 @@ function _render(rows, depIcao, ctx = { mode: 'local' }) {
         const ceilFt = r.cat.ceilHund === 999 ? null : r.cat.ceilHund * 100;
         const wind = r.cat.wind;
 
-        const visiStr = visiM >= 10000 ? '>10km' : `${visiM}m`;
+        const visiStr = visiM == null ? '—' : (visiM >= 10000 ? '>10km' : `${visiM}m`);
         const ceilStr = ceilFt !== null ? `${ceilFt}ft` : '∞';
         const windStr = wind ? `${wind.dir === null ? 'VRB' : String(wind.dir).padStart(3, '0') + '°'} ${wind.speed}${wind.gust ? 'G' + wind.gust : ''}` : '—';
         const star = r.metarFrom ? '*' : '';
@@ -473,8 +545,8 @@ function _render(rows, depIcao, ctx = { mode: 'local' }) {
                 <span class="alt-code">${escapeHtml(r.code)}${star}</span>
                 <span class="alt-name">${escapeHtml(r.name)}</span>
             </div>
-            <div class="alt-cell" style="color:${color}; font-weight:800;">${r.cat.cat}</div>
-            <div class="alt-cell" style="${visiM < 5000 ? 'color:#FCA5A5;' : ''}">${visiStr}</div>
+            <div class="alt-cell" style="color:${color}; font-weight:800;">${catLbl(r.cat.cat)}</div>
+            <div class="alt-cell" style="${visiM != null && visiM < 5000 ? 'color:#FCA5A5;' : ''}">${visiStr}</div>
             <div class="alt-cell" style="${ceilFt !== null && ceilFt < 1500 ? 'color:#FCA5A5;' : ''}">${ceilStr}</div>
             <div class="alt-cell">${windStr}</div>
             ${isRoute ? `<div class="alt-cell">${r.offsetNm} NM ${r.side >= 0 ? (isFr ? 'D' : 'R') : (isFr ? 'G' : 'L')}</div>` : ''}
@@ -485,10 +557,20 @@ function _render(rows, depIcao, ctx = { mode: 'local' }) {
                 const bits = d.distNm != null ? [`${d.distNm} NM ${isFr ? 'de l\u2019arrivée' : 'from destination'}`] : [];
                 if (d.h24) bits.push('H24');
                 if (d.prive) bits.push(isFr ? 'privé' : 'private');
+                if (d.ldg === 'limitative') bits.push(isFr ? 'piste limitative' : 'limiting runway');
+                if (d.ldg === 'danger') bits.push(isFr ? 'piste insuffisante' : 'runway too short');
                 const title = chosen
                     ? (isFr ? `Terrain de dégagement du devis carburant (${bits.join(' · ')}) — cliquer pour retirer` : `Fuel plan alternate field (${bits.join(' · ')}) — click to clear`)
                     : (isFr ? `Utiliser comme terrain de dégagement — branche carburant du plan (${bits.join(' · ')})` : `Use as alternate field — fuel plan branch (${bits.join(' · ')})`);
+                // Marqueur performances atterrissage (NCO.OP.105) : le bouton
+                // reste cliquable (choix du pilote) mais l'avertissement est
+                // visible — le message complet du verdict est dans le title.
+                const ldgLevel = r.ldg?.level || null;
+                const ldgWarn = (ldgLevel === 'danger' || ldgLevel === 'limitative')
+                    ? `<span class="alt-ldg-warn${ldgLevel === 'danger' ? ' danger' : ''}" title="${escapeHtml(r.ldg.message || '')}">⚠</span>`
+                    : '';
                 return `<div class="alt-cell alt-div-cell">
+                    ${ldgWarn}
                     <button class="alt-divert${chosen ? ' on' : ''}${reco ? ' reco' : ''}" data-icao="${escapeHtml(r.code)}"
                         title="${escapeHtml(title)}" aria-pressed="${chosen ? 'true' : 'false'}">
                         <i data-lucide="${chosen ? 'flag' : 'plus'}" style="width:13px;height:13px;"></i>
@@ -504,8 +586,8 @@ function _render(rows, depIcao, ctx = { mode: 'local' }) {
         <i data-lucide="info" style="width:13px;height:13px;vertical-align:middle;"></i>
         ${isRoute
             ? (isFr
-                ? `8 terrains régulièrement espacés le long du trajet, dans l'ordre du vol. « * » : METAR de la station la plus proche. Cliquez un terrain pour le charger. Le bouton <strong>+</strong> le désigne <strong>terrain de dégagement</strong> : la branche carburant (destination → dégagement) s'ajoute au devis — Trajet + Dégagement + Réserve 30 min.`
-                : `8 airfields evenly spaced along the route, in flight order. "*": METAR from the nearest reporting station. Click a field to load it. The <strong>+</strong> button marks it as the <strong>alternate field</strong>: its fuel branch (destination → alternate) is added to the fuel plan — Trip + Alternate + Reserve.`)
+                ? `8 terrains régulièrement espacés le long du trajet, dans l'ordre du vol. « * » : METAR de la station la plus proche. Cliquez un terrain pour le charger. Le bouton <strong>+</strong> le désigne <strong>terrain de dégagement</strong> : la branche carburant (destination → dégagement) s'ajoute au devis — Trajet + Dégagement + Réserve 30 min. <strong>⚠</strong> : piste limitative ou insuffisante pour l'avion actif (performances d'atterrissage de la flotte, jamais proposée comme dégagement si insuffisante).`
+                : `8 airfields evenly spaced along the route, in flight order. "*": METAR from the nearest reporting station. Click a field to load it. The <strong>+</strong> button marks it as the <strong>alternate field</strong>: its fuel branch (destination → alternate) is added to the fuel plan — Trip + Alternate + Reserve. <strong>⚠</strong>: limiting or insufficient runway for the active aircraft (fleet landing performance — never suggested as an alternate when insufficient).`)
             : (isFr
                 ? `Alternates viables autour de <strong>${escapeHtml(depIcao)}</strong>, triés par viabilité (catégorie de vol puis proximité). Cliquez un terrain pour le charger.`
                 : `Viable alternates around <strong>${escapeHtml(depIcao)}</strong>, sorted by flight category then proximity. Click a field to load it.`)}
@@ -541,9 +623,12 @@ function _render(rows, depIcao, ctx = { mode: 'local' }) {
     }
 }
 
-function _categoryFromMetar(raw) {
-    const visiMatch = raw.match(/KT(?:\s+\d{3}V\d{3})?\s+(\d{4})\b/);
-    const visiM = visiMatch ? (parseInt(visiMatch[1], 10) === 9999 ? 10000 : parseInt(visiMatch[1], 10)) : parseVisiToMeters('');
+function _categoryFromMetar(raw, ctx = null) {
+    // Fiche n°15 (audit 27/09) : l'ancre du groupe vent accepte les 3 unités
+    // OACI (KT/MPS/KMH) — sinon la visi d'un METAR MPS était perdue.
+    const visiMatch = raw.match(/(?:KT|MPS|KMH)(?:\s+\d{3}V\d{3})?\s+(\d{4})\b/);
+    // Visi absente du groupe = null (pas de 10 km implicite — ré-audit 26/09).
+    const visiM = visiMatch ? (parseInt(visiMatch[1], 10) === 9999 ? 10000 : parseInt(visiMatch[1], 10)) : null;
 
     let ceilHund = 999;
     const cloudMatches = [...raw.matchAll(/\b(BKN|OVC)(\d{3})/g)];
@@ -555,19 +640,12 @@ function _categoryFromMetar(raw) {
     if (vvMatch) ceilHund = parseInt(vvMatch[1], 10);
     if (/CAVOK|NSC|SKC|NCD/.test(raw)) ceilHund = 999;
 
-    const windMatch = raw.match(/\b(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?KT\b/);
-    const wind = windMatch ? {
-        variable: windMatch[1] === 'VRB',
-        dir: windMatch[1] === 'VRB' ? null : parseInt(windMatch[1], 10),
-        speed: parseInt(windMatch[2], 10),
-        gust: windMatch[3] ? parseInt(windMatch[3], 10) : null,
-    } : null;
+    // Vent décodé par le parseur canonique (KT/MPS/KMH → kt, fiche n°15).
+    const wind = parseWindGroupToKt(raw);
 
-    let cat;
-    if (ceilHund < 5 || visiM < 1600) cat = 'LIFR';
-    else if (ceilHund < 10 || visiM < 4800) cat = 'IFR';
-    else if (ceilHund <= 30 || visiM <= 8000) cat = 'MVFR';
-    else cat = 'VFR';
+    // Catégorie VMC/IMC (SERA.5005) conditionnée par la classe d'espace du
+    // terrain quand le contexte est fourni — pire-cas sinon (fiche n°3).
+    const cat = getFlightCategory(visiM, ceilHund, ctx).cat;
 
     return { cat, visiM, ceilHund, wind };
 }

@@ -49,3 +49,34 @@ test('drawVacPages : liste vide → aucune page', () => {
     drawVacPages(doc, null);
     equal(doc.getNumberOfPages(), n0);
 });
+
+// Fiche 21 : dimensions pdf.js dégénérées (page à MediaBox nulle → scale
+// 1400/0 = Infinity côté vac-viewer) — 0/NaN sont falsy mais Infinity et
+// négatif sont TRUTHY : l'ancien garde `p.w && p.h` laissait passer un sc
+// NaN/négatif et addImage écrivait « … NaN NaN cm » SANS jeter : le dossier
+// PDF entier devenait corrompu (try/catch impuissant). Toute dimension
+// invalide → repli pleine zone, sc = 1, PDF sain.
+test('drawVacPages : dimensions dégénérées → repli pleine zone, PDF sans NaN', () => {
+    const doc = new jsPDF({ unit: 'pt', format: 'a5' });
+    const n0 = doc.getNumberOfPages();
+    drawVacPages(doc, [
+        { label: 'Départ LFRV', airac: '2026-09-03', pages: [
+            { data: JPEG1, w: Infinity, h: Infinity },   // pdf.js MediaBox nulle
+            { data: JPEG1, w: 0, h: 1400 },              // falsy : déjà couvert avant
+            { data: JPEG1, w: NaN, h: 1400 },
+            { data: JPEG1, w: -990, h: 1400 },           // négatif : truthy, non couvert
+            { data: JPEG1 },                              // absentes
+        ] },
+    ]);
+    equal(doc.getNumberOfPages(), n0 + 5, '5 pages VAC posées malgré tout');
+    const raw = Buffer.from(doc.output('arraybuffer')).toString('latin1');
+    ok(!raw.includes('NaN'), 'aucun NaN dans le flux PDF');
+    ok(!/"-[\d.]+ 0 0/.test(raw), 'aucune dimension négative');
+    const places = [...raw.matchAll(/([\d.]+) 0 0 ([\d.]+) ([\d.]+) ([\d.]+) cm\s*\/\w+ Do/g)]
+        .map((m) => ({ w: +m[1], h: +m[2] }));
+    equal(places.length, 5, '5 images posées');
+    for (const p of places) {
+        ok(Number.isFinite(p.w) && p.w > 370 && Number.isFinite(p.h) && p.h > 520,
+            `repli pleine zone (${p.w.toFixed(0)}×${p.h.toFixed(0)} pt)`);
+    }
+});

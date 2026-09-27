@@ -17,7 +17,14 @@ const FT_PER_M = 3.28084;
 
 // Filtres identiques au rendu de la carte (airspaces.js).
 const ADMIN_NAME_RE = /\bFIR\b|\bUIR\b|\bLTA\b/;
-const MAX_BASE_FT = 5000;
+// Cap de plancher : PAS de VFR au-dessus du FL195 (SERA.5005), croisières
+// semi-circulaires VFR FL055–FL195 (SERA Appendice 3) — une zone dont le
+// plancher dépasse le FL195 ne peut concerner AUCUN vol de l'app. Le cap
+// historique à 5000 ft rendait carte, profil et log de nav aveugles à une
+// TMA C/D de plancher FL065 survolée au FL085 (audit 27/09, fiche 2) ;
+// défini ICI (module pur) et importé par airspaces.js pour ne garder
+// qu'UNE valeur côté client.
+export const MAX_BASE_FT = 19500;
 // Tolérance autour de l'altitude de croisière pour les espaces CONTRÔLÉS
 // (CTR/TMA/CTA/SIV…) : une limite à moins de 1000 ft du niveau de vol reste
 // affichée — élargie de 500 → 1000 ft (consigne pilote 20/09 : une CTR/TMA
@@ -184,14 +191,27 @@ export function computeRouteAirspaces(points, items, opts) {
     if (!Array.isArray(points) || points.length < 2 || !Array.isArray(items)) return null;
     const cruise = Number.isFinite(opts?.cruiseAltFt) && opts.cruiseAltFt > 0 ? opts.cruiseAltFt : null;
 
+    // M13 (audit 27/09) : limites SIA « FT ASFC » (au-dessus du SOL) :
+    // converties en AMSL avec le relief de la route — plancher → sol MIN,
+    // plafond → sol MAX (les deux sens ÉLARGISSENT la zone, jamais
+    // l'inverse). Lues AMSL brutes avant : en montagne (CTR CALVI, CTA
+    // TOULON, R 158 B…) une zone CONTENANT l'altitude de vol était exclue
+    // du profil et les étiquettes « ft AMSL »/« FL » mentaient.
+    const _elevs = points.map(p => p.elevFt).filter(Number.isFinite);
+    const elevMin = _elevs.length ? Math.min(..._elevs) : 0;
+    const elevMax = _elevs.length ? Math.max(..._elevs) : 0;
+    const _asfc = (lim) => !!(lim && lim.ref === 'ASFC');
+
     const byKey = new Map();
     for (const as of items) {
         if (ADMIN_NAME_RE.test(String(as.name || as.designator || '').toUpperCase())) continue;
         // FIR/UIR/secteurs ACC openAIP dont le nom ne dit pas « FIR »
         // (ex. « LRBB », « POLARIS ACC ») — filtrés aussi sur la carte.
         if (!as._sia && (as.type === 10 || as.type === 11 || as.type === 27)) continue;
-        const lo = limitToFt(as.lowerLimit ?? as.lower) ?? 0;
-        const up = limitToFt(as.upperLimit ?? as.upper);
+        const loLim = as.lowerLimit ?? as.lower, upLim = as.upperLimit ?? as.upper;
+        const lo = (limitToFt(loLim) ?? 0) + (_asfc(loLim) ? elevMin : 0);
+        const upRaw = limitToFt(upLim);
+        const up = upRaw == null ? null : upRaw + (_asfc(upLim) ? elevMax : 0);
         if (up == null || up <= 0) continue;            // plafond inconnu : on ignore
         if (lo > MAX_BASE_FT) continue;                  // plancher trop haut pour du VFR
         if (up <= lo) continue;

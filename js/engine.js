@@ -5,7 +5,7 @@
 
 import { I18N, PALETTE, UNIFIED_RED, REGEX_BLOCKS_PATTERN, sunCacheGet, sunCacheSet } from './core.js';
 import { state } from './core.js';
-import { parseVisiToMeters, getCeiling, getFlightCategory, getWeatherIcon, inferStartYear, traduireCode, findActiveValueAtHour, surfaceLabel, SOFT_SURFACES } from './core.js';
+import { parseVisiToMeters, parseWindGroupToKt, getCeiling, getFlightCategory, getWeatherIcon, inferStartYear, traduireCode, findActiveValueAtHour, surfaceLabel, SOFT_SURFACES } from './core.js';
 import { getDeclinationForIcao } from './magvar.js';
 import { themeTokens } from './night-mode.js';
 import { siaRunwayFor, siaSurfaceCode } from './sia-data.js';
@@ -28,17 +28,27 @@ function getWindColorBySpeed(speed) {
 function getUniqueId(prefix = 'wind') { return `${prefix}-${Math.random().toString(36).substring(7)}`; }
 
 function _parseVent(seg) {
-    const mV = seg.match(/((?:\d{3}|VRB)\d{2,3}(?:G\d{2,3})?KT)/); if (!mV) return '';
-    let base = mV[0].trim().replace(/^(\d{3}|VRB)(\d{2,3}(?:G\d{2,3})?KT)/, (m, dir, spd) => (dir === 'VRB' ? 'VRB' : dir + '°') + ' ' + spd);
+    // Fiche n°15 (audit 27/09) : le groupe vent OACI peut être en KT, MPS ou
+    // KMH selon la région émettrice — parseWindGroupToKt (core.js) normalise
+    // tout en KT. Les valeurs converties sont RE-PADÉES (dir sur 3 chiffres,
+    // vitesses sur 2) : parseWindString exige ces largeurs, sans quoi
+    // « 90° 8KT » nettoyé en « 908KT » ne rematcherait pas.
+    const w = parseWindGroupToKt(seg);
+    if (!w) return '';
+    let base = (w.variable ? 'VRB' : String(w.dir).padStart(3, '0') + '°') + ' '
+        + String(w.speed).padStart(2, '0') + (w.gust != null ? 'G' + String(w.gust).padStart(2, '0') : '') + 'KT';
     // Variation de direction METAR : "170V250" suit immédiatement le groupe vent.
     // On la réinjecte pour que parseWindString et la rose des vents puissent la représenter.
-    const mVar = seg.match(/(?:\d{3}|VRB)\d{2,3}(?:G\d{2,3})?KT\s?(\d{3})V(\d{3})/);
-    if (mVar) base += ` ${mVar[1]}V${mVar[2]}`;
+    if (w.varFrom != null) base += ` ${w.varFrom}V${w.varTo}`;
     return base;
 }
 
 function _parseVisi(seg) {
-    const mVi = seg.match(/\s(\d{4}|[PM]?\d+SM|[PM]?\d+\s\d+\/\d+SM|[PM]?\d+\/\d+SM)\s/); if (!mVi) return '';
+    // M3 (audit 27/09) : suffixe français ND/NDZ toléré (« 7000ND » = 7 km
+    // mais « pas de direction significative ») — l'ancien regex exigeait
+    // un espace juste après les 4 chiffres : visi affichée VIDE sur les
+    // METAR français concernés.
+    const mVi = seg.match(/\s(\d{4}|[PM]?\d+SM|[PM]?\d+\s\d+\/\d+SM|[PM]?\d+\/\d+SM)(?:NDZ|ND)?\s/); if (!mVi) return '';
     let valVisi = mVi[1]; const visiM = parseVisiToMeters(valVisi);
     if (valVisi === '9999') valVisi = '> 10 km'; else if (/^\d{4}$/.test(valVisi)) valVisi += ' m'; else if (valVisi.includes('SM')) { const clean = valVisi.replace(/^P/, '> ').replace(/^M/, '< ').replace('SM', ' SM'); valVisi = `${clean} (${(visiM / 1000).toFixed(1)} km)`; }
     return valVisi;
@@ -99,7 +109,7 @@ export function analyserMETAR(rawText) {
     const baseSegPadded = ' ' + baseSeg + ' ';
     const valVent = _parseVent(baseSegPadded); let valVisi = _parseVisi(baseSegPadded); let valNuage = _parseNuage(baseSeg);
     if (baseSeg.includes('CAVOK')) { valNuage = 'CAVOK'; if (!valVisi) valVisi = '> 10 km'; }
-    const valTempsTrad = _parsePhenomenes(baseSeg, ['METAR','SPECI','AUTO','KT','CAVOK','NCD','NOSIG','RMK','BECMG','TEMPO','SM']);
+    const valTempsTrad = _parsePhenomenes(baseSeg, ['METAR','SPECI','AUTO','KT','MPS','KMH','CAVOK','NCD','NOSIG','RMK','BECMG','TEMPO','SM']);
     const endH = obsStartH + 2; const baseLayer = { start: obsStartH, end: endH, becmgEnd: endH, type: 'BASE', prob: '', color: PALETTE[0], _lvl: 0 };
     const processedData = { temp: [{ ...baseLayer, val: valTemp }], qnh: [{ ...baseLayer, val: valQnh }], vent: [{ ...baseLayer, val: valVent }], visi: [{ ...baseLayer, val: valVisi }], temps: [{ ...baseLayer, val: valTempsTrad }], nuage: [{ ...baseLayer, val: valNuage }], soleil: [] };
     const tempoLayers = []; let paletteCounter = 0;
@@ -108,7 +118,7 @@ export function analyserMETAR(rawText) {
         if (seg.includes('NOSIG')) return;
         const isTempo = seg.includes('TEMPO'); if (!isTempo) paletteCounter++;
         const color = isTempo ? UNIFIED_RED : PALETTE[paletteCounter % PALETTE.length];
-        const tVent = _parseVent(' ' + seg + ' '), tVisi = _parseVisi(' ' + seg + ' '), tNuage = _parseNuage(seg), tTemps = _parsePhenomenes(seg, ['METAR','SPECI','AUTO','KT','CAVOK','NCD','NOSIG','RMK','BECMG','TEMPO','SM']);
+        const tVent = _parseVent(' ' + seg + ' '), tVisi = _parseVisi(' ' + seg + ' '), tNuage = _parseNuage(seg), tTemps = _parsePhenomenes(seg, ['METAR','SPECI','AUTO','KT','MPS','KMH','CAVOK','NCD','NOSIG','RMK','BECMG','TEMPO','SM']);
         let blockStart = obsStartH, blockEnd = endH;
         const mFm = seg.match(/FM(\d{2})(\d{2})/), mTl = seg.match(/TL(\d{2})(\d{2})/), mAt = seg.match(/AT(\d{2})(\d{2})/);
         if (mFm) { blockStart = parseInt(mFm[1], 10) + parseInt(mFm[2], 10) / 60.0; if (blockStart < obsStartH - 12) blockStart += 24; }
@@ -119,7 +129,7 @@ export function analyserMETAR(rawText) {
         if (isTempo) tempoLayers.push({ ...block, vent: tVent, visi: tVisi, temps: tTemps, nuage: tNuage });
         else { if (tVent) processedData.vent.push({ ...block, val: tVent }); if (tVisi) processedData.visi.push({ ...block, val: tVisi }); if (tTemps) processedData.temps.push({ ...block, val: tTemps }); if (tNuage) processedData.nuage.push({ ...block, val: tNuage }); }
     });
-    return { isMetar: true, code: codeOACI, validity: validStr, flightCat: getFlightCategory(parseVisiToMeters(valVisi), getCeiling(baseSeg)), weatherIcon: getWeatherIcon(valNuage, valTempsTrad), startH: obsStartH - 0.5, endH: endH + 0.5, base: processedData, tempo: tempoLayers, tafTemps: [], startYear, startMonth, startDay };
+    return { isMetar: true, code: codeOACI, validity: validStr, flightCat: getFlightCategory(valVisi ? parseVisiToMeters(valVisi) : null, getCeiling(baseSeg)), weatherIcon: getWeatherIcon(valNuage, valTempsTrad), startH: obsStartH - 0.5, endH: endH + 0.5, base: processedData, tempo: tempoLayers, tafTemps: [], startYear, startMonth, startDay };
 }
 
 export function analyserTAF(rawText) {
@@ -174,7 +184,7 @@ export function analyserTAF(rawText) {
         if (seg.includes('TEMPO') || /PROB\d{2}/.test(seg)) { type = 'TEMPO'; isTempo = true; if (calcStart !== null) { start = calcStart; end = calcEnd; } } 
         else if (seg.includes('BECMG')) { type = 'BECMG'; if (calcStart !== null) { start = calcStart; becmgEnd = calcEnd; cursorTime = start; } if (idx > 0) paletteCounter++; } 
         else if (seg.includes('FM')) { type = 'FM'; const mFm = seg.match(/FM(\d{2})(\d{2})\d{2}/); if (mFm) { const fd = parseInt(mFm[1], 10), fh = parseInt(mFm[2], 10); let fDiffH = (fd * 24 + fh) - (d1 * 24 + h1); if (fDiffH < -100) fDiffH += daysInMonth * 24; cursorTime = start = globalStartH + fDiffH; } if (idx > 0) paletteCounter++; }
-        const block = { start, end, becmgEnd, vent: _parseVent(seg), visi: _parseVisi(seg), temps: _parsePhenomenes(seg, ['TEMPO','BECMG','PROB','FM','KT','CAVOK','NCD','NOSIG','RMK','TX','TN','SM']), nuage: _parseNuage(seg), type, prob: (seg.match(/(PROB\d{2})/) || [''])[0], color: isTempo ? UNIFIED_RED : PALETTE[paletteCounter % PALETTE.length] };
+        const block = { start, end, becmgEnd, vent: _parseVent(seg), visi: _parseVisi(seg), temps: _parsePhenomenes(seg, ['TEMPO','BECMG','PROB','FM','KT','MPS','KMH','CAVOK','NCD','NOSIG','RMK','TX','TN','SM']), nuage: _parseNuage(seg), type, prob: (seg.match(/(PROB\d{2})/) || [''])[0], color: isTempo ? UNIFIED_RED : PALETTE[paletteCounter % PALETTE.length] };
         if (isTempo) tempoLayers.push(block); else baseLayers.push(block);
     });
 
@@ -267,14 +277,16 @@ export function selectBestRunway(runways, wind, forcedId = null, magDeclination 
 }
 
 /**
- * Catégorie de vol (VFR/MVFR/IFR/LIFR) — POINT D'ENTRÉE UNIQUE.
- * Délègue à getFlightCategory (core.js) pour garantir des seuils cohérents
- * partout dans l'app. Ne pas dupliquer les seuils 500/1000/3000 ft ici.
+ * Catégorie de vol VMC/IMC (SERA.5005, conditionnée par la classe
+ * d'espace du terrain courant — fiche n°3, audit 27/09) — POINT
+ * D'ENTRÉE UNIQUE. Délègue à getFlightCategory (core.js) pour
+ * garantir des seuils cohérents partout dans l'app. Ne pas dupliquer
+ * les minima 1500/2500/5000/1500 m ici.
  */
 export function calculateFlightCategoryRobust(visiStr, nuageStr) {
-    const visiM = parseVisiToMeters(visiStr || '');
-    // getCeiling renvoie des centaines de ft (999 = illimité) ; getFlightCategory
-    // attend ce même format, donc on ne multiplie PAS.
+    // Visi absente = null (jamais 10 km implicite) ; getCeiling renvoie
+    // des centaines de ft (999 = illimité) — format attendu tel quel.
+    const visiM = visiStr ? parseVisiToMeters(visiStr) : null;
     const ceilHundFt = getCeiling(nuageStr || '');
     return getFlightCategory(visiM, ceilHundFt);
 }
@@ -296,9 +308,9 @@ export function getForecastAtHour(tafData, targetHour) {
             const tVisi = b.visi || activeVisiStr;
             const tNuage = b.nuage || activeNuageStr;
             const tCatObj = getFlightCategory(parseVisiToMeters(tVisi), getCeiling(tNuage));
-            
-            if (tCatObj.cat !== 'VFR') {
-                const getSev = (c) => c === 'LIFR' ? 4 : (c === 'IFR' ? 3 : (c === 'MVFR' ? 2 : 1));
+
+            if (tCatObj.cat !== 'VMC') {
+                const getSev = (c) => c === 'IMC' ? 3 : (c === 'MARGINAL' ? 2 : 1);
                 if (!worstTempoCatObj || getSev(tCatObj.cat) > getSev(worstTempoCatObj.cat)) {
                     worstTempoCatObj = tCatObj;
                     let p = b.prob || '';
@@ -659,10 +671,15 @@ export function getSunData(lat, lon, startYear, startMonth, startDay, startH, en
         const d = new Date(Date.UTC(startYear, startMonth - 1, startDay + dayOffset, 12, 0, 0));
         const times = SunCalc.getTimes(d, lat, lon);
         if (times.sunrise) {
-            let srH = (times.sunrise.getTime() - baseTime) / 3600000 - 0.5;
-            let ssH = (times.sunset.getTime() - baseTime) / 3600000 + 0.5;
-            sunEvents.push({ type: 'sunrise', val: srH });
-            sunEvents.push({ type: 'sunset', val: ssH });
+            // Bornes du jour = crépuscules civils (M6, audit 27/09 —
+            // FCL.010/SERA.2010) ; repli forfait ±30 min sinon (haute
+            // latitude : dawn/dusk invalides).
+            const srBound = (times.dawn && !isNaN(times.dawn.getTime()))
+                ? times.dawn.getTime() : times.sunrise.getTime() - 30 * 60000;
+            const ssBound = (times.dusk && !isNaN(times.dusk.getTime()))
+                ? times.dusk.getTime() : times.sunset.getTime() + 30 * 60000;
+            sunEvents.push({ type: 'sunrise', val: (srBound - baseTime) / 3600000 });
+            sunEvents.push({ type: 'sunset', val: (ssBound - baseTime) / 3600000 });
         }
     }
     
@@ -674,7 +691,13 @@ export function getSunData(lat, lon, startYear, startMonth, startDay, startH, en
 export function isAeroNight(lat, lon, dateUTC) {
     if (typeof SunCalc === 'undefined' || lat == null || lon == null) return false;
     const times = SunCalc.getTimes(dateUTC, lat, lon); if (!times.sunrise) return false;
-    const t = dateUTC.getTime(); return (t < times.sunrise.getTime() - 30 * 60000 || t > times.sunset.getTime() + 30 * 60000);
+    const t = dateUTC.getTime();
+    // Nuit = hors crépuscules civils (M6, audit 27/09 — FCL.010/SERA.2010,
+    // soleil à −6°) ; repli forfait ±30 min si dawn/dusk indisponibles.
+    const dawnOk = times.dawn && !isNaN(times.dawn.getTime());
+    const duskOk = times.dusk && !isNaN(times.dusk.getTime());
+    if (dawnOk && duskOk) return t < times.dawn.getTime() || t > times.dusk.getTime();
+    return (t < times.sunrise.getTime() - 30 * 60000 || t > times.sunset.getTime() + 30 * 60000);
 }
 
 export function renderWindCompass(containerId, windStr, runways = null, forcedId = null, apt = null) {

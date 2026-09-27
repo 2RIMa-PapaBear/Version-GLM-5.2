@@ -1,4 +1,4 @@
-import { state, escapeHtml, fetchAvecRelais, memoGet } from './core.js';
+import { state, escapeHtml, fetchAvecRelais, memoGet, parseMetarQnhOat, parseWindGroupToKt } from './core.js';
 import { getAirportByICAO, enrichAirport } from './ui-module.js';
 
 // « Inverser » le sens des points de passage (retour pilote 25/09) : le
@@ -27,9 +27,9 @@ import { getVacIndexInfo, getVacConsultedTs } from './vac-viewer.js';
 import { getLastMetarObsMs } from './data-age.js';
 import { getLastNotamFetchTs } from './notam.js';
 import { getSelectedNotams, getCurrentNotams } from './notam.js';
-import { computeWb, resolveLoads, normalizeEnvelope } from './wb-core.js';
+import { computeWb, resolveLoads } from './wb-core.js';
 import { makeCollapsible } from './collapsible.js';
-import { computeFlightPlan, computeMultiLegFlightPlan, getDefaultAircraftPerf, greatCircleDistanceNm, computeLeg2Fuel, RESERVES } from './flight-planner.js';
+import { computeFlightPlan, computeMultiLegFlightPlan, getDefaultAircraftPerf, greatCircleDistanceNm, computeLeg2Fuel, RESERVES, computeLocalFuelDevis, localReserveMin } from './flight-planner.js';
 import { evaluateVfrMinima, collectVfrMinima } from './vfr-minima.js';
 import { getActiveRunwaySurfaceInfo, isSoftSurface } from './runway-surface.js';
 import { getEnRouteAlternates } from './alternates.js';
@@ -126,6 +126,7 @@ function _readPerf(acId) {
         fuelBurnLph: fuelBurnLph ?? def.fuelBurnLph,
         reserveExtraMin: Number.isFinite(ac.reserveExtraMin) ? ac.reserveExtraMin : (def.reserveExtraMin ?? 0),
         unusableFuelL: (ac.unusableFuelL > 0) ? ac.unusableFuelL : (def.unusableFuelL ?? 0),
+        isULM: !!ac.isULM,
     };
 }
 
@@ -203,8 +204,8 @@ export async function showFlightPlanner(fromIcao, toIcao) {
         && String(seq[seq.length - 1]).toUpperCase() === toIcao.toUpperCase())
         ? seq : [fromIcao, toIcao];
     const plan = route.length >= 3
-        ? await computeMultiLegFlightPlan(route, { cruiseAltFt: cruiseAlt, tasKt, fuelBurnLph: burn, isNight, diversionIcao: state.diversionIcao || null, reserveExtraMin: perf.reserveExtraMin ?? 0, unusableFuelL: perf.unusableFuelL ?? 0, poses: state.routePoses || [] })
-        : await computeFlightPlan(fromIcao, toIcao, { cruiseAltFt: cruiseAlt, tasKt, fuelBurnLph: burn, isNight, diversionIcao: state.diversionIcao || null, reserveExtraMin: perf.reserveExtraMin ?? 0, unusableFuelL: perf.unusableFuelL ?? 0 });
+        ? await computeMultiLegFlightPlan(route, { cruiseAltFt: cruiseAlt, tasKt, fuelBurnLph: burn, isNight, isULM: !!perf.isULM, diversionIcao: state.diversionIcao || null, reserveExtraMin: perf.reserveExtraMin ?? 0, unusableFuelL: perf.unusableFuelL ?? 0, poses: state.routePoses || [] })
+        : await computeFlightPlan(fromIcao, toIcao, { cruiseAltFt: cruiseAlt, tasKt, fuelBurnLph: burn, isNight, isULM: !!perf.isULM, diversionIcao: state.diversionIcao || null, reserveExtraMin: perf.reserveExtraMin ?? 0, unusableFuelL: perf.unusableFuelL ?? 0 });
 
     // Un calcul plus récent a pris la main (changement de départ/destination
     // pendant les fetchs) : ce rendu périmé ne doit pas l'écraser.
@@ -338,14 +339,10 @@ async function _generateNavLogPdfInto(tab, { file = false, local = false } = {})
         if (!/^[A-Z][A-Z0-9]{3}$/.test(icao) || lat == null || lon == null) return;
         const ac0 = getActiveAircraft() || {};
         const burn = ac0.fuelBurnLph ?? 35;
-        // Même formule que le devis du widget Centrage / la tuile Carburant.
         const min = parseInt(document.getElementById('wb-local-min')?.value, 10) || 0;
-        const reserveMin = 10 + (ac0.reserveExtraMin || 0);
-        const unusableL = (ac0.unusableFuelL > 0) ? ac0.unusableFuelL : 0;
-        const r1 = (v) => Math.round(v * 10) / 10;
-        const tripL = r1(min / 60 * burn);
-        const groundL = r1(10 / 60 * burn);
-        const reserveL = r1(reserveMin / 60 * burn);
+        // Devis local partagé (fiche 26) : même source que le widget
+        // Centrage et la tuile Carburant du dossier de vol.
+        const devis = computeLocalFuelDevis(min, ac0);
         stash = {
             plan: {
                 from: { icao, lat, lon, elevFt: apt?.elevation ?? null },
@@ -355,9 +352,9 @@ async function _generateNavLogPdfInto(tab, { file = false, local = false } = {})
                 wind: null, windCorrection: {}, groundSpeed: null,
                 legTimeMin: min,
                 fuel: {
-                    tripFuelL: tripL, groundMin: 10, groundL,
-                    reserveMin, reserveL, unusableL,
-                    totalL: r1(tripL + groundL + reserveL + unusableL),
+                    tripFuelL: devis.tripFuelL, groundMin: devis.groundMin, groundL: devis.groundL,
+                    reserveMin: devis.reserveMin, reserveL: devis.reserveL, unusableL: devis.unusableL,
+                    totalL: devis.totalL,
                     diversionL: 0, diversion: null,
                 },
                 cruiseAltFt: null, tasKt: null, declination: null,
@@ -395,10 +392,12 @@ async function _generateNavLogPdfInto(tab, { file = false, local = false } = {})
     let metarRaw = '', qnh = '', windDir = null, windKt = null;
     try {
         metarRaw = String(await fetchAvecRelais(`https://aviationweather.gov/api/data/metar?ids=${fromIcao}&format=raw`) || '').trim().split('\n')[0] || '';
-        const mQ = metarRaw.match(/\bQ(\d{4})\b/);
-        if (mQ) qnh = parseInt(mQ[1], 10);
-        const mW = metarRaw.match(/\b(\d{3}|VRB)(\d{2})(?:G\d{2})?KT\b/);
-        if (mW) { windDir = mW[1] === 'VRB' ? 'VRB' : parseInt(mW[1], 10); windKt = parseInt(mW[2], 10); }
+        // QNH via l'extracteur unique (fiche n°9 : Axxxx inHg nord-américain
+        // aussi converti, sinon en-tête vide sans signal).
+        qnh = parseMetarQnhOat(metarRaw).qnh ?? '';
+        // Vent décodé par le parseur canonique (KT/MPS/KMH → kt, fiche n°15).
+        const wGrp = parseWindGroupToKt(metarRaw);
+        if (wGrp) { windDir = wGrp.variable ? 'VRB' : wGrp.dir; windKt = wGrp.speed; }
     } catch { /* hors ligne : champs laissés vides à compléter à la main */ }
 
     const ac = getActiveAircraft() || {};
@@ -418,7 +417,11 @@ async function _generateNavLogPdfInto(tab, { file = false, local = false } = {})
     let cum = 0;
     const bounds = legs.map(lg => { const b = [cum, cum + lg.distanceNm]; cum += lg.distanceNm; return b; });
     const zSecuFor = (i) => {
-        if (!prof?.points?.length || cum <= 0) return '';
+        // M2 (audit 27/09) : JAMAIS de Z sécu sur le profil de REPLI
+        // (noTerrain — interpolé entre les terrains, sans relief ni
+        // obstacles) : la colonne PDF serait de plusieurs milliers de
+        // pieds trop basse en zone de relief. L'écran, lui, refuse déjà.
+        if (!prof?.points?.length || cum <= 0 || prof.noTerrain) return '';
         const [a, b] = bounds[i];
         let max = -Infinity;
         for (const p of prof.points) {
@@ -538,6 +541,12 @@ async function _generateNavLogPdfInto(tab, { file = false, local = false } = {})
                 surfaceLabel: surf ? surf.label : '—',
                 surfaceSoft: surf ? isSoftSurface(surf.code) : false,
                 surfacePct: t.surfaceFactor > 1 ? Math.round((t.surfaceFactor - 1) * 100) : 0,
+                // Vent axial sur la piste de décollage (fiche 14, 27/09) :
+                // affiché dans l'entête de la section PDF — même style que
+                // la mention vent de l'atterrissage.
+                windTxt: t.headwindKt == null ? '' : (isFr3
+                    ? ` · vent ${t.headwindKt >= 0 ? 'de face' : 'arrière'} ${Math.abs(t.headwindKt)} kt`
+                    : ` · ${t.headwindKt >= 0 ? 'headwind' : 'tailwind'} ${Math.abs(t.headwindKt)} kt`),
             };
         }
     }
@@ -633,7 +642,7 @@ async function _generateNavLogPdfInto(tab, { file = false, local = false } = {})
             maxOffsetNm: 25,
             rows: altRows.map(r => ({
                 code: r.code, name: r.name, cat: r.cat.cat,
-                visiStr: r.cat.visiM >= 10000 ? '>10 km' : `${r.cat.visiM} m`,
+                visiStr: r.cat.visiM == null ? '—' : (r.cat.visiM >= 10000 ? '>10 km' : `${r.cat.visiM} m`),
                 ceilStr: r.cat.ceilHund === 999 ? '—' : `${r.cat.ceilHund * 100} ft`,
                 windStr: r.cat.wind
                     ? `${r.cat.wind.dir == null ? 'VRB' : String(r.cat.wind.dir).padStart(3, '0') + '°'} ${r.cat.wind.speed}${r.cat.wind.gust ? 'G' + r.cat.wind.gust : ''} kt`
@@ -641,6 +650,9 @@ async function _generateNavLogPdfInto(tab, { file = false, local = false } = {})
                 offsetNm: Math.round(r.offsetNm),
                 side: r.side >= 0 ? (isFr3 ? 'D' : 'R') : (isFr3 ? 'G' : 'L'),
                 metarFrom: r.metarFrom || null, metarDistNm: r.metarDistNm ?? null,
+                // Verdict atterrissage avion actif (NCO.OP.105, audit 27/09) :
+                // ok|caution|limitative|danger|unknown, null si non calculable.
+                ldgLevel: r.ldg?.level ?? null,
             })),
         };
     }
@@ -655,7 +667,7 @@ async function _generateNavLogPdfInto(tab, { file = false, local = false } = {})
         centro = {
             isFr: isFr3, fromIcao,
             reg: ac.registration || ac.name, type: ac.type || '',
-            wb: { ...ac.wb, envelope: normalizeEnvelope(ac.wb.envelope) },
+            wb: ac.wb,   // enveloppe telle que saisie (ordre certifié, fiche 16)
             calc: computeWb(ac.wb, loads),
             fuelL: loads.fuelL, burnL: loads.burnL,
         };
@@ -770,7 +782,7 @@ async function _generateNavLogPdfInto(tab, { file = false, local = false } = {})
             // ARRIVÉE, chacun en GRAPHIQUE TAF (capturé du moteur réel,
             // substitution olive grise mentionnée si le terrain n'émet pas)
             // au-dessus du texte BRUT — PAS de METAR pour ces deux terrains.
-            const { captureTafChartPng } = await import('./taf-chart-capture.js');
+            const { captureTafChart } = await import('./taf-chart-capture.js');
             const terrains = [];
             const addTafBlock = async (role, icao) => {
                 if (!icao) return;
@@ -781,8 +793,8 @@ async function _generateNavLogPdfInto(tab, { file = false, local = false } = {})
                     tafRaw: tf.raw,
                     note: tf.from ? `${isFr3 ? 'station' : 'stn'} ${tf.from}, ${tf.distNm} NM` : undefined,
                 };
-                const cap = await captureTafChartPng(tf.raw);
-                if (cap) { t.chart = cap.png; t.chartRatio = cap.ratio; t.chartFmt = cap.fmt; }
+                const cap = await captureTafChart(tf.raw);
+                if (cap) { t.chart = cap.imgData; t.chartRatio = cap.ratio; t.chartFmt = cap.fmt; }
                 terrains.push(t);
             };
             if (state.diversionIcao && state.diversionIcao !== toIcao) {
@@ -954,7 +966,7 @@ function _leg2Compute(plan, isNight, tas, burn) {
         distNm: info ? info.distNm : null,
         localMin: info ? null : localMin,
         tasKt: tas, fuelBurnLph: burn,
-        reserveMin: (info ? (isNight ? RESERVES.NIGHT_MIN : RESERVES.DAY_MIN) : 10) + perso,
+        reserveMin: (info ? (isNight ? RESERVES.NIGHT_MIN : RESERVES.DAY_MIN) : localReserveMin(ac, isNight)) + perso,
     }) : null;
     // Embarqué (widget Centrage) plafonné au carburant UTILISABLE (capacité
     // du poste carburant − inutilisable du manuel de vol).
@@ -1027,7 +1039,7 @@ function _leg2InnerHtml(plan, isFr, isNight, tas, burn) {
                     <span>${t('2ᵉ étape (OACI)', '2nd leg (ICAO)')}</span>
                     <input type="text" id="fp-leg2-icao" value="${escapeHtml(c.saved.icao || '')}" placeholder="LFRD" class="fp-input" style="font-family:'DM Mono',monospace; text-transform:uppercase;" maxlength="8">
                 </label>
-                <label class="fp-input-label" title="${t('Étape 2 LOCALE : durée estimée en minutes (réserve 10 min)', 'LOCAL 2nd leg: estimated duration in minutes (10 min reserve)')}">
+                <label class="fp-input-label" title="${t('Étape 2 LOCALE : durée estimée en minutes (réserve finale légale 20 min, 15 en ULM)', 'LOCAL 2nd leg: estimated duration in minutes (final legal reserve 20 min, 15 for microlights)')}">
                     <span>${t('ou durée locale (min)', 'or local duration (min)')}</span>
                     <input type="number" id="fp-leg2-min" value="${c.saved.min != null && c.saved.min !== '' ? escapeHtml(String(c.saved.min)) : ''}" placeholder="30" min="0" max="600" step="5" class="fp-input">
                 </label>
@@ -1125,8 +1137,10 @@ const _MINIMA_MSG = {
                   tipFr: 'Même le VFR spécial exige ≥ 1500 m et ≥ 600 ft', tipEn: 'Even special VFR needs ≥ 1500 m and ≥ 600 ft' },
     unctrl_ok:  { fr: 'Conditions VFR OK (hors zone contrôlée)', en: 'VFR conditions OK (uncontrolled airspace)',
                   tipFr: 'Visi ≥ 1500 m et plafond > 500 ft (espace non contrôlé, Vi ≤ 140 kt)', tipEn: 'Vis ≥ 1500 m and ceiling > 500 ft (uncontrolled, Vi ≤ 140 kt)' },
-    unctrl_below: { fr: 'Sous tous les minima VFR', en: 'Below all VFR minima',
-                  tipFr: 'Exige visi ≥ 1500 m et plafond > 500 ft', tipEn: 'Needs vis ≥ 1500 m and ceiling > 500 ft' },
+    unctrl_lowceil: { fr: 'Légal mais très bas — plafond ≤ 500 ft', en: 'Legal but very low — ceiling ≤ 500 ft',
+                  tipFr: 'Classe G : SERA.5005 n’exige pas de plafond (« hors nuages, en vue de la surface ») — la garde 500 ft relève de la hauteur minimale (SERA.3105)', tipEn: 'Class G: SERA.5005 sets no ceiling (“clear of cloud, in sight of the surface”) — the 500 ft guard is the minimum-height rule (SERA.3105)' },
+    unctrl_below: { fr: 'Visibilité sous les minima VFR', en: 'Visibility below VFR minima',
+                  tipFr: 'Exige visi ≥ 1500 m le jour (5 km la nuit) en espace non contrôlé', tipEn: 'Needs vis ≥ 1500 m by day (5 km at night) in uncontrolled airspace' },
     unknown:    { fr: 'météo indisponible', en: 'weather unavailable' },
 };
 const _MINIMA_DOT = { ok: 'ok', caution: 'warn', danger: 'bad', unknown: 'dim' };

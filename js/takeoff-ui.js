@@ -88,15 +88,15 @@ const FT_TO_M = 0.3048;
 /** Convertit pieds en mètres, arrondi à l'entier. */
 function ftToM(ft) { return Math.round(ft * FT_TO_M); }
 
-/** État de piste déduit du facteur de majoration (mêmes seuils que
- *  takeoff-performance). Herbe sèche (+15 %) : rien à préciser. Les états
- *  restent courts (« humide », « contaminée ») : la ligne doit tenir entière. */
-function _surfaceState(factor, isFr) {
-    if (Math.abs(factor - 1.15) < 1e-9) return '';            // herbe sèche
-    if (factor >= 1.30) return isFr ? 'contaminée' : 'contaminated';
-    if (factor >= 1.25) return isFr ? 'humide' : 'wet';
-    if (factor >= 1.10) return isFr ? 'contaminée' : 'contaminated';
-    if (factor > 1) return isFr ? 'humide' : 'wet';
+/** État de piste affiché (M10, audit 27/09 — l'ancien décodage PAR FACTEUR
+ *  inversait les libellés : herbe sèche ×1,20 affichée « contaminée »,
+ *  herbe mouillée ×1,30 « contaminée », contaminée ×1,25 « humide »).
+ *  Libellé déduit de l'ÉTAT réel du calcul (corr.surfaceState), jamais
+ *  du facteur. Sèche (dur ou herbe) : rien à préciser. Les états restent
+ *  courts (« humide », « contaminée ») : la ligne doit tenir entière. */
+function _surfaceState(state, isFr) {
+    if (state === 'contaminated') return isFr ? 'contaminée' : 'contaminated';
+    if (state === 'wet') return isFr ? 'humide' : 'wet';
     return '';
 }
 
@@ -179,7 +179,7 @@ function render(container, r, icao) {
     // facteur majoré ne s'explique pas par le seul revêtement (herbe sèche).
     const surfInfo = getActiveRunwaySurfaceInfo(icao);
     const surfSoft = surfInfo ? isSoftSurface(surfInfo.code) : false;
-    const surfState = r?.surfaceFactor > 1 ? _surfaceState(r.surfaceFactor, isFr) : '';
+    const surfState = (r?.surfaceState && r.surfaceState !== 'dry') ? _surfaceState(r.surfaceState, isFr) : '';
 
     // Liste des avions pour le sélecteur.
     const fleet = getFleet();
@@ -216,6 +216,8 @@ function render(container, r, icao) {
             <span><span class="lab">${lblDa} :</span> <span class="val">${r.da} ft</span></span>
             <span><span class="lab">${isFr ? 'Revêtement' : 'Surface'} :</span> <span class="val">${surfInfo ? escapeHtml(surfInfo.label) : '—'}${r.surfaceFactor > 1
                 ? `${surfState ? ' · ' + surfState : ''} <span style="color:${surfSoft ? '#FBBF24' : '#38BDF8'};">+${Math.round((r.surfaceFactor - 1) * 100)}%</span>` : ''}</span></span>
+            <span><span class="lab">${isFr ? 'Vent' : 'Wind'} :</span> <span class="val">${r.headwindKt == null ? '—' : `${Math.abs(r.headwindKt)} kt ${r.headwindKt >= 0 ? (isFr ? 'de face' : 'headwind') : (isFr ? 'arrière' : 'tailwind')}`}${r.windFactor > 1
+                ? ` <span style="color:#FBBF24;">+${Math.round((r.windFactor - 1) * 100)}%</span>` : ''}</span></span>
             <span><span class="lab">${lblAcRef} :</span> <span class="val">${ftToM(ref.groundRoll)}/${ftToM(ref.fiftyFt)} m</span></span>
         </div>
         <div class="to-profile" style="margin-top:10px;"></div>
@@ -233,8 +235,8 @@ function render(container, r, icao) {
         <div style="font-size:10px; color:var(--text-muted); margin-top:8px; line-height:1.4;">
             <i data-lucide="info" style="width:11px;height:11px;vertical-align:middle;"></i>
             ${isFr
-                ? `Distances corrigées selon la densité-altitude (réf. manuel de vol au niveau mer/ISA). « Flotte » pour gérer vos avions.`
-                : `Distances corrected for density altitude (POH ref. at SL/ISA). "Fleet" to manage your aircraft.`}
+                ? `Distances corrigées densité-altitude, vent arrière et état de piste (réf. manuel de vol au niveau mer/ISA). « Flotte » pour gérer vos avions.`
+                : `Distances corrected for density altitude, tailwind and runway state (POH ref. at SL/ISA). "Fleet" to manage your aircraft.`}
         </div>` : `
         <div style="padding:12px; background:var(--input-bg); border:1px dashed var(--border-color); border-radius:8px; font-size:11.5px; color:var(--text-muted); text-align:center; line-height:1.5;">
             <i data-lucide="plane-takeoff" style="width:14px;height:14px;vertical-align:-2px;"></i>

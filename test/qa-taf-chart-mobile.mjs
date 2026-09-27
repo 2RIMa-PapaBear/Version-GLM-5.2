@@ -42,8 +42,8 @@ async function captureAt(width, isMobile) {
     await page.waitForFunction(() => !!document.getElementById('tafCanvas'), { timeout: 30000 });
     await new Promise((r) => setTimeout(r, 2500));
     const res = await page.evaluate(async (taf) => {
-        const { captureTafChartPng } = await import('./js/taf-chart-capture.js');
-        const cap = await captureTafChartPng(taf);
+        const { captureTafChart } = await import('./js/taf-chart-capture.js');
+        const cap = await captureTafChart(taf);
         // La restauration RE-REND l'écran (genererGraphique asynchrone) :
         // laisser le canvas revenir à la largeur écran avant de mesurer.
         for (let i = 0; i < 20; i++) {
@@ -55,7 +55,7 @@ async function captureAt(width, isMobile) {
         return {
             ok: !!cap,
             ratio: cap?.ratio ?? null,
-            imgLen: cap?.png?.length ?? 0,
+            imgLen: cap?.imgData?.length ?? 0,
             canvasCssW: Math.round(parseFloat(can?.style?.width || '0')) || null,
         };
     }, TAF_LFOO);
