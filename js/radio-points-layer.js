@@ -301,7 +301,20 @@ export function createRadioPointsController(map, deps = {}) {
         group.appendChild(menuEl);
 
         const close = () => { menuEl.style.display = 'none'; btn.setAttribute('aria-expanded', 'false'); };
-        const open = () => { _syncFromState(); menuEl.style.display = 'block'; btn.setAttribute('aria-expanded', 'true'); };
+        // Retour pilote 27/09 : À L'OUVERTURE, TOUTES les cases DÉCOCHÉES —
+        // chaque ouverture repart d'une carte vierge de couches, on ne
+        // re-coche que ce qu'on veut voir (le menu se referme après chaque
+        // case, cf. change/close ci-dessous).
+        const resetAllOff = () => {
+            menuEl.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                const kind = cb.dataset.rpKind;
+                if (kind) setKind(kind, false);
+                else if (cb.dataset.rpAirgroup) deps.airspace?.setGroup(cb.dataset.rpAirgroup, false);
+                else if (cb.dataset.rpAirspaces != null) deps.airspace?.toggle(false);
+                cb.checked = false;
+            });
+        };
+        const open = () => { resetAllOff(); _syncFromState(); menuEl.style.display = 'block'; btn.setAttribute('aria-expanded', 'true'); };
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             menuEl.style.display === 'block' ? close() : open();
