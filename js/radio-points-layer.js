@@ -353,7 +353,7 @@ export function createRadioPointsController(map, deps = {}) {
             <label style="display:flex;align-items:center;gap:7px;padding:3px 8px 3px 26px;border-radius:6px;cursor:pointer;white-space:nowrap;font-size:11px;">
                 <input type="checkbox" ${attrs} style="accent-color:${color};width:12px;height:12px;cursor:pointer;">
                 <span>${label}</span>
-                <span style="width:8px;height:8px;border-radius:2px;background:${color};opacity:.8;margin-left:auto;"></span>
+                <span style="width:8px;height:8px;border-radius:2px;background:${color};opacity:.8;margin-left:auto;border:1px solid rgba(255,255,255,.75);"></span>
             </label>`;
         let html = row('data-rp-airspaces="1"', fr ? 'Espaces aériens' : 'Airspaces', '#38BDF8');
         for (const [g, def] of Object.entries(AIRSPACE_GROUPS)) {
