@@ -49,10 +49,15 @@ function _idbOpen() {
         // de clé (l'ancien appel passait le NOM du store aux helpers uniparamétrés
         // _idbGet/_idbPut → les deux fichiers s'écrasaient mutuellement sous la
         // clé « freq », et la valeur stockée était la chaîne 'sia'/'sia-aa').
-        const req = indexedDB.open('freq-sia-cache', 2);
+        // v3 (27/09/2026) : invalidation de masse — le fetch-freq-sia n'avait
+        // JAMAIS pu extraire depuis le portail (jour de dossier eAIP non paddé,
+        // 404 systématique) : freq-sia était figé au cycle 08-06 chez tous les
+        // visiteurs ; sans bump, le TTL de 7 jours aurait différé la nouvelle
+        // base d'une semaine chez les visiteurs existants.
+        const req = indexedDB.open('freq-sia-cache', 3);
         req.onupgradeneeded = () => {
             if (!req.result.objectStoreNames.contains('freq')) req.result.createObjectStore('freq');
-            try { req.transaction.objectStore('freq').delete('freq'); } catch { /* base neuve */ }
+            try { req.transaction.objectStore('freq').clear(); } catch { /* base neuve */ }
         };
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
