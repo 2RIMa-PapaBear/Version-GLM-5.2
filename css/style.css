@@ -3345,3 +3345,9 @@ html.theme-light .data-age-badge.age-old   { color: #B91C1C; background: rgba(23
     font-variant-numeric: tabular-nums;
 }
 .leaflet-container.hide-oaci-labels .oaci-label { display: none; }
+
+/* Icône aérodrome « carte OACI » pivotée au cap réel de la piste
+ * (regional-map.js) : l'img est en rotation CSS dans un divIcon 30×30
+ * (OACI_SYMBOL_SIZE — maintenir en phase). */
+.leaflet-container .oaci-sym { background: transparent; border: none; }
+.leaflet-container .oaci-sym img { width: 30px; height: 30px; display: block; }
