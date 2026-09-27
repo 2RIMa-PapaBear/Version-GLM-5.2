@@ -136,7 +136,9 @@ export const AIRSPACE_STYLE = {
     // comme sur la carte papier. SIV : remplissage plus léger + contour
     // POINTILLÉ bien marqué (2.5 px, retour pilote « trop discret »).
     'SIV':   { color: '#2B5D34', fill: 'rgba(43,93,52,0.07)', weight: 2.5, label: 'SIV',
-              line: '#2B5D34', lineW: 2, dashArray: '3 3' },   // vert sapin, pointillé court (pilote)
+              // vert sapin, pointillé court — trait ×2 (épaisseur +100 %) et
+              // espacement +10 % (3 → 3,3) sur cotes pilote 27/09
+              line: '#2B5D34', lineW: 4, dashArray: '3 3.3' },
     'OTHER': { color: '#94A3B8', fill: 'rgba(148,163,184,0.06)', weight: 1, label: '?' },
 };
 
