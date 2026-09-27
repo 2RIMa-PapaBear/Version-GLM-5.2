@@ -98,37 +98,43 @@ describe('saisies pilote + orientation piste (27/09)', () => {
     });
 });
 
-describe('symboles SVG recomposés (cardinaux fixes, piste pivotée)', () => {
-    test('piste-dur : 4 traits cardinaux ÉPAIS (stroke 9) + canal pivoté au cap', () => {
+describe('symboles SVG recomposés (cardinaux COLLÉS, cotes mesurées)', () => {
+    test('piste-dur civil : 4 traits cardinaux collés (rects y=2, h=12) + canal pivoté + disque r36', () => {
         const svg = oaciSymbolSvg('civil-piste-dur', 133.5);
         assert.ok(svg.includes('rotate(133.5 50 50)'), 'canal pivoté au cap');
-        assert.ok(svg.includes('stroke-width="9"'), 'cardinaux épaissis (retour pilote)');
-        assert.equal((svg.match(/<line /g) || []).length, 4);
-        assert.ok(svg.includes('#0040A0'));
-        assert.ok(!svg.includes('r="39"'), "civil : pas d anneau externe");
+        assert.ok(svg.includes('<rect x="46.25" y="2" width="7.5" height="12"'), 'trait N collé au disque (bord r36 → r48)');
+        assert.equal((svg.match(/<rect /g) || []).length, 5, '4 cardinaux + canal');
+        assert.ok(svg.includes('r="36" fill="#0040A0"'), 'disque');
+        assert.ok(!svg.includes('r="25.6"'), 'civil : pas d anneau externe');
     });
 
-    test('mixte/militaire : anneau externe (double) ; rouge militaire', () => {
-        assert.ok(oaciSymbolSvg('mixte-piste-dur', 40).includes('r="39"'));
+    test('mixte : anneau externe r25,6 détaché, traits collés à l anneau ; militaire réduit (k=0,76) et rouge', () => {
+        const mx = oaciSymbolSvg('mixte-piste-dur', 40);
+        assert.ok(mx.includes('r="25.6"'));
+        assert.ok(mx.includes('height="20.2"'), 'traits collés au bord externe de l anneau');
         const mil = oaciSymbolSvg('militaire-piste-dur', 90);
-        assert.ok(mil.includes('#E03020') && mil.includes('r="39"'));
+        assert.ok(mil.includes('#E03020') && mil.includes('r="27.36"'), 'échelle militaire');
+        assert.ok(mil.includes('width="5.7"'), 'traits militaire plus fins (7,5×0,76)');
     });
 
-    test('bande : anneau épais sans canal ; hélistation : H blanc ; hydro : ancre', () => {
+    test('bande : anneau FIN (r34 ép. 7), sans orientation', () => {
         const bande = oaciSymbolSvg('civil-bande', 90);
-        assert.ok(bande.includes('r="26"') && bande.includes('stroke-width="16"'));
-        assert.ok(!bande.includes("rotate("), "bande : pas d orientation");
-        const heli = oaciSymbolSvg('civil-helistation', null);
-        assert.ok((heli.match(/<rect /g) || []).length >= 3, 'H = 2 montants + barre');
-        const hydro = oaciSymbolSvg('civil-hydro', null);
-        assert.ok(hydro.includes('A 19 16'), 'ancre (arc)');
+        assert.ok(bande.includes('r="34"') && bande.includes('stroke-width="7"'));
+        assert.ok(!bande.includes('rotate('), 'bande : pas d orientation');
     });
 
-    test('privé : P blanc sur disque ; désaffecté : anneau noir barré X, sans cardinaux', () => {
+    test('hélistation : H blanc (3 rects) ; hydro : ancre (arc A 15 13)', () => {
+        const heli = oaciSymbolSvg('civil-helistation', null);
+        assert.equal((heli.match(/<rect /g) || []).length, 7, '4 cardinaux + 2 montants + barre');
+        assert.ok(oaciSymbolSvg('civil-hydro', null).includes('A 15 13'));
+    });
+
+    test('privé : P blanc sur disque r36 ; désaffecté : anneau noir barré X, sans cardinaux', () => {
         const p = oaciSymbolSvg('prive', null);
-        assert.ok(p.includes('#0040A0') && p.includes('<circle cx="53" cy="37" r="13"') && p.includes('stroke-width="9"'));
+        assert.ok(p.includes('r="36" fill="#0040A0"') && p.includes('<circle cx="55" cy="37" r="14"'));
         const d = oaciSymbolSvg('desaffecte', null);
         assert.ok(d.includes('#141414') && (d.match(/<line /g) || []).length === 2, 'X sans cardinaux');
+        assert.ok(!d.includes('<rect'), 'pas de traits cardinaux sur le désaffecté');
     });
 
     test('nom inconnu → null ; cap normalisé mod 180 ; repli pose légende', () => {
