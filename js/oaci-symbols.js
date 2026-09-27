@@ -50,6 +50,13 @@ export const MIXTE_OVERRIDES = new Set([
     // (vide — en attente de la liste pilote)
 ]);
 
+// Terrains MILITAIRES que le SIA ne marque pas « MIL » (saisie pilote
+// 27/09 : LFRH Lorient Lann-Bihoué — BAN, statut SIA « RST » → bleu à
+// tort).
+export const MILITARY_OVERRIDES = new Set([
+    'LFRH',   // Lorient Lann-Bihoué (base d'aéronautique navale)
+]);
+
 function _mainRunway(rws) {
     const list = Array.isArray(rws) ? rws : [];
     return list.filter(r => r.main)[0] || list[0] || null;
@@ -206,6 +213,9 @@ export function classifyOaciSymbol(icao, siaAf = null, siaRws = null) {
     // statut PRV (LF01…LF38 : plateformes ULM/privées) est fiable.
     if (af.statut === 'PRV') {
         return { icon: 'prive', statut: af.statut, surf: main?.surf || null };
+    }
+    if (MILITARY_OVERRIDES.has(code)) {
+        return { icon: 'militaire-' + surface, statut: 'MIL (saisie pilote)', surf: main?.surf || null };
     }
     if (af.statut === 'MIL' || MIXTE_OVERRIDES.has(code)) {
         return { icon: MIXTE_OVERRIDES.has(code) ? 'mixte-' + surface : 'militaire-' + surface, statut: MIXTE_OVERRIDES.has(code) ? 'MIX' : af.statut, surf: main?.surf || null };

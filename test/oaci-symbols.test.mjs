@@ -4,7 +4,7 @@
 // sinon piste-dur) ; hors France/sans entrée SIA → null (à demander).
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyOaciSymbol, MIXTE_OVERRIDES, MANUAL_OVERRIDES, bearingDeg, oaciRunwayBearing, oaciIconRotation, oaciSymbolSvg, OACI_BAR_HEADING } from '../js/oaci-symbols.js';
+import { classifyOaciSymbol, MIXTE_OVERRIDES, MANUAL_OVERRIDES, MILITARY_OVERRIDES, bearingDeg, oaciRunwayBearing, oaciIconRotation, oaciSymbolSvg, OACI_BAR_HEADING } from '../js/oaci-symbols.js';
 
 const AF = (statut, prive = false) => ({ statut, prive });
 const RW = surf => [{ d: '10/28', surf, main: true }];
@@ -142,5 +142,19 @@ describe('symboles SVG recomposés (cardinaux COLLÉS, cotes mesurées)', () => 
         assert.equal(oaciSymbolSvg('nimporte', 90), null);
         assert.ok(oaciSymbolSvg('civil-piste-dur', 313.5).includes('rotate(133.5 50 50)'));
         assert.ok(oaciSymbolSvg('civil-piste-dur', null).includes(`rotate(${OACI_BAR_HEADING} 50 50)`));
+    });
+});
+
+describe('MILITARY_OVERRIDES (saisies pilote)', () => {
+    test('LFRH Lorient Lann-Bihoué : militaire malgré statut SIA « RST »', () => {
+        assert.ok(MILITARY_OVERRIDES.has('LFRH'));
+        assert.equal(classifyOaciSymbol('LFRH', AF('RST'), RW('béton')).icon, 'militaire-piste-dur');
+        // injection : sans override, RST resterait civil
+        MILITARY_OVERRIDES.delete('LFRH');
+        try {
+            assert.equal(classifyOaciSymbol('LFRH', AF('RST'), RW('béton')).icon, 'civil-piste-dur');
+        } finally {
+            MILITARY_OVERRIDES.add('LFRH');
+        }
     });
 });
