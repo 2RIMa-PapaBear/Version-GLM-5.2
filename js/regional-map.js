@@ -15,6 +15,7 @@ import { mountWindLayer } from './wind-layer.js';
 import { mountTemsiButton, closeTemsiViewer } from './temsi.js';
 import { mountFrontsButton, closeFrontsViewer } from './fronts.js';
 import { getAirportFreqs, loadFreqSources } from './freq-sia.js';
+import { classifyOaciSymbol, OACI_SYMBOL_DIR, OACI_SYMBOL_SIZE } from './oaci-symbols.js';
 
 let _map = null;
 let _precip = null;
@@ -1421,6 +1422,11 @@ function _removeOaciLabel(marker) {
     _map?.removeLayer(marker);
 }
 
+function _removeAirportDecor(m) {
+    _removeOaciLabel(m?.oaciLabel);
+    if (m?.oaciIcon) { _map?.removeLayer(m.oaciIcon); m.oaciIcon = null; }
+}
+
 // Décalage de base des étiquettes selon le zoom — COURBE PILOTE 27/09 :
 // z9=6, z10=15, z11=30, z13=50 « correct » (z12 interpolé 40), plafonné
 // à 50 au-delà (le terrain courant continue de suivre ses pistes).
@@ -1491,14 +1497,33 @@ function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null
     const color = isCurrent ? '#FBBF24' : (cat && !sub ? CAT_PIN_COLORS[cat.cat] || '#94A3B8' : '#94A3B8');
     const radius = isCurrent ? 10 : 7;
 
+    // Icône « carte OACI » (classification SIA, retour pilote 27/09) :
+    // le pictogramme remplace la pastille ; la couleur météo passe sur un
+    // ANNEAU fin autour. Terrains non classés (étrangers, LF sans SIA) :
+    // pastille pleine comme avant — à faire trancher par le pilote.
+    const sym = classifyOaciSymbol(icao);
+
     const marker = L.circleMarker([lat, lon], {
-        radius,
+        radius: sym ? 17 : radius,
         fillColor: color,
-        color: '#fff',
-        weight: isCurrent ? 3 : 1.5,
+        fill: !sym,
+        color: sym ? color : '#fff',
+        weight: sym ? 3.5 : (isCurrent ? 3 : 1.5),
         opacity: 1,
         fillOpacity: 0.85,
     }).addTo(_map);
+
+    if (sym) {
+        marker.oaciIcon = L.marker([lat, lon], {
+            interactive: false,
+            keyboard: false,
+            icon: L.icon({
+                iconUrl: `${OACI_SYMBOL_DIR}/${sym.icon}.png`,
+                iconSize: [OACI_SYMBOL_SIZE, OACI_SYMBOL_SIZE],
+                iconAnchor: [OACI_SYMBOL_SIZE / 2, OACI_SYMBOL_SIZE / 2],
+            }),
+        }).addTo(_map);
+    }
     // Marqueur DOM léger superposé au cercle SVG : capte proprement les
     // clics (droit inclus) mÃªme quand le path est recouvert par d'autres
     // couches, et rend la pastille prioritaire sur le contextmenu carte.
@@ -1620,14 +1645,14 @@ function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null
 }
 
 function _clearAirportMarkers() {
-    _airportMarkers.forEach(m => { _removeOaciLabel(m.oaciLabel); _map.removeLayer(m); });
+    _airportMarkers.forEach(m => { _removeAirportDecor(m); _map.removeLayer(m); });
     _airportMarkers = [];
     _currentRunwayPts = null;
 }
 function _clearHitMarkers(arr) { arr.forEach(m => _map.removeLayer(m)); }
 
 function _clearNeighborMarkers() {
-    _neighborMarkers.forEach(m => { _removeOaciLabel(m.oaciLabel); _map.removeLayer(m.hit || m); });
+    _neighborMarkers.forEach(m => { _removeAirportDecor(m); _map.removeLayer(m.hit || m); });
     _neighborMarkers = [];
     _neighborRunwayLayer?.clearLayers();
     _displayedNeighborsIcao.clear();
