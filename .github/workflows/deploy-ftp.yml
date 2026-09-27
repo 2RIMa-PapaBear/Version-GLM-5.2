@@ -1,15 +1,23 @@
 # ============================================================================
-# DEPLOY FTP FREE.FR — déploiement automatique à chaque push sur Version-2.0.
+# DEPLOY FTP FREE.FR + WORKER CLOUDFLARE — déploiement automatique à chaque
+# push sur Version-2.0.
 #
 # Chaîne : push → fichiers prod modifiés depuis le dernier commit marqueur
 # « [deploy] » → bump auto des versions PWA (index.html ?v= + sw.js CACHE)
-# → upload FTP → commit du bump (message « [deploy] … », qui ne re-déclenche
-# PAS ce workflow : les pushes au token GitHub n'amorcent pas de workflow).
+# → upload FTP → commit du bump (message « [deploy] …», qui ne re-déclenche
+# PAS ce workflow : les pushes au token GitHub n'amorcent pas de workflow)
+# → job « deploy-worker » : le relais meteo-relais (Cloudflare) suit le
+#   même push — AVANT cette automatisation (audit 27/09 : M14/M17 restés
+#   inactifs en prod après la publication du site), il fallait un
+#   `wrangler deploy` manuel à chaque fois.
 #
 # Secrets à définir une fois (Settings → Secrets and variables → Actions) :
 #   FTP_SERVER   ex. ftpperso.free.fr
 #   FTP_USER     ex. papabear56
 #   FTP_PASSWORD mot de passe Free.fr
+#   CLOUDFLARE_API_TOKEN  (optionnel tant qu'absent : le job affiche un
+#     simple rappel) — token Cloudflare « Edit Cloudflare Workers », cf.
+#     README § Déploiement pour la création en 2 minutes.
 # ============================================================================
 name: Deploy FTP Free.fr
 
@@ -93,3 +101,35 @@ jobs:
             git commit -m "[deploy] bump versions PWA"
             git push
           fi
+
+  # ----------------------------------------------------------------------------
+  # WORKER CLOUDFLARE « meteo-relais » — même push, même déploiement. Le job
+  # suit `deploy` (tests bloquants inclus) : worker jamais déployé sur rouge.
+  # Sans le secret CLOUDFLARE_API_TOKEN : avertissement visible, zéro échec —
+  # le pilotage FTP reste indépendant.
+  # ----------------------------------------------------------------------------
+  deploy-worker:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: Version-2.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Déployer le worker (wrangler)
+        if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+        working-directory: worker
+        run: npx --yes wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      - name: Rappel — secret CLOUDFLARE_API_TOKEN absent
+        if: ${{ secrets.CLOUDFLARE_API_TOKEN == '' }}
+        run: |
+          echo "::warning::Worker meteo-relais NON déployé : secret CLOUDFLARE_API_TOKEN absent. Créer un token Cloudflare (modèle « Edit Cloudflare Workers ») et l'ajouter dans Settings → Secrets and variables → Actions — cf. README § Déploiement. En attendant : cd worker && npx wrangler deploy (manuel)."

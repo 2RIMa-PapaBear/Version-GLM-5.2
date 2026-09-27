@@ -181,17 +181,31 @@ npm test        # suite complète (~250 tests : cœur, plan de vol, perfs, centr
 - `vendor/` — dépendances bundlées (Leaflet + leaflet-rotate, jsPDF, pdf.js,
   Lucide, geomag) pour un fonctionnement 100 % hors ligne.
 - `worker/` — code du relais CORS (Cloudflare Worker, proxy météo avec cache
-  + route `POST /notam` vers SOFIA-Briefing ; déploiement :
-  `cd worker && npx wrangler deploy`). `scripts/dev-notam-relay.mjs` = même
-  route en local pour le développement (sans Worker). `apps-script/` conserve
-  l'ancien relais Google Apps Script (historique / repli).
+  + route `POST /notam` vers SOFIA-Briefing ; déployé automatiquement à
+  chaque push par le workflow `deploy-ftp.yml` — job `deploy-worker`, cf.
+  § Déploiement ; en direct : `cd worker && npx wrangler deploy`).
+  `scripts/dev-notam-relay.mjs` = même route en local pour le développement
+  (sans Worker). `apps-script/` conserve l'ancien relais Google Apps Script
+  (historique / repli).
 
 ## Déploiement
 
 À chaque push sur `Version-2.0`, **GitHub Actions** déploie automatiquement par
 FTP sur Free.fr, bump les versions PWA et committe le marqueur `[deploy]`
 (workflow `.github/workflows/deploy-ftp.yml`, secrets `FTP_SERVER`,
-`FTP_USER`, `FTP_PASSWORD`). Les ~27 000 cellules openAIP
+`FTP_USER`, `FTP_PASSWORD`). Le **worker Cloudflare « meteo-relais » suit le
+même push** (job `deploy-worker`, après les tests bloquants — jamais déployé
+sur rouge). Pour l'activer, **une seule fois** :
+
+1. Dashboards Cloudflare → My Profile → **API Tokens** → Create Token →
+   modèle **« Edit Cloudflare Workers »** (compte : le vôtre) → Create →
+   copier le token affiché ;
+2. GitHub → dépôt → Settings → Secrets and variables → **Actions** → New
+   repository secret : nom **`CLOUDFLARE_API_TOKEN`**, valeur = le token.
+
+Tant que ce secret est absent, le job affiche un avertissement (aucun échec)
+et le worker se déploie manuellement : `cd worker && npx wrangler deploy`.
+Les ~27 000 cellules openAIP
 (`data/airspaces/cells/`) sont **exclues de cet upload** (débit Free.fr
 insuffisant) : elles partent par **`npm run cells`** — upload incrémental
 local qui ne pousse que le delta (identifiants dans `deploy.config.json`,
@@ -274,7 +288,7 @@ npm run deploy:test -- --mirror      # supprime aussi les fichiers distants disp
 - **2026-09-05** — FICHE TERRAIN v3 — feu vert pilote après aperçu PDF (Apercu_fiche_terrain.pdf, 3 terrains LFRN/LFRV/LFPF) : section Terrain en LIGNES LIBELL…
 - **2026-09-05** — FICHE TERRAIN v2 (retours pilote : ordre + lisibilité) : ① FRÉQUENCES en tête (sans sous-titre redondant) ② PISTES (seuils officiels affiché…
 - **2026-09-05** — FICHE TERRAIN COMPLÈTE dans l onglet « Fréquences & info terrain » (demande pilote, 4 arbitrages validés) : ① IDENTITÉ en chips — élévation,…
-<!-- docs:lastSha=20c33e6f27389c9147a80b02ef22d7c398f0d355 -->
+<!-- docs:lastSha=feefc860189d0afe42415ef4ae8422fd7cca1cc7 -->
 
 
 
