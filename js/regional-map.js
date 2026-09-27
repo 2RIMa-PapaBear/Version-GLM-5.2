@@ -1421,6 +1421,40 @@ function _removeOaciLabel(marker) {
 function _updateOaciLabelVisibility() {
     if (!_map) return;
     _map.getContainer().classList.toggle('hide-oaci-labels', _map.getZoom() < OACI_LABEL_MIN_ZOOM);
+    _updateCurrentOaciOffset();
+}
+
+// Étiquette du TERRAIN COURANT : le dessin des pistes est GÉOGRAPHIQUE —
+// à zoom élevé son emprise dépasse tout décalage px fixe et l'étiquette
+// semblait « se déplacer » sur la piste au fil du zoom (retour pilote
+// 27/09). On repousse donc le bloc au-delà de l'emprise px réelle des
+// pistes à CE zoom (coin bas-gauche à droite du bord droit / au-dessus
+// du bord haut + marge). Les voisins — pastille seule — gardent le
+// décalage CSS constant (.oaci-in) : leur symbole ne grandit pas.
+function _updateCurrentOaciOffset() {
+    if (!_map) return;
+    const cur = _airportMarkers[0];
+    const inner = cur?.oaciLabel?.getElement()?.querySelector('.oaci-in');
+    if (!inner) return;
+    if (_map.getZoom() < RUNWAY_MIN_ZOOM) { inner.style.left = ''; inner.style.bottom = ''; return; }
+
+    const pin = _map.latLngToContainerPoint(cur.getLatLng());
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, any = false;
+    _runwayLayer?.eachLayer(l => {
+        const lls = l.getLatLngs?.() || (l.getLatLng ? [l.getLatLng()] : null);
+        if (!lls) return;
+        (Array.isArray(lls[0]) ? lls.flat() : lls).forEach(pt => {
+            const p = _map.latLngToContainerPoint(pt);
+            minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+            minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+            any = true;
+        });
+    });
+    if (!any) { inner.style.left = ''; inner.style.bottom = ''; return; }
+
+    const MARGIN = 15;
+    inner.style.left = Math.max(50, Math.round(maxX - pin.x) + MARGIN) + 'px';
+    inner.style.bottom = Math.max(50, Math.round(pin.y - minY) + MARGIN) + 'px';
 }
 
 function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null, sub = null) {
@@ -1628,6 +1662,7 @@ async function _drawRunways(lat, lon, apt) {
     });
 
     _updateRunwayVisibility();
+    _updateCurrentOaciOffset();
 }
 
 function _computeRunwaysFromCentroid(lat, lon, apt) {
