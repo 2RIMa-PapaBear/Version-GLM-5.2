@@ -3301,6 +3301,8 @@ html.theme-light .data-age-badge.age-old   { color: #B91C1C; background: rgba(23
 .leaflet-container .oaci-label {
     background: transparent;
     border: none;
+    width: 0;
+    height: 0;
     font-family: 'Univers', 'Archivo', 'DM Sans', sans-serif;
     text-align: center;
     line-height: 1.2;
@@ -3313,6 +3315,16 @@ html.theme-light .data-age-badge.age-old   { color: #B91C1C; background: rgba(23
         -1.3px  1.3px 0 rgba(255, 255, 255, .95),
          1.3px  1.3px 0 rgba(255, 255, 255, .95),
          0 0 4px rgba(255, 255, 255, .9);
+}
+/* Enveloppe positionnelle : racine 0×0 posée sur le point (iconAnchor
+ * [0,0]) ; le coin BAS-GAUCHE du bloc est ancré à 50 px à droite et
+ * 50 px AU-DESSUS du symbole, IDENTIQUE pour tous les terrains — le
+ * bloc grandit ensuite vers la droite et le haut (comme la carte papier).
+ * Cotes pilote réglables : left = décalage droit, bottom = décalage haut. */
+.leaflet-container .oaci-label .oaci-in {
+    position: absolute;
+    left: 50px;
+    bottom: 50px;
 }
 .leaflet-container .oaci-label .oaci-code {
     font-weight: 700;

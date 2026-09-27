@@ -1379,9 +1379,13 @@ export function _oaciLabelHtml(icao, name, apt) {
     const rec = apt ?? getAirportByICAO(icao);
     const elev = Number.isFinite(rec?.elevation) ? String(Math.round(rec.elevation)) : '';
     const data = [elev, _oaciFreqText(icao)].filter(Boolean).join(' ');
-    return `<div class="oaci-code">${escapeHtml(icao)}</div>`
+    // .oaci-in : enveloppe positionnelle (ancrage bas-gauche constant,
+    // cf. CSS) — les 3 lignes restent centrées entre elles comme la carte.
+    return `<div class="oaci-in">`
+        + `<div class="oaci-code">${escapeHtml(icao)}</div>`
         + (name ? `<div class="oaci-name">${escapeHtml(name)}</div>` : '')
-        + (data ? `<div class="oaci-data">${data}</div>` : '');
+        + (data ? `<div class="oaci-data">${data}</div>` : '')
+        + `</div>`;
 }
 
 function _addOaciLabel(lat, lon, icao, name) {
@@ -1392,10 +1396,14 @@ function _addOaciLabel(lat, lon, icao, name) {
         icon: L.divIcon({
             className: 'oaci-label',
             iconSize: null,          // taille par contenu (3 lignes)
-            // Décalé en HAUT À DROITE du symbole (cotes pilote 27/09 :
-            // 50 px à droite, 50 px au-dessus) — ne masque ni la pastille
-            // ni le trait de piste.
-            iconAnchor: [50, 50],
+            // Racine 0×0 POSÉE sur le point : le décalage réel est porté
+            // par l'enveloppe interne (.oaci-in, CSS) — le coin BAS-GAUCHE
+            // du bloc est ancré à +50 px à droite / +50 px au-dessus du
+            // symbole POUR TOUS les terrains (retour pilote 27/09 : avec
+            // iconAnchor, le point d'ancrage était À L'INTÉRIEUR d'un bloc
+            // de largeur variable — le texte dérivait de −17 à +15 px
+            // selon la longueur du nom).
+            iconAnchor: [0, 0],
         }),
     }).addTo(_map);
     const el = marker.getElement();
