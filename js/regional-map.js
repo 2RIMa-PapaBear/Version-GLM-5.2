@@ -14,6 +14,7 @@ import { registerMap } from './map-registry.js';
 import { mountWindLayer } from './wind-layer.js';
 import { mountTemsiButton, closeTemsiViewer } from './temsi.js';
 import { mountFrontsButton, closeFrontsViewer } from './fronts.js';
+import { getAirportFreqs, loadFreqSources } from './freq-sia.js';
 
 let _map = null;
 let _precip = null;
@@ -30,6 +31,13 @@ let _currentIcao = null;
 
 let _runwayLayer = null;
 const RUNWAY_MIN_ZOOM = 11;
+
+// Étiquettes aérodromes « carte OACI » (légende SCAN-OACI 1/500 000) :
+// code OACI / nom / altitude ft + fréquence Tour-AFIS-A/A, à droite du
+// symbole. Visibles à partir de OACI_LABEL_MIN_ZOOM — en dessous la densité
+// de terrains rend le bloc illisible (l'équivalent papier ne « dézoome » pas).
+let _oaciLabelMarkers = new Map();   // marqueur étiquette → { icao, name }
+const OACI_LABEL_MIN_ZOOM = 9;
 
 // Anti-doublon pastilles : un aérodrome déjà affiché comme voisin (base locale,
 // position station) ne reçoit pas de seconde pastille corridor météo.
@@ -70,6 +78,18 @@ if (typeof document !== 'undefined') document.addEventListener('elevation-hover'
         _cursorMarker.setLatLng(latlng);
     }
 });
+
+// Fréquences SIA chargées APRÈS le premier rendu des pastilles : les
+// étiquettes OACI posées sans fréquence (base pas encore là) sont
+// régénérées. Garde navigateur : inutile sous Node (tests).
+if (typeof document !== 'undefined') {
+    loadFreqSources().then(() => {
+        for (const [mk, info] of _oaciLabelMarkers) {
+            const el = mk.getElement();
+            if (el) el.innerHTML = _oaciLabelHtml(info.icao, info.name);
+        }
+    }).catch(() => { /* étiquettes sans fréquence — repli silencieux */ });
+}
 
 // Couleur du trait de piste selon le revêtement (codes FAA/OurAirports).
 // Durs (asphalte/béton/bitume) = gris clair, herbe = vert, terre = ocre, etc.
@@ -225,6 +245,10 @@ function _ensureMapReady(lat, lon) {
 
             _runwayLayer = L.layerGroup().addTo(_map);
             _map.on('zoomend', _updateRunwayVisibility);
+            // Étiquettes OACI : affichage conditionné au niveau de zoom
+            // (classe CSS sur le conteneur — pas de re-création de marqueurs).
+            _map.on('zoomend', _updateOaciLabelVisibility);
+            _updateOaciLabelVisibility();
 
             // Boutons des popups METAR : le contenu du popup est recréé à chaque
             // ouverture, on binde les handlers sur l'évènement popupopen.
@@ -1327,6 +1351,67 @@ function _decodeMetarForPopup(raw) {
     return d;
 }
 
+// ---- Étiquettes « carte OACI » --------------------------------------------
+// Mise en page de la légende SCAN-OACI (IGN) :
+//        LFBI           ← code OACI
+//     POITIERS          ← nom en clair
+//   423 118.500         ← altitude (ft) + fréquence Tour, AFIS ou A/A
+// Fréquence : priorité TWR → AFIS → A/A (hiérarchie de la légende papier) ;
+// rien si le terrain n'a aucune fréquence attribuée (la règle « 123.500 »
+// des terrains sans fréquence est une convention générale, pas une valeur
+// imprimée — on ne l'affiche pas).
+function _oaciFreqText(icao) {
+    try {
+        const { freqs } = getAirportFreqs(icao) || {};
+        const list = Array.isArray(freqs) ? freqs : [];
+        const pick = list.find(f => /^TWR/i.test(f.type || ''))
+            || list.find(f => /^AFIS$/i.test(f.type || ''))
+            || list.find(f => /^A\/A$/i.test(f.type || ''));
+        if (pick && Number.isFinite(pick.freq)) return pick.freq.toFixed(3);
+    } catch { /* sources pas encore chargées */ }
+    return '';
+}
+
+// Exportée pour les tests (underscore, convention _setSources) : `apt`
+// (enregistrement airports.json) optionnel — fourni par les tests purs,
+// chargé depuis la base par l'appelant navigateur.
+export function _oaciLabelHtml(icao, name, apt) {
+    const rec = apt ?? getAirportByICAO(icao);
+    const elev = Number.isFinite(rec?.elevation) ? String(Math.round(rec.elevation)) : '';
+    const data = [elev, _oaciFreqText(icao)].filter(Boolean).join(' ');
+    return `<div class="oaci-code">${escapeHtml(icao)}</div>`
+        + (name ? `<div class="oaci-name">${escapeHtml(name)}</div>` : '')
+        + (data ? `<div class="oaci-data">${data}</div>` : '');
+}
+
+function _addOaciLabel(lat, lon, icao, name) {
+    if (!_map) return null;
+    const marker = L.marker([lat, lon], {
+        interactive: false,
+        keyboard: false,
+        icon: L.divIcon({
+            className: 'oaci-label',
+            iconSize: null,          // taille par contenu (3 lignes)
+            iconAnchor: [10, 19],    // à droite du symbole, centré verticalement
+        }),
+    }).addTo(_map);
+    const el = marker.getElement();
+    if (el) el.innerHTML = _oaciLabelHtml(icao, name);
+    _oaciLabelMarkers.set(marker, { icao, name });
+    return marker;
+}
+
+function _removeOaciLabel(marker) {
+    if (!marker) return;
+    _oaciLabelMarkers.delete(marker);
+    _map?.removeLayer(marker);
+}
+
+function _updateOaciLabelVisibility() {
+    if (!_map) return;
+    _map.getContainer().classList.toggle('hide-oaci-labels', _map.getZoom() < OACI_LABEL_MIN_ZOOM);
+}
+
 function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null, sub = null) {
     if (!_map) return;
 
@@ -1352,6 +1437,9 @@ function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null
         keyboard: false,
         icon: L.divIcon({ className: 'pin-hit', iconSize: [16, 16], iconAnchor: [8, 8] }),
     }).addTo(_map);
+
+    // Bloc identification « carte OACI » à droite de la pastille.
+    marker.oaciLabel = _addOaciLabel(lat, lon, icao, name);
 
     const label = isCurrent
         ? `<strong>${escapeHtml(icao)}</strong>${name ? ' — ' + escapeHtml(name) : ''}<br><em>${state.lang === 'fr' ? 'Terrain courant' : 'Current airport'}</em>`
@@ -1445,13 +1533,13 @@ function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null
 }
 
 function _clearAirportMarkers() {
-    _airportMarkers.forEach(m => _map.removeLayer(m));
+    _airportMarkers.forEach(m => { _removeOaciLabel(m.oaciLabel); _map.removeLayer(m); });
     _airportMarkers = [];
 }
 function _clearHitMarkers(arr) { arr.forEach(m => _map.removeLayer(m)); }
 
 function _clearNeighborMarkers() {
-    _neighborMarkers.forEach(m => { _map.removeLayer(m.hit || m); });
+    _neighborMarkers.forEach(m => { _removeOaciLabel(m.oaciLabel); _map.removeLayer(m.hit || m); });
     _neighborMarkers = [];
     _displayedNeighborsIcao.clear();
     _metarByIcao = {};
