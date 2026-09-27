@@ -330,7 +330,15 @@ export function createRadioPointsController(map, deps = {}) {
             if (kind) setKind(kind, e.target.checked);
             else {
                 const group = e.target?.dataset?.rpAirgroup;
-                if (group && deps.airspace) deps.airspace.setGroup(group, e.target.checked);
+                if (group && deps.airspace) {
+                    deps.airspace.setGroup(group, e.target.checked);
+                    // Retour pilote 27/09 : cocher un groupe (CTR, TMA…)
+                    // AFFICHE ses zones immédiatement — la visibilité de la
+                    // couche passe à ON en interne, mais la case maîtresse
+                    // « Espaces aériens » ne se coche PAS pour autant
+                    // (ancien symptôme : case active, rien à l'écran).
+                    if (e.target.checked && !deps.airspace.visible) deps.airspace.toggle(true);
+                }
                 else if (e.target?.dataset?.rpAirspaces != null && deps.airspace) {
                     deps.airspace.toggle(e.target.checked);
                 }

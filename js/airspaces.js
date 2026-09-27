@@ -944,6 +944,20 @@ export function createAirspaceController(map) {
     // Inset géométrique du contour VERS L'INTÉRIEUR de `meters` : chaque
     // sommet glisse le long de la normale intérieure moyenne de ses deux
     // arêtes (calcul en métrique local, lon corrigé par cos(lat)).
+    // ANTI-BAVURES (retour pilote 27/09 : « bave dans les angles et sort
+    // des limites ») : 1) LIMITE DE MITRE — aux angles aigus la bissectrice
+    // allonge le décalage (miter blowout) : plafonné à 1,8× l'inset ;
+    // 2) CONTRÔLE D'APPARTENANCE — un sommet décalé qui sortirait de la
+    // zone reste à sa position d'origine (ray casting).
+    function _pointInRing(lon, lat, ring) {
+        let inside = false;
+        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+            const yi = ring[i][0], xi = ring[i][1], yj = ring[j][0], xj = ring[j][1];
+            if (((yi > lat) !== (yj > lat)) && (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi)) inside = !inside;
+        }
+        return inside;
+    }
+
     function _insetRing(ring, meters) {
         const n = ring.length;
         if (n < 3 || meters <= 0) return null;
@@ -971,8 +985,12 @@ export function createAirspaceController(map) {
             const nl = Math.hypot(nx, ny);
             if (nl < 0.05) { out.push(ring[i]); continue; }   // demi-tour : garde le sommet
             nx /= nl; ny /= nl;
-            // retour aux degrés : lat = y/M, lon = x/kx (ring = [lat, lon])
-            out.push([(p[1] + ny * meters) / M, (p[0] + nx * meters) / kx]);
+            // limite de mitre : l'angle aigu entre les deux arêtes allonge
+            // le décalage sur la bissectrice — plafonné (≈1,8× l'inset).
+            const miter = 1 / Math.max(0.55, nx * n1[0] + ny * n1[1]);
+            const off = meters * Math.min(miter, 1.8);
+            const lat = (p[1] + ny * off) / M, lon = (p[0] + nx * off) / kx;
+            out.push(_pointInRing(lon, lat, ring) ? [lat, lon] : ring[i]);
         }
         return out;
     }
