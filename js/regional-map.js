@@ -1419,10 +1419,10 @@ function _removeOaciLabel(marker) {
 }
 
 // Décalage de base des étiquettes selon le zoom — COURBE PILOTE 27/09 :
-// z9=9, z10=15, z11=30, z13=50 « correct » (z12 interpolé 40), plafonné
+// z9=6, z10=15, z11=30, z13=50 « correct » (z12 interpolé 40), plafonné
 // à 50 au-delà (le terrain courant continue de suivre ses pistes).
 function _oaciBaseOffset(zoom) {
-    const T = [[9, 9], [10, 15], [11, 30], [12, 40], [13, 50]];
+    const T = [[9, 6], [10, 15], [11, 30], [12, 40], [13, 50]];
     if (zoom <= T[0][0]) return T[0][1];
     if (zoom >= T[T.length - 1][0]) return T[T.length - 1][1];
     for (let i = 1; i < T.length; i++) {
