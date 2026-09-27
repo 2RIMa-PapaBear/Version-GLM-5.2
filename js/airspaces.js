@@ -100,11 +100,18 @@ const ICAO_CLASS_MAP = {
 };
 
 export const AIRSPACE_STYLE = {
-    CTR:    { color: '#3B82F6', fill: 'rgba(59,130,246,0.10)', weight: 2, label: 'CTR' },
+    // Style « carte OACI » (retour pilote 27/09) : TRAIT FIN sombre sur la
+    // limite + BANDE CLAIRE ÉPAISSE côté INTÉRIEUR (bande = inset px du
+    // contour, recalculé au zoom). SIV : pointillés courts vert sapin.
+    // `color` reste la couleur de FAMILLE (légende, groupes, infobulles).
+    CTR:    { color: '#3B82F6', fill: 'rgba(59,130,246,0.10)', weight: 2, label: 'CTR',
+              line: '#1A1A1A', lineW: 1.2, band: '#9CC0E4', bandW: 6 },
     // STRICT SIA (décision pilote 09/09) : espaces contrôlés en BLEU
     // (les TMA/CTA étaient orange, confondues avec les zones D ambre).
-    TMA:    { color: '#3B82F6', fill: 'rgba(59,130,246,0.10)', weight: 2, label: 'TMA' },
-    CTA:    { color: '#3B82F6', fill: 'rgba(59,130,246,0.10)', weight: 1.5, label: 'CTA' },
+    TMA:    { color: '#3B82F6', fill: 'rgba(59,130,246,0.10)', weight: 2, label: 'TMA',
+              line: '#1A1A1A', lineW: 1.2, band: '#9CC0E4', bandW: 6 },
+    CTA:    { color: '#3B82F6', fill: 'rgba(59,130,246,0.10)', weight: 1.5, label: 'CTA',
+              line: '#1A1A1A', lineW: 1.2, band: '#9CC0E4', bandW: 5 },
     ATZ:    { color: '#FBBF24', fill: 'rgba(251,191,36,0.08)', weight: 1.2, label: 'ATZ' },
     ACRO:   { color: '#A855F7', fill: 'rgba(168,85,247,0.08)', weight: 1, label: 'Voltige' },
     'A':    { color: '#DC2626', fill: 'rgba(220,38,38,0.10)',  weight: 1.5, label: 'A' },
@@ -117,14 +124,18 @@ export const AIRSPACE_STYLE = {
     TMZ:    { color: '#A855F7', fill: 'rgba(168,85,247,0.10)', weight: 1.5, label: 'TMZ' },
     'GLIDER': { color: '#4ADE80', fill: 'rgba(74,222,128,0.08)', weight: 1, label: 'Planel' },
     'DROP': { color: '#94A3B8', fill: 'rgba(148,163,184,0.08)', weight: 1, label: 'Parachut.' },
-    'RESTRICTED': { color: '#EF4444', fill: 'rgba(239,68,68,0.18)', weight: 2, label: 'Réglementée' },
-    'DANGER': { color: '#EF4444', fill: 'rgba(239,68,68,0.12)', weight: 2, label: 'Dangereuse' },
-    'PROHIBITED': { color: '#DC2626', fill: 'rgba(220,38,38,0.25)', weight: 2.5, label: 'Interdite' },
+    'RESTRICTED': { color: '#EF4444', fill: 'rgba(239,68,68,0.18)', weight: 2, label: 'Réglementée',
+              line: '#1A1A1A', lineW: 1.2, band: '#F0606C', bandW: 6 },
+    'DANGER': { color: '#EF4444', fill: 'rgba(239,68,68,0.12)', weight: 2, label: 'Dangereuse',
+              line: '#1A1A1A', lineW: 1.2, band: '#F0606C', bandW: 6 },
+    'PROHIBITED': { color: '#DC2626', fill: 'rgba(220,38,38,0.25)', weight: 2.5, label: 'Interdite',
+              line: '#1A1A1A', lineW: 1.2, band: '#F0606C', bandW: 7 },
     // STRICT SIA (décision pilote 09/09) : TOUS les espaces contrôlés en
     // BLEU (CTR, TMA/CTA, SIV) — la distinction passe par les étiquettes,
     // comme sur la carte papier. SIV : remplissage plus léger + contour
     // POINTILLÉ bien marqué (2.5 px, retour pilote « trop discret »).
-    'SIV':   { color: '#3B82F6', fill: 'rgba(59,130,246,0.07)', weight: 2.5, label: 'SIV', dashArray: '8 5' },
+    'SIV':   { color: '#2B5D34', fill: 'rgba(43,93,52,0.07)', weight: 2.5, label: 'SIV',
+              line: '#2B5D34', lineW: 2, dashArray: '3 3' },   // vert sapin, pointillé court (pilote)
     'OTHER': { color: '#94A3B8', fill: 'rgba(148,163,184,0.06)', weight: 1, label: '?' },
 };
 
@@ -133,7 +144,7 @@ export const AIRSPACE_STYLE = {
 export const AIRSPACE_GROUPS = {
     ctr:    { kinds: ['CTR'], label: 'CTR', en: 'CTR', color: '#3B82F6' },
     tma:    { kinds: ['TMA', 'CTA'], label: 'TMA / CTA', en: 'TMA / CTA', color: '#3B82F6' },
-    siv:    { kinds: ['SIV'], label: 'SIV', en: 'SIV', color: '#3B82F6' },
+    siv:    { kinds: ['SIV'], label: 'SIV', en: 'SIV', color: '#2B5D34' },
     atz:    { kinds: ['ATZ'], label: 'ATZ', en: 'ATZ', color: '#FBBF24' },
     rpd:    { kinds: ['RESTRICTED', 'PROHIBITED', 'DANGER', 'DROP'], label: 'Zones R · P · D', en: 'R · P · D areas', color: '#DC2626' },
     tmz:    { kinds: ['TMZ', 'RMZ'], label: 'TMZ / RMZ', en: 'TMZ / RMZ', color: '#A855F7' },
@@ -858,6 +869,9 @@ export function createAirspaceController(map) {
     let openZonePopup = null;   // fiche de zone ouverte (bascule au 2e clic)
     let openZonePoly = null;
     let polyMeta = new Map();
+    // Bandes intérieures « carte OACI » : [{ poly, ring }] — l'inset (px →
+    // mètres selon le zoom) est recalculé à chaque zoomend.
+    let bandLayers = [];
 
     let _loadEpoch = 0;   // annule les rendus d'un chargement dépassé (pan rapide)
 
@@ -925,9 +939,61 @@ export function createAirspaceController(map) {
         }
     }
 
+    // ---- Bande intérieure « carte OACI » ----------------------------------
+    // Inset géométrique du contour VERS L'INTÉRIEUR de `meters` : chaque
+    // sommet glisse le long de la normale intérieure moyenne de ses deux
+    // arêtes (calcul en métrique local, lon corrigé par cos(lat)).
+    function _insetRing(ring, meters) {
+        const n = ring.length;
+        if (n < 3 || meters <= 0) return null;
+        const M = 111320;
+        const lat0 = ring.reduce((a, p) => a + p[0], 0) / n;
+        const kx = M * Math.cos(lat0 * Math.PI / 180);
+        const pts = ring.map(p => [p[1] * kx, p[0] * M]);
+        // sens de parcours (aire signée) → côté intérieur
+        let area = 0;
+        for (let i = 0; i < n; i++) {
+            const a = pts[i], b = pts[(i + 1) % n];
+            area += a[0] * b[1] - b[0] * a[1];
+        }
+        const cw = area < 0;   // horaire en repère y-nord
+        const out = [];
+        for (let i = 0; i < n; i++) {
+            const p = pts[i];
+            const a = pts[(i - 1 + n) % n], b = pts[(i + 1) % n];
+            const e1 = [p[0] - a[0], p[1] - a[1]], e2 = [b[0] - p[0], b[1] - p[1]];
+            const l1 = Math.hypot(...e1) || 1, l2 = Math.hypot(...e2) || 1;
+            // normales intérieures des arêtes
+            const n1 = cw ? [e1[1] / l1, -e1[0] / l1] : [-e1[1] / l1, e1[0] / l1];
+            const n2 = cw ? [e2[1] / l2, -e2[0] / l2] : [-e2[1] / l2, e2[0] / l2];
+            let nx = n1[0] + n2[0], ny = n1[1] + n2[1];
+            const nl = Math.hypot(nx, ny);
+            if (nl < 0.05) { out.push(ring[i]); continue; }   // demi-tour : garde le sommet
+            nx /= nl; ny /= nl;
+            // retour aux degrés : lat = y/M, lon = x/kx (ring = [lat, lon])
+            out.push([(p[1] + ny * meters) / M, (p[0] + nx * meters) / kx]);
+        }
+        return out;
+    }
+
+    // Inset px → mètres au zoom courant (bande W/2 + demi-trait de marge).
+    function _bandOffsetMeters(bandW, lat) {
+        const mPerPx = 40075016.686 * Math.cos(lat * Math.PI / 180) / (256 * Math.pow(2, map.getZoom()));
+        return (bandW / 2 + 1) * mPerPx;
+    }
+
+    function updateBands() {
+        bandLayers.forEach(b => {
+            const lat = b.ring.reduce((a, p) => a + p[0], 0) / b.ring.length;
+            const inset = _insetRing(b.ring, _bandOffsetMeters(b.bandW, lat));
+            if (inset) b.poly.setLatLngs(inset);
+        });
+    }
+
     function _render(items) {
         layerGroup.clearLayers();
         polyMeta.clear();
+        bandLayers = [];
         highlighted = null;
         if (!Array.isArray(items)) return;
 
@@ -997,19 +1063,37 @@ export function createAirspaceController(map) {
                 // ligne superposée (bordure CTR/TMA pleine, SIV voisin
                 // partageant la limite) remplit les trous et l'effet
                 // pointillé disparaît (retour pilote 09/09).
-                if (st.dashArray) {
+                if (st.dashArray || !activeToday) {
                     L.polygon(ring, {
                         stroke: true, color: 'rgba(2,6,23,0.35)',
-                        weight: (st.weight || 2.5) + 1.5,
+                        weight: ((st.lineW || st.weight) || 2.5) + 1.5,
                         fill: false, interactive: false,
                     }).addTo(layerGroup);
                 }
+                // Bande intérieure CLAIRE « carte OACI » (retour pilote
+                // 27/09) : inset du contour, épaisseur px constante —
+                // recalculée au zoom (updateBands). Uniquement pour les
+                // zones à trait PLEIN et actives (SIV pointillé : pas de
+                // bande ; inactive : pointillé + halo existants).
+                const finalDash = st.dashArray || (activeToday ? undefined : '8 5');
+                if (st.band && !finalDash) {
+                    const lat = ring.reduce((a, q) => a + q[0], 0) / ring.length;
+                    const inset = _insetRing(ring, _bandOffsetMeters(st.bandW || 6, lat));
+                    if (inset) {
+                        const band = L.polygon(inset, {
+                            stroke: true, color: st.band, weight: st.bandW || 6,
+                            fill: false, interactive: false, lineCap: 'butt',
+                        });
+                        layerGroup.addLayer(band);
+                        bandLayers.push({ poly: band, ring, bandW: st.bandW || 6 });
+                    }
+                }
                 const poly = L.polygon(ring, {
-                    color: st.color,
-                    weight: st.weight,
+                    color: st.line || st.color,   // trait FIN de limite (carte OACI)
+                    weight: st.lineW || st.weight,
                     fillColor: st.color,
                     fillOpacity: parseFloat(st.fill.match(/[\d.]+(?=\))/)[0]) || 0.08,
-                    dashArray: st.dashArray,   // SIV / zone non active ce jour ; undefined = trait plein
+                    dashArray: finalDash,   // SIV pointillé court ; zone non active ce jour
                     interactive: true,
 
                 });
@@ -1056,13 +1140,13 @@ export function createAirspaceController(map) {
         if (highlighted === poly) return;
         if (highlighted && polyMeta.has(highlighted)) {
             const m = polyMeta.get(highlighted);
-            highlighted.setStyle({ color: m.style.color, weight: m.style.weight });
+            highlighted.setStyle({ color: m.style.line || m.style.color, weight: m.style.lineW || m.style.weight });
         }
         poly.bringToFront();
         // Surlignage SANS blanc (retour pilote 09/09) : on épaissit le trait
         // dans la COULEUR PROPRE de la zone — le code couleur SIA reste lisible.
         const st = (polyMeta.get(poly) || {}).style || {};
-        poly.setStyle({ weight: (st.weight || 2) + 2 });
+        poly.setStyle({ weight: (st.lineW || st.weight || 2) + 2.5 });
         highlighted = poly;
     }
 
@@ -1159,6 +1243,7 @@ export function createAirspaceController(map) {
     }
 
     function onMapMove() {
+        updateBands();
         if (visible && map.getZoom() >= MIN_ZOOM) {
             loadForBounds(map.getBounds());
         }
@@ -1167,7 +1252,7 @@ export function createAirspaceController(map) {
     function onMapClick() {
         if (highlighted && polyMeta.has(highlighted)) {
             const m = polyMeta.get(highlighted);
-            highlighted.setStyle({ color: m.style.color, weight: m.style.weight });
+            highlighted.setStyle({ color: m.style.line || m.style.color, weight: m.style.lineW || m.style.weight });
             highlighted = null;
         }
         map.closePopup();
