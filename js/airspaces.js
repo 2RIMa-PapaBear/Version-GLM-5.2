@@ -983,11 +983,49 @@ export function createAirspaceController(map) {
         return (bandW / 2 + 1) * mPerPx;
     }
 
+    // Distance minimale sommet → centre (m) : proxy de la « largeur » de la
+    // zone. SANS cette borne, l'inset en mètres (déduit des px au zoom
+    // courant : ~6 km/px en z7 !) traverse les PETITES zones — la bande
+    // dépassait la zone entière au dé-zoom (retour pilote 27/09).
+    function _ringCapMeters(ring) {
+        const n = ring.length, M = 111320;
+        const lat = ring.reduce((a, p) => a + p[0], 0) / n, lon = ring.reduce((a, p) => a + p[1], 0) / n;
+        const kx = M * Math.cos(lat * Math.PI / 180);
+        let dmin = Infinity;
+        for (const p of ring) dmin = Math.min(dmin, Math.hypot((p[1] - lon) * kx, (p[0] - lat) * M));
+        return dmin;
+    }
+
+    // Métriques de bande À CE ZOOM (retour pilote 27/09 : « l'épaisseur
+    // s'élargit trop au dé-zoom » — une bande de 12 px constants recouvrait
+    // les petites zones) : largeur = min(souhaitée, 60 % de la largeur
+    // ÉCRAN de la zone) ; zone < ~16 px à l'écran → PAS de bande (trait
+    // seul) ; inset plafonné à 45 % de la taille géographique.
+    function _bandMetrics(ring, bandW) {
+        const n = ring.length;
+        const lat = ring.reduce((a, p) => a + p[0], 0) / n;
+        const mPerPx = 40075016.686 * Math.cos(lat * Math.PI / 180) / (256 * Math.pow(2, map.getZoom()));
+        const dmin = _ringCapMeters(ring);
+        const zonePx = (2 * dmin) / mPerPx;
+        if (zonePx < 24) return null;   // zone trop petite à l'écran : trait seul
+        const w = Math.max(2, Math.min(bandW, 0.5 * zonePx));
+        const offM = (w / 2 + 1) * mPerPx;
+        if (offM > 0.45 * dmin) return null;
+        const inset = _insetRing(ring, offM);
+        return inset ? { w, inset } : null;
+    }
+
     function updateBands() {
         bandLayers.forEach(b => {
-            const lat = b.ring.reduce((a, p) => a + p[0], 0) / b.ring.length;
-            const inset = _insetRing(b.ring, _bandOffsetMeters(b.bandW, lat));
-            if (inset) b.poly.setLatLngs(inset);
+            const bm = _bandMetrics(b.ring, b.bandW);
+            if (bm) {
+                b.poly.setLatLngs(bm.inset);
+                b.poly.setStyle({ opacity: 0.5, weight: bm.w });
+            } else {
+                // trop petite à ce zoom : masque (réapparaît au zoom avant)
+                b.poly.setLatLngs(b.ring);
+                b.poly.setStyle({ opacity: 0 });
+            }
         });
     }
 
@@ -1073,11 +1111,10 @@ export function createAirspaceController(map) {
                 // actives seulement (CTR pointillé long : bande quand
                 // même ; SIV : pas de bande).
                 if (st.bandW && activeToday) {
-                    const lat = ring.reduce((a, q) => a + q[0], 0) / ring.length;
-                    const inset = _insetRing(ring, _bandOffsetMeters(st.bandW || 6, lat));
-                    if (inset) {
-                        const band = L.polygon(inset, {
-                            stroke: true, color: st.color, weight: st.bandW || 12,
+                    const bm = _bandMetrics(ring, st.bandW || 12);
+                    if (bm) {
+                        const band = L.polygon(bm.inset, {
+                            stroke: true, color: st.color, weight: bm.w,
                             opacity: 0.5,   // 50 % (retour pilote 27/09)
                             fill: false, interactive: false, lineCap: 'butt',
                         });
