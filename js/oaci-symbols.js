@@ -89,7 +89,8 @@ export function oaciIconRotation(icon, bearing) {
  * mesuré sur les PNG légende), seule la piste pivote. Cotes relevées sur
  * les pictogrammes (px ×100/92 — militaire dessiné plus petit sur la
  * planche, k=0.76, tailles relatives préservées) :
- *   disque r≈36 ; traits cardinaux collés (du bord à r≈48, largeur 7,5) ;
+ *   disque r≈36 ; traits cardinaux collés (du bord à r≈48, largeur 10,8
+ *   ≈ 3,2 px écran — +1 px sur demande pilote) ;
  *   anneau externe (mixte/militaire) r≈25,6 ± 2,2, détaché du disque ;
  *   « bande » : anneau FIN r≈34 ép. 7 (pas 16 — retour pilote) ;
  *   canal piste largeur ≈ 14, débordant du disque.
@@ -99,14 +100,17 @@ export function oaciIconRotation(icon, bearing) {
 const OACI_STYLES = {
     civil: { color: '#0040A0', k: 1.0, doubleRing: false },
     mixte: { color: '#0040A0', k: 1.0, doubleRing: true },
-    militaire: { color: '#E03020', k: 0.76, doubleRing: true },
+    // Militaire à la MÊME TAILLE que les autres (retour pilote 27/09 :
+    // la planche les dessine plus petits, le pilote veut l'uniforme).
+    militaire: { color: '#E03020', k: 1.0, doubleRing: true },
 };
 
 const SVG_OPEN = '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">';
 const SVG_CLOSE = '</svg>';
 
 /** 4 traits cardinaux COLLÉS au bord du symbole (rectangles, retour
- *  pilote : attachés, épais 7,5 u, du bord du disque/anneau à r=48). */
+ *  pilote : attachés ; épais 10,8 u ≈ 3,2 px à l'écran 30 px — épaissis
+ *  de +1 px à la demande pilote 27/09 — du bord à r=48). */
 const SVG_TICKS = (c, attach, out, w) => {
     const h = out - attach, x = 50 - w / 2;
     return `<g fill="${c}">`
@@ -132,7 +136,7 @@ export function oaciSymbolSvg(icon, bearing) {
     if (name === 'prive') {
         const c = OACI_STYLES.civil.color;
         return SVG_OPEN
-            + SVG_TICKS(c, 36, 48, 7.5)
+            + SVG_TICKS(c, 36, 48, 10.8)
             + `<circle cx="50" cy="50" r="36" fill="${c}"/>`
             + `<g fill="#fff"><rect x="40" y="27" width="9" height="50"/>`
             + `<circle cx="55" cy="37" r="14"/></g>`
@@ -145,7 +149,7 @@ export function oaciSymbolSvg(icon, bearing) {
     const k = st.k, c = st.color;
     const discR = 36 * k;
     const outerR = 25.6 * k, outerW = 4.4 * k;
-    const tickW = 7.5 * k, tickOut = 48 * k;
+    const tickW = 10.8 * k, tickOut = 48 * k;
     const attach = st.doubleRing ? outerR + outerW / 2 : (type === 'bande' ? 34 * k + 3.5 * k : discR);
     let core = '';
     if (type === 'piste-dur') {
