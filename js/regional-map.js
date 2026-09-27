@@ -30,6 +30,8 @@ let _displayedNeighborsIcao = new Set();  // Anti-doublon : voisins déjà affic
 let _currentIcao = null;
 
 let _runwayLayer = null;
+let _neighborRunwayLayer = null;   // pistes des VOISINS (même représentation que l'actif — retour pilote 27/09).
+let _currentRunwayPts = null;      // extrémités géo des pistes de l'actif (répulsion d'étiquette).
 const RUNWAY_MIN_ZOOM = 11;
 
 // Étiquettes aérodromes « carte OACI » (légende SCAN-OACI 1/500 000) :
@@ -244,6 +246,7 @@ function _ensureMapReady(lat, lon) {
             if (lateMounted) window.dispatchEvent(new CustomEvent('route-changed'));
 
             _runwayLayer = L.layerGroup().addTo(_map);
+            _neighborRunwayLayer = L.layerGroup();   // ajouté/retiré par _updateRunwayVisibility (z≥11)
             _map.on('zoomend', _updateRunwayVisibility);
             // Étiquettes OACI : affichage conditionné au niveau de zoom
             // (classe CSS sur le conteneur — pas de re-création de marqueurs).
@@ -1442,41 +1445,41 @@ function _updateOaciLabelVisibility() {
     const base = _oaciBaseOffset(z) + 'px';
     cont.style.setProperty('--oaci-dx', base);
     cont.style.setProperty('--oaci-dy', base);
-    _updateCurrentOaciOffset();
+    _updateOaciLabelOffsets();
 }
 
-// Étiquette du TERRAIN COURANT : le dessin des pistes est GÉOGRAPHIQUE —
-// à zoom élevé son emprise dépasse tout décalage px fixe et l'étiquette
-// semblait « se déplacer » sur la piste au fil du zoom (retour pilote
-// 27/09). On repousse donc le bloc au-delà de l'emprise px réelle des
-// pistes à CE zoom (coin bas-gauche à droite du bord droit / au-dessus
-// du bord haut + marge). Les voisins — pastille seule — gardent le
-// décalage CSS constant (.oaci-in) : leur symbole ne grandit pas.
-function _updateCurrentOaciOffset() {
+// Répulsion des étiquettes par les PISTES DESSINÉES : le tracé est
+// géographique — à zoom élevé son emprise dépasse tout décalage px fixe
+// et l'étiquette semblait « se déplacer » sur la piste au fil du zoom
+// (retour pilote 27/09). Même traitement pour TOUS les terrains (retour
+// pilote 27/09 soir) : coin bas-gauche du bloc repoussé au-delà de
+// l'emprise px des pistes de SON terrain + marge, plancher = décalage
+// de base de la courbe. Sous RUNWAY_MIN_ZOOM (aucune piste dessinée),
+// les styles inline sont retirés → décalage CSS de base.
+function _updateOaciLabelOffsets() {
     if (!_map) return;
-    const cur = _airportMarkers[0];
-    const inner = cur?.oaciLabel?.getElement()?.querySelector('.oaci-in');
-    if (!inner) return;
-    if (_map.getZoom() < RUNWAY_MIN_ZOOM) { inner.style.left = ''; inner.style.bottom = ''; return; }
-
-    const pin = _map.latLngToContainerPoint(cur.getLatLng());
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, any = false;
-    _runwayLayer?.eachLayer(l => {
-        const lls = l.getLatLngs?.() || (l.getLatLng ? [l.getLatLng()] : null);
-        if (!lls) return;
-        (Array.isArray(lls[0]) ? lls.flat() : lls).forEach(pt => {
+    const z = _map.getZoom();
+    const base = _oaciBaseOffset(z);
+    const MARGIN = 15;
+    const apply = (marker, pts) => {
+        const inner = marker?.oaciLabel?.getElement()?.querySelector('.oaci-in');
+        if (!inner) return;
+        if (z < RUNWAY_MIN_ZOOM || !pts || !pts.length) {
+            inner.style.left = ''; inner.style.bottom = '';
+            return;
+        }
+        const pin = _map.latLngToContainerPoint(marker.getLatLng());
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        pts.forEach(pt => {
             const p = _map.latLngToContainerPoint(pt);
             minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
             minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
-            any = true;
         });
-    });
-    if (!any) { inner.style.left = ''; inner.style.bottom = ''; return; }
-
-    const base = _oaciBaseOffset(_map.getZoom());
-    const MARGIN = 15;
-    inner.style.left = Math.max(base, Math.round(maxX - pin.x) + MARGIN) + 'px';
-    inner.style.bottom = Math.max(base, Math.round(pin.y - minY) + MARGIN) + 'px';
+        inner.style.left = Math.max(base, Math.round(maxX - pin.x) + MARGIN) + 'px';
+        inner.style.bottom = Math.max(base, Math.round(pin.y - minY) + MARGIN) + 'px';
+    };
+    apply(_airportMarkers[0], _currentRunwayPts);
+    _neighborMarkers.forEach(m => apply(m, m.oaciRunwayPts));
 }
 
 function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null, sub = null) {
@@ -1507,6 +1510,23 @@ function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null
 
     // Bloc identification « carte OACI » à droite de la pastille.
     marker.oaciLabel = _addOaciLabel(lat, lon, icao, name);
+
+    // Pistes des VOISINS (retour pilote 27/09 : même représentation que le
+    // terrain actif) — tracé approximé LOCALEMENT depuis la base (caps/
+    // longueurs, _computeRunwaysFromCentroid : aucun réseau), sans
+    // désignateurs (la carte papier ne les numérote pas non plus). Les
+    // extrémités servent aussi à la répulsion de l'étiquette.
+    if (!isCurrent && _neighborRunwayLayer) {
+        const apt = getAirportByICAO(icao);
+        const rws = apt ? _computeRunwaysFromCentroid(lat, lon, apt) : [];
+        marker.oaciRunwayPts = rws.flatMap(rw => [rw.endA, rw.endB]);
+        rws.forEach(rw => {
+            const rwColor = _runwayColorForSurface(
+                _resolveRunwaySurface(apt, rw.desigAtEndB) || _resolveRunwaySurface(apt, rw.desigAtEndA));
+            L.polyline([rw.endA, rw.endB], { color: rwColor, weight: 3, opacity: .85, lineCap: 'round' }).addTo(_neighborRunwayLayer);
+            L.polyline([rw.endA, rw.endB], { color: '#1E293B', weight: 1.5, opacity: .95, lineCap: 'round', dashArray: '8,6' }).addTo(_neighborRunwayLayer);
+        });
+    }
 
     const label = isCurrent
         ? `<strong>${escapeHtml(icao)}</strong>${name ? ' — ' + escapeHtml(name) : ''}<br><em>${state.lang === 'fr' ? 'Terrain courant' : 'Current airport'}</em>`
@@ -1602,12 +1622,14 @@ function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null
 function _clearAirportMarkers() {
     _airportMarkers.forEach(m => { _removeOaciLabel(m.oaciLabel); _map.removeLayer(m); });
     _airportMarkers = [];
+    _currentRunwayPts = null;
 }
 function _clearHitMarkers(arr) { arr.forEach(m => _map.removeLayer(m)); }
 
 function _clearNeighborMarkers() {
     _neighborMarkers.forEach(m => { _removeOaciLabel(m.oaciLabel); _map.removeLayer(m.hit || m); });
     _neighborMarkers = [];
+    _neighborRunwayLayer?.clearLayers();
     _displayedNeighborsIcao.clear();
     _metarByIcao = {};
     _stationPosByIcao = {};
@@ -1639,6 +1661,7 @@ function _parseRunwayPairs(runways) {
 async function _drawRunways(lat, lon, apt) {
     if (!_map || !_runwayLayer) return;
     _runwayLayer.clearLayers();
+    _currentRunwayPts = null;
     if (!apt) return;
 
     const realThresholds = await getRunwayThresholds(_currentIcao);
@@ -1662,6 +1685,10 @@ async function _drawRunways(lat, lon, apt) {
 
     if (drawn.length === 0) return;
 
+    // Extrémités géo : répulsion de l'étiquette du terrain actif
+    // (_updateOaciLabelOffsets).
+    _currentRunwayPts = drawn.flatMap(rw => [rw.endA, rw.endB]);
+
     drawn.forEach(rw => {
         // Couleur du trait selon le revêtement (herbe=béton=terre...).
         const surfaceCode = _resolveRunwaySurface(apt, rw.desigAtEndB) || _resolveRunwaySurface(apt, rw.desigAtEndA);
@@ -1684,7 +1711,7 @@ async function _drawRunways(lat, lon, apt) {
     });
 
     _updateRunwayVisibility();
-    _updateCurrentOaciOffset();
+    _updateOaciLabelOffsets();
 }
 
 function _computeRunwaysFromCentroid(lat, lon, apt) {
@@ -1740,6 +1767,11 @@ function _updateRunwayVisibility() {
     const show = _map.getZoom() >= RUNWAY_MIN_ZOOM;
     if (show && !_map.hasLayer(_runwayLayer)) _runwayLayer.addTo(_map);
     else if (!show && _map.hasLayer(_runwayLayer)) _map.removeLayer(_runwayLayer);
+    // Pistes des voisins : même règle de visibilité que celles de l'actif.
+    if (_neighborRunwayLayer) {
+        if (show && !_map.hasLayer(_neighborRunwayLayer)) _neighborRunwayLayer.addTo(_map);
+        else if (!show && _map.hasLayer(_neighborRunwayLayer)) _map.removeLayer(_neighborRunwayLayer);
+    }
 }
 
 // escapeHtml (18 usages, CONTEXTES ATTRIBUT compris) vient de core.js —
