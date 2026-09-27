@@ -4,7 +4,7 @@
 // sinon piste-dur) ; hors France/sans entrée SIA → null (à demander).
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyOaciSymbol, MIXTE_OVERRIDES } from '../js/oaci-symbols.js';
+import { classifyOaciSymbol, MIXTE_OVERRIDES, MANUAL_OVERRIDES, bearingDeg, oaciRunwayBearing, oaciIconRotation } from '../js/oaci-symbols.js';
 
 const AF = (statut, prive = false) => ({ statut, prive });
 const RW = surf => [{ d: '10/28', surf, main: true }];
@@ -47,8 +47,8 @@ describe('classifyOaciSymbol (règles SIA)', () => {
         assert.equal(classifyOaciSymbol('EBBR', null, null), null);
     });
 
-    test('sans entrée sia-airfields → null (à faire trancher par le pilote)', () => {
-        assert.equal(classifyOaciSymbol('LFVM', null, RW('gazon')), null);
+    test('sans entrée sia-airfields ni override → null (à faire trancher par le pilote)', () => {
+        assert.equal(classifyOaciSymbol('LFZZ', null, RW('gazon')), null);
     });
 
     test('MIXTE_OVERRIDES : table manuelle pilote → mixte-<surface>', () => {
@@ -58,5 +58,41 @@ describe('classifyOaciSymbol (règles SIA)', () => {
         } finally {
             MIXTE_OVERRIDES.delete('LFSL');
         }
+    });
+});
+
+describe('saisies pilote + orientation piste (27/09)', () => {
+    test('MANUAL_OVERRIDES : LFVM/LFVP civil-dur, LFPI hélistation, LFPY désaffecté', () => {
+        assert.equal(classifyOaciSymbol('LFVM', null, null).icon, 'civil-piste-dur');
+        assert.equal(classifyOaciSymbol('LFVP', null, null).icon, 'civil-piste-dur');
+        assert.equal(classifyOaciSymbol('LFPI', null, null).icon, 'civil-helistation');
+        assert.equal(classifyOaciSymbol('LFPY', null, null).icon, 'desaffecte');
+    });
+
+    test('bearingDeg : plein Est = 90°, plein Nord = 0°', () => {
+        const bE = bearingDeg({ lat: 0, lon: 0 }, { lat: 0, lon: 1 });
+        const bN = bearingDeg({ lat: 0, lon: 0 }, { lat: 1, lon: 0 });
+        assert.ok(Math.abs(bE - 90) < 0.01);
+        assert.ok(Math.abs(bN - 0) < 0.01);
+    });
+
+    test('oaciRunwayBearing : seuils SIA t1/t2 (cap vrai) prioritaire sur brg', () => {
+        const rws = [{ d: '09/27', main: true, brg: 275,
+            t1: { lat: 0, lon: 0 }, t2: { lat: 0, lon: 1 } }];   // plein Est
+        assert.ok(Math.abs(oaciRunwayBearing('LFXX', rws) - 90) < 0.01);
+        const seulementBrg = [{ d: '11/29', main: true, brg: 112 }];
+        assert.equal(oaciRunwayBearing('LFXX', seulementBrg), 112);
+        assert.equal(oaciRunwayBearing('LFXX', null), null);
+    });
+
+    test('oaciIconRotation : barre légende à 140° — piste à 140 = 0°, à 50 = −90', () => {
+        assert.equal(oaciIconRotation('civil-piste-dur', 140), 0);
+        assert.equal(oaciIconRotation('civil-piste-dur', 320), 0);       // 320 ≡ 140 (mod 180)
+        assert.equal(oaciIconRotation('civil-piste-dur', 50), -90);      // 50−140 = −90
+        assert.equal(oaciIconRotation('civil-piste-dur', 220), 80);      // 220 mod 180 = 40 → 40−140 = −100 ≡ 80
+        // pas de rotation hors famille « piste-dur »
+        assert.equal(oaciIconRotation('civil-bande', 50), 0);
+        assert.equal(oaciIconRotation('prive', 50), 0);
+        assert.equal(oaciIconRotation('militaire-piste-dur', null), 0);
     });
 });
