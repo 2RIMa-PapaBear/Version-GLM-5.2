@@ -339,23 +339,22 @@ export function createRadioPointsController(map, deps = {}) {
 
     function _menuHtml() {
         const fr = isFr();
-        const row = (attrs, label, color) => `
+        // UNE seule mise en forme pour TOUTES les cases (retour pilote 28/09 :
+        // groupes d'espaces et points radio IDENTIQUES — police, taille,
+        // coche 14 px, marges) ; les groupes portent en plus la pastille
+        // couleur de famille à droite.
+        const row = (attrs, label, color, chip = false) => `
             <label style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;cursor:pointer;white-space:nowrap;">
                 <input type="checkbox" ${attrs} style="accent-color:${color};width:14px;height:14px;cursor:pointer;">
                 <span>${label}</span>
-            </label>`;
-        const subRow = (attrs, label, color) => `
-            <label style="display:flex;align-items:center;gap:7px;padding:3px 8px 3px 26px;border-radius:6px;cursor:pointer;white-space:nowrap;font-size:11px;">
-                <input type="checkbox" ${attrs} style="accent-color:${color};width:12px;height:12px;cursor:pointer;">
-                <span>${label}</span>
-                <span style="width:8px;height:8px;border-radius:2px;background:${color};opacity:.8;margin-left:auto;border:1px solid rgba(255,255,255,.75);"></span>
+                ${chip ? `<span style="width:8px;height:8px;border-radius:2px;background:${color};opacity:.8;margin-left:auto;border:1px solid rgba(255,255,255,.75);"></span>` : ''}
             </label>`;
         // PAS de case maîtresse « Espaces aériens » (retour pilote 28/09 :
         // sans intérêt — chaque groupe affiche directement, la couche
         // s'active d'elle-même au premier coche).
         let html = '';
         for (const [g, def] of Object.entries(AIRSPACE_GROUPS)) {
-            html += subRow(`data-rp-airgroup="${g}"`, fr ? def.label : def.en, def.color);
+            html += row(`data-rp-airgroup="${g}"`, fr ? def.label : def.en, def.color, true);
         }
         return html
             + row('data-rp-kind="vor"', 'VOR', COLORS.vor)
