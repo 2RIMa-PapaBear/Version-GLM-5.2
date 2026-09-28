@@ -3358,3 +3358,23 @@ html.theme-light .data-age-badge.age-old   { color: #B91C1C; background: rgba(23
 /* Barre de couches deux rangées (retour pilote 28/09) : « Vols » poussé
  * à DROITE de la 1ʳᵉ rangée (fond de carte · Espaces · Zoom terrain). */
 .map-layers-row-top .gps-vols-group { margin-left: auto; }
+
+/* Sélecteur de fond de carte FLOTTANT en bas à gauche de la carte
+ * (retour pilote 28/09 — il quitte la barre ; rangée 1 : Espaces ·
+ * Zoom terrain · … · Vols à droite). */
+.basemap-floating {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    z-index: 800;
+}
+.basemap-floating .basemap-select {
+    background: rgba(2, 6, 23, 0.8);
+    color: var(--text-color, #E2E8F0);
+    border: 1px solid var(--border-color, #334155);
+    border-radius: 8px;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-family: 'DM Sans', Verdana, sans-serif;
+    cursor: pointer;
+}

@@ -418,7 +418,9 @@ function _initLayerControls() {
     //       fin (le lecteur radar absorbe l'espace restant, retour 20/09).
     _precip = createPrecipController(_map);
 
-    try { _mountBasemapSwitcher(row1); } catch (e) { console.error('basemap switcher failed:', e.message); }
+    // Fond de carte : contrôle FLOTTANT en bas à gauche de la carte
+    // (retour pilote 28/09 — il quitte la rangée 1).
+    try { _mountBasemapSwitcher(null); } catch (e) { console.error('basemap switcher failed:', e.message); }
     _airspaces = createAirspaceController(_map);
     _airspaces.mountControls(row1);
 
@@ -564,10 +566,11 @@ function createSigmetController(map) {
 
 // Sélecteur de fond de carte (satellite / OSM / sombre / relief).
 function _mountBasemapSwitcher(bar) {
-    if (!bar) return;
     const isFr = state.lang === 'fr';
     const group = document.createElement('div');
-    group.className = 'precip-control-group';
+    // bar=null → contrôle flottant BAS GAUCHE de la carte (retour pilote
+    // 28/09) ; sinon groupe de la barre de couches.
+    group.className = bar ? 'precip-control-group' : 'basemap-floating';
     // Récupère le fond mémorisé pour pré-sélectionner le <select>.
     const savedBase = localStorage.getItem('mt-basemap');
     const currentBase = (savedBase && BASEMAPS[savedBase]) ? savedBase : 'satellite';
@@ -580,7 +583,7 @@ function _mountBasemapSwitcher(bar) {
         <select class="basemap-select" title="${isFr ? 'Fond de carte' : 'Base map'}" aria-label="${isFr ? 'Fond de carte' : 'Base map'}">
             ${options.map(([v, lbl]) => `<option value="${v}" ${v === currentBase ? 'selected' : ''}>${lbl}</option>`).join('')}
         </select>`;
-    bar.appendChild(group);
+    (bar || document.getElementById('regional-map')).appendChild(group);
     group.querySelector('.basemap-select')?.addEventListener('change', (ev) => {
         const key = ev.target.value;
         if (!BASEMAPS[key] || !_map) return;
