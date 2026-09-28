@@ -907,6 +907,30 @@ body.mode-local #alternates-container { display: none !important; }
 }
 .leaflet-tooltip.rp-label strong { font-weight: 700; }
 .leaflet-tooltip.rp-label::before { display: none; }
+/* ---- Radiophares OACI (planche validée 27/09 — js/oaci-radionav.js) :
+   symbole bleu #0040A0 aux dimensions du document + annotation façon
+   carte papier : nom du lieu POSÉ sur la ligne haute du cadre (fond
+   opaque derrière les lettres = le trait est masqué), « (D) IDENT FRÉQ »
+   dans le cadre, bloc remonté de 20 % + 14 px, trait de rappel. */
+.rn-marker { overflow: visible; }
+.rn-marker > svg { position: relative; z-index: 2; }
+.rn-marker .rn-ann {
+    position: absolute; left: calc(100% + 14px); top: 50%;
+    transform: translateY(calc(-20% - 14px));
+    line-height: 1.05; white-space: nowrap; pointer-events: none;
+    font-family: 'Archivo', sans-serif;
+}
+.rn-marker .rn-box {
+    position: relative; display: inline-block;
+    border: 1.5px solid #0040A0; color: #0040A0;
+    font-weight: 700; font-size: 12.5px; letter-spacing: .02em;
+    padding: 1px 5px; background: rgba(255,255,255,.85);
+}
+.rn-marker .rn-name {
+    position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
+    color: #0040A0; font-weight: 700; font-size: 13px; letter-spacing: .02em;
+    line-height: 1; background: rgba(255,255,255,.85); padding: 0 3px;
+}
 /* Hauteur des obstacles (m) : même mono, encre rouge danger. */
 .leaflet-tooltip.rp-label-obstacle { color: #F87171; border-color: rgba(248,113,113,0.65); font-size: 9px; padding: 1px 4px; }
 /* Étiquettes des extrémités de route : code OACI vert (départ) / rouge (arrivée). */
@@ -3355,3 +3379,26 @@ html.theme-light .data-age-badge.age-old   { color: #B91C1C; background: rgba(23
 /* Symbole OACI « piste en dur » dessiné en SVG (oaci-symbols.js) :
  * 30×30, la piste pivote à l'intérieur, cardinaux fixes. */
 .leaflet-container .oaci-sym svg { display: block; width: 30px; height: 30px; }
+/* Barre de couches deux rangées (retour pilote 28/09) : « Vols » poussé
+ * à DROITE de la 1ʳᵉ rangée (fond de carte · Espaces · Zoom terrain). */
+.map-layers-row-top .gps-vols-group { margin-left: auto; }
+
+/* Sélecteur de fond de carte FLOTTANT en bas à gauche de la carte
+ * (retour pilote 28/09 — il quitte la barre ; rangée 1 : Espaces ·
+ * Zoom terrain · … · Vols à droite). */
+.basemap-floating {
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    z-index: 800;
+}
+.basemap-floating .basemap-select {
+    background: rgba(2, 6, 23, 0.8);
+    color: var(--text-color, #E2E8F0);
+    border: 1px solid var(--border-color, #334155);
+    border-radius: 8px;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-family: 'DM Sans', Verdana, sans-serif;
+    cursor: pointer;
+}

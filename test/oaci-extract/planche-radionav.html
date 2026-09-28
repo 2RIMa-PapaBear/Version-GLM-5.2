@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planche radionav — symboles OACI (maquette)</title>
+<style>
+  @font-face { font-family:'Archivo'; src:url('../../fonts/Archivo-400-normal.woff2') format('woff2'); font-weight:400; }
+  @font-face { font-family:'Archivo'; src:url('../../fonts/Archivo-700-normal.woff2') format('woff2'); font-weight:700; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Archivo',system-ui,sans-serif; background:#F1F5F9; color:#0F172A; padding:24px; }
+  h1 { font-size:20px; margin-bottom:4px; }
+  .sub { color:#475569; font-size:13px; margin-bottom:6px; }
+  .warn { background:#FEF3C7; border:1px solid #F59E0B; border-radius:8px; padding:10px 14px; font-size:13px; margin:12px 0 22px; }
+  .warn strong { color:#92400E; }
+  table { border-collapse:separate; border-spacing:0 14px; width:100%; }
+  th { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:#64748B; text-align:left; padding:0 12px; }
+  td { vertical-align:middle; padding:0 12px; }
+  tr.card td { background:#FFFFFF; border:1px solid #E2E8F0; }
+  tr.card td:first-child { border-radius:10px 0 0 10px; }
+  tr.card td:last-child { border-radius:0 10px 10px 0; }
+  .type-name { font-weight:700; font-size:15px; }
+  .type-note { font-size:11px; color:#64748B; max-width:150px; }
+  img.ref { background:#fff; border:1px solid #E2E8F0; border-radius:6px; display:block; }
+  /* --- rendu carte : fond type fond de carte clair (SOLIDE pour masquer le trait sous le nom) --- */
+  .map-sim { position:relative; background:#E6ECF2; border:1px solid #CBD5E1; border-radius:6px; height:120px; display:flex; align-items:center; padding-left:56px; }
+  /* bloc annotation façon document OACI — remonté de 20 % (pilote) */
+  .ann { margin-left:14px; line-height:1.05; transform:translateY(-20%); }
+  /* le nom est DANS le cadre : centré, posé sur la ligne haute, trait masqué derrière */
+  .ann .box { position:relative; display:inline-block; border:1.5px solid #0040A0; color:#0040A0; font-weight:700; font-size:12.5px; padding:1px 5px; letter-spacing:.02em; background:rgba(255,255,255,.55); }
+  .ann .box .name { position:absolute; top:-13px; left:50%; transform:translateX(-50%); color:#0040A0; font-weight:700; font-size:13px; letter-spacing:.02em; line-height:1; background:#E6ECF2; padding:0 3px; white-space:nowrap; }
+  .ann .typ { color:#000; font-weight:400; font-size:10.5px; margin-top:2px; margin-left:2px; letter-spacing:.04em; }
+  /* comparaison actuel vs proposé */
+  .cmp { display:flex; gap:26px; flex-wrap:wrap; margin-top:8px; }
+  .cmp > div { background:#fff; border:1px solid #E2E8F0; border-radius:10px; padding:16px 20px; }
+  .cmp h3 { font-size:13px; margin-bottom:10px; color:#334155; }
+  .old-label { font-size:12.5px; }
+  .old-label strong { font-weight:700; }
+  .foot { margin-top:20px; font-size:12px; color:#64748B; max-width:900px; line-height:1.5; }
+  code { background:#E2E8F0; border-radius:4px; padding:0 4px; font-size:11.5px; }
+</style>
+</head>
+<body>
+
+<h1>Moyens de radionavigation — symboles OACI (planche de validation)</h1>
+<div class="sub">Source : légende « Moyens de radionavigation » de la carte OACI (document fourni). Recréations SVG au bleu du document #0040A0, même famille de traits que les symboles d'aérodromes déjà en prod.</div>
+<div class="warn"><strong>Maquette uniquement</strong> — rien n'est appliqué à la carte tant que vous n'avez pas validé. Les 4 types barrés (VOR-DME, VOR-TACAN, TACAN, DME ENR) sont <strong>en réserve</strong> : les données actuelles (SIA + openAIP) ne distinguent que VOR et NDB.</div>
+
+<script>
+/* ===== Générateur SVG — tailles RÉELLES mesurées sur le document (px).
+   Chaque symbole garde ses proportions et sa taille relative (pilote :
+   « respecte la taille de chaque ») : VOR 40×36, VOR-DME 50×38,
+   VOR-TACAN 55×55, TACAN 50×54, DME 50×37, NDB 78×78. ===== */
+const BLUE = '#0040A0';
+function svgDoc(vbW, vbH, inner, wDoc, hDoc, k) {
+  return `<svg width="${(wDoc * k).toFixed(1)}" height="${(hDoc * k).toFixed(1)}" viewBox="0 0 ${vbW} ${vbH}" style="display:block;overflow:visible">${inner}</svg>`;
+}
+/* VOR : hexagone plat haut/bas, pointes gauche/droite, point central (40×36, trait 3) */
+function svgVor(k) {
+  const pts = '1.5,19.5 9.5,2.5 33.5,2.5 41.5,19.5 33.5,36.5 9.5,36.5';
+  return svgDoc(43, 39, `<polygon points="${pts}" fill="none" stroke="${BLUE}" stroke-width="3"/>`
+    + `<circle cx="21.5" cy="19.5" r="3.5" fill="${BLUE}"/>`, 43, 39, k);
+}
+/* VOR-DME : hexagone INSCRIT touchant les 4 bords du cadre (50×38, trait 3) */
+function svgVorDme(k) {
+  const pts = '2,19 14,2 36,2 48,19 36,36 14,36';
+  return svgDoc(50, 38, `<rect x="1.5" y="1.5" width="47" height="35" fill="none" stroke="${BLUE}" stroke-width="3"/>`
+    + `<polygon points="${pts}" fill="none" stroke="${BLUE}" stroke-width="2.8"/>`
+    + `<circle cx="25" cy="19" r="3" fill="${BLUE}"/>`, 50, 38, k);
+}
+/* VOR-TACAN (≈55×55) : hexagone effilé vers le bas, traits épais, COIFFE PLEINE
+   au sommet (triangle), BARRE PLEINE à la base, coins renforcés, cercle central à point */
+function svgVorTacan(k) {
+  const pts = '12,12 55,12 59,23 46,46 22,46 4,24';
+  return svgDoc(62, 58,
+      `<polygon points="${pts}" fill="none" stroke="${BLUE}" stroke-width="5.5" stroke-linejoin="round"/>`
+    + `<polygon points="10,13 57,13 33.5,3" fill="${BLUE}"/>`
+    + `<rect x="20" y="45" width="28" height="11" fill="${BLUE}"/>`
+    + `<circle cx="12" cy="12" r="3.4" fill="${BLUE}"/><circle cx="55" cy="12" r="3.4" fill="${BLUE}"/>`
+    + `<circle cx="4" cy="24" r="3.4" fill="${BLUE}"/><circle cx="59" cy="23" r="3.4" fill="${BLUE}"/>`
+    + `<circle cx="33.5" cy="29" r="5" fill="none" stroke="${BLUE}" stroke-width="2.4"/>`
+    + `<circle cx="33.5" cy="29" r="1.7" fill="${BLUE}"/>`,
+    60, 56, k);
+}
+/* TACAN (≈50×54) : pentagone — pointe à gauche, sommet pointu près du coin gauche,
+   barres pleines en haut et en bas, côté droit fin, triangle PLEIN pointant à gauche à l'intérieur */
+function svgTacan(k) {
+  const pts = '4,24 14,3 45,9 41,52 22,52';
+  return svgDoc(50, 56,
+      `<polygon points="${pts}" fill="none" stroke="${BLUE}" stroke-width="3.5" stroke-linejoin="round"/>`
+    + `<polygon points="12,4 45,9.5 12,11" fill="${BLUE}"/>`
+    + `<rect x="22" y="49.5" width="19" height="4.5" fill="${BLUE}"/>`
+    + `<polygon points="27,28 36,24 36,32" fill="${BLUE}"/>`,
+    50, 56, k);
+}
+/* DME ENR : rectangle + point central (50×37, trait 3) */
+function svgDme(k) {
+  return svgDoc(52, 39, `<rect x="2" y="2" width="48" height="35" fill="none" stroke="${BLUE}" stroke-width="3"/>`
+    + `<circle cx="26" cy="19.5" r="2.6" fill="${BLUE}"/>`, 52, 39, k);
+}
+/* NDB : cercle central + point + 3 couronnes de points (78×78 ; photo pilote :
+   couronnes r20/28/36,5 — 16, ~21, ~29 points, cercle central r12, point r2,6) */
+function svgNdb(k) {
+  const cx = 39, cy = 39;
+  const dot = (r, n) => {
+    const c = 2 * Math.PI * r;
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${BLUE}" stroke-width="4" stroke-linecap="round" stroke-dasharray="0.01 ${(c / n - 0.01).toFixed(3)}"/>`;
+  };
+  return svgDoc(78, 78,
+      dot(20, 16) + dot(28, 21) + dot(36.5, 29)
+    + `<circle cx="${cx}" cy="${cy}" r="12" fill="none" stroke="${BLUE}" stroke-width="2.6"/>`
+    + `<circle cx="${cx}" cy="${cy}" r="2.6" fill="${BLUE}"/>`, 78, 78, k);
+}
+/* ===== Table assemblée en JS ===== */
+const ROWS = [
+  { t:'VOR', gen:svgVor, sym:'sym-vor', ann:'ann-vor', lift:14, lead:true,
+    note:'Hexagone + point central. Applicable : 11-12 VOR simples SIA (ex. BNE) + mondiste openAIP.',
+    live:{ name:'BOULOGNE', box:'BNE 113.8', typ:'' } },
+  { t:'NDB', gen:svgNdb, sym:'sym-ndb', ann:null, mapK:0.385, lift:14, lead:true,
+    note:'Cercle central + point + 3 couronnes de points (votre photo). Taille carte : −30 % (pilote). 54 NDB SIA.',
+    live:{ name:'', box:'ALM 413', typ:'' } },
+  { t:'VOR-DME', lead:true, gen:svgVorDme, sym:'sym-vordme', ann:'ann-vordme', lift:14,
+    note:'Hexagone inscrit dans un cadre = DME colocalisé, préfixe (D). APPLICABLE : 51 stations SIA.', live:{ name:'ROANNE', box:'(D) ROA 110.4', typ:'' } },
+  { t:'VOR-TACAN', lead:true, gen:svgVorTacan, sym:'sym-vortacan', ann:'ann-vortacan', lift:14,
+    note:'Hexagone lourd + coiffe + cercle central. 0 en France — réserve (étranger).', live:{ name:'CREIL', box:'(D) CRL 109.2', typ:'' } },
+  { t:'TACAN', lead:true, gen:svgTacan, sym:'sym-tacan', ann:'ann-tacan', lift:14,
+    note:'Pentagone + triangle plein, fréquence entre parenthèses. 16 TACAN SIA (exclus de la base aujourd hui — à décider).', live:{ name:'', box:'(D) LDV (115.15)', typ:'' } },
+  { t:'DME ENR', lead:true, gen:svgDme, sym:'sym-dme', ann:'ann-dme', lift:14,
+    note:'Rectangle + point central. 19 DME-ATT SIA (exclus de la base aujourd hui — à décider).', live:{ name:'', box:'(D) BSN 114.85', typ:'' } },
+];
+document.body.insertAdjacentHTML('beforeend', `
+<table>
+  <tr><th style="width:150px">Type</th><th style="width:200px">Document (×3)</th><th style="width:150px">SVG recréé (×3)</th><th>Rendu sur la carte (échelle réelle)</th></tr>
+  ${ROWS.map(r => `
+  <tr class="card">
+    <td><div class="type-name">${r.t}</div><div class="type-note">${r.note}</div></td>
+    <td>${r.sym ? `<img class="ref" src="radionav-ref/${r.sym}.png" style="max-width:none">` : '<div class="type-note">(échantillon PDF — pas dans le PNG)</div>'}</td>
+    <td>${r.gen(3)}</td>
+    <td><div class="map-sim${r.lead ? ' lead-target' : ''}">
+      ${r.gen(r.mapK || 0.55)}
+      <div class="ann"${r.lift ? ` style="transform:translateY(calc(-20% - ${r.lift}px))"` : ''}>
+        <div class="box">${r.live.name ? `<span class="name">${r.live.name}</span>` : ''}${r.live.box}</div>
+        ${r.live.typ ? `<div class="typ">${r.live.typ}</div>` : ''}
+      </div>
+    </div></td>
+  </tr>`).join('')}
+</table>
+
+<h2 style="font-size:15px;margin-top:26px">Comparaison — annotation actuelle vs proposée (VOR)</h2>
+<div class="cmp">
+  <div>
+    <h3>Actuel (olives météo)</h3>
+    <div style="display:flex;align-items:center;gap:10px">
+      <svg width="18" height="18" viewBox="0 0 18 18"><polygon points="9,1 16.5,5.3 16.5,13.7 9,18 1.5,13.7 1.5,5.3" fill="none" stroke="#60A5FA" stroke-width="1.8"/><circle cx="9" cy="9" r="1.4" fill="#60A5FA"/></svg>
+      <div class="old-label"><strong>AJO</strong> — AJACCIO<br><span style="color:#60A5FA;font-weight:700">114.8 MHz</span></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:14px">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path d="M9 0.8 L9 6" stroke="#4ADE80" stroke-width="1.6"/><circle cx="9" cy="11" r="5.2" fill="none" stroke="#4ADE80" stroke-width="1.8"/><circle cx="9" cy="11" r="1.6" fill="#4ADE80"/></svg>
+      <div class="old-label"><strong>ALM</strong><br><span style="color:#4ADE80;font-weight:700">413 kHz</span></div>
+    </div>
+  </div>
+  <div>
+    <h3>Proposé (document OACI)</h3>
+    <div class="lead-target" style="position:relative;display:flex;align-items:center;background:#E6ECF2;border:1px solid #CBD5E1;border-radius:6px;padding:18px 22px">
+      ${svgVor(0.55)}
+      <div class="ann" style="transform:translateY(calc(-20% - 14px))"><div class="box"><span class="name">ROANNE</span>ROA 110.25</div></div>
+    </div>
+    <div class="lead-target" style="position:relative;display:flex;align-items:center;margin-top:14px">
+      ${svgNdb(0.385)}
+      <div class="ann" style="transform:translateY(calc(-20% - 14px))"><div class="box">ALM 413</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="foot">
+Annotations façon document : nom du lieu en bleu au-dessus de l'encadré (quand connu — les NDB SIA n'ont pas de nom), <code>IDENT FRÉQUENCE</code>
+dans un encadré bleu (préfixe <code>(D)</code> = DME colocalisé, fréquence entre parenthèses pour le TACAN), type en noir sous l'encadré.
+Un trait de rappel relie le coin bas-gauche du cadre au symbole (VOR et NDB).
+Symboles au bleu OACI <code>#0040A0</code> — abandon des couleurs pastel par famille (bleu clair VOR / vert NDB).
+Tailles sur carte : chaque symbole garde sa taille relative du document (VOR ≈ 24 px à z11+, NDB −30 %), réduites selon zoom comme les aérodromes.
+</div>
+`);
+
+/* ===== Trait de rappel : coin bas-gauche du cadre → bord droit du symbole ===== */
+requestAnimationFrame(() => {
+  document.querySelectorAll('.lead-target').forEach(grp => {
+    const sym = grp.querySelector('svg'), box = grp.querySelector('.box');
+    if (!sym || !box) return;
+    const g = grp.getBoundingClientRect(), s = sym.getBoundingClientRect(), b = box.getBoundingClientRect();
+    /* le trait VISE le centre du symbole et s'accroche au bord extérieur du dessin :
+       intersection ligne (centre → cadre) avec l'ellipse enveloppe du symbole */
+    const cx = s.left + s.width / 2 - g.left, cy = s.top + s.height / 2 - g.top;
+    const px = b.left - g.left, py = b.top + b.height / 2 - g.top;       // milieu gauche du cadre
+    const dx = px - cx, dy = py - cy;
+    const rx = s.width / 2 - 1, ry = s.height / 2 - 1;
+    const t = 1 / Math.sqrt((dx / rx) ** 2 + (dy / ry) ** 2);
+    const x1 = cx + dx * t, y1 = cy + dy * t;
+    const x2 = px, y2 = py;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('style', 'position:absolute;inset:0;pointer-events:none;overflow:visible');
+    svg.setAttribute('width', g.width); svg.setAttribute('height', g.height);
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+    line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+    line.setAttribute('stroke', '#0040A0'); line.setAttribute('stroke-width', '1.5');
+    svg.appendChild(line);
+    grp.appendChild(svg);
+  });
+});
+</script>
+</body>
+</html>

@@ -661,16 +661,16 @@ function mount() {
     const host = document.getElementById('regional-map');
     (host || bar).appendChild(cluster);
 
-    // « Vols » reste dans la barre (fonction d'archive, pas un réflexe de vol)
-    // — 2e rangée (fond & cadrage) de la barre deux-lignes 17/09.
+    // « Vols » reste dans la barre (fonction d'archive, pas un réflexe de
+    // vol) — 1ʳᵉ rangée, POUSSÉ À DROITE (retour pilote 28/09).
     const groupVols = document.createElement('div');
-    groupVols.className = 'precip-control-group';
+    groupVols.className = 'precip-control-group gps-vols-group';
     groupVols.innerHTML = `
         <button class="precip-toggle" id="gps-vols-btn" title="${t.volsTitle}">
             <i data-lucide="download" style="width:14px;height:14px;"></i><span>${t.vols}</span><span class="gps-vols-count"></span>
         </button>`;
-    const rowBottom = bar.querySelector('.map-layers-row-bottom');
-    (rowBottom || bar).appendChild(groupVols);
+    const rowTop = bar.querySelector('.map-layers-row-top');
+    (rowTop || bar).appendChild(groupVols);
 
     btn = cluster.querySelector('#gps-toggle-btn');
     recBtn = cluster.querySelector('#gps-recenter-btn');
@@ -738,23 +738,28 @@ function mount() {
     // sous son bouton, déplacé sur <body> (hors du contexte de défilement).
     // (écouteur en CAPTURE : le bouton « Espaces » fait stopPropagation,
     // les écouteurs de remontée ne voient jamais le clic.)
-    document.addEventListener('click', () => {
-        setTimeout(() => {
-            document.querySelectorAll('.rp-menu').forEach(m => {
-                if (m.style.display !== 'block') return;
-                const btn = m._rpBtn || (m._rpBtn = m.parentElement?.querySelector?.('button'));
-                if (!btn) return;
-                if (m.parentElement !== document.body) document.body.appendChild(m);
-                const r = btn.getBoundingClientRect();
-                m.style.position = 'fixed';
-                m.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 185)) + 'px';
-                m.style.top = (r.bottom + 6) + 'px';
-                m.style.zIndex = 4000;
-                m.style.maxHeight = '60vh';
-                m.style.overflowY = 'auto';
-            });
-        }, 0);
-    }, true);
+    // Recadrage des menus « Espaces » sous leur bouton — joué à l'ouverture
+    // ET à CHAQUE défilement/redimensionnement : en position:fixed, le menu
+    // ne suivait plus le bouton quand la page défilait dessous (retour
+    // pilote 28/09 : « doit rester accroché au bouton »).
+    const placeRpMenus = () => {
+        document.querySelectorAll('.rp-menu').forEach(m => {
+            if (m.style.display !== 'block') return;
+            const btn = m._rpBtn || (m._rpBtn = m.parentElement?.querySelector?.('button'));
+            if (!btn) return;
+            if (m.parentElement !== document.body) document.body.appendChild(m);
+            const r = btn.getBoundingClientRect();
+            m.style.position = 'fixed';
+            m.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 185)) + 'px';
+            m.style.top = (r.bottom + 6) + 'px';
+            m.style.zIndex = 4000;
+            m.style.maxHeight = '60vh';
+            m.style.overflowY = 'auto';
+        });
+    };
+    document.addEventListener('click', () => setTimeout(placeRpMenus, 0), true);
+    window.addEventListener('scroll', placeRpMenus, true);
+    window.addEventListener('resize', placeRpMenus);
 
     // Orphelins d'une fermeture brutale (endedAt nul, plus rien qui arrive) :
     // finalisés si ≥ durée minimale, sinon supprimés — même règle qu'à l'arrêt.

@@ -32,13 +32,14 @@ export const OBSTACLES_URL = 'data/obstacles.json';
  * MÊME niveau de zoom (retour utilisateur 27/08 — avant : 6/8/10).
  * Obstacles FRANCE (8 900 points, 91 % d'éoliennes en fermes denses) :
  * couche plus locale, étiquettes de hauteur uniquement en vue rapprochée. */
-export const LAYER_MIN_ZOOM = { vor: 6, ndb: 6, vrp: 6, obstacle: 10 };
-/** Seuils de zoom pour afficher les étiquettes (icône seule en dessous). */
-export const LABEL_MIN_ZOOM = { vor: 7, ndb: 10, vrp: 11, obstacle: 13 };
+export const LAYER_MIN_ZOOM = { vor: 6, 'vor-dme': 6, ndb: 6, dme: 6, vrp: 6, obstacle: 10 };
+/** Seuils de zoom pour afficher les étiquettes (icône seule en dessous).
+ * VOR-DME et DME ENR suivent le VOR (présentation OACI 27/09). */
+export const LABEL_MIN_ZOOM = { vor: 7, 'vor-dme': 7, ndb: 10, dme: 7, vrp: 11, obstacle: 13 };
 /** Nombre maximal de marqueurs rendus par couche et par cadrage. VRP 800 :
  * la France seule en compte 675 — un plafond inférieur tronquait
  * arbitrairement (ordre du fichier) dès la vue nationale. */
-export const LAYER_MAX_POINTS = { vor: 400, ndb: 400, vrp: 800, obstacle: 800 };
+export const LAYER_MAX_POINTS = { vor: 400, 'vor-dme': 400, ndb: 400, dme: 400, vrp: 800, obstacle: 800 };
 
 /** Catégories d'obstacles — 21 types SIA regroupés en 6 familles d'icônes
  *  (cf. scripts/fetch-obstacles.mjs, export AIXM officiel du SIA ; le type
@@ -67,7 +68,12 @@ export function classifyNavaid(freq, unit) {
  */
 export function parseRadioPoints(json) {
     if (!json || !Array.isArray(json.navaids) || !Array.isArray(json.vrps)) return null;
-    const vor = [], ndb = [], vrp = [];
+    // Kinds SIA : la distinction NavType est CONSERVÉE depuis le XML
+    // ('vor' | 'vor-dme' | 'ndb' | 'dme' — 51 VOR-DME, 12 VOR, 54 NDB,
+    // 19 DME ENR en France, décision pilote 27/09) ; les entrées openAIP
+    // (type numérique) restent classées par bande de fréquence.
+    const SIA_KIND = { vor: 'vor', 'vor-dme': 'vor-dme', ndb: 'ndb', dme: 'dme' };
+    const buckets = { vor: [], 'vor-dme': [], ndb: [], dme: [], vrp: [] };
     // 7ᵉ élément (optionnel, SIA) : [nom phraséologique, portée NM].
     for (const n of json.navaids) {
         const [type, ident, lat, lon, freq, unit, meta] = n;
@@ -77,8 +83,10 @@ export function parseRadioPoints(json) {
             officialName: Array.isArray(meta) && meta[0] ? String(meta[0]) : null,
             rangeNm: Array.isArray(meta) && Number.isFinite(meta[1]) ? meta[1] : null,
         };
-        (classifyNavaid(freq, unit) === 'NDB' ? ndb : vor).push(it);
+        const k = SIA_KIND[type] ?? (classifyNavaid(freq, unit) === 'NDB' ? 'ndb' : 'vor');
+        buckets[k].push(it);
     }
+    const { vrp } = buckets;
     // VRP : [name, lat, lon, cc] openAIP monde + [name, lat, lon, 'FR', desc]
     // officiels SIA (5ᵉ élément = description, ex. « VRP-Cavaillon (Pont
     // TGV sur la Durance) »).
@@ -87,7 +95,7 @@ export function parseRadioPoints(json) {
         if (!name || !Number.isFinite(lat) || !Number.isFinite(lon)) continue;
         vrp.push({ name: String(name), lat, lon, cc: cc || '', desc: desc || null, sia: cc === 'FR' && !!desc });
     }
-    return { vor, ndb, vrp, generatedAt: json.generatedAt || '', counts: json.counts || {} };
+    return { ...buckets, generatedAt: json.generatedAt || '', counts: json.counts || {} };
 }
 
 /**
@@ -114,7 +122,9 @@ export function filterBbox(items, west, south, east, north) {
 export function visibleKinds(zoom) {
     return {
         vor: zoom >= LAYER_MIN_ZOOM.vor,
+        'vor-dme': zoom >= LAYER_MIN_ZOOM['vor-dme'],
         ndb: zoom >= LAYER_MIN_ZOOM.ndb,
+        dme: zoom >= LAYER_MIN_ZOOM.dme,
         vrp: zoom >= LAYER_MIN_ZOOM.vrp,
         obstacle: zoom >= LAYER_MIN_ZOOM.obstacle,
     };
@@ -172,7 +182,7 @@ function _openDB() {
     });
 }
 
-async function _idbGet(key = 'data') {
+async function _idbGet(key = 'data-v2') {
     try {
         const db = await _openDB();
         return await new Promise((resolve, reject) => {
@@ -183,7 +193,7 @@ async function _idbGet(key = 'data') {
     } catch { return null; }
 }
 
-async function _idbPut(entry, key = 'data') {
+async function _idbPut(entry, key = 'data-v2') {
     try {
         const db = await _openDB();
         await new Promise((resolve, reject) => {
@@ -206,8 +216,8 @@ const _idbPutObstacles = (entry) => _idbPut(entry, 'obstacles-sia');
  * En cas d'échec réseau, sert les données périmées si présentes.
  *
  * @param {{fetchImpl?:Function, now?:number}} [opts] Injection pour tests.
- * @returns {Promise<{vor:Array,ndb:Array,vrp:Array,generatedAt:string,
- *                    counts:Object, stale:boolean}|null>}
+ * @returns {Promise<{vor:Array,'vor-dme':Array,ndb:Array,dme:Array,vrp:Array,
+ *                    generatedAt:string, counts:Object, stale:boolean}|null>}
  */
 export async function loadRadioPoints(opts = {}) {
     const doFetch = opts.fetchImpl ?? (typeof fetch === 'function' ? fetch : null);

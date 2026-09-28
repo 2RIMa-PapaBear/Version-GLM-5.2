@@ -411,11 +411,16 @@ function _initLayerControls() {
     if (!row1) { row1 = document.createElement('div'); row1.className = 'map-layers-row map-layers-row-top'; bar.appendChild(row1); }
     if (!row2) { row2 = document.createElement('div'); row2.className = 'map-layers-row map-layers-row-bottom'; bar.appendChild(row2); }
 
-    // RADAR + GROUPE HORLOGE en FIN de rangée (retour pilote 20/09) :
-    // Espaces — Vent — TEMSI — Fronts — SIGMET d'abord, puis le lecteur
-    // radar dont le groupe horloge (élastique) absorbe l'espace restant.
+    // RANGÉES (retour pilote 28/09) :
+    //   1 — fond de carte · Espaces · Zoom terrain · … · Vols (à droite,
+    //       posé par gps.js avec margin-left:auto) ;
+    //   2 — Vent · TEMSI · Fronts · SIGMET · Radar + horloge ÉLASTIQUE en
+    //       fin (le lecteur radar absorbe l'espace restant, retour 20/09).
     _precip = createPrecipController(_map);
 
+    // Fond de carte : contrôle FLOTTANT en bas à gauche de la carte
+    // (retour pilote 28/09 — il quitte la rangée 1).
+    try { _mountBasemapSwitcher(null); } catch (e) { console.error('basemap switcher failed:', e.message); }
     _airspaces = createAirspaceController(_map);
     _airspaces.mountControls(row1);
 
@@ -431,19 +436,18 @@ function _initLayerControls() {
         _radioPoints.mountControls(row1);
     } catch (e) { console.error('radio points layer failed:', e.message); }
 
-    // Ordre — rangée 1 (couches) : Espaces — Vent — TEMSI — Fronts — SIGMET
-    // — Radar + horloge (FIN, élastique). Rangée 2 (fond & cadrage) :
-    // Satellite — Terrain — Vols. (Cadrer plan et Plein cadre sont ENSUITE
-    // promus dans le paquet d'icônes flottant sur la carte par gps.js, qui y
-    // ajoute aussi « Vols » en rangée 2.)
-    try { mountWindLayer(_map, row1); } catch (e) { console.error('wind layer failed:', e.message); }
-    try { mountTemsiButton(row1); } catch (e) { console.error('temsi button failed:', e.message); }
-    try { mountFrontsButton(row1); } catch (e) { console.error('fronts button failed:', e.message); }
+    // Rangée 1 : (fond de carte + Espaces déjà posés) Zoom terrain.
+    // Rangée 2 : couches MÉTÉO du vol — Vent — TEMSI — Fronts — SIGMET —
+    // Radar + horloge (FIN, élastique). « Cadrer plan » et « Plein cadre »
+    // sont promus ensuite dans le paquet d'icônes flottant par gps.js.
+    try { mountWindLayer(_map, row2); } catch (e) { console.error('wind layer failed:', e.message); }
+    try { mountTemsiButton(row2); } catch (e) { console.error('temsi button failed:', e.message); }
+    try { mountFrontsButton(row2); } catch (e) { console.error('fronts button failed:', e.message); }
     try {
         _sigmetLayer = createSigmetController(_map);
-        _sigmetLayer.mountControls(row1);
+        _sigmetLayer.mountControls(row2);
     } catch (e) { console.error('sigmet layer failed:', e.message); }
-    _precip.mountControls(row1);
+    _precip.mountControls(row2);
 
     // SIGMET réintégré à la carte (retour pilote 20/09) : calque OFF par
     // défaut, alimenté par l'événement du GO/NO-GO (les données sont déjà
@@ -452,10 +456,9 @@ function _initLayerControls() {
         if (_sigmetLayer && e.detail) _sigmetLayer.refresh(e.detail);
     });
 
-    try { _mountBasemapSwitcher(row2); } catch (e) { console.error('basemap switcher failed:', e.message); }
-    _mountZoomAirfieldButton(row2);
+    _mountZoomAirfieldButton(row1);
     _wireFreeWaypointShortcuts();
-    _mountFitPlanButton(row2);
+    _mountFitPlanButton(row2);   // promené ensuite dans le paquet flottant (gps.js)
     _mountFullscreenButton(row2);
 
     // Radar n'est PAS activé d'office : le pilote l'allume d'un clic
@@ -563,10 +566,11 @@ function createSigmetController(map) {
 
 // Sélecteur de fond de carte (satellite / OSM / sombre / relief).
 function _mountBasemapSwitcher(bar) {
-    if (!bar) return;
     const isFr = state.lang === 'fr';
     const group = document.createElement('div');
-    group.className = 'precip-control-group';
+    // bar=null → contrôle flottant BAS GAUCHE de la carte (retour pilote
+    // 28/09) ; sinon groupe de la barre de couches.
+    group.className = bar ? 'precip-control-group' : 'basemap-floating';
     // Récupère le fond mémorisé pour pré-sélectionner le <select>.
     const savedBase = localStorage.getItem('mt-basemap');
     const currentBase = (savedBase && BASEMAPS[savedBase]) ? savedBase : 'satellite';
@@ -579,7 +583,7 @@ function _mountBasemapSwitcher(bar) {
         <select class="basemap-select" title="${isFr ? 'Fond de carte' : 'Base map'}" aria-label="${isFr ? 'Fond de carte' : 'Base map'}">
             ${options.map(([v, lbl]) => `<option value="${v}" ${v === currentBase ? 'selected' : ''}>${lbl}</option>`).join('')}
         </select>`;
-    bar.appendChild(group);
+    (bar || document.getElementById('regional-map')).appendChild(group);
     group.querySelector('.basemap-select')?.addEventListener('change', (ev) => {
         const key = ev.target.value;
         if (!BASEMAPS[key] || !_map) return;
