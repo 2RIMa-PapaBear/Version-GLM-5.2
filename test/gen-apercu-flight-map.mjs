@@ -28,6 +28,7 @@ const { jsPDF } = _m.exports;
 
 const { drawFlightMapPage, computeMapBounds, pickTileZoom, safeTileRange, mapArea }
     = await import(pathToFileURL(path.join(root, 'js', 'flight-map-pdf.js')).href);
+const { collectNavaids, withOaciInfo } = await import(pathToFileURL(path.join(root, 'js', 'flight-map-collect.js')).href);
 const { normalizeZones, zoneLegend } = await import(pathToFileURL(path.join(root, 'js', 'flight-map-collect.js')).href);
 const { loadZoneFreqServices, terrainFreqText } = await import(pathToFileURL(path.join(root, 'js', 'airspace-freq.js')).href);
 
@@ -176,9 +177,11 @@ const scenarios = [
 for (const sc of scenarios) {
     const bounds = computeMapBounds(sc.route, sc.alternates, { aspect: mapArea().w / mapArea().h });
     const zones = zonesFor(bounds);
+    const navaids = await collectNavaids(bounds, sc.route);
+    console.log(`   radiophares : ${navaids.length} (${navaids.slice(0, 6).map((n) => n.ident).join(' ')}${navaids.length > 6 ? '…' : ''})`);
     reportZones(sc.suffix, zones);
-    const routeT = await withTerrainFreq(sc.route);
-    const alternatesT = await withTerrainFreq(sc.alternates);
+    const routeT = await withOaciInfo(await withTerrainFreq(sc.route));
+    const alternatesT = await withOaciInfo(await withTerrainFreq(sc.alternates));
     for (const p of [...routeT, ...alternatesT]) {
         if (p?.freq) console.log(`   terrain ${p.code} : ${p.freq}`);
     }
@@ -200,6 +203,7 @@ for (const sc of scenarios) {
         bounds,
         route: routeT,
         alternates: alternatesT,
+        navaids,
         zones,
         legend: zoneLegend(zones, true),
         legendNote: '',

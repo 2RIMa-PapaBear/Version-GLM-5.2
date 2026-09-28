@@ -242,3 +242,112 @@ export function classifyOaciSymbol(icao, siaAf = null, siaRws = null, apt = null
     }
     return { icon: 'civil-' + surface, statut: af.statut, surf: main?.surf || null };
 }
+
+/* ---- JUMEAU PDF (carte du dossier de vol) ------------------------------
+ * MÊME géométrie que oaciSymbolSvg (mêmes constantes, viewBox 100 → points
+ * via sizePt) tracée en primitives jsPDF — la carte imprimée est
+ * IDENTIQUE à la carte régionale (harmonisation pilote 28/09). Le doc
+ * jsPDF est passé en argument (module Node-safe, aucun import navigateur).
+ */
+const PDF_COLORS = {
+    civil: [0, 64, 160], mixte: [0, 64, 160], militaire: [224, 48, 32],
+};
+
+/** Rect ABCD rempli/contourné (coins absolus). */
+function _pdfQuad(doc, pts, style) {
+    const seg = [];
+    for (let i = 1; i < 4; i++) seg.push([pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]]);
+    seg.push([pts[0][0] - pts[3][0], pts[0][1] - pts[3][1]]);
+    doc.lines(seg, pts[0][0], pts[0][1], [1, 1], style, true);
+}
+
+/** Symbole OACI `icon` tracé sur doc, centré (cx, cy), diamètre ~sizePt.
+ *  Rotation « piste-dur » au cap réel comme à l'écran. */
+export function oaciSymbolDrawPdf(doc, icon, bearing, cx, cy, sizePt = 9) {
+    const name = String(icon || '');
+    const s = sizePt / 100;                       // unités viewBox 100 → pt
+    const P = (ux, uy) => [cx + (ux - 50) * s, cy + (uy - 50) * s];
+    if (name === 'desaffecte') {
+        const c = [20, 20, 20];
+        doc.setDrawColor(...c);
+        doc.setLineWidth(16 * s);
+        doc.circle(cx, cy, 28 * s, 'S');
+        doc.setLineWidth(7 * s);
+        doc.line(...P(32, 32), ...P(68, 68));
+        doc.line(...P(68, 32), ...P(32, 68));
+        return;
+    }
+    if (name === 'prive') {
+        // Jumeau exact du SVG : cardinaux + disque + P blanc (jambe +
+        // panse pleine, contre-point bleu).
+        const c = PDF_COLORS.civil;
+        doc.setFillColor(...c);
+        const tickW = 10.8, tickOut = 48, attach = 36, h = tickOut - attach;
+        [[50 - tickW / 2, 50 - tickOut, tickW, h], [50 + attach, 50 - tickW / 2, h, tickW],
+         [50 - tickW / 2, 50 + attach, tickW, h], [50 - tickOut, 50 - tickW / 2, h, tickW]]
+            .forEach(([x, y, w, hh]) => {
+                const p1 = P(x, y), p2 = P(x + w, y + hh);
+                doc.rect(p1[0], p1[1], p2[0] - p1[0], p2[1] - p1[1], 'F');
+            });
+        doc.circle(cx, cy, 36 * s, 'F');
+        doc.setFillColor(255, 255, 255);
+        const j1 = P(40, 27), j2 = P(49, 77);
+        doc.rect(j1[0], j1[1], j2[0] - j1[0], j2[1] - j1[1], 'F');          // jambe
+        doc.circle(...P(55, 37), 14 * s, 'F');                              // panse
+        doc.setFillColor(...c);
+        doc.circle(...P(55, 37), 7 * s, 'F');                               // contre-point
+        return;
+    }
+    const st = OACI_STYLES[name.split('-')[0]];
+    const type = name.split('-').slice(1).join('-');
+    if (!st || !['piste-dur', 'bande', 'helistation', 'hydro'].includes(type)) return;
+    const c = PDF_COLORS[name.split('-')[0]] || PDF_COLORS.civil;
+    doc.setDrawColor(...c);
+    doc.setFillColor(...c);
+    const discR = 36, outerR = 25.6, outerW = 4.4, tickW = 10.8, tickOut = 48;
+    const attach = st.doubleRing ? outerR + outerW / 2 : (type === 'bande' ? 34 + 3.5 : discR);
+    // 4 traits cardinaux COLLÉS (N E S W — rects pleins)
+    const h = tickOut - attach;
+    [[50 - tickW / 2, 50 - tickOut, tickW, h], [50 + attach, 50 - tickW / 2, h, tickW],
+     [50 - tickW / 2, 50 + attach, tickW, h], [50 - tickOut, 50 - tickW / 2, h, tickW]]
+        .forEach(([x, y, w, hh]) => {
+            const p1 = P(x, y), p2 = P(x + w, y + hh);
+            doc.rect(p1[0], p1[1], p2[0] - p1[0], p2[1] - p1[1], 'F');
+        });
+    if (st.doubleRing) {
+        doc.setLineWidth(outerW * s);
+        doc.circle(cx, cy, outerR * s, 'S');
+    }
+    if (type === 'piste-dur') {
+        doc.circle(cx, cy, discR * s, 'F');
+        // canal blanc pivoté au cap (même rotation que le SVG rotate(hdg))
+        const hdg = Number.isFinite(bearing) ? ((bearing % 180) + 180) % 180 : OACI_BAR_HEADING;
+        const a = hdg * Math.PI / 180, chW = 14 / 2, chH = 37.5;
+        const rot = (dx, dy) => [cx + (dx * Math.cos(a) - dy * Math.sin(a)) * s,
+            cy + (dx * Math.sin(a) + dy * Math.cos(a)) * s];
+        const pts = [rot(-chW, -chH), rot(chW, -chH), rot(chW, chH), rot(-chW, chH)];
+        doc.setFillColor(255, 255, 255);
+        _pdfQuad(doc, pts, 'F');
+    } else if (type === 'bande') {
+        doc.setLineWidth(7 * s);
+        doc.circle(cx, cy, 34 * s, 'S');
+    } else if (type === 'helistation') {
+        doc.circle(cx, cy, discR * s, 'F');
+        doc.setFillColor(255, 255, 255);
+        [[-14, -19, 9, 38], [5, -19, 9, 38], [-14, -4, 28, 8]].forEach(([x, y, w, hh]) => {
+            const p1 = P(50 + x, 50 + y), p2 = P(50 + x + w, 50 + y + hh);
+            doc.rect(p1[0], p1[1], p2[0] - p1[0], p2[1] - p1[1], 'F');
+        });
+    } else if (type === 'hydro') {
+        // disque + ancre stylisée (lignes blanches)
+        doc.circle(cx, cy, discR * s, 'F');
+        doc.setDrawColor(255, 255, 255);
+        doc.setLineWidth(7 * s);
+        doc.line(...P(50, 29), ...P(50, 60));
+        doc.line(...P(35, 36), ...P(65, 36));
+        // arc de la coche : 2 segments approchés (assez à cette taille)
+        doc.line(...P(35, 54), ...P(43, 46));
+        doc.line(...P(65, 54), ...P(57, 46));
+        doc.line(...P(43, 46), ...P(57, 46));
+    }
+}

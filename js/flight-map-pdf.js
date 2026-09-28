@@ -39,6 +39,9 @@ const HDR_H = 30;        // bande titre au-dessus de la carte
 const LEG_H = 15;        // bande légende sous la carte
 const TILE = 256;        // tuile Web Mercator
 
+import { radionavFreqText } from './oaci-radionav.js';
+import { oaciSymbolDrawPdf } from './oaci-symbols.js';
+
 const INK = [17, 24, 39];
 const MUTED = [100, 116, 139];
 const SUB_INK = [51, 65, 85];        // #334155 — bornes des zones : lisibles sur relief
@@ -213,6 +216,148 @@ function _niceScale(mppPagePt) {
 }
 
 // ---------------------------------------------------------------------------
+// RADIOPHARES OACI — mêmes symboles et annotations que la carte régionale
+// (planche validée 27-28/09) : VOR hexagone + point, VOR-DME hexagone
+// inscrit dans un cadre, NDB cercle + point + 3 couronnes de points, DME
+// rectangle — tout au bleu OACI #0040A0, annotation « (D) IDENT FRÉQ » en
+// cadre avec le nom posé sur la ligne haute et trait de rappel.
+// ---------------------------------------------------------------------------
+const RN_BLUE = [0, 64, 160];
+
+/** Hexagone OACI plat haut/bas (VOR, VOR-DME) tracé point à point. */
+function _rnHexPath(doc, cx, cy, w, h) {
+    const hw = w / 2, hh = h / 2, tf = hw * 0.58;
+    const pts = [[cx - hw, cy], [cx - hw + tf, cy - hh], [cx + hw - tf, cy - hh],
+        [cx + hw, cy], [cx + hw - tf, cy + hh], [cx - hw + tf, cy + hh]];
+    const seg = [];
+    for (let i = 1; i <= 6; i++) {
+        const a = pts[i - 1], b2 = pts[i % 6];
+        seg.push([b2[0] - a[0], b2[1] - a[1]]);
+    }
+    doc.lines(seg, pts[0][0], pts[0][1], [1, 1], 'S', true);
+}
+
+/** Symbole du radiophare (unités POINT, centré en x,y). */
+function _rnSymbol(doc, kind, x, y) {
+    doc.setDrawColor(...RN_BLUE);
+    doc.setFillColor(...RN_BLUE);
+    doc.setLineDashPattern([], 0);
+    if (kind === 'vor') {
+        doc.setLineWidth(0.55);
+        _rnHexPath(doc, x, y, 6.2, 5.6);
+        doc.circle(x, y, 0.55, 'F');
+    } else if (kind === 'vor-dme') {
+        doc.setLineWidth(0.5);
+        doc.rect(x - 3.3, y - 2.6, 6.6, 5.2, 'S');
+        doc.setLineWidth(0.45);
+        _rnHexPath(doc, x, y, 6.2, 5.0);
+        doc.circle(x, y, 0.5, 'F');
+    } else if (kind === 'dme') {
+        doc.setLineWidth(0.5);
+        doc.rect(x - 3.1, y - 2.4, 6.2, 4.8, 'S');
+        doc.circle(x, y, 0.5, 'F');
+    } else if (kind === 'ndb') {
+        doc.setLineWidth(0.32);
+        doc.circle(x, y, 1.55, 'S');
+        doc.circle(x, y, 0.45, 'F');
+        // 3 couronnes de points (12 / 15 / 19) — même construction que
+        // l'écran (cercles pointillés réguliers).
+        [[2.35, 12], [3.1, 15], [3.85, 19]].forEach(([r, n]) => {
+            for (let i = 0; i < n; i++) {
+                const a = (i / n) * 2 * Math.PI - Math.PI / 2;
+                doc.circle(x + r * Math.cos(a), y + r * Math.sin(a), 0.24, 'F');
+            }
+        });
+    }
+}
+
+/** Annotation « document » : nom posé sur la ligne haute du cadre (fond
+ *  opaque derrière les lettres = le trait est masqué), cadre « (D) IDENT
+ *  FRÉQ », trait de rappel du milieu gauche du cadre au symbole. */
+function _rnAnnotation(doc, n, x, y, freqTxt, place) {
+    const dPrefix = (n.kind === 'vor-dme' || n.kind === 'dme') ? '(D) ' : '';
+    const boxTxt = `${dPrefix}${n.ident}${freqTxt ? ' ' + freqTxt : ''}`;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(4.6);
+    const bw = doc.getTextWidth(boxTxt) + 2.6;
+    const bh = 4.6;
+    const gap = 2.6;                        // symbole → cadre (comme l écran : 14 px)
+    const bx = x + 3.6 + gap;               // bord gauche du cadre
+    const by = y - 4.4;                     // bloc remonté (20 % + 14 px à l écran)
+    // réservation symbole + annotation ; refusée → symbole seul (déjà posé)
+    if (place && !place({ x: x - 4.5, y: by - 3, w: bx + bw - x + 4.5, h: bh + 7 })) return;
+    // fond translucide (écran : rgba(255,255,255,.85)) + cadre bleu
+    doc.setDrawColor(...RN_BLUE);
+    doc.setLineWidth(0.35);
+    doc.setGState(new doc.GState({ opacity: 0.85 }));
+    doc.setFillColor(255, 255, 255);
+    doc.rect(bx, by, bw, bh, 'FD');
+    doc.setGState(new doc.GState({ opacity: 1 }));
+    doc.setTextColor(...RN_BLUE);
+    doc.text(boxTxt, bx + 1.3, by + bh - 1.3);
+    // nom centré, posé sur la ligne haute (masque le trait derrière lui)
+    if (n.name) {
+        doc.setFontSize(4.6);
+        const nw = doc.getTextWidth(n.name) + 1.6;
+        const nx = bx + bw / 2 - nw / 2;
+        doc.setGState(new doc.GState({ opacity: 0.85 }));
+        doc.setFillColor(255, 255, 255);
+        doc.rect(nx, by - 1.1, nw, 2.0, 'F');
+        doc.setGState(new doc.GState({ opacity: 1 }));
+        doc.text(n.name, nx + 0.8, by + 0.55);
+    }
+    // trait de rappel : milieu gauche du cadre → bord du symbole (vers le centre)
+    doc.setDrawColor(...RN_BLUE);
+    doc.setLineWidth(0.3);
+    const px = bx, py = by + bh / 2;
+    const dx = px - x, dy = py - y;
+    const rx = 3.2, ry = 2.7;
+    const t = 1 / Math.sqrt((dx / rx) ** 2 + (dy / ry) ** 2);
+    doc.line(x + dx * t, y + dy * t, px, py);
+    doc.setTextColor(...INK);
+}
+
+/** Étiquette aérodrome « carte OACI » 3 lignes (jumeau PDF de
+ *  _oaciLabelHtml de la carte régionale) : code gras, NOM majuscules,
+ *  élévation + fréquence — halo blanc translucide (l'écran utilise un
+ *  text-shadow), coin BAS-GAUCHE ancré à droite/au-dessus du symbole
+ *  comme sur la carte. Retourne la largeur du bloc (réservation). */
+function _oaciLabel3(doc, p, x, y) {
+    const lines = [];
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(5.4);
+    lines.push({ t: p.code, size: 5.4, font: 'bold' });
+    if (p.name) lines.push({ t: String(p.name).toUpperCase(), size: 4.4, font: 'normal' });
+    const data = [p.elevFt, p.freq].filter(Boolean).join(' ');
+    if (data) lines.push({ t: data, size: 4.4, font: 'normal' });
+    let w = 0;
+    for (const l of lines) {
+        doc.setFont('helvetica', l.font);
+        doc.setFontSize(l.size);
+        w = Math.max(w, doc.getTextWidth(l.t));
+    }
+    const lh = [6.0, 4.9, 4.9], pad = 0.8;
+    const H = lh.slice(0, lines.length).reduce((a, b2) => a + b2, 0) + pad;
+    const W = w + 2 * pad;
+    const bx = x + 4.2, byBot = y - 4.2;          // coin bas-gauche
+    // halo translucide (équivalent impression du text-shadow écran)
+    doc.setGState(new doc.GState({ opacity: 0.8 }));
+    doc.setFillColor(255, 255, 255);
+    doc.rect(bx, byBot - H, W, H, 'F');
+    doc.setGState(new doc.GState({ opacity: 1 }));
+    let ty = byBot - 1.2;
+    doc.setTextColor(...INK);
+    for (let i = lines.length - 1; i >= 0; i--) {
+        const l = lines[i];
+        doc.setFont('helvetica', l.font);
+        doc.setFontSize(l.size);
+        doc.text(l.t, bx + W / 2 - doc.getTextWidth(l.t) / 2, ty);
+        ty -= lh[Math.min(i, 2)];
+    }
+    return { w: W, h: H };
+}
+
+// ---------------------------------------------------------------------------
 // LA PAGE
 // ---------------------------------------------------------------------------
 
@@ -281,18 +426,39 @@ export function drawFlightMapPage(doc, d) {
             if (out.length >= 3) dec.push(out);
         }
         if (!dec.length) continue;
-        if (typeof doc.GState === 'function') {
+        // Style « carte OACI » (identique à la carte régionale — pilote
+        // 28/09) : familles à BANDE = limite fine sombre + bande claire
+        // ÉPAISSE côté INTÉRIEUR (contour clippé au polygone, 50 %) ;
+        // SIV/RMZ/TMZ = trait spécifique pointillé ; les autres gardent
+        // le remplissage translucide d'impression.
+        const ls = zone.lineStyle || null;
+        const bandW = zone.bandW || 0;
+        if (bandW && typeof doc.GState === 'function') {
+            doc.saveGraphicsState();
+            for (const ring of dec) _ringPath(doc, ring, xy, null);   // chemin
+            doc.clip();
+            doc.setGState(new doc.GState({ opacity: 0.3 }));   // bande translucide (retour pilote 28/09)
+            doc.setDrawColor(..._hex(zone.color));
+            doc.setLineWidth(bandW);
+            doc.setLineDashPattern([], 0);
+            for (const ring of dec) _ringPath(doc, ring, xy, 'S');
+            doc.restoreGraphicsState();
+        } else if (!ls && typeof doc.GState === 'function') {
             doc.saveGraphicsState();
             doc.setGState(new doc.GState({ opacity: zone.fillOpacity ?? 0.10 }));
             doc.setFillColor(..._hex(zone.fill || zone.color));
             for (const ring of dec) _ringPath(doc, ring, xy, 'F');
             doc.restoreGraphicsState();
         }
-        doc.setDrawColor(..._hex(zone.color));
-        doc.setLineWidth(zone.weight ?? 0.7);
-        if (zone.dashed) doc.setLineDashPattern([2.6, 1.8], 0);
+        const stroke = ls || { color: _hex(zone.color), w: zone.weight ?? 0.7, dash: null };
+        // AZBA inactive → pointillé (sauf familles déjà pointillées par
+        // convention : SIV, CTR, RMZ/TMZ gardent leur trait propre).
+        const dash = stroke.dash || (zone.dashed && !ls ? [2.6, 1.8] : (zone.dashed ? stroke.dash : null));
+        doc.setDrawColor(...(stroke.color || _hex(zone.color)));
+        doc.setLineWidth(stroke.w);
+        doc.setLineDashPattern(dash || [], 0);
         for (const ring of dec) _ringPath(doc, ring, xy, 'S');
-        if (zone.dashed) doc.setLineDashPattern([], 0);
+        doc.setLineDashPattern([], 0);
         // Candidat étiquette : centre de la bbox de l'anneau externe.
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         for (const p of dec[0]) {
@@ -341,6 +507,15 @@ export function drawFlightMapPage(doc, d) {
         const p = rp[i];
         const [x, y] = rPts[i];
         const isEnd = p.role === 'dep' || p.role === 'dest';
+        // Terrain FRANÇAIS classé OACI : MÊME symbole que la carte
+        // régionale (classification SIA + cap réel de piste) + étiquette
+        // 3 lignes « LFBI POITIERS 423 118.500 » (harmonisation 28/09).
+        if (p.oaci) {
+            oaciSymbolDrawPdf(doc, p.oaci.icon, p.oaci.bearing, x, y, isEnd ? 10 : 8.5);
+            const lb = p.code ? _oaciLabel3(doc, p, x, y) : { w: 0, h: 0 };
+            if (p.code) place({ x: x - 5, y: y - 4.2 - lb.h, w: 10 + lb.w, h: Math.max(lb.h + 5, 12) });
+            continue;
+        }
         doc.setFillColor(...(isEnd ? ROUTE : AMBER));
         doc.setDrawColor(255, 255, 255);
         doc.setLineWidth(0.7);
@@ -395,6 +570,11 @@ export function drawFlightMapPage(doc, d) {
         let [x, y] = xy(a.lat, a.lon);
         const clamped = x < map.x + 8 || x > map.x + map.w - 8 || y < map.y + 8 || y > map.y + map.h - 8;
         if (clamped) [x, y] = clampToMap(x, y);
+        if (a.oaci) {
+            // Terrain français : symbole OACI identique à la carte (le
+            // losange ambre du dégagement carburant reste par-dessus).
+            oaciSymbolDrawPdf(doc, a.oaci.icon, a.oaci.bearing, x, y, 8.5);
+        }
         if (a.diversion) {
             // Dégagement carburant : losange ambre plein (il fait partie
             // DU plan, pas de la simple liste d'alternates).
@@ -403,12 +583,17 @@ export function drawFlightMapPage(doc, d) {
             doc.setLineWidth(0.6);
             doc.triangle(x, y - 4, x + 4, y, x, y + 4, 'FD');
             doc.triangle(x, y + 4, x + 4, y, x - 4, y, 'FD');
-        } else {
+        } else if (!a.oaci) {
             doc.setDrawColor(...MUTED);
             doc.setLineWidth(0.8);
             doc.setLineDashPattern([1.6, 1.2], 0);
             doc.circle(x, y, 3, 'S');
             doc.setLineDashPattern([], 0);
+        }
+        if (a.oaci && a.code) {
+            const lb = _oaciLabel3(doc, a, x, y);
+            place({ x: x - 5, y: y - 4.2 - lb.h, w: 10 + lb.w, h: Math.max(lb.h + 5, 12) });
+            continue;
         }
         const label = a.diversion ? `${a.code} ${isFr ? '(dégagement)' : '(alt.)'}` : a.code;
         // (retour pilote 22/09, lisibilité sur relief) codes d alternates
@@ -440,6 +625,17 @@ export function drawFlightMapPage(doc, d) {
         if (a.freq) {
             _label(doc, a.freq, x + 5, y + 8, { size: 4.8, bold: true, color: INK });
         }
+    }
+
+    // ---- Radiophares OACI (VOR / VOR-DME / NDB / DME ENR) : symboles +
+    // annotations à l'identique de la carte régionale (pilote 28/09),
+    // posés AVANT les étiquettes de zones (route et terrains priment).
+    for (const n of d.navaids || []) {
+        if (!Number.isFinite(n.lat) || !Number.isFinite(n.lon)) continue;
+        const [x, y] = xy(n.lat, n.lon);
+        _rnSymbol(doc, n.kind, x, y);
+        const freqTxt = radionavFreqText(n.freq, n.kind);
+        _rnAnnotation(doc, n, x, y, freqTxt, place);
     }
 
     // ---- Étiquettes de zones (grandes d'abord, sans chevauchement).

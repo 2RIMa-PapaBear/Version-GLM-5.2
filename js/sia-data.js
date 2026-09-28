@@ -78,6 +78,21 @@ function _idbPut(key, value) {
 export async function loadSiaAux() {
     if (_runways && _airfields) return { runways: _runways, airfields: _airfields };
     _loadPromise ??= (async () => {
+        // Node (maquette carte PDF) : lecture directe des fichiers.
+        if (typeof document === 'undefined') {
+            try {
+                const { default: fs } = await import('node:fs');
+                const { default: path } = await import('node:path');
+                const { fileURLToPath } = await import('node:url');
+                const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+                _runways = JSON.parse(fs.readFileSync(path.join(root, 'data', 'sia-runways.json'), 'utf8')).items || {};
+                const af = JSON.parse(fs.readFileSync(path.join(root, 'data', 'sia-airfields.json'), 'utf8'));
+                _airfields = Array.isArray(af?.items) ? af.items : [];
+                _auxAirac = af?.airac || null;
+                _byCode = new Map(_airfields.map(t => [t.code, t]));
+                return { runways: _runways, airfields: _airfields };
+            } catch { return { runways: {}, airfields: [] }; }
+        }
         const use = async (key, file) => {
             const cached = await _idbGet(key);
             if (cached?.data && Date.now() - cached.ts < TTL_MS) return cached.data;

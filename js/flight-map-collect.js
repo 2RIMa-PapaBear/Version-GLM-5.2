@@ -20,6 +20,9 @@ import {
 import { zoneActiveToday } from './azba.js';
 import { computeMapBounds, pickTileZoom, safeTileRange, mapArea } from './flight-map-pdf.js';
 import { loadZoneFreqServices, zoneFreqInfo, terrainFreqText } from './airspace-freq.js';
+import { parseRadioPoints } from './radio-points.js';
+import { loadSiaAux, getSiaAirfield, getSiaRunways } from './sia-data.js';
+import { classifyOaciSymbol, oaciRunwayBearing } from './oaci-symbols.js';
 
 // Palette IMPRESSION : les couleurs écran de la carte régionale (#3B82F6,
 // #FBBF24…) assombries d un cran pour rester lisibles sur papier blanc,
@@ -53,11 +56,13 @@ export function normalizeZones(items, { notams = [], now = Date.now(), services 
         if (!as || !as.geometry || !as.geometry.coordinates) continue;
         const nameU = String(as.name || as.designator || '').toUpperCase();
         if (/\bFIR\b|\bUIR\b|\bLTA\b/.test(nameU)) continue;
+        const kind0 = _decodeType(as) || 'OTHER';
+        if (kind0 === 'CTA') continue;   // retiré comme sur la carte (pilote 28/09)
         if (!as._sia && (as.type === 10 || as.type === 11 || as.type === 27)) continue;
         const baseFt = _limitFt(as.lowerLimit ?? as.lower) ?? 0;
         if (baseFt > MAX_BASE_FT) continue;
 
-        const kind = _decodeType(as) || 'OTHER';
+        const kind = kind0;
         const color = PRINT_COLORS[kind] || PRINT_COLORS.OTHER;
         const dashedAzba = notams.length > 0
             && !zoneActiveToday({ hor: as.hor, key: _rdpKey(as.name) }, notams, now, null);
@@ -76,9 +81,25 @@ export function normalizeZones(items, { notams = [], now = Date.now(), services 
             const fi = zoneFreqInfo(as, kind, services);
             if (fi) freq = fi.tag ? `${fi.freq} ${fi.tag}` : fi.freq;
         }
+        // Style « carte OACI » (identique à la carte régionale — pilote
+        // 28/09) : limite FINE sombre + BANDE claire intérieure pour les
+        // familles à bande ; SIV pointillé vert sapin ; RMZ/TMZ noir
+        // court-long-court ; CTR pointillé long.
+        const DARK = [26, 26, 26];
+        const SIVC = [43, 93, 52];
+        const lineStyle = kind === 'SIV'
+            ? { color: SIVC, w: 2.0, dash: [2, 4.5] }
+            : (kind === 'RMZ' || kind === 'TMZ')
+                ? { color: DARK, w: 0.5, dash: [3, 3, 8, 3] }
+                : kind === 'CTR'
+                    ? { color: DARK, w: 0.5, dash: [8, 3] }
+                    : { color: DARK, w: 0.5, dash: null };
+        const BANDED = { CTR: 5, TMA: 5, RESTRICTED: 5, DANGER: 5, PROHIBITED: 6 };
         out.push({
             rings,
             color, fill: color,
+            lineStyle,
+            bandW: BANDED[kind] ?? 0,
             weight: PRINT_WEIGHT[kind] ?? 0.7,
             // SIV : pointillé PERMANENT (représentation SIA) ; les autres
             // familles ne le deviennent que par la sémantique AZBA.
@@ -177,6 +198,69 @@ export async function compositeOtmTiles(bounds, range) {
     } catch { return null; }
 }
 
+/** Classement OACI + élévation de chaque terrain du plan : la carte du
+ *  PDF dessine les MÊMES symboles que la carte régionale (classification
+ *  SIA statut/piste + cap réel, cf. oaci-symbols.js). Hors France → null
+ *  (le point garde son marqueur de plan). */
+export async function withOaciInfo(pts) {
+    try { await loadSiaAux(); } catch { /* getters vides → classement null */ }
+    let elevByCode = null;
+    try {
+        let json = null;
+        if (typeof document === 'undefined') {
+            const { default: fs } = await import('node:fs');
+            const { default: path } = await import('node:path');
+            const { fileURLToPath } = await import('node:url');
+            const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+            json = JSON.parse(fs.readFileSync(path.join(root, 'data', 'airports.json'), 'utf8'));
+        } else {
+            const res = await fetch('data/airports.json', { cache: 'no-store' });
+            if (res.ok) json = await res.json();
+        }
+        const items = json?.items || json || [];
+        elevByCode = new Map((Array.isArray(items) ? items : []).map((a) => [a.icao, a.elevation]));
+    } catch { /* élévation absente : 3e ligne = fréquence seule */ }
+    return (pts || []).map((p) => {
+        if (!p?.code || !/^LF/i.test(p.code)) return p;
+        const cls = classifyOaciSymbol(p.code);
+        if (!cls) return p;
+        const elev = elevByCode?.get(p.code);
+        return {
+            ...p,
+            oaci: { icon: cls.icon, bearing: oaciRunwayBearing(p.code) },
+            elevFt: Number.isFinite(elev) ? Math.round(elev) : null,
+        };
+    });
+}
+
+/** Radiophares dans l'emprise, triés par distance à la route (max 24).
+ *  Node (maquette) : lecture directe du fichier ; navigateur : fetch. */
+export async function collectNavaids(bounds, route) {
+    let json = null;
+    try {
+        if (typeof document === 'undefined') {
+            const { default: fs } = await import('node:fs');
+            const { default: path } = await import('node:path');
+            const { fileURLToPath } = await import('node:url');
+            const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+            json = JSON.parse(fs.readFileSync(path.join(root, 'data', 'radio-points.json'), 'utf8'));
+        } else {
+            const res = await fetch('data/radio-points.json', { cache: 'no-store' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            json = await res.json();
+        }
+    } catch { return []; }
+    const parsed = parseRadioPoints(json);
+    if (!parsed) return [];
+    const all = [];
+    for (const k of ['vor', 'vor-dme', 'ndb', 'dme'])
+        for (const it of parsed[k] || []) all.push({ kind: k, ident: it.ident, lat: it.lat, lon: it.lon, freq: it.freq, name: it.officialName || null });
+    const inBox = all.filter((n) => n.lat >= bounds.minLat && n.lat <= bounds.maxLat
+        && n.lon >= bounds.minLon && n.lon <= bounds.maxLon);
+    const d2 = (n) => Math.min(...(route || []).map((p) => (p.lat - n.lat) ** 2 + (p.lon - n.lon) ** 2));
+    return inBox.sort((a, b2) => d2(a) - d2(b2)).slice(0, 24);
+}
+
 /** Assemblage complet pour drawFlightMapPage() — null si rien à tracer
  *  (ni route ni terrain). Jamais throw : chaque source dégrade seule. */
 export async function buildFlightMapData({
@@ -213,16 +297,23 @@ export async function buildFlightMapData({
         }
         return out;
     };
-    const routeT = await withTerrainFreq(route);
-    const alternatesT = await withTerrainFreq(alternates);
+    const routeT = await withOaciInfo(await withTerrainFreq(route));
+    const alternatesT = await withOaciInfo(await withTerrainFreq(alternates));
 
     const zones = normalizeZones(items, { notams, now: Date.now(), services });
     const legend = zoneLegend(zones, isFr);
     const hasAzbaDash = zones.some((zn) => zn.dashed && zn.kind !== 'SIV');
+
+    // Radiophares OACI de l'emprise (VOR / VOR-DME / NDB / DME ENR) —
+    // mêmes données que la carte régionale (SIA prioritaire France,
+    // openAIP pour le reste du monde), dessinés à l'identique sur la
+    // carte du PDF (harmonisation pilote 28/09). Triés par distance à la
+    // route, plafonnés pour rester lisibles à l'échelle A5.
+    const navaids = await collectNavaids(bounds, route);
     return {
         isFr, generatedLabel, routeLabel,
         bounds, tiles,
-        route: routeT, alternates: alternatesT, zones, legend,
+        route: routeT, alternates: alternatesT, zones, legend, navaids,
         legendNote: hasAzbaDash
             ? (isFr ? 'Plein : active ou sans info · pointillé : non active ce jour (AZBA)'
                 : 'Solid: active or unknown · dashed: not active today (AZBA)')
