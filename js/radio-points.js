@@ -182,7 +182,7 @@ function _openDB() {
     });
 }
 
-async function _idbGet(key = 'data-v2') {
+async function _idbGet(key = RP_CACHE_KEY) {
     try {
         const db = await _openDB();
         return await new Promise((resolve, reject) => {
@@ -193,7 +193,7 @@ async function _idbGet(key = 'data-v2') {
     } catch { return null; }
 }
 
-async function _idbPut(entry, key = 'data-v2') {
+async function _idbPut(entry, key = RP_CACHE_KEY) {
     try {
         const db = await _openDB();
         await new Promise((resolve, reject) => {
@@ -204,6 +204,11 @@ async function _idbPut(entry, key = 'data-v2') {
         });
     } catch { /* quota : le cache HTTP fera le relais */ }
 }
+
+// Clé suffixée par révision : les données SIA évoluent sans que le délai de
+// fraîcheur (7 j) soit écoulé — chaque changement de base impose une nouvelle
+// clé pour forcer le re-téléchargement (v3 : noms officiels AIXM 28/09).
+const RP_CACHE_KEY = 'data-v3';
 
 // Cache obstacles : même base IndexedDB, clé distincte — suffixée -sia pour
 // invalider le format openAIP précédent (jamais déployé, préversion locale).
