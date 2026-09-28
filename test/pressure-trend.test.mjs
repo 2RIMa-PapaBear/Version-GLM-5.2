@@ -17,18 +17,34 @@ globalThis.fetch = async () => ({
 
 const { fetchPressureTrend, evaluatePressureTrend } = await import('../js/pressure-trend.js');
 
-// Petit constructeur : METAR avec QNH hPa et heure d'observation ISO.
-const M = (h, qnh) => ({
-    rawOb: `LFLY 26${h}Z 24008KT CAVOK 10/05 ${qnh}`,
-    observeTime: `2026-09-26T${h}:00:00.000Z`,
-});
+// Petit constructeur : METAR avec QNH hPa, daté PAR RAPPORT À MAINTENANT
+// (heures en arrière — les dates FIGÉES du 26/09 sont devenues trop
+// vieilles pour la fenêtre de fraîcheur du code au fil des jours : les
+// tests basculaient selon la date d'exécution, repéré le 28/09).
+const M = (hoursAgo, qnh) => {
+    const d = new Date(Date.now() - hoursAgo * 3600e3);
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    const hh = String(d.getUTCHours()).padStart(2, '0');
+    const mm = String(d.getUTCMinutes()).padStart(2, '0');
+    return {
+        rawOb: `LFLY ${dd}${hh}${mm}Z 24008KT CAVOK 10/05 ${qnh}`,
+        observeTime: d.toISOString(),
+    };
+};
+// Idem pour un rawOb entièrement personnalisé (ex. KLAX en inHg).
+const RAW = (hoursAgo, rawOb) => {
+    const d = new Date(Date.now() - hoursAgo * 3600e3);
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    const hh = String(d.getUTCHours()).padStart(2, '0');
+    return { rawOb: rawOb(dd, hh), observeTime: d.toISOString() };
+};
 
 describe('pressure-trend — parsing des séries QNH (transport stubbé)', () => {
 
     test('baisse 1015 → 1009 en 2 h : pente −3 hPa/h exactement (borne danger)', async () => {
         // Trois METARs : 12:00 Q1015, 13:00 Q1012, 14:00 Q1009.
         // delta = 1009 − 1015 = −6 hPa sur 2 h → −6/2 = −3 hPa/h.
-        STUB_DATA = [M('1200', 'Q1015'), M('1300', 'Q1012'), M('1400', 'Q1009')];
+        STUB_DATA = [M(4, 'Q1015'), M(3, 'Q1012'), M(2, 'Q1009')];
         const t = await fetchPressureTrend('LFLY');
         assert.equal(t.deltaHpa, -6);
         assert.equal(t.hoursSpan, 2);
@@ -42,8 +58,8 @@ describe('pressure-trend — parsing des séries QNH (transport stubbé)', () =>
         // 2992/100 = 29,92 inHg ; 29,92 × 33,8639 = 1013,2078… → 1013.
         // Le récent est en Q1007 : delta = 1007 − 1013 = −6 sur 2 h → −3/h.
         STUB_DATA = [
-            { rawOb: 'KLAX 261200Z 24008KT FEW030 18/07 A2992', observeTime: '2026-09-26T12:00:00.000Z' },
-            M('1400', 'Q1007'),
+            RAW(4, (dd, hh) => `KLAX ${dd}${hh}Z 24008KT FEW030 18/07 A2992`),
+            M(2, 'Q1007'),
         ];
         const t = await fetchPressureTrend('KLAX');
         assert.equal(t.oldestQnh, 1013);
@@ -55,18 +71,15 @@ describe('pressure-trend — parsing des séries QNH (transport stubbé)', () =>
         // Pas de terrain.
         assert.equal(await fetchPressureTrend(''), null);
         // Un seul METAR : impossible de tracer une pente.
-        STUB_DATA = [M('1200', 'Q1015')];
+        STUB_DATA = [M(2, 'Q1015')];
         assert.equal(await fetchPressureTrend('LFLY'), null);
         // Aucun QNH exploitable dans les rawOb → points filtrés.
-        STUB_DATA = [
-            { rawOb: 'LFLY 261200Z 24008KT CAVOK 10/05', observeTime: '2026-09-26T12:00:00.000Z' },
-            { rawOb: 'LFLY 261400Z 24008KT CAVOK 10/05', observeTime: '2026-09-26T14:00:00.000Z' },
-        ];
+        STUB_DATA = [RAW(4, (dd, hh) => `LFLY ${dd}${hh}Z 24008KT CAVOK 10/05`), RAW(2, (dd, hh) => `LFLY ${dd}${hh}Z 24008KT CAVOK 10/05`)];
         assert.equal(await fetchPressureTrend('LFLY'), null);
         // Deux observations 14:00 et 14:15 : span 0,25 h < 0,5 h de recul.
         STUB_DATA = [
-            M('1400', 'Q1010'),
-            { rawOb: 'LFLY 261415Z 24008KT CAVOK 10/05 Q1010', observeTime: '2026-09-26T14:15:00.000Z' },
+            M(2, 'Q1010'),
+            RAW(1.75, (dd, hh) => `LFLY ${dd}${hh}15Z 24008KT CAVOK 10/05 Q1010`),
         ];
         assert.equal(await fetchPressureTrend('LFLY'), null);
     });
