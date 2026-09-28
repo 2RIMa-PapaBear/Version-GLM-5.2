@@ -22,26 +22,41 @@ import {
     loadRadioPoints, loadObstacles, filterBbox, visibleKinds,
     LABEL_MIN_ZOOM, LAYER_MAX_POINTS, formatFreq, OBSTACLE_CATS,
 } from './radio-points.js';
+import {
+    RADIONAV_BLUE, RADIONAV_KINDS, RADIONAV_KIND_LABEL,
+    radionavMarkerHtml, radionavMapSize,
+} from './oaci-radionav.js';
 
-const COLORS = { vor: '#60A5FA', ndb: '#4ADE80', vrp: '#2563EB', obstacle: '#F87171' };
+// Présentation OACI 27/09 (planche validée) : les 4 kinds radio au bleu
+// OACI uniforme — la distinction se lit sur le SYMBOLE, plus la couleur.
+const COLORS = {
+    vor: RADIONAV_BLUE, 'vor-dme': RADIONAV_BLUE, ndb: RADIONAV_BLUE, dme: RADIONAV_BLUE,
+    vrp: '#2563EB', obstacle: '#F87171',
+};
 
 // S5 (audit 27/09) : core.escapeHtml remplace la copie locale (F13/A10).
 const _esc = escapeHtml;
 
-/** Symboles conventionnels des cartes aéro (SIA/OACI) :
- *  VOR = hexagone + point central ; NDB = « goutte » (cercle + tige) ;
- *  point de repère VFR = triangle plein. */
+/** Marqueur OACI d'un radiophare : symbole aux dimensions du document
+ *  (VOR 24 px, VOR-DME 28, NDB 30, DME 29) + annotation « document »
+ *  (nom posé sur le cadre, encadré IDENT FRÉQ, trait de rappel) — cf.
+ *  js/oaci-radionav.js, planche validée 27/09. */
+function _radionavIcon(kind, it, withLabels) {
+    const [w, h] = radionavMapSize(kind);
+    return L.divIcon({
+        className: 'rn-marker rn-' + kind,
+        html: radionavMarkerHtml(kind, it, { withLabel: withLabels, esc: _esc }),
+        iconSize: [w, h],
+        iconAnchor: [Math.round(w / 2), Math.round(h / 2)],
+    });
+}
+
+/** Point de repère VFR : triangle plein (les radiophares ont leurs
+ *  symboles OACI dédiés — cf. _radionavIcon). */
 function _icon(kind) {
     const c = COLORS[kind];
-    const svg = kind === 'vor'
-        ? `<polygon points="9,1 16.5,5.3 16.5,13.7 9,18 1.5,13.7 1.5,5.3" fill="none" stroke="${c}" stroke-width="1.8"/>`
-            + `<circle cx="9" cy="9" r="1.4" fill="${c}"/>`
-        : kind === 'ndb'
-            ? `<path d="M9 0.8 L9 6" stroke="${c}" stroke-width="1.6"/>`            // tige
-                + `<circle cx="9" cy="11" r="5.2" fill="none" stroke="${c}" stroke-width="1.8"/>`
-                + `<circle cx="9" cy="11" r="1.6" fill="${c}"/>`
-            : `<path d="M9 1.5 L16 14 L2 14 Z" fill="none" stroke="${c}" stroke-width="1.8" stroke-linejoin="round"/>`
-                + `<path d="M9 5.2 L13.3 12.4 L4.7 12.4 Z" fill="${c}" opacity="0.5"/>`;
+    const svg = `<path d="M9 1.5 L16 14 L2 14 Z" fill="none" stroke="${c}" stroke-width="1.8" stroke-linejoin="round"/>`
+        + `<path d="M9 5.2 L13.3 12.4 L4.7 12.4 Z" fill="${c}" opacity="0.5"/>`;
     return L.divIcon({
         className: 'rp-marker rp-' + kind,
         html: `<svg width="18" height="18" viewBox="0 0 18 18" style="display:block;overflow:visible">${svg}</svg>`,
@@ -94,12 +109,12 @@ export function createRadioPointsController(map, deps = {}) {
     let data = null, loadPromise = null;
     let obstData = null, obstPromise = null;
     let layerGroup = null;
-    const enabled = { vor: false, ndb: false, vrp: false, obstacle: false };
+    const enabled = { vor: false, 'vor-dme': false, ndb: false, dme: false, vrp: false, obstacle: false };
     let refreshTimer = null;
     let menuEl = null;
 
     const isFr = () => state.lang === 'fr';
-    const anyEnabled = () => enabled.vor || enabled.ndb || enabled.vrp || enabled.obstacle;
+    const anyEnabled = () => Object.values(enabled).some(Boolean);
 
     function ensureLayer() {
         layerGroup ??= L.layerGroup().addTo(map);
@@ -132,14 +147,14 @@ export function createRadioPointsController(map, deps = {}) {
             // Nom phraséologique officiel SIA (« BMC » → « BORDEAUX ») et
             // portée RadioNav, comme sur les cartes.
             if (it.officialName) parts.push(`<div style="font-size:11px;color:var(--text-muted,#94A3B8);">${_esc(it.officialName)}</div>`);
-            else parts.push(`<div style="font-size:11px;color:var(--text-muted,#94A3B8);">${kind === 'vor' ? 'VOR' + (fr ? ' · DME colocalisé le cas échéant' : ' · co-located DME if any') : 'NDB'}</div>`);
+            else parts.push(`<div style="font-size:11px;color:var(--text-muted,#94A3B8);">${RADIONAV_KIND_LABEL[kind] || 'VOR'}</div>`);
             if (it.freq != null) parts.push(`<div style="font-family:'DM Mono',monospace;font-size:12px;">${_esc(formatFreq(it.freq, kind === 'ndb' ? 1 : 2))}${it.rangeNm ? ` <span style="color:var(--text-muted,#94A3B8);font-size:10px;">· ${fr ? 'portée' : 'range'} ${it.rangeNm} NM</span>` : ''}</div>`);
         }
-        const wpName = kind === 'vrp' ? it.name : `${it.ident} (${kind === 'vor' ? 'VOR' : 'NDB'})`;
+        const wpName = kind === 'vrp' ? it.name : `${it.ident} (${RADIONAV_KIND_LABEL[kind]})`;
         // Fréquence portée par le bouton : le waypoint créé la conservera
         // (affichée dans le détail des waypoints, écran + log PDF).
         const freqStr = it.freq != null ? formatFreq(it.freq, kind === 'ndb' ? 1 : 2) : '';
-        parts.push(`<div class="mp-btns"><button class="rp-wp-btn" data-lat="${it.lat}" data-lon="${it.lon}" data-name="${_esc(wpName)}" data-freq="${_esc(freqStr)}" data-kind="${kind === 'vrp' ? 'VRP' : kind.toUpperCase()}" title="${fr ? 'Ajouter comme waypoint du plan de navigation' : 'Add as waypoint to the flight plan'}">+ Waypoint</button></div>`);
+        parts.push(`<div class="mp-btns"><button class="rp-wp-btn" data-lat="${it.lat}" data-lon="${it.lon}" data-name="${_esc(wpName)}" data-freq="${_esc(freqStr)}" data-kind="${kind === 'vrp' ? 'VRP' : RADIONAV_KIND_LABEL[kind]}" title="${fr ? 'Ajouter comme waypoint du plan de navigation' : 'Add as waypoint to the flight plan'}">+ Waypoint</button></div>`);
         return `<div class="fw-inner">${parts.join('')}</div>`;
     }
 
@@ -178,34 +193,33 @@ export function createRadioPointsController(map, deps = {}) {
         const zoom = map.getZoom();
         const kinds = visibleKinds(zoom);
         const b = map.getBounds().pad(0.2);
-        if (data) for (const kind of ['vor', 'ndb', 'vrp']) {
+        // Kinds radio en symboles OACI (vor / vor-dme / ndb / dme) puis VRP.
+        if (data) for (const kind of [...RADIONAV_KINDS, 'vrp']) {
             if (!enabled[kind] || !kinds[kind]) continue;
-            let pts = filterBbox(data[kind], b.getWest(), b.getSouth(), b.getEast(), b.getNorth());
+            let pts = filterBbox(data[kind] || [], b.getWest(), b.getSouth(), b.getEast(), b.getNorth());
             if (pts.length > LAYER_MAX_POINTS[kind]) pts = pts.slice(0, LAYER_MAX_POINTS[kind]);
             const withLabels = zoom >= LABEL_MIN_ZOOM[kind];
+            const oaci = RADIONAV_KINDS.includes(kind);
             for (const it of pts) {
                 const m = L.marker([it.lat, it.lon], {
-                    icon: _icon(kind),
+                    icon: oaci ? _radionavIcon(kind, it, withLabels) : _icon(kind),
                     keyboard: false,
                     zIndexOffset: kind === 'vrp' ? -200 : 0,
                 });
-                if (withLabels) {
-                    // Étiquette sur le MODÈLE DES AÉRODROMES (harmonisation
-                    // pilote 16/09) : <strong>IDENT</strong> — nom, 2e ligne
-                    // colorée par famille (fréquence officielle pour les
-                    // radiophares, « point VFR » pour les repères) — même
-                    // structure que « LFRV — Vannes · VFR » des pastilles.
-                    const l2 = kind === 'vrp'
-                        ? (isFr() ? 'point VFR' : 'VFR point')
-                        : _esc(formatFreq(it.freq, kind === 'ndb' ? 1 : 2));
-                    const nom = kind === 'vrp'
-                        ? (it.desc ? _esc(it.desc.replace(/^VRP-/i, '').slice(0, 24)) : '')
-                        : (it.officialName ? _esc(it.officialName) : '');
-                    const labelHtml = `<strong>${_esc(kind === 'vrp' ? it.name : it.ident)}</strong>`
+                // Radiophares OACI : l'annotation « document » (nom + cadre
+                // + trait de rappel) fait partie du MARQUEUR — pas d'autre
+                // étiquette ; en deçà du zoom étiquette, infobulle au survol.
+                // VRP : étiquette sur le MODÈLE DES AÉRODROMES (harmonisation
+                // pilote 16/09) — <strong>IDENT</strong> — nom, 2e ligne
+                // « point VFR », comme « LFRV — Vannes · VFR » des pastilles.
+                if (!oaci && withLabels) {
+                    const l2 = isFr() ? 'point VFR' : 'VFR point';
+                    const nom = it.desc ? _esc(it.desc.replace(/^VRP-/i, '').slice(0, 24)) : '';
+                    const labelHtml = `<strong>${_esc(it.name)}</strong>`
                         + (nom ? ' — ' + nom : '')
                         + `<br><span style="color:${COLORS[kind]};font-weight:700;">${l2}</span>`;
                     m.bindTooltip(labelHtml, { permanent: true, direction: 'right', className: 'rp-label rp-label-' + kind });
-                } else {
+                } else if (!withLabels) {
                     m.bindTooltip(_esc(kind === 'vrp' ? it.name : it.ident), { direction: 'top' });
                 }
                 m.bindPopup(() => popupHtml(kind, it), { maxWidth: 250 });
@@ -218,9 +232,9 @@ export function createRadioPointsController(map, deps = {}) {
                 m.on('contextmenu', (e) => {
                     L.DomEvent.stopPropagation(e);
                     map.closePopup();
-                    const wpName = kind === 'vrp' ? it.name : `${it.ident} (${kind === 'vor' ? 'VOR' : 'NDB'})`;
+                    const wpName = kind === 'vrp' ? it.name : `${it.ident} (${RADIONAV_KIND_LABEL[kind]})`;
                     const freqStr = it.freq != null ? formatFreq(it.freq, kind === 'ndb' ? 1 : 2) : '';
-                    deps.createWaypoint?.(it.lat, it.lon, wpName, freqStr, kind === 'vrp' ? 'VRP' : kind.toUpperCase());
+                    deps.createWaypoint?.(it.lat, it.lon, wpName, freqStr, kind === 'vrp' ? 'VRP' : RADIONAV_KIND_LABEL[kind]);
                 });
                 m.addTo(layerGroup);
             }
@@ -358,7 +372,9 @@ export function createRadioPointsController(map, deps = {}) {
         }
         return html
             + row('data-rp-kind="vor"', 'VOR', COLORS.vor)
+            + row('data-rp-kind="vor-dme"', 'VOR-DME', COLORS['vor-dme'])
             + row('data-rp-kind="ndb"', 'NDB', COLORS.ndb)
+            + row('data-rp-kind="dme"', fr ? 'DME ENR' : 'ENR DME', COLORS.dme)
             + row('data-rp-kind="vrp"', fr ? 'Points VFR' : 'VFR points', COLORS.vrp)
             + row('data-rp-kind="obstacle"', fr ? 'Obstacles' : 'Obstacles', COLORS.obstacle)
             // La source ne concerne que les POINTS RADIO (VOR/NDB/VRP/
@@ -377,7 +393,7 @@ export function createRadioPointsController(map, deps = {}) {
                 if (el) el.checked = groups[g];
             }
         }
-        for (const k of ['vor', 'ndb', 'vrp', 'obstacle']) {
+        for (const k of ['vor', 'vor-dme', 'ndb', 'dme', 'vrp', 'obstacle']) {
             const el = menuEl?.querySelector(`[data-rp-kind="${k}"]`);
             if (el) el.checked = enabled[k];
         }

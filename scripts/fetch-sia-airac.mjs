@@ -229,6 +229,9 @@ const siaLayerSnapshot = {
     generatedAt: new Date().toISOString(),
     airac: siaNav.effDate,
     navaids: siaNav.navaids,
+    // TACAN exclus du rendu mais listés : leurs jumeaux openAIP sont
+    // retirés à la fusion (doublon CGC/CNA Cognac — retour pilote 27/09).
+    tacans: siaNav.tacans || [],
     vrps: siaVrps,
 };
 fs.writeFileSync(path.join(ROOT, 'data', 'sia-radio-layer.json'), JSON.stringify(siaLayerSnapshot));

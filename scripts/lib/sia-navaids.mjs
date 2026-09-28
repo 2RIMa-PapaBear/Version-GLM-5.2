@@ -13,8 +13,11 @@
 // RadioNav, noms+portées ET les VRP officiels (0/6121 avec description).
 //
 // Règles de fusion (validées 29/08 et 14/09, commits 99702179/7ed86324) :
-//   - navaids retenus : VOR, VOR-DME, VORTAC, NDB (TACAN = azimut militaire
-//     UHF non recevable sur VOR classique, DME seul = sans azimut) ;
+//   - navaids retenus : VOR, VOR-DME, VORTAC, NDB et DME-ATT (DME ENR) —
+//     distinction CONSERVÉE (décision pilote 27/09 : VOR-DME = hexagone
+//     dans un cadre + préfixe (D), DME ENR = rectangle ; 51 VOR-DME et 19
+//     DME-ATT en France) ; TACAN = azimut militaire UHF non recevable sur
+//     VOR classique → EXCLU (symbole en réserve) ;
 //   - fréquence/méta officielles des <RadioNav> (Frequence, NomPhraseo,
 //     Portee) rapprochées par « TYPE IDENT » ;
 //   - rapprochement openAIP par ident ET proximité (<0,35° lat / 0,5° lon)
@@ -27,32 +30,53 @@
 // ============================================================================
 import fs from 'node:fs';
 
-/** Parse l'export XML SIA (AIRAC) → { effDate, navaids:[{k,ident,lat,lon,f,u,n,r}] }. */
+/** Parse l'export XML SIA (AIRAC) → { effDate, navaids:[{k,ident,lat,lon,f,u,n,r}],
+ *  tacans:[{ident,lat,lon}] } — les TACAN (exclus du rendu) sont listés
+ *  à part pour retirer leurs jumeaux openAIP (doublon « CGC 116.2 » à
+ *  côté du VOR-DME CNA Cognac — retour pilote 27/09). */
 export function parseSiaNavaids(xml) {
     const effDate = (xml.match(/effDate="(\d{4}-\d{2}-\d{2})"/) || [])[1] || 'inconnue';
     const each = _each(xml);
-    const NAV_KIND = { VOR: 'vor', 'VOR-DME': 'vor', VORTAC: 'vor', NDB: 'ndb' };
-    const navFreq = new Map();   // "TYPE IDENT" → { f, u, n (nom phraséologique), r (portée NM) }
+    const NAV_KIND = { VOR: 'vor', 'VOR-DME': 'vor-dme', VORTAC: 'vor-dme', NDB: 'ndb', 'DME-ATT': 'dme' };
+    // RadioNav TOUS territoires : l'export SIA publie aussi les moyens
+    // FRONTALIERS des pays voisins ([LS] Suisse, [EB] Belgique, [LI] Italie,
+    // [ED] Allemagne…) qui figurent sur les cartes françaises — leur nom est
+    // dans <Station> (le <NomPhraseo> français n'existe que pour [LF]).
+    const navFreq = new Map();   // "TYPE IDENT" → { f, u, n (nom), r (portée NM) }
     each('RadioNav', (attrs, body) => {
-        const m = (each.attr(attrs, 'lk') || '').match(/^\[LF\]\[([A-Z-]+) ([^\]]+)\]$/);
+        const m = (each.attr(attrs, 'lk') || '').match(/^\[[A-Za-z]{2}\]\[([A-Z-]+) ([^\]]+)\]$/);
         if (!m) return;
         const f = parseFloat(String(each.txt(body, 'Frequence') || '').replace(',', '.'));
         if (!Number.isFinite(f)) return;
         const portee = parseInt(String(each.txt(body, 'Portee') || ''), 10);
         navFreq.set(`${m[1]} ${m[2]}`, {
             f, u: m[1] === 'NDB' ? 1 : 2,
-            n: (each.txt(body, 'NomPhraseo') || '').trim() || null,
+            n: ((each.txt(body, 'NomPhraseo') || '').trim() || (each.txt(body, 'Station') || '').trim()) || null,
             r: Number.isFinite(portee) && portee > 0 ? portee : null,
         });
     });
     const navaids = [];
+    const tacans = [];
     each('NavFix', (attrs, body) => {
-        if (!/^\[LF\]/.test(each.attr(attrs, 'lk'))) return;
+        // [LF] France + moyens FRONTALIERS des pays voisins (base officielle
+        // des cartes françaises) — les autres types (WPT/VRP/PNP hors [LF])
+        // restent hors périmètre.
+        const pre = each.attr(attrs, 'lk').split(']')[0] + ']';
+        const isFr = /^\[lf\]$/i.test(pre);
+        const isRadioNavType = t => ['VOR', 'VOR-DME', 'VORTAC', 'NDB', 'DME-ATT', 'TACAN'].includes(t);
         const t = each.txt(body, 'NavType');
-        if (!NAV_KIND[t]) return;
+        if (!isFr && !isRadioNavType(t)) return;
         const lat = parseFloat(each.txt(body, 'Latitude')), lon = parseFloat(each.txt(body, 'Longitude'));
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+        if (t === 'TACAN') {
+            // Exclus du rendu (azimut militaire UHF) — mais connus, pour
+            // retirer leurs jumeaux openAIP de la couche France.
+            tacans.push({ ident: each.txt(body, 'Ident') || '', lat, lon });
+            return;
+        }
+        if (!NAV_KIND[t]) return;
         const ident = each.txt(body, 'Ident') || '';
+        if (!ident) return;                     // garde : Ident malformé (LFDD du flux réel)
         const fq = navFreq.get(`${t} ${ident}`);
         navaids.push({
             k: NAV_KIND[t], ident,
@@ -60,7 +84,7 @@ export function parseSiaNavaids(xml) {
             f: fq?.f ?? null, u: fq?.u ?? null, n: fq?.n ?? null, r: fq?.r ?? null,
         });
     });
-    return { effDate, navaids };
+    return { effDate, navaids, tacans };
 }
 
 /** Points VFR officiels SIA (NavFix type VFR) → [[Ident, lat, lon, 'FR', description], …]. */
@@ -85,7 +109,38 @@ export function parseSiaVrps(xml) {
  */
 export function mergeIntoRadioPoints(rp, sia, { effDate } = {}) {
     const metaOf = (s) => (s.n || s.r) ? [s.n, s.r] : null;
+    // TACAN exclus du rendu : retirer leurs jumeaux openAIP (même ident +
+    // proximité, règle du rapprochement) — sinon un « VOR » fantôme doublonne
+    // la station officielle (CGC 116.2 à côté du VOR-DME CNA Cognac).
+    const tacans = sia.tacans || [];
+    let droppedTacans = 0;
+    if (tacans.length) {
+        const before = (rp.navaids || []).length;
+        rp.navaids = (rp.navaids || []).filter((o) => !tacans.some((tc) =>
+            o[1] === tc.ident && Math.abs(o[2] - tc.lat) < 0.35 && Math.abs(o[3] - tc.lon) < 0.5));
+        droppedTacans = before - rp.navaids.length;
+    }
     const pending = (sia.navaids || []).map((s) => ({ ...s, used: false }));
+    // RÈGLE PILOTE (répétée le 27/09) : « pour la France uniquement la base
+    // SIA » — tout navaid openAIP (type numérique) situé sur le territoire
+    // français est retiré : ce que le SIA publie est déjà fusionné, ce qu'il
+    // ne publie pas (VOR militaires non publiés, ex. AMU Ambérieu) n'a pas
+    // à figurer sur la carte. Les moyens FRONTALIERS du SIA (PASSEIRY…)
+    // sont fusionnés comme les [LF] — un openAIP voisin reste remplacé.
+    const FR = { latMin: 41.2, latMax: 51.2, lonMin: -5.8, lonMax: 9.8 };
+    // Exception FRONTALIÈRE : un openAIP n'est gardé dans le cadre France
+    // que s'il correspond à une station SIA (ident + proximité) — il sera
+    // remplacé par l'officielle à l'étape suivante (PAS→PASSEIRY).
+    const twinOfSia = (o) => (sia.navaids || []).some((s) =>
+        s.ident === o[1] && Math.abs(s.lat - o[2]) < 0.35 && Math.abs(s.lon - o[3]) < 0.5);
+    const beforeFr = (rp.navaids || []).length;
+    rp.navaids = (rp.navaids || []).filter((o) => {
+        if (typeof o[0] === 'string') return true;              // déjà SIA
+        const lat = o[2], lon = o[3];
+        const inFr = lat >= FR.latMin && lat <= FR.latMax && lon >= FR.lonMin && lon <= FR.lonMax;
+        return !inFr || twinOfSia(o);
+    });
+    const droppedOpenAipFr = beforeFr - rp.navaids.length;
     const merged = (rp.navaids || []).map((o) => {
         const s = pending.find((n) => !n.used && n.ident === o[1]
             && Math.abs(n.lat - o[2]) < 0.35 && Math.abs(n.lon - o[3]) < 0.5);
@@ -98,9 +153,11 @@ export function mergeIntoRadioPoints(rp, sia, { effDate } = {}) {
     rp.navaids = merged;
     rp.counts = rp.counts || {};
     rp.counts.navaidsSia = pending.length;
+    rp.counts.navaidsTacanTwin = droppedTacans;
+    rp.counts.navaidsOpenAipFrDropped = droppedOpenAipFr;
     const airac = effDate || sia.airac || sia.effDate;
     if (airac) rp.siaAirac = airac;
-    return { matched: pending.length - added, added, total: pending.length };
+    return { matched: pending.length - added, added, droppedTacans, droppedOpenAipFr, total: pending.length };
 }
 
 /** VRP : les points VFR officiels SIA REMPLACENT les points openAIP de

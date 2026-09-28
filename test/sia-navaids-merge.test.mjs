@@ -15,19 +15,24 @@ const XML = `<?xml version="1.0" encoding="UTF-8"?>
   <RadioNav lk="[LF][VOR-DME BMC]"><Frequence>113,75</Frequence><NomPhraseo>BORDEAUX</NomPhraseo><Portee>100</Portee></RadioNav>
   <RadioNav lk="[LF][NDB MVN]"><Frequence>355</Frequence><NomPhraseo>MOISDON</NomPhraseo></RadioNav>
   <RadioNav lk="[LF][VOR FOO]"><Frequence>xxx</Frequence></RadioNav>
+  <RadioNav lk="[LF][DME-ATT BSN]"><Frequence>114,85</Frequence><NomPhraseo>BOURSONNE</NomPhraseo><Portee>60</Portee></RadioNav>
+  <RadioNav lk="[LS][VOR-DME PAS]"><Frequence>116,6</Frequence><Station>PASSEIRY</Station></RadioNav>
   <NavFix lk="[LF][VOR-DME BMC]"><NavType>VOR-DME</NavType><Ident>BMC</Ident><Latitude>44.98060</Latitude><Longitude>-0.70861</Longitude></NavFix>
   <NavFix lk="[LF][NDB MVN]"><NavType>NDB</NavType><Ident>MVN</Ident><Latitude>47.89889</Latitude><Longitude>-2.42583</Longitude></NavFix>
   <NavFix lk="[LF][TACAN TAC]"><NavType>TACAN</NavType><Ident>TAC</Ident><Latitude>45.0</Latitude><Longitude>1.0</Longitude></NavFix>
   <NavFix lk="[LF][VOR SEUL]"><NavType>VOR</NavType><Ident>SEUL</Ident><Latitude>47.0</Latitude><Longitude>-3.0</Longitude></NavFix>
+  <NavFix lk="[LF][DME-ATT BSN]"><NavType>DME-ATT</NavType><Ident>BSN</Ident><Latitude>49.35444</Latitude><Longitude>3.30806</Longitude></NavFix>
+  <NavFix lk="[LS][VOR-DME PAS]"><NavType>VOR-DME</NavType><Ident>PAS</Ident><Latitude>46.16372</Latitude><Longitude>5.99991</Longitude></NavFix>
   <NavFix lk="[LFDD][VOR ETR]"><NavType>VOR</NavType><Ident>ETR</NavType><Latitude>48.0</Latitude><Longitude>7.0</Longitude></NavFix>
 </Export>`;
 
-test('parseSiaNavaids : RadioNav + NavFix LF, TACAN et hors-France écartés', () => {
+test('parseSiaNavaids : LF + frontaliers radio, distinction VOR-DME/DME, TACAN listé, Ident vide écarté', () => {
     const sia = parseSiaNavaids(XML);
     equal(sia.effDate, '2026-09-03');
-    equal(sia.navaids.length, 3, 'BMC, MVN, SEUL (TACAN exclu, LFDD exclu)');
+    equal(sia.navaids.length, 5, 'BMC, MVN, SEUL, BSN [LF] + PAS [LS] (TACAN listé, LFDD sans Ident écarté)');
+    equal(sia.tacans.length, 1, 'TACAN listé à part');
     const bmc = sia.navaids.find((n) => n.ident === 'BMC');
-    equal(bmc.k, 'vor');
+    equal(bmc.k, 'vor-dme', 'VOR-DME conservé (décision pilote 27/09)');
     equal(bmc.f, 113.75);
     equal(bmc.u, 2);
     deepEqual([bmc.n, bmc.r], ['BORDEAUX', 100]);
@@ -35,7 +40,11 @@ test('parseSiaNavaids : RadioNav + NavFix LF, TACAN et hors-France écartés', (
     equal(mvn.u, 1, 'NDB en kHz');
     equal(mvn.r, null, 'sans portée');
     const seul = sia.navaids.find((n) => n.ident === 'SEUL');
+    equal(seul.k, 'vor', 'VOR simple');
     equal(seul.f, null, 'pas de RadioNav → pas de fréquence officielle');
+    const bsn = sia.navaids.find((n) => n.ident === 'BSN');
+    equal(bsn.k, 'dme', 'DME-ATT → DME ENR');
+    deepEqual([bsn.f, bsn.n, bsn.r], [114.85, 'BOURSONNE', 60]);
 });
 
 test('mergeIntoRadioPoints : rapprochement ident+proximité, anti-collision mondiale, ajout des absents', () => {
@@ -45,12 +54,23 @@ test('mergeIntoRadioPoints : rapprochement ident+proximité, anti-collision mond
             ['vor', 'BMC', 44.98, -0.7, 113.7, 2],       // ≈ BMC openAIP → rapproché
             ['vor', 'BMC', 48.85, 2.35, 117.5, 2],       // même ident loin (Paris) → NON rapproché
             ['ndb', 'AUTRE', 47.9, -2.4, 350, 1],        // autre terrain → intact
+            [1, 'TAC', 45.0, 1.0, 116.2, 2],             // jumeau openAIP du TACAN → RETIRÉ
+            [1, 'PAS', 46.16, 6.0, 116.6, 2],             // frontalier : REMPLACÉ par le SIA (PASSEIRY)
+            [1, 'AMU', 45.99, 5.33, 116.3, 2],            // France sans publication SIA → RETIRÉ
         ],
     };
     const st = mergeIntoRadioPoints(rp, sia, { effDate: '2026-09-03' });
-    equal(st.total, 3);
-    equal(st.added, 2, 'SEUL et MVN absents d openAIP → ajoutés');
-    equal(rp.counts.navaidsSia, 3);
+    equal(st.total, 5, '4 [LF] + le frontalier [LS]');
+    equal(st.added, 3, 'SEUL, MVN et BSN absents d openAIP → ajoutés');
+    equal(rp.counts.navaidsSia, 5);
+    equal(st.droppedTacans, 1, 'jumeau openAIP du TACAN retiré (règle SIA prioritaire)');
+    ok(!rp.navaids.some((n) => n[1] === 'TAC'), 'plus de « VOR » fantôme TAC');
+    // « Pour la France uniquement la base SIA » (pilote 27/09)
+    equal(st.droppedOpenAipFr, 1, 'AMU non publié SIA retiré du territoire');
+    ok(!rp.navaids.some((n) => n[1] === 'AMU'), 'plus de AMU fantôme');
+    const pas = rp.navaids.find((n) => n[1] === 'PAS');
+    equal(pas[0], 'vor-dme', 'frontalier remplacé par le SIA');
+    deepEqual(pas[6], ['PASSEIRY', null], 'nom via <Station>');
     equal(rp.siaAirac, '2026-09-03');
     // BMC proche : fréquence OFFICIELLE + méta [nom, portée].
     const bmc = rp.navaids.find((n) => n[1] === 'BMC' && Math.abs(n[2] - 44.98) < 0.01);

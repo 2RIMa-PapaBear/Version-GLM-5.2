@@ -104,11 +104,13 @@ test('filterBbox : cadre simple et antiméridien (est < ouest)', () => {
     deepStrictEqual(filterBbox(pts, 170, -5, -170, 5).map(p => p.lon), [178, -178], 'antiméridien');
 });
 
-test('visibleKinds : VOR, NDB et points VFR AU MÊME niveau de zoom ; obstacles plus locaux', () => {
-    deepStrictEqual(visibleKinds(5), { vor: false, ndb: false, vrp: false, obstacle: false }, 'z5 : rien');
-    deepStrictEqual(visibleKinds(6), { vor: true, ndb: true, vrp: true, obstacle: false }, 'z6 : les trois couches, pas les obstacles');
-    deepStrictEqual(visibleKinds(LAYER_MIN_ZOOM.obstacle), { vor: true, ndb: true, vrp: true, obstacle: true }, 'z seuil obstacles : tout');
-    const zs = [LAYER_MIN_ZOOM.vor, LAYER_MIN_ZOOM.ndb, LAYER_MIN_ZOOM.vrp];
+test('visibleKinds : radiophares OACI et points VFR AU MÊME niveau de zoom ; obstacles plus locaux', () => {
+    const off = { vor: false, 'vor-dme': false, ndb: false, dme: false, vrp: false, obstacle: false };
+    const on3 = { vor: true, 'vor-dme': true, ndb: true, dme: true, vrp: true, obstacle: false };
+    deepStrictEqual(visibleKinds(5), off, 'z5 : rien');
+    deepStrictEqual(visibleKinds(6), on3, 'z6 : les cinq couches radio, pas les obstacles');
+    deepStrictEqual(visibleKinds(LAYER_MIN_ZOOM.obstacle), { ...on3, obstacle: true }, 'z seuil obstacles : tout');
+    const zs = [LAYER_MIN_ZOOM.vor, LAYER_MIN_ZOOM['vor-dme'], LAYER_MIN_ZOOM.ndb, LAYER_MIN_ZOOM.dme, LAYER_MIN_ZOOM.vrp];
     ok(new Set(zs).size === 1, `seuils identiques (${zs.join('/')})`);
     ok(LAYER_MIN_ZOOM.obstacle > zs[0], 'obstacles = couche plus locale (8 900 points FR)');
 });
