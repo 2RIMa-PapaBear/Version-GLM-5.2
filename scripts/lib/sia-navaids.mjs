@@ -103,12 +103,38 @@ export function parseSiaVrps(xml) {
 }
 
 /**
+ * Table des noms officiels depuis l'export AIXM complet (AIXM4.5_all_FR_OM) :
+ * <Vor|Ndb|Dme|Tacan> → dernier <codeId> + dernier <txtName> (le 1er
+ * <txtName> est celui de l'<OrgUid> = « FRANCE »). Le XML_SIA n'a pas de
+ * RadioNav pour 115 navaids (bases militaires : BZH, BOV, BT…) — l'AIXM
+ * porte leur nom officiel (« BREST BRETAGNE », « PARIS LE BOURGET »…).
+ * @param {string} aixmXml Contenu de AIXM4.5_all_FR_OM_<date>.xml.
+ * @returns {Object<string,string>} ident → nom officiel.
+ */
+export function parseAixmNavaidNames(aixmXml) {
+    const names = {};
+    const re = /<(Vor|Ndb|Dme|Tacan)>([\s\S]*?)<\/(?:Vor|Ndb|Dme|Tacan)>/g;
+    let m;
+    while ((m = re.exec(aixmXml))) {
+        const ids = [...m[2].matchAll(/<codeId>([^<]*)<\/codeId>/g)];
+        const tns = [...m[2].matchAll(/<txtName>([^<]*)<\/txtName>/g)];
+        const id = ids.length ? ids[ids.length - 1][1].trim() : null;
+        const name = tns.length ? tns[tns.length - 1][1].trim() : null;
+        if (id && name) names[id] = name;
+    }
+    return names;
+}
+
+/**
  * Fusionne les navaids SIA dans un objet radio-points (MUTÉ sur place).
  * Les données SIA PRIMENT : coordonnées/fréquence officielles remplacent
  * celles d'openAIP (qui ne complète que les champs inconnus du SIA).
  */
-export function mergeIntoRadioPoints(rp, sia, { effDate } = {}) {
-    const metaOf = (s) => (s.n || s.r) ? [s.n, s.r] : null;
+export function mergeIntoRadioPoints(rp, sia, { effDate, aixmNames } = {}) {
+    // Nom officiel : RadioNav d'abord, AIXM en repli (115 navaids sans
+    // RadioNav — retour pilote 28/09 « BZH 110.65 sans nom ? »).
+    const nameOf = (s) => s.n || (aixmNames && aixmNames[s.ident]) || null;
+    const metaOf = (s) => (nameOf(s) || s.r) ? [nameOf(s), s.r] : null;
     // TACAN exclus du rendu : retirer leurs jumeaux openAIP (même ident +
     // proximité, règle du rapprochement) — sinon un « VOR » fantôme doublonne
     // la station officielle (CGC 116.2 à côté du VOR-DME CNA Cognac).

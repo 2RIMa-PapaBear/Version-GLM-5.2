@@ -25,6 +25,10 @@ const args = Object.fromEntries(process.argv.slice(2).map(a => a.replace(/^--/, 
 if (!args.xml) { console.error('Usage : node scripts/fetch-sia-airac.mjs --xml=<XML_SIA_date.xml>'); process.exit(1); }
 
 const xml = fs.readFileSync(args.xml, 'latin1');
+// Noms officiels AIXM (repli RadioNav absent — 115 navaids, ex. BZH Brest) :
+// --aixm=<fichier> ou AIXM4.5_all_FR_OM_<même date>.xml à côté du XML_SIA.
+const aixmPath = args.aixm || args.xml.replace(/XML_SIA_([\d-]+)\.xml/, 'AIXM4.5_all_FR_OM_$1.xml');
+const aixmNames = fs.existsSync(aixmPath) ? parseAixmNavaidNames(fs.readFileSync(aixmPath, 'latin1')) : {};
 const effDate = (xml.match(/effDate="(\d{4}-\d{2}-\d{2})"/) || [])[1] || 'inconnue';
 console.log(`Export SIA du ${effDate} (${(xml.length / 1e6).toFixed(1)} Mo)`);
 
@@ -221,7 +225,7 @@ console.log(`fréquences organismes : ${services.size} services → data/freq-se
 //    AIRAC : c'est la BASE OBLIGATOIRE que le robot fetch-radio-points.mjs
 //    ré-applique à chaque crawl (il refuse de tourner sans elle).
 // ---------------------------------------------------------------------------
-const { parseSiaNavaids, parseSiaVrps, mergeIntoRadioPoints, applySiaVrps, verifySiaLayer }
+const { parseSiaNavaids, parseSiaVrps, parseAixmNavaidNames, mergeIntoRadioPoints, applySiaVrps, verifySiaLayer }
     = await import(pathToFileURL(path.join(ROOT, 'scripts', 'lib', 'sia-navaids.mjs')).href);
 const siaNav = parseSiaNavaids(xml);
 const siaVrps = parseSiaVrps(xml);
@@ -237,7 +241,7 @@ const siaLayerSnapshot = {
 fs.writeFileSync(path.join(ROOT, 'data', 'sia-radio-layer.json'), JSON.stringify(siaLayerSnapshot));
 const rpPath = path.join(ROOT, 'data', 'radio-points.json');
 const rp = JSON.parse(fs.readFileSync(rpPath, 'utf8'));
-const st = mergeIntoRadioPoints(rp, siaNav, { effDate: siaNav.effDate });
+const st = mergeIntoRadioPoints(rp, siaNav, { effDate: siaNav.effDate, aixmNames });
 applySiaVrps(rp, siaVrps, { effDate: siaNav.effDate });
 const integrite = verifySiaLayer(rp, siaLayerSnapshot);
 if (integrite) {
@@ -245,9 +249,10 @@ if (integrite) {
     process.exit(1);
 }
 fs.writeFileSync(rpPath, JSON.stringify(rp));
+const navNamed = siaNav.navaids.filter(n => n.n || aixmNames[n.ident]).length;
 const navFreqCount = siaNav.navaids.filter(n => n.f != null).length;
 console.log(`radio-points.json : ${rp.navaids.length} navaids (dont ${st.total} officiels SIA, `
-    + `${navFreqCount} avec fréquence officielle RadioNav ; ${st.matched} rapprochés, ${st.added} ajoutés) `
+    + `${navFreqCount} avec fréquence officielle RadioNav, ${navNamed} avec nom (RadioNav+AIXM) ; ${st.matched} rapprochés, ${st.added} ajoutés) `
     + `+ ${siaVrps.length} VRP officiels — base data/sia-radio-layer.json (AIRAC ${siaNav.effDate})`);
 
 // ---------------------------------------------------------------------------

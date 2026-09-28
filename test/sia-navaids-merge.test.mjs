@@ -6,7 +6,7 @@
 // (incident 14/09 : écrasement openAIP — navaids ET VRP officiels perdus).
 import test from 'node:test';
 import { ok, equal, deepEqual } from 'node:assert/strict';
-import { parseSiaNavaids, parseSiaVrps, mergeIntoRadioPoints, applySiaVrps, verifySiaLayer } from '../scripts/lib/sia-navaids.mjs';
+import { parseSiaNavaids, parseSiaVrps, parseAixmNavaidNames, mergeIntoRadioPoints, applySiaVrps, verifySiaLayer } from '../scripts/lib/sia-navaids.mjs';
 
 // Extrait minimal d'un export XML SIA (structure réelle : RadioNav par
 // lk="[LF][TYPE IDENT]", NavFix LF avec NavType/Ident/coordonnées).
@@ -45,6 +45,32 @@ test('parseSiaNavaids : LF + frontaliers radio, distinction VOR-DME/DME, TACAN l
     const bsn = sia.navaids.find((n) => n.ident === 'BSN');
     equal(bsn.k, 'dme', 'DME-ATT → DME ENR');
     deepEqual([bsn.f, bsn.n, bsn.r], [114.85, 'BOURSONNE', 60]);
+});
+
+test('parseAixmNavaidNames + repli : le nom officiel AIXM comble les RadioNav absents (BZH sans nom)', () => {
+    // Extrait AIXM : le 1er <txtName> est celui de l'<OrgUid> (« FRANCE »),
+    // le DERNIER est le nom de la station.
+    const aixm = `<?xml version="1.0"?>
+<Aixm>
+  <Vor><VorUid><codeId>BZH</codeId><geoLat>482631.4N</geoLat></VorUid>
+    <OrgUid><txtName>FRANCE</txtName></OrgUid><txtName>BREST BRETAGNE</txtName></Vor>
+  <Ndb><NdbUid><codeId>ALM</codeId></NdbUid>
+    <OrgUid><txtName>FRANCE</txtName></OrgUid><txtName>AIX LES MILLES</txtName></Ndb>
+</Aixm>`;
+    const names = parseAixmNavaidNames(aixm);
+    equal(names.BZH, 'BREST BRETAGNE', 'dernier txtName, pas FRANCE');
+    equal(names.ALM, 'AIX LES MILLES');
+
+    // BZH : NavFix sans RadioNav → sans AIXM le nom est null, avec il est comblé.
+    const xmlBzh = `<?xml version="1.0"?><Export effDate="2026-09-03">
+  <NavFix lk="[LF][VOR-DME BZH]"><NavType>VOR-DME</NavType><Ident>BZH</Ident><Latitude>48.44</Latitude><Longitude>-4.44</Longitude></NavFix>
+</Export>`;
+    const rp = { navaids: [] };
+    mergeIntoRadioPoints(rp, parseSiaNavaids(xmlBzh), { effDate: '2026-09-03' });
+    equal(rp.navaids[0][6], null, 'sans AIXM : pas de nom');
+    const rp2 = { navaids: [] };
+    mergeIntoRadioPoints(rp2, parseSiaNavaids(xmlBzh), { effDate: '2026-09-03', aixmNames: names });
+    equal(rp2.navaids[0][6][0], 'BREST BRETAGNE', 'nom AIXM en repli');
 });
 
 test('mergeIntoRadioPoints : rapprochement ident+proximité, anti-collision mondiale, ajout des absents', () => {
