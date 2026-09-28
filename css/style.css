@@ -3355,21 +3355,3 @@ html.theme-light .data-age-badge.age-old   { color: #B91C1C; background: rgba(23
 /* Symbole OACI « piste en dur » dessiné en SVG (oaci-symbols.js) :
  * 30×30, la piste pivote à l'intérieur, cardinaux fixes. */
 .leaflet-container .oaci-sym svg { display: block; width: 30px; height: 30px; }
-
-/* ═══ DEBUG — À RETIRER AVANT LA VERSION FINALE ═══
- * Badge niveau de zoom (demande pilote 27/09 — réglages étiquettes/bandes).
- * Supprimer avec le bloc DEBUG_ZOOM de regional-map.js. */
-.debug-zoom-badge {
-    position: absolute;
-    bottom: 22px;
-    left: 10px;
-    z-index: 1000;
-    padding: 2px 8px;
-    border-radius: 6px;
-    background: rgba(2, 6, 23, 0.75);
-    color: #FBBF24;
-    font-family: 'DM Mono', monospace;
-    font-size: 12px;
-    font-weight: 700;
-    pointer-events: none;
-}

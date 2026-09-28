@@ -35,22 +35,6 @@ let _neighborRunwayLayer = null;   // pistes des VOISINS (même représentation 
 let _currentRunwayPts = null;      // extrémités géo des pistes de l'actif (répulsion d'étiquette).
 const RUNWAY_MIN_ZOOM = 11;
 
-// ═══ DEBUG — À RETIRER AVANT LA VERSION FINALE (demande pilote 27/09) ═══
-// Badge « z<niveau> » sur la carte, réglages visuels des étiquettes/
-// bandes. Passer à false (ou supprimer le bloc _mountDebugZoomBadge)
-// supprime toute trace.
-const DEBUG_ZOOM = true;
-function _mountDebugZoomBadge() {
-    if (!DEBUG_ZOOM || !_map) return;
-    const el = document.createElement('div');
-    el.className = 'debug-zoom-badge';
-    el.textContent = 'z' + _map.getZoom();
-    _map.getContainer().appendChild(el);
-    const maj = () => { el.textContent = 'z' + _map.getZoom(); };
-    _map.on('zoom zoomend', maj);
-}
-// ═══ FIN DEBUG ═══
-
 // Étiquettes aérodromes « carte OACI » (légende SCAN-OACI 1/500 000) :
 // code OACI / nom / altitude ft + fréquence Tour-AFIS-A/A, à droite du
 // symbole. Visibles à partir de OACI_LABEL_MIN_ZOOM — en dessous la densité
@@ -269,7 +253,6 @@ function _ensureMapReady(lat, lon) {
             // (classe CSS sur le conteneur — pas de re-création de marqueurs).
             _map.on('zoomend', _updateOaciLabelVisibility);
             _updateOaciLabelVisibility();
-            _mountDebugZoomBadge();   // DEBUG — retirer avant version finale
 
             // Boutons des popups METAR : le contenu du popup est recréé à chaque
             // ouverture, on binde les handlers sur l'évènement popupopen.
