@@ -21,8 +21,12 @@ const { fetchPressureTrend, evaluatePressureTrend } = await import('../js/pressu
 // (heures en arrière — les dates FIGÉES du 26/09 sont devenues trop
 // vieilles pour la fenêtre de fraîcheur du code au fil des jours : les
 // tests basculaient selon la date d'exécution, repéré le 28/09).
+// Base CALÉE sur un quart d'heure exact : les écarts entre points sont
+// des heures PILE (sinon Date.now() jitter → span 2,0000003 h et les
+// égalités strictes du test sautent).
+const _BASE = Math.floor(Date.now() / 900e3) * 900e3;
 const M = (hoursAgo, qnh) => {
-    const d = new Date(Date.now() - hoursAgo * 3600e3);
+    const d = new Date(_BASE - hoursAgo * 3600e3);
     const dd = String(d.getUTCDate()).padStart(2, '0');
     const hh = String(d.getUTCHours()).padStart(2, '0');
     const mm = String(d.getUTCMinutes()).padStart(2, '0');
@@ -33,7 +37,7 @@ const M = (hoursAgo, qnh) => {
 };
 // Idem pour un rawOb entièrement personnalisé (ex. KLAX en inHg).
 const RAW = (hoursAgo, rawOb) => {
-    const d = new Date(Date.now() - hoursAgo * 3600e3);
+    const d = new Date(_BASE - hoursAgo * 3600e3);
     const dd = String(d.getUTCDate()).padStart(2, '0');
     const hh = String(d.getUTCHours()).padStart(2, '0');
     return { rawOb: rawOb(dd, hh), observeTime: d.toISOString() };
