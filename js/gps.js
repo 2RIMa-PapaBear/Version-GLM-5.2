@@ -661,16 +661,16 @@ function mount() {
     const host = document.getElementById('regional-map');
     (host || bar).appendChild(cluster);
 
-    // « Vols » reste dans la barre (fonction d'archive, pas un réflexe de vol)
-    // — 2e rangée (fond & cadrage) de la barre deux-lignes 17/09.
+    // « Vols » reste dans la barre (fonction d'archive, pas un réflexe de
+    // vol) — 1ʳᵉ rangée, POUSSÉ À DROITE (retour pilote 28/09).
     const groupVols = document.createElement('div');
-    groupVols.className = 'precip-control-group';
+    groupVols.className = 'precip-control-group gps-vols-group';
     groupVols.innerHTML = `
         <button class="precip-toggle" id="gps-vols-btn" title="${t.volsTitle}">
             <i data-lucide="download" style="width:14px;height:14px;"></i><span>${t.vols}</span><span class="gps-vols-count"></span>
         </button>`;
-    const rowBottom = bar.querySelector('.map-layers-row-bottom');
-    (rowBottom || bar).appendChild(groupVols);
+    const rowTop = bar.querySelector('.map-layers-row-top');
+    (rowTop || bar).appendChild(groupVols);
 
     btn = cluster.querySelector('#gps-toggle-btn');
     recBtn = cluster.querySelector('#gps-recenter-btn');
