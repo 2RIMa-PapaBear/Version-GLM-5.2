@@ -1400,6 +1400,8 @@ function _applyAirportSymbol(marker, lat, lon, icao, sym) {
     }
 }
 
+// RÉSERVE (abandonné — retour pilote 28/09 : étrangers de nouveau en
+// olives météo) : enrichissement openAIP du type d'aérodrome étranger.
 const _foreignEnriched = new Set();   // icao déjà interrogés (session)
 async function _enrichForeignSymbolOa(marker, lat, lon, icao) {
     const code = String(icao || '').toUpperCase();
@@ -1583,12 +1585,6 @@ function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null
 
     if (sym) {
         _applyAirportSymbol(marker, lat, lon, icao, sym);
-        // TERRAINS HORS FRANCE : le TYPE (militaire/héliport/fermé) vient
-        // d'openAIP (retour pilote 27/09) — fetch asynchrone (cache IDB),
-        // l'icône est remplacée si le classement openAIP diffère de la
-        // base locale. Sans clé API (canal /test/), le classement base
-        // reste.
-        if (!icao.toUpperCase().startsWith('LF')) _enrichForeignSymbolOa(marker, lat, lon, icao);
     }
     // Marqueur DOM léger superposé au cercle SVG : capte proprement les
     // clics (droit inclus) mÃªme quand le path est recouvert par d'autres

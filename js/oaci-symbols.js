@@ -220,15 +220,10 @@ export function classifyOaciSymbol(icao, siaAf = null, siaRws = null, apt = null
     const code = String(icao || '').toUpperCase();
     const manual = MANUAL_OVERRIDES.get(code);
     if (manual) return { icon: manual.icon, statut: 'MAN', surf: null };
-    // Hors France (pas de SIA — retour pilote 27/09 « généraliser à tous
-    // les aérodromes ») : classification sur la BASE LOCALE — revêtement
-    // (GRS/terre/sable → bande, sinon dur) en CIVIL par défaut (les
-    // militaires étrangers se déclarent via MILITARY_OVERRIDES).
-    if (!code.startsWith('LF')) {
-        const surf = String(apt?.surface || '').toUpperCase();
-        if (!apt) return null;
-        return { icon: /^(GRS|GRASS|DIRT|DIR|GRVL|SAND|UN)/.test(surf) ? 'civil-bande' : 'civil-piste-dur', statut: 'ÉTR', surf: surf || null };
-    }
+    // Hors France : RETOUR AUX OLIVES MÉTÉO (retour pilote 28/09 — la
+    // généralisation des symboles aux étrangers est abandonnée ;
+    // classifyForeignSymbolOa reste en réserve au cas où).
+    if (!code.startsWith('LF')) return null;
     const af = siaAf ?? getSiaAirfield(code);
     if (!af) return null;
     const main = _mainRunway(siaRws ?? getSiaRunways(code));
