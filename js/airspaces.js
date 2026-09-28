@@ -154,7 +154,8 @@ export const AIRSPACE_STYLE = {
 export const AIRSPACE_GROUPS = {
     ctr:    { kinds: ['CTR'], label: 'CTR', en: 'CTR', color: '#3B82F6' },
     tma:    { kinds: ['TMA'], label: 'TMA', en: 'TMA', color: '#3B82F6' },
-    cta:    { kinds: ['CTA'], label: 'CTA', en: 'CTA', color: '#3B82F6' },   // séparés (pilote 27/09)
+    // CTA : groupe SUPPRIMÉ (pilote 28/09) — zones jamais tracées (cf.
+    // filtre kind CTA dans _render).
     siv:    { kinds: ['SIV'], label: 'SIV', en: 'SIV', color: '#2B5D34' },
     atz:    { kinds: ['ATZ'], label: 'ATZ', en: 'ATZ', color: '#FBBF24' },
     rpd:    { kinds: ['RESTRICTED', 'PROHIBITED', 'DANGER', 'DROP'], label: 'Zones R · P · D', en: 'R · P · D areas', color: '#DC2626' },
@@ -1049,6 +1050,9 @@ export function createAirspaceController(map) {
             if (!as._sia && (as.type === 10 || as.type === 11 || as.type === 27)) return;
 
             const kind = _decodeAirspace(as);
+            // CTA SUPPRIMÉES (retour pilote 28/09) : pas d'intérêt pour le
+            // vol VFR — jamais tracées, quelque soit l'état des cases.
+            if (kind.kind === 'CTA') return;
             if (!activeGroups.has(_KIND_TO_GROUP[kind.kind] || 'autres')) return;
             const style = AIRSPACE_STYLE[kind.kind] || AIRSPACE_STYLE.OTHER;
             // B2 v2 (arbitrage pilote 13/09) : zone à activation « par

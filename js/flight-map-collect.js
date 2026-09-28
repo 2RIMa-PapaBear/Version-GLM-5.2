@@ -72,7 +72,7 @@ export function normalizeZones(items, { notams = [], now = Date.now(), services 
         // airspace-freq.js : overrides > champ f SIA > services SIA >
         // legs openAIP du dédoublonnage).
         let freq = null;
-        if (services && (kind === 'CTR' || kind === 'TMA' || kind === 'CTA' || kind === 'SIV')) {
+        if (services && (kind === 'CTR' || kind === 'TMA' || kind === 'SIV')) {
             const fi = zoneFreqInfo(as, kind, services);
             if (fi) freq = fi.tag ? `${fi.freq} ${fi.tag}` : fi.freq;
         }
@@ -93,7 +93,7 @@ export function normalizeZones(items, { notams = [], now = Date.now(), services 
 }
 
 const LEGEND_GROUPS = (isFr) => ([
-    { kinds: ['CTR', 'TMA', 'CTA'], color: PRINT_COLORS.CTR, label: isFr ? 'Contrôlés' : 'Controlled' },
+    { kinds: ['CTR', 'TMA'], color: PRINT_COLORS.CTR, label: isFr ? 'Contrôlés' : 'Controlled' },   // CTA retirées (pilote 28/09)
     { kinds: ['SIV'], color: PRINT_COLORS.SIV, label: 'SIV', dashed: true },
     { kinds: ['ATZ'], color: PRINT_COLORS.ATZ, label: 'ATZ' },
     {

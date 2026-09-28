@@ -213,6 +213,8 @@ export function computeRouteAirspaces(points, items, opts) {
         // FIR/UIR/secteurs ACC openAIP dont le nom ne dit pas « FIR »
         // (ex. « LRBB », « POLARIS ACC ») — filtrés aussi sur la carte.
         if (!as._sia && (as.type === 10 || as.type === 11 || as.type === 27)) continue;
+        // CTA SUPPRIMÉES du profil vertical comme de la carte (pilote 28/09).
+        if (String(as.name || as.designator || '').toUpperCase().includes('CTA')) continue;
         // A8 (audit 27/09) : l'exception R/D/P « toujours retenues »
         // (consigne 20/09) doit précéder TOUS les filtres d'altitude —
         // l'ancien ordre laissait le filtre de plancher (puis le filtre
