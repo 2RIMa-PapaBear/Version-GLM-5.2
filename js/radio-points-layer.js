@@ -323,15 +323,10 @@ export function createRadioPointsController(map, deps = {}) {
                 const group = e.target?.dataset?.rpAirgroup;
                 if (group && deps.airspace) {
                     deps.airspace.setGroup(group, e.target.checked);
-                    // Retour pilote 27/09 : cocher un groupe (CTR, TMA…)
-                    // AFFICHE ses zones immédiatement — la visibilité de la
-                    // couche passe à ON en interne, mais la case maîtresse
-                    // « Espaces aériens » ne se coche PAS pour autant
-                    // (ancien symptôme : case active, rien à l'écran).
+                    // Cocher un groupe AFFICHE ses zones immédiatement — la
+                    // visibilité de la couche passe à ON en interne (retour
+                    // pilote 27/09).
                     if (e.target.checked && !deps.airspace.visible) deps.airspace.toggle(true);
-                }
-                else if (e.target?.dataset?.rpAirspaces != null && deps.airspace) {
-                    deps.airspace.toggle(e.target.checked);
                 }
             }
             // Le menu RESTE OUVERT : sélectionner PLUSIEURS cases d'affilée
@@ -355,7 +350,10 @@ export function createRadioPointsController(map, deps = {}) {
                 <span>${label}</span>
                 <span style="width:8px;height:8px;border-radius:2px;background:${color};opacity:.8;margin-left:auto;border:1px solid rgba(255,255,255,.75);"></span>
             </label>`;
-        let html = row('data-rp-airspaces="1"', fr ? 'Espaces aériens' : 'Airspaces', '#38BDF8');
+        // PAS de case maîtresse « Espaces aériens » (retour pilote 28/09 :
+        // sans intérêt — chaque groupe affiche directement, la couche
+        // s'active d'elle-même au premier coche).
+        let html = '';
         for (const [g, def] of Object.entries(AIRSPACE_GROUPS)) {
             html += subRow(`data-rp-airgroup="${g}"`, fr ? def.label : def.en, def.color);
         }
