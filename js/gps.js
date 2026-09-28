@@ -738,23 +738,28 @@ function mount() {
     // sous son bouton, déplacé sur <body> (hors du contexte de défilement).
     // (écouteur en CAPTURE : le bouton « Espaces » fait stopPropagation,
     // les écouteurs de remontée ne voient jamais le clic.)
-    document.addEventListener('click', () => {
-        setTimeout(() => {
-            document.querySelectorAll('.rp-menu').forEach(m => {
-                if (m.style.display !== 'block') return;
-                const btn = m._rpBtn || (m._rpBtn = m.parentElement?.querySelector?.('button'));
-                if (!btn) return;
-                if (m.parentElement !== document.body) document.body.appendChild(m);
-                const r = btn.getBoundingClientRect();
-                m.style.position = 'fixed';
-                m.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 185)) + 'px';
-                m.style.top = (r.bottom + 6) + 'px';
-                m.style.zIndex = 4000;
-                m.style.maxHeight = '60vh';
-                m.style.overflowY = 'auto';
-            });
-        }, 0);
-    }, true);
+    // Recadrage des menus « Espaces » sous leur bouton — joué à l'ouverture
+    // ET à CHAQUE défilement/redimensionnement : en position:fixed, le menu
+    // ne suivait plus le bouton quand la page défilait dessous (retour
+    // pilote 28/09 : « doit rester accroché au bouton »).
+    const placeRpMenus = () => {
+        document.querySelectorAll('.rp-menu').forEach(m => {
+            if (m.style.display !== 'block') return;
+            const btn = m._rpBtn || (m._rpBtn = m.parentElement?.querySelector?.('button'));
+            if (!btn) return;
+            if (m.parentElement !== document.body) document.body.appendChild(m);
+            const r = btn.getBoundingClientRect();
+            m.style.position = 'fixed';
+            m.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 185)) + 'px';
+            m.style.top = (r.bottom + 6) + 'px';
+            m.style.zIndex = 4000;
+            m.style.maxHeight = '60vh';
+            m.style.overflowY = 'auto';
+        });
+    };
+    document.addEventListener('click', () => setTimeout(placeRpMenus, 0), true);
+    window.addEventListener('scroll', placeRpMenus, true);
+    window.addEventListener('resize', placeRpMenus);
 
     // Orphelins d'une fermeture brutale (endedAt nul, plus rien qui arrive) :
     // finalisés si ≥ durée minimale, sinon supprimés — même règle qu'à l'arrêt.

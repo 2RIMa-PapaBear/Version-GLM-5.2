@@ -364,7 +364,10 @@ export function createRadioPointsController(map, deps = {}) {
             + row('data-rp-kind="ndb"', 'NDB', COLORS.ndb)
             + row('data-rp-kind="vrp"', fr ? 'Points VFR' : 'VFR points', COLORS.vrp)
             + row('data-rp-kind="obstacle"', fr ? 'Obstacles' : 'Obstacles', COLORS.obstacle)
-            + `<div style="padding:4px 8px 2px;font-size:9px;color:var(--text-muted,#94A3B8);border-top:1px solid var(--border-color,#334155);margin-top:4px;">openAIP · ${fr ? 'maj' : 'upd'} <span class="rp-date">—</span></div>`;
+            // La source ne concerne que les POINTS RADIO (VOR/NDB/VRP/
+            // obstacles — openAIP) : les ZONES aériennes, elles, viennent
+            // du SIA (retour pilote 28/09 : la mention prêtait à confusion).
+            + `<div style="padding:4px 8px 2px;font-size:9px;color:var(--text-muted,#94A3B8);border-top:1px solid var(--border-color,#334155);margin-top:4px;">${fr ? 'Points radio : openAIP · maj' : 'Radio points: openAIP · upd'} <span class="rp-date">—</span></div>`;
     }
 
     function _syncFromState() {
