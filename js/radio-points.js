@@ -34,8 +34,9 @@ export const OBSTACLES_URL = 'data/obstacles.json';
  * couche plus locale, étiquettes de hauteur uniquement en vue rapprochée. */
 export const LAYER_MIN_ZOOM = { vor: 6, 'vor-dme': 6, ndb: 6, dme: 6, vrp: 6, obstacle: 10 };
 /** Seuils de zoom pour afficher les étiquettes (icône seule en dessous).
- * VOR-DME et DME ENR suivent le VOR (présentation OACI 27/09). */
-export const LABEL_MIN_ZOOM = { vor: 7, 'vor-dme': 7, ndb: 10, dme: 7, vrp: 11, obstacle: 13 };
+ * Tous les radiophares OACI étiquettent AU MÊME niveau (harmonisation
+ * pilote 28/09 — avant : NDB à z10, VOR à z7). */
+export const LABEL_MIN_ZOOM = { vor: 7, 'vor-dme': 7, ndb: 7, dme: 7, vrp: 11, obstacle: 13 };
 /** Nombre maximal de marqueurs rendus par couche et par cadrage. VRP 800 :
  * la France seule en compte 675 — un plafond inférieur tronquait
  * arbitrairement (ordre du fichier) dès la vue nationale. */
