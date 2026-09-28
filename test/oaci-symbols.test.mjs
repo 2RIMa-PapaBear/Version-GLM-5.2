@@ -159,11 +159,10 @@ describe('MILITARY_OVERRIDES (saisies pilote)', () => {
     });
 });
 
-describe('généralisation : terrains étrangers (base locale, retour pilote 27/09)', () => {
-    test('EG/EB : revêtement ASP → civil-piste-dur ; GRS → civil-bande', () => {
-        assert.equal(classifyOaciSymbol('EGKK', null, null, { surface: 'ASP' }).icon, 'civil-piste-dur');
-        assert.equal(classifyOaciSymbol('EBGB', null, null, { surface: 'GRS' }).icon, 'civil-bande');
-        assert.equal(classifyOaciSymbol('EGKK', null, null, { surface: 'ASP' }).statut, 'ÉTR');
+describe('étrangers : RETOUR AUX OLIVES MÉTÉO (retour pilote 28/09)', () => {
+    test('hors France → null (olive météo), même avec une base connue', () => {
+        assert.equal(classifyOaciSymbol('EGKK', null, null, { surface: 'ASP' }), null);
+        assert.equal(classifyOaciSymbol('EBGB', null, null, { surface: 'GRS' }), null);
     });
 
     test('étranger inconnu de la base → null (pastille)', () => {
