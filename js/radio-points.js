@@ -32,15 +32,15 @@ export const OBSTACLES_URL = 'data/obstacles.json';
  * MÊME niveau de zoom (retour utilisateur 27/08 — avant : 6/8/10).
  * Obstacles FRANCE (8 900 points, 91 % d'éoliennes en fermes denses) :
  * couche plus locale, étiquettes de hauteur uniquement en vue rapprochée. */
-export const LAYER_MIN_ZOOM = { vor: 6, 'vor-dme': 6, ndb: 6, dme: 6, vrp: 6, obstacle: 10 };
+export const LAYER_MIN_ZOOM = { vor: 6, 'vor-dme': 6, ndb: 6, dme: 6, tacan: 6, vrp: 6, obstacle: 10 };
 /** Seuils de zoom pour afficher les étiquettes (icône seule en dessous).
  * Tous les radiophares OACI étiquettent AU MÊME niveau (harmonisation
  * pilote 28/09 — avant : NDB à z10, VOR à z7). */
-export const LABEL_MIN_ZOOM = { vor: 7, 'vor-dme': 7, ndb: 7, dme: 7, vrp: 11, obstacle: 13 };
+export const LABEL_MIN_ZOOM = { vor: 7, 'vor-dme': 7, ndb: 7, dme: 7, tacan: 7, vrp: 11, obstacle: 13 };
 /** Nombre maximal de marqueurs rendus par couche et par cadrage. VRP 800 :
  * la France seule en compte 675 — un plafond inférieur tronquait
  * arbitrairement (ordre du fichier) dès la vue nationale. */
-export const LAYER_MAX_POINTS = { vor: 400, 'vor-dme': 400, ndb: 400, dme: 400, vrp: 800, obstacle: 800 };
+export const LAYER_MAX_POINTS = { vor: 400, 'vor-dme': 400, ndb: 400, dme: 400, tacan: 400, vrp: 800, obstacle: 800 };
 
 /** Catégories d'obstacles — 21 types SIA regroupés en 6 familles d'icônes
  *  (cf. scripts/fetch-obstacles.mjs, export AIXM officiel du SIA ; le type
@@ -73,8 +73,8 @@ export function parseRadioPoints(json) {
     // ('vor' | 'vor-dme' | 'ndb' | 'dme' — 51 VOR-DME, 12 VOR, 54 NDB,
     // 19 DME ENR en France, décision pilote 27/09) ; les entrées openAIP
     // (type numérique) restent classées par bande de fréquence.
-    const SIA_KIND = { vor: 'vor', 'vor-dme': 'vor-dme', ndb: 'ndb', dme: 'dme' };
-    const buckets = { vor: [], 'vor-dme': [], ndb: [], dme: [], vrp: [] };
+    const SIA_KIND = { vor: 'vor', 'vor-dme': 'vor-dme', ndb: 'ndb', dme: 'dme', tacan: 'tacan' };
+    const buckets = { vor: [], 'vor-dme': [], ndb: [], dme: [], tacan: [], vrp: [] };
     // 7ᵉ élément (optionnel, SIA) : [nom phraséologique, portée NM].
     for (const n of json.navaids) {
         const [type, ident, lat, lon, freq, unit, meta] = n;
@@ -126,6 +126,7 @@ export function visibleKinds(zoom) {
         'vor-dme': zoom >= LAYER_MIN_ZOOM['vor-dme'],
         ndb: zoom >= LAYER_MIN_ZOOM.ndb,
         dme: zoom >= LAYER_MIN_ZOOM.dme,
+        tacan: zoom >= LAYER_MIN_ZOOM.tacan,
         vrp: zoom >= LAYER_MIN_ZOOM.vrp,
         obstacle: zoom >= LAYER_MIN_ZOOM.obstacle,
     };
@@ -208,8 +209,8 @@ async function _idbPut(entry, key = RP_CACHE_KEY) {
 
 // Clé suffixée par révision : les données SIA évoluent sans que le délai de
 // fraîcheur (7 j) soit écoulé — chaque changement de base impose une nouvelle
-// clé pour forcer le re-téléchargement (v3 : noms officiels AIXM 28/09).
-const RP_CACHE_KEY = 'data-v3';
+// clé pour forcer le re-téléchargement (v4 : TACAN intégrés 29/09).
+const RP_CACHE_KEY = 'data-v4';
 
 // Cache obstacles : même base IndexedDB, clé distincte — suffixée -sia pour
 // invalider le format openAIP précédent (jamais déployé, préversion locale).

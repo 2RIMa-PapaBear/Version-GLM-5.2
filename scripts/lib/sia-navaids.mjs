@@ -37,7 +37,7 @@ import fs from 'node:fs';
 export function parseSiaNavaids(xml) {
     const effDate = (xml.match(/effDate="(\d{4}-\d{2}-\d{2})"/) || [])[1] || 'inconnue';
     const each = _each(xml);
-    const NAV_KIND = { VOR: 'vor', 'VOR-DME': 'vor-dme', VORTAC: 'vor-dme', NDB: 'ndb', 'DME-ATT': 'dme' };
+    const NAV_KIND = { VOR: 'vor', 'VOR-DME': 'vor-dme', VORTAC: 'vor-dme', NDB: 'ndb', 'DME-ATT': 'dme', TACAN: 'tacan' };
     // RadioNav TOUS territoires : l'export SIA publie aussi les moyens
     // FRONTALIERS des pays voisins ([LS] Suisse, [EB] Belgique, [LI] Italie,
     // [ED] Allemagne…) qui figurent sur les cartes françaises — leur nom est
@@ -68,13 +68,8 @@ export function parseSiaNavaids(xml) {
         if (!isFr && !isRadioNavType(t)) return;
         const lat = parseFloat(each.txt(body, 'Latitude')), lon = parseFloat(each.txt(body, 'Longitude'));
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-        if (t === 'TACAN') {
-            // Exclus du rendu (azimut militaire UHF) — mais connus, pour
-            // retirer leurs jumeaux openAIP de la couche France.
-            tacans.push({ ident: each.txt(body, 'Ident') || '', lat, lon });
-            return;
-        }
         if (!NAV_KIND[t]) return;
+        if (t === 'TACAN') tacans.push({ ident: each.txt(body, 'Ident') || '', lat, lon });   // dédup openAIP
         const ident = each.txt(body, 'Ident') || '';
         if (!ident) return;                     // garde : Ident malformé (LFDD du flux réel)
         const fq = navFreq.get(`${t} ${ident}`);

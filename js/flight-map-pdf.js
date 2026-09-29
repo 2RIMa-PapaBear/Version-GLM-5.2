@@ -39,7 +39,7 @@ const HDR_H = 30;        // bande titre au-dessus de la carte
 const LEG_H = 15;        // bande légende sous la carte
 const TILE = 256;        // tuile Web Mercator
 
-import { radionavFreqText } from './oaci-radionav.js';
+import { radionavFreqText, TACAN_PDF_PATH } from './oaci-radionav.js';
 import { oaciSymbolDrawPdf } from './oaci-symbols.js';
 
 const INK = [17, 24, 39];
@@ -237,6 +237,20 @@ function _rnHexPath(doc, cx, cy, w, h) {
     doc.lines(seg, pts[0][0], pts[0][1], [1, 1], 'S', true);
 }
 
+/** Remplissage evenodd multi-sous-chemins (TACAN) : construction du
+ *  chemin (doc.lines sans style) puis doc.fill — les trous findContours
+ *  sont orientés à l envers, le nonzero en repli soustrait aussi. */
+function _pdfEvenoddPath(doc, subs, ox, oy, s) {
+    doc.setFillColor(...RN_BLUE);
+    for (const pts of subs) {
+        const seg = [];
+        for (let i = 1; i < pts.length; i++) seg.push([(pts[i][0] - pts[i - 1][0]) * s, (pts[i][1] - pts[i - 1][1]) * s]);
+        seg.push([(pts[0][0] - pts[pts.length - 1][0]) * s, (pts[0][1] - pts[pts.length - 1][1]) * s]);
+        doc.lines(seg, ox + pts[0][0] * s, oy + pts[0][1] * s, [1, 1], null, true);
+    }
+    try { doc.fill('evenodd'); } catch { doc.fill(); }
+}
+
 /** Symbole du radiophare (unités POINT, centré en x,y). */
 function _rnSymbol(doc, kind, x, y) {
     doc.setDrawColor(...RN_BLUE);
@@ -256,6 +270,10 @@ function _rnSymbol(doc, kind, x, y) {
         doc.setLineWidth(0.5);
         doc.rect(x - 3.1, y - 2.4, 6.2, 4.8, 'S');
         doc.circle(x, y, 0.5, 'F');
+    } else if (kind === 'tacan') {
+        // copie conforme validée (TACAN_2) : mêmes sommets que l écran
+        const s = 9.5 / 100;
+        _pdfEvenoddPath(doc, TACAN_PDF_PATH, x - 50 * s, y - 50 * s, s);
     } else if (kind === 'ndb') {
         doc.setLineWidth(0.32);
         doc.circle(x, y, 1.55, 'S');

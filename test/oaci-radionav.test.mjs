@@ -43,9 +43,18 @@ test('radionavSymbolSvg : DME ENR = rectangle + point central', () => {
     ok(svg.includes('fill="' + RADIONAV_BLUE + '"'), 'point central');
 });
 
-test('radionavSymbolSvg : kind inconnu → erreur (TACAN/VOR-TACAN en réserve)', () => {
-    throws(() => radionavSymbolSvg('tacan'), /kind inconnu/);
-    ok(!RADIONAV_KINDS.includes('tacan'), 'TACAN hors kinds rendus');
+test('radionavSymbolSvg : TACAN = copie conforme (chemin evenodd TACAN_2 validé)', () => {
+    const svg = radionavSymbolSvg('tacan');
+    ok(svg.includes('fill-rule="evenodd"'), 'chemin evenodd');
+    equal((svg.match(/<path/g) || []).length, 1, 'chemin unique');
+});
+test('radionavSymbolSvg : kind inconnu → erreur (VOR-TACAN en réserve)', () => {
+    throws(() => radionavSymbolSvg('vor-tacan'), /kind inconnu/);
+    ok(!RADIONAV_KINDS.includes('vor-tacan'), 'VOR-TACAN hors kinds rendus');
+});
+test('radionavFreqText : TACAN entre parenthèses (légende « (D) LDV (115.15) »)', () => {
+    equal(radionavFreqText(115.15, 'tacan'), '(115.15)');
+    equal(radionavFreqText(116.2, 'tacan'), '(116.2)');
 });
 
 test('radionavMapSize : tailles relatives du document, NDB −30 %', () => {

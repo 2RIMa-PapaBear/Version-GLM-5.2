@@ -29,8 +29,9 @@ const XML = `<?xml version="1.0" encoding="UTF-8"?>
 test('parseSiaNavaids : LF + frontaliers radio, distinction VOR-DME/DME, TACAN listé, Ident vide écarté', () => {
     const sia = parseSiaNavaids(XML);
     equal(sia.effDate, '2026-09-03');
-    equal(sia.navaids.length, 5, 'BMC, MVN, SEUL, BSN [LF] + PAS [LS] (TACAN listé, LFDD sans Ident écarté)');
-    equal(sia.tacans.length, 1, 'TACAN listé à part');
+    equal(sia.navaids.length, 6, 'BMC, MVN, SEUL, BSN, TAC [LF] + PAS [LS] (LFDD sans Ident écarté)');
+    equal(sia.tacans.length, 1, 'TACAN listé pour la dédup openAIP');
+    equal(sia.navaids.find((n) => n.ident === 'TAC')?.k, 'tacan', 'TACAN rendu (validation pilote 29/09)');
     const bmc = sia.navaids.find((n) => n.ident === 'BMC');
     equal(bmc.k, 'vor-dme', 'VOR-DME conservé (décision pilote 27/09)');
     equal(bmc.f, 113.75);
@@ -86,11 +87,13 @@ test('mergeIntoRadioPoints : rapprochement ident+proximité, anti-collision mond
         ],
     };
     const st = mergeIntoRadioPoints(rp, sia, { effDate: '2026-09-03' });
-    equal(st.total, 5, '4 [LF] + le frontalier [LS]');
-    equal(st.added, 3, 'SEUL, MVN et BSN absents d openAIP → ajoutés');
-    equal(rp.counts.navaidsSia, 5);
-    equal(st.droppedTacans, 1, 'jumeau openAIP du TACAN retiré (règle SIA prioritaire)');
-    ok(!rp.navaids.some((n) => n[1] === 'TAC'), 'plus de « VOR » fantôme TAC');
+    equal(st.total, 6, '5 [LF] (dont TACAN) + le frontalier [LS]');
+    equal(st.added, 4, 'SEUL, MVN, BSN et TAC (jumeau retiré) ajoutés');
+    equal(rp.counts.navaidsSia, 6);
+    // Le jumeau openAIP du TACAN est REMPLACÉ par l officiel SIA (kind tacan)
+    const tac = rp.navaids.find((n) => n[1] === 'TAC');
+    equal(tac[0], 'tacan', 'TACAN officiel SIA (validation pilote 29/09)');
+    equal(rp.navaids.filter((n) => n[1] === 'TAC').length, 1, 'un seul TAC (jumeau remplacé)');
     // « Pour la France uniquement la base SIA » (pilote 27/09)
     equal(st.droppedOpenAipFr, 1, 'AMU non publié SIA retiré du territoire');
     ok(!rp.navaids.some((n) => n[1] === 'AMU'), 'plus de AMU fantôme');
