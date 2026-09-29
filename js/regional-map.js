@@ -35,6 +35,18 @@ let _neighborRunwayLayer = null;   // pistes des VOISINS (même représentation 
 let _currentRunwayPts = null;      // extrémités géo des pistes de l'actif (répulsion d'étiquette).
 const RUNWAY_MIN_ZOOM = 11;
 
+// ═══ DEBUG LOCAL — badge niveau de zoom (jamais commité) ═══
+function _mountDebugZoomBadge() {
+    if (!_map) return;
+    const el = document.createElement('div');
+    el.className = 'debug-zoom-badge';
+    el.textContent = 'z' + _map.getZoom();
+    _map.getContainer().appendChild(el);
+    const maj = () => { el.textContent = 'z' + _map.getZoom(); };
+    _map.on('zoom zoomend', maj);
+}
+// ═══ FIN DEBUG LOCAL ═══
+
 // Étiquettes aérodromes « carte OACI » (légende SCAN-OACI 1/500 000) :
 // code OACI / nom / altitude ft + fréquence Tour-AFIS-A/A, à droite du
 // symbole. Visibles à partir de OACI_LABEL_MIN_ZOOM — en dessous la densité
@@ -252,6 +264,7 @@ function _ensureMapReady(lat, lon) {
             // Étiquettes OACI : affichage conditionné au niveau de zoom
             // (classe CSS sur le conteneur — pas de re-création de marqueurs).
             _map.on('zoomend', _updateOaciLabelVisibility);
+            _map.on('zoomend', _updateAirportSymByZoom);
             _updateOaciLabelVisibility();
 
             // Boutons des popups METAR : le contenu du popup est recréé à chaque
@@ -1361,6 +1374,42 @@ function _decodeMetarForPopup(raw) {
 
 // Pose (ou remplace) l'icône SVG OACI d'un aérodrome sur son marqueur.
 // Cap : seuils SIA (cap vrai) d'abord, sinon cap magnétique de la base.
+// Marqueurs porteurs d'un symbole OACI (bascule olive/badge par zoom).
+const _oaciSymMarkers = new Set();
+
+/** Représentation des AÉRODROMES par zoom (cotes pilote 29/09) :
+ *  z6-  → OLVES météo pleines (même représentation que les terrains hors
+ *         France), badge masqué ;
+ *  z7   → badges OACI à −40 % (18 px) ;
+ *  z8   → badges OACI à −30 % (21 px) ;
+ *  z9+  → taille de référence 30 px, inchangée. */
+function _updateAirportSymByZoom() {
+    if (!_map) return;
+    const z = _map.getZoom();
+    const sizeCls = z <= 7 ? 's7' : (z === 8 ? 's8' : '');
+    const olives = z <= 6;
+    document.querySelectorAll('.oaci-sym').forEach((el) => {
+        el.classList.toggle('s7', sizeCls === 's7');
+        el.classList.toggle('s8', sizeCls === 's8');
+        el.style.display = olives ? 'none' : '';
+    });
+    for (const m of _oaciSymMarkers) {
+        if (!m?.oaciIcon) continue;
+        if (olives) {
+            // olive météo : pastille pleine identique aux terrains non-OACI
+            m.oaciIcon.setOpacity(0);
+            m.setStyle({ fill: true, fillOpacity: 0.85, radius: 8, weight: 1.5, color: '#fff', fillColor: m.oaciColor || '#94A3B8' });
+        } else {
+            // anneau météo fin autour du badge — SA TAILLE SUIT le badge
+            // (pilote 29/09) : 17 px pour 30 px de badge, proportionnel.
+            const r = sizeCls === 's7' ? 10.2 : (sizeCls === 's8' ? 11.9 : 17);
+            const wgt = sizeCls === 's7' ? 2 : (sizeCls === 's8' ? 2.5 : 3.5);
+            m.oaciIcon.setOpacity(1);
+            m.setStyle({ fill: false, radius: r, weight: wgt, color: m.oaciColor || '#FBBF24' });
+        }
+    }
+}
+
 function _applyAirportSymbol(marker, lat, lon, icao, sym) {
     if (!_map) return;
     let bearing = oaciRunwayBearing(icao);
@@ -1376,6 +1425,7 @@ function _applyAirportSymbol(marker, lat, lon, icao, sym) {
         iconSize: [OACI_SYMBOL_SIZE, OACI_SYMBOL_SIZE],
         iconAnchor: [OACI_SYMBOL_SIZE / 2, OACI_SYMBOL_SIZE / 2],
     });
+    _oaciSymMarkers.add(marker);
     if (marker.oaciIcon) {
         marker.oaciIcon.setIcon(icon);
     } else {
@@ -1385,6 +1435,7 @@ function _applyAirportSymbol(marker, lat, lon, icao, sym) {
             icon,
         }).addTo(_map);
     }
+    _updateAirportSymByZoom();
 }
 
 // RÉSERVE (abandonné — retour pilote 28/09 : étrangers de nouveau en
@@ -1571,6 +1622,7 @@ function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null
     }).addTo(_map);
 
     if (sym) {
+        marker.oaciColor = color;
         _applyAirportSymbol(marker, lat, lon, icao, sym);
     }
     // Marqueur DOM léger superposé au cercle SVG : capte proprement les
@@ -1592,14 +1644,31 @@ function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null
     // extrémités servent aussi à la répulsion de l'étiquette.
     if (!isCurrent && _neighborRunwayLayer) {
         const apt = getAirportByICAO(icao);
-        const rws = apt ? _computeRunwaysFromCentroid(lat, lon, apt) : [];
-        marker.oaciRunwayPts = rws.flatMap(rw => [rw.endA, rw.endB]);
-        rws.forEach(rw => {
-            const rwColor = _runwayColorForSurface(
-                _resolveRunwaySurface(apt, rw.desigAtEndB) || _resolveRunwaySurface(apt, rw.desigAtEndA));
-            L.polyline([rw.endA, rw.endB], { color: rwColor, weight: 3, opacity: .85, lineCap: 'round' }).addTo(_neighborRunwayLayer);
-            L.polyline([rw.endA, rw.endB], { color: '#1E293B', weight: 1.5, opacity: .95, lineCap: 'round', dashArray: '8,6' }).addTo(_neighborRunwayLayer);
-        });
+        // DISSOCIÉ DU SYMBOLE OACI (pilote 29/09 : « le badge de piste ne
+        // doit pas servir de repère ») : axes aux SEUILS RÉELS (SIA puis
+        // CSV monde — même source que le terrain actif), posés sur les
+        // vraies pistes du fond ; repli approximation centroïde seulement
+        // sans données. Asynchrone : tracé au chargement des seuils (les
+        // voisins n'apparaissent qu'à z≥11, hors flash).
+        (async () => {
+            let rws = [];
+            try {
+                const thr = await getRunwayThresholds(icao);
+                rws = thr
+                    .filter(rw => isFinite(rw.lat) && isFinite(rw.lon) && isFinite(rw.lat2) && isFinite(rw.lon2))
+                    .map(rw => ({ endA: [rw.lat, rw.lon], endB: [rw.lat2, rw.lon2], desigAtEndA: rw.desig, desigAtEndB: rw.desig2 }));
+            } catch { /* seuils indisponibles */ }
+            if (!rws.length) rws = apt ? _computeRunwaysFromCentroid(lat, lon, apt) : [];
+            if (!rws.length || !_neighborRunwayLayer) return;
+            marker.oaciRunwayPts = rws.flatMap(rw => [rw.endA, rw.endB]);
+            rws.forEach(rw => {
+                const rwColor = _runwayColorForSurface(
+                    _resolveRunwaySurface(apt, rw.desigAtEndB) || _resolveRunwaySurface(apt, rw.desigAtEndA));
+                L.polyline([rw.endA, rw.endB], { color: rwColor, weight: 3, opacity: .85, lineCap: 'round' }).addTo(_neighborRunwayLayer);
+                L.polyline([rw.endA, rw.endB], { color: '#1E293B', weight: 1.5, opacity: .95, lineCap: 'round', dashArray: '8,6' }).addTo(_neighborRunwayLayer);
+            });
+            _updateOaciLabelOffsets();
+        })();
     }
 
     const label = isCurrent
