@@ -1023,8 +1023,18 @@ body.mode-local #alternates-container { display: none !important; }
    Fullscreen du navigateur (celle-ci n'existe pas pour une carte sur
    iPhone/iPad Safari). Sortie : bouton (✕) ou Échap. */
 #regional-map-panel.map-fullscreen {
+    /* top/left/right/bottom EXPLICITES + width/height : « inset » seul est
+     * ignoré par Safari iOS < 14.5 — sur téléphone le panneau perdait sa
+     * géométrie et la barre d'outils + le paquet GPS disparaissaient
+     * (retour pilote 29/09). dvh quand disponible, vh sinon. */
     position: fixed;
-    inset: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
     z-index: 3000;
     margin: 0;
     border-radius: 0;
@@ -1039,8 +1049,13 @@ body.mode-local #alternates-container { display: none !important; }
     flex: 1;
     min-height: 0;
     display: flex;
+    flex-direction: column;   /* explicite : certains moteurs perdent la valeur de base */
     padding: 8px 10px 10px;
 }
+/* La barre d'outils ne rétrécit JAMAIS en plein cadre (iOS flex) et le
+ * paquet GPS (suivi/centrage/nord/cadrer/réduire) reste au-dessus de tout. */
+#regional-map-panel.map-fullscreen .map-layers-bar { flex: 0 0 auto; }
+#regional-map-panel.map-fullscreen .gps-map-cluster { z-index: 3500; }
 #regional-map-panel.map-fullscreen .regional-map {
     flex: 1;
     height: auto;
