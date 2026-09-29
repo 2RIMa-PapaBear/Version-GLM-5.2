@@ -331,6 +331,9 @@ canvas { background-color: transparent; display: block; transition: opacity 0.3s
 .legend-bar { display: flex; justify-content: center; flex-wrap: wrap; gap: 15px; padding: 12px; font-size: 0.85rem; background: var(--panel-bg); border-top: 1px solid var(--border-color); }
 .legend-item { display: flex; align-items: center; gap: 8px; color: var(--text-color); }
 .aero-legend-bar { display: flex; justify-content: center; padding: 10px; font-size: 0.9rem; font-weight: 500; color: var(--text-muted); background-color: var(--inner-bg); border-bottom: 1px solid var(--border-color); margin-bottom: -15px; border-radius: 8px 8px 0 0; }
+/* Libellé nuit aéronautique sur UNE ligne (pilote 29/09) — la définition
+ * SERA.2010 clarifiée est longue : police réduite + sans retour. */
+.aero-legend-bar #lbl-aero-hours { font-size: 12px; white-space: nowrap; }
 .tag-cloud { font-family: 'DM Mono', monospace; font-weight:500; background-color: rgba(74, 222, 128, 0.12); color: #4ADE80; padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(74, 222, 128, 0.25); font-size: 12px;}
 .tag-ceil { background-color: rgba(248, 113, 113, 0.12); color: #F87171; border: 1px solid rgba(248, 113, 113, 0.25); }
 
@@ -3378,7 +3381,8 @@ html.theme-light .data-age-badge.age-old   { color: #B91C1C; background: rgba(23
 
 /* Symbole OACI « piste en dur » dessiné en SVG (oaci-symbols.js) :
  * 30×30, la piste pivote à l'intérieur, cardinaux fixes. */
-.leaflet-container .oaci-sym svg { display: block; width: 30px; height: 30px; margin: auto; }
+.leaflet-container .oaci-sym { display: flex; align-items: center; justify-content: center; }
+.leaflet-container .oaci-sym svg { display: block; width: 30px; height: 30px; }
 /* Tailles par zoom (cotes pilote 29/09) : z7 = -40 %, z8 = -30 %, z9+ = 30 px.
  * Le wrapper reste 30×30 centré sur le point : margin:auto recentre le SVG. */
 .leaflet-container .oaci-sym.s7 svg { width: 18px; height: 18px; }

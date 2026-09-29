@@ -746,6 +746,7 @@ export function setLanguage(l) {
         'lbl-alternates': tr.alternatesTitle, 'lbl-regional-map': tr.regionalMapTitle,
         'lbl-route-from': tr.routeFrom, 'lbl-route-to': tr.routeTo,
         'lbl-no-metar': tr.mapNoMetar, 'lbl-current-apt': tr.mapCurrentApt,
+        'lbl-cat-vmc': tr.mapCatVmc, 'lbl-cat-lim': tr.mapCatLim, 'lbl-cat-imc': tr.mapCatImc,
         'lbl-dep-btn': tr.depBtn, 'lbl-dest-btn': tr.destBtn,
     };
     Object.keys(dict).forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = dict[id]; });
