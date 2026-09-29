@@ -37,7 +37,7 @@ import fs from 'node:fs';
 export function parseSiaNavaids(xml) {
     const effDate = (xml.match(/effDate="(\d{4}-\d{2}-\d{2})"/) || [])[1] || 'inconnue';
     const each = _each(xml);
-    const NAV_KIND = { VOR: 'vor', 'VOR-DME': 'vor-dme', VORTAC: 'vor-dme', NDB: 'ndb', 'DME-ATT': 'dme', TACAN: 'tacan' };
+    const NAV_KIND = { VOR: 'vor', 'VOR-DME': 'vor-dme', VORTAC: 'vor-tacan', NDB: 'ndb', 'DME-ATT': 'dme', TACAN: 'tacan' };
     // RadioNav TOUS territoires : l'export SIA publie aussi les moyens
     // FRONTALIERS des pays voisins ([LS] Suisse, [EB] Belgique, [LI] Italie,
     // [ED] Allemagne…) qui figurent sur les cartes françaises — leur nom est

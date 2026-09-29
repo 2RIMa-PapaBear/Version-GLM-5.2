@@ -39,7 +39,7 @@ const HDR_H = 30;        // bande titre au-dessus de la carte
 const LEG_H = 15;        // bande légende sous la carte
 const TILE = 256;        // tuile Web Mercator
 
-import { radionavFreqText, TACAN_PDF_PATH } from './oaci-radionav.js';
+import { radionavFreqText, TACAN_PDF_PATH, VORTACAN_PDF_PATH } from './oaci-radionav.js';
 import { oaciSymbolDrawPdf } from './oaci-symbols.js';
 
 const INK = [17, 24, 39];
@@ -274,6 +274,9 @@ function _rnSymbol(doc, kind, x, y) {
         // copie conforme validée (TACAN_2) : mêmes sommets que l écran
         const s = 9.5 / 100;
         _pdfEvenoddPath(doc, TACAN_PDF_PATH, x - 50 * s, y - 50 * s, s);
+    } else if (kind === 'vor-tacan') {
+        const s = 9.5 / 100;
+        _pdfEvenoddPath(doc, VORTACAN_PDF_PATH, x - 50 * s, y - 50 * s, s);
     } else if (kind === 'ndb') {
         doc.setLineWidth(0.32);
         doc.circle(x, y, 1.55, 'S');

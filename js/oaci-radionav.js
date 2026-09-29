@@ -30,13 +30,13 @@
 export const RADIONAV_BLUE = '#0040A0';
 
 /** Kinds rendus en symboles OACI (TACAN/VOR-TACAN en réserve). */
-export const RADIONAV_KINDS = ['vor', 'vor-dme', 'ndb', 'dme', 'tacan'];
-export const RADIONAV_KIND_LABEL = { vor: 'VOR', 'vor-dme': 'VOR-DME', ndb: 'NDB', dme: 'DME', tacan: 'TACAN' };
+export const RADIONAV_KINDS = ['vor', 'vor-dme', 'ndb', 'dme', 'tacan', 'vor-tacan'];
+export const RADIONAV_KIND_LABEL = { vor: 'VOR', 'vor-dme': 'VOR-DME', ndb: 'NDB', dme: 'DME', tacan: 'TACAN', 'vor-tacan': 'VOR-TACAN' };
 
 /** Taille du DESSIN en px document (mesurée sur la légende) + échelle
  *  carte (NDB réduit de 30 % — retour pilote 27/09). */
-export const RADIONAV_DOC_SIZE = { vor: [43, 39], 'vor-dme': [50, 38], ndb: [78, 78], dme: [52, 39], tacan: [58, 55] };
-const MAP_SCALE = { vor: 0.55, 'vor-dme': 0.55, ndb: 0.385, dme: 0.55, tacan: 0.55 };
+export const RADIONAV_DOC_SIZE = { vor: [43, 39], 'vor-dme': [50, 38], ndb: [78, 78], dme: [52, 39], tacan: [58, 55], 'vor-tacan': [58, 55] };
+const MAP_SCALE = { vor: 0.55, 'vor-dme': 0.55, ndb: 0.385, dme: 0.55, tacan: 0.55, 'vor-tacan': 0.55 };
 
 /** Taille du symbole sur la carte (px) — ancre Leaflet au centre. */
 export function radionavMapSize(kind) {
@@ -98,7 +98,17 @@ function _svgTacan() {
  *  (flight-map-pdf.js — remplissage evenodd). */
 export const TACAN_PDF_PATH = [[[18.0,0.0],[0.0,31.1],[14.8,42.6],[31.1,68.9],[31.1,83.6],[68.9,83.6],[68.9,67.2],[86.9,37.7],[98.4,29.5],[78.7,0.0],[68.9,6.6],[31.1,6.6]],[[21.3,8.2],[27.9,11.5],[70.5,11.5],[77.0,8.2],[90.2,27.9],[82.0,34.4],[62.3,67.2],[62.3,77.0],[60.7,78.7],[37.7,78.7],[36.1,77.0],[36.1,65.6],[16.4,34.4],[8.2,29.5]],[[49.2,32.8],[47.5,34.4],[45.9,34.4],[44.3,36.1],[44.3,42.6],[47.5,45.9],[52.5,45.9],[55.7,42.6],[55.7,36.1],[54.1,34.4],[52.5,34.4],[50.8,32.8]]];
 
-const _SYMBOLS = { vor: _svgVor, 'vor-dme': _svgVorDme, ndb: _svgNdb, dme: _svgDme, tacan: _svgTacan };
+/* VOR-TACAN — SVG pilote 29/09 RETRACÉ NET (rendu canvas + findContours,
+   33 sommets, escaliers lissés — validé planche). */
+const VORTACAN_D = 'M 50.6,33.7 L 49.9,35.1 L 48.2,36.1 L 48.2,38.5 L 46.6,39.4 L 46.6,41.3 L 48.0,42.0 L 50.6,45.3 L 54.1,45.3 L 54.8,43.9 L 58.1,41.3 L 58.1,37.8 L 56.7,37.0 L 54.1,33.7 Z M 18.5,0.0 L 0.0,33.2 L 12.9,40.6 L 30.5,67.9 L 30.5,85.0 L 69.4,85.0 L 71.0,66.3 L 85.4,42.2 L 99.9,33.2 L 87.0,7.2 L 77.9,0.0 L 66.8,8.3 L 34.1,8.4 Z M 34.9,13.2 L 65.4,13.2 L 80.6,38.0 L 64.1,65.6 L 35.7,65.9 L 19.6,39.0 Z';
+function _svgVorTacan() {
+    return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:100%"><path fill="${RADIONAV_BLUE}" fill-rule="evenodd" d="${VORTACAN_D}"/></svg>`;
+}
+
+/** Sommets des sous-chemins VOR-TACAN (boîte 100) pour jsPDF. */
+export const VORTACAN_PDF_PATH = [[[50.6,33.7],[49.9,35.1],[48.2,36.1],[48.2,38.5],[46.6,39.4],[46.6,41.3],[48.0,42.0],[50.6,45.3],[54.1,45.3],[54.8,43.9],[58.1,41.3],[58.1,37.8],[56.7,37.0],[54.1,33.7]],[[18.5,0.0],[0.0,33.2],[12.9,40.6],[30.5,67.9],[30.5,85.0],[69.4,85.0],[71.0,66.3],[85.4,42.2],[99.9,33.2],[87.0,7.2],[77.9,0.0],[66.8,8.3],[34.1,8.4]],[[34.9,13.2],[65.4,13.2],[80.6,38.0],[64.1,65.6],[35.7,65.9],[19.6,39.0]]];
+
+const _SYMBOLS = { vor: _svgVor, 'vor-dme': _svgVorDme, ndb: _svgNdb, dme: _svgDme, tacan: _svgTacan, 'vor-tacan': _svgVorTacan };
 
 /** SVG du symbole (remplit son conteneur — taille pilotée par le CSS). */
 export function radionavSymbolSvg(kind) {
@@ -128,7 +138,7 @@ export function radionavFreqText(freq, kind) {
  */
 export function radionavAnnotationHtml(kind, it, opts = {}) {
     const esc = opts.esc || ((s) => String(s));
-    const dPrefix = (kind === 'vor-dme' || kind === 'dme') ? '(D) ' : '';
+    const dPrefix = (kind === 'vor-dme' || kind === 'dme' || kind === 'vor-tacan') ? '(D) ' : '';
     const freq = radionavFreqText(it.freq, kind);
     const box = `${dPrefix}${esc(it.ident)}${freq ? ' ' + freq : ''}`;
     const name = it.officialName ? `<span class="rn-name">${esc(it.officialName)}</span>` : '';

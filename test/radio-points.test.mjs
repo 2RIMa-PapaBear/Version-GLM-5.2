@@ -105,12 +105,12 @@ test('filterBbox : cadre simple et antiméridien (est < ouest)', () => {
 });
 
 test('visibleKinds : radiophares OACI et points VFR AU MÊME niveau de zoom ; obstacles plus locaux', () => {
-    const off = { vor: false, 'vor-dme': false, ndb: false, dme: false, tacan: false, vrp: false, obstacle: false };
-    const on3 = { vor: true, 'vor-dme': true, ndb: true, dme: true, tacan: true, vrp: true, obstacle: false };
+    const off = { vor: false, 'vor-dme': false, ndb: false, dme: false, tacan: false, 'vor-tacan': false, vrp: false, obstacle: false };
+    const on3 = { vor: true, 'vor-dme': true, ndb: true, dme: true, tacan: true, 'vor-tacan': true, vrp: true, obstacle: false };
     deepStrictEqual(visibleKinds(5), off, 'z5 : rien');
     deepStrictEqual(visibleKinds(6), on3, 'z6 : les six couches radio, pas les obstacles');
     deepStrictEqual(visibleKinds(LAYER_MIN_ZOOM.obstacle), { ...on3, obstacle: true }, 'z seuil obstacles : tout');
-    const zs = [LAYER_MIN_ZOOM.vor, LAYER_MIN_ZOOM['vor-dme'], LAYER_MIN_ZOOM.ndb, LAYER_MIN_ZOOM.dme, LAYER_MIN_ZOOM.tacan, LAYER_MIN_ZOOM.vrp];
+    const zs = [LAYER_MIN_ZOOM.vor, LAYER_MIN_ZOOM['vor-dme'], LAYER_MIN_ZOOM.ndb, LAYER_MIN_ZOOM.dme, LAYER_MIN_ZOOM.tacan, LAYER_MIN_ZOOM['vor-tacan'], LAYER_MIN_ZOOM.vrp];
     ok(new Set(zs).size === 1, `seuils identiques (${zs.join('/')})`);
     ok(LAYER_MIN_ZOOM.obstacle > zs[0], 'obstacles = couche plus locale (8 900 points FR)');
 });

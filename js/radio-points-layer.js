@@ -30,7 +30,7 @@ import {
 // Présentation OACI 27/09 (planche validée) : les 4 kinds radio au bleu
 // OACI uniforme — la distinction se lit sur le SYMBOLE, plus la couleur.
 const COLORS = {
-    vor: RADIONAV_BLUE, 'vor-dme': RADIONAV_BLUE, ndb: RADIONAV_BLUE, dme: RADIONAV_BLUE, tacan: RADIONAV_BLUE,
+    vor: RADIONAV_BLUE, 'vor-dme': RADIONAV_BLUE, ndb: RADIONAV_BLUE, dme: RADIONAV_BLUE, tacan: RADIONAV_BLUE, 'vor-tacan': RADIONAV_BLUE,
     vrp: '#2563EB', obstacle: '#F87171',
 };
 
@@ -109,7 +109,7 @@ export function createRadioPointsController(map, deps = {}) {
     let data = null, loadPromise = null;
     let obstData = null, obstPromise = null;
     let layerGroup = null;
-    const enabled = { vor: false, 'vor-dme': false, ndb: false, dme: false, tacan: false, vrp: false, obstacle: false };
+    const enabled = { vor: false, 'vor-dme': false, ndb: false, dme: false, tacan: false, 'vor-tacan': false, vrp: false, obstacle: false };
     let refreshTimer = null;
     let menuEl = null;
 
@@ -376,6 +376,7 @@ export function createRadioPointsController(map, deps = {}) {
             + row('data-rp-kind="ndb"', 'NDB', COLORS.ndb)
             + row('data-rp-kind="dme"', fr ? 'DME ENR' : 'ENR DME', COLORS.dme)
             + row('data-rp-kind="tacan"', 'TACAN', COLORS.tacan)
+            + row('data-rp-kind="vor-tacan"', 'VOR-TACAN', COLORS['vor-tacan'])
             + row('data-rp-kind="vrp"', fr ? 'Points VFR' : 'VFR points', COLORS.vrp)
             + row('data-rp-kind="obstacle"', fr ? 'Obstacles' : 'Obstacles', COLORS.obstacle)
             // La source ne concerne que les POINTS RADIO (VOR/NDB/VRP/
@@ -394,7 +395,7 @@ export function createRadioPointsController(map, deps = {}) {
                 if (el) el.checked = groups[g];
             }
         }
-        for (const k of ['vor', 'vor-dme', 'ndb', 'dme', 'tacan', 'vrp', 'obstacle']) {
+        for (const k of ['vor', 'vor-dme', 'ndb', 'dme', 'tacan', 'vor-tacan', 'vrp', 'obstacle']) {
             const el = menuEl?.querySelector(`[data-rp-kind="${k}"]`);
             if (el) el.checked = enabled[k];
         }

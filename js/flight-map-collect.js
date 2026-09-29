@@ -253,7 +253,7 @@ export async function collectNavaids(bounds, route) {
     const parsed = parseRadioPoints(json);
     if (!parsed) return [];
     const all = [];
-    for (const k of ['vor', 'vor-dme', 'ndb', 'dme', 'tacan'])
+    for (const k of ['vor', 'vor-dme', 'ndb', 'dme', 'tacan', 'vor-tacan'])
         for (const it of parsed[k] || []) all.push({ kind: k, ident: it.ident, lat: it.lat, lon: it.lon, freq: it.freq, name: it.officialName || null });
     const inBox = all.filter((n) => n.lat >= bounds.minLat && n.lat <= bounds.maxLat
         && n.lon >= bounds.minLon && n.lon <= bounds.maxLon);

@@ -1,0 +1,14 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>render</title></head><body>
+<canvas id="c" width="1232" height="1200"></canvas>
+<script>
+fetch('vortac.svg').then(r => r.text()).then(svg => {
+  const img = new Image();
+  img.onload = () => {
+    const ctx = document.getElementById('c').getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 1232, 1200);
+    ctx.drawImage(img, 0, 0, 1232, 1200);
+    window.__done = true;
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+});
+</script></body></html>
