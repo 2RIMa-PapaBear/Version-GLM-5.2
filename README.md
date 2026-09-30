@@ -276,6 +276,7 @@ npm run deploy:test -- --mirror      # supprime aussi les fichiers distants disp
 
 ## Journal des versions
 <!-- debut journal -->
+- **2026-09-30** — Rose des vents : nom du terrain en clair en tête de cadre — une ligne centrée, repli code/mémo (pilote 30/09)
 - **2026-09-27** — Lot P3 no3 + P4 tranche 1 (audit 27/09) — P3 : A9-v4 garde runwayBelongsToAirport à l'affichage (5e chemin, les 4 calculs étaient gardés) ;…
 - **2026-09-27** — Lot P3 audit 27/09 no2 : 6 correctifs — A6 CG pile sur une limite : pointInEnvelopeTolerant (±0,5 kg / ±1 mm) branchée sur le verdict…
 - **2026-09-27** — Lot P3 audit 27/09 no2 : 6 correctifs — A6 CG pile sur une limite : pointInEnvelopeTolerant (±0,5 kg / ±1 mm) branchée sur le verdict…
@@ -314,7 +315,7 @@ npm run deploy:test -- --mirror      # supprime aussi les fichiers distants disp
 
 
 <!-- fin journal -->
-<!-- docs:lastSha=1f037abad03d35d97ac72224411e3cf45ee88fd8 -->
+<!-- docs:lastSha=e2537c67bb0245a71dcb3fb05e646671fedd521c -->
 
 
 

@@ -5,7 +5,7 @@
 
 import { I18N, PALETTE, UNIFIED_RED, REGEX_BLOCKS_PATTERN, sunCacheGet, sunCacheSet } from './core.js';
 import { state } from './core.js';
-import { parseVisiToMeters, parseWindGroupToKt, getCeiling, getFlightCategory, getWeatherIcon, inferStartYear, traduireCode, findActiveValueAtHour, surfaceLabel, SOFT_SURFACES } from './core.js';
+import { parseVisiToMeters, parseWindGroupToKt, getCeiling, getFlightCategory, getWeatherIcon, inferStartYear, traduireCode, findActiveValueAtHour, surfaceLabel, SOFT_SURFACES, memoGet, escapeHtml } from './core.js';
 import { getDeclinationForIcao } from './magvar.js';
 import { themeTokens } from './night-mode.js';
 import { siaRunwayFor, siaSurfaceCode } from './sia-data.js';
@@ -723,9 +723,19 @@ export function renderWindCompass(containerId, windStr, runways = null, forcedId
     const isFr = state.lang === 'fr';
     const wind = parseWindString(windStr);
 
+    // Nom en clair du terrain représenté, en tête de cadre (une ligne,
+    // centrée — retour pilote 30/09). Même résolution que la barre d'infos
+    // (ui-module) : nom mémorisé au fil des recherches, sinon base
+    // d'aéroports, sinon le code brut. Rien si aucun terrain identifié.
+    const roseCode = state.requestedIcao || state.lastParsed?.code || null;
+    const memo = roseCode ? memoGet(roseCode) : null;
+    const memoName = (memo && memo !== 'PENDING' && memo.name && memo.name !== roseCode) ? memo.name : null;
+    const roseName = memoName || (apt && apt.name) || roseCode;
+    const nameHtml = roseName ? `<div title="${escapeHtml(roseName)}" style="max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;font-size:11px;font-weight:700;letter-spacing:0.4px;color:${T.muted};margin-bottom:2px;">${escapeHtml(roseName)}</div>` : '';
+
     if (!wind) {
         state.activeRunwayName = null;   // sans vent : plus de piste active publiée
-        host.innerHTML = `<div class="dash-title">${isFr ? 'Vent' : 'Wind'}</div><div style="flex:1;display:flex;align-items:center;justify-content:center;color:"+T.dim+";">—</div>`;
+        host.innerHTML = `${nameHtml}<div class="dash-title">${isFr ? 'Vent' : 'Wind'}</div><div style="flex:1;display:flex;align-items:center;justify-content:center;color:"+T.dim+";">—</div>`;
         return;
     }
     
@@ -903,6 +913,7 @@ export function renderWindCompass(containerId, windStr, runways = null, forcedId
 
     host.innerHTML = `
         <div style="display:flex;flex-direction:column;align-items:center;">
+            ${nameHtml}
             <svg viewBox="0 -15 260 295" style="width:100%;max-width:280px;overflow:visible;">
                 <circle cx="${CX}" cy="${CY}" r="${R_OUTER}" fill="none" stroke="${T.grid}" stroke-width="1.5"/>
                 ${ticksSvg}${cardsSvg}${runwaySvg}${arrowSvg}${varRangeSvg}
