@@ -276,6 +276,7 @@ npm run deploy:test -- --mirror      # supprime aussi les fichiers distants disp
 
 ## Journal des versions
 <!-- debut journal -->
+- **2026-09-30** — Fonds de carte IGN Géoportaille sans clé (Licence Ouverte 2.0) : Ortho + Plan dans le sélecteur (pilote 30/09)
 - **2026-09-30** — Carte : étiquettes des terrains militaires au rouge du pictogramme OACI — carte régionale + carte PDF du dossier (pilote 30/09)
 - **2026-09-30** — Rose des vents : nom du terrain en clair en tête de cadre — une ligne centrée, repli code/mémo (pilote 30/09)
 - **2026-09-27** — Lot P3 no3 + P4 tranche 1 (audit 27/09) — P3 : A9-v4 garde runwayBelongsToAirport à l'affichage (5e chemin, les 4 calculs étaient gardés) ;…
@@ -316,7 +317,7 @@ npm run deploy:test -- --mirror      # supprime aussi les fichiers distants disp
 
 
 <!-- fin journal -->
-<!-- docs:lastSha=155f2d990f89bcaa0f2db579d3e54e6ed8332cd8 -->
+<!-- docs:lastSha=703fa6d0bcc3cec28e7c00792fc4af15882de529 -->
 
 
 

@@ -195,6 +195,15 @@ const BASEMAPS = {
         attribution: 'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics',
         maxZoom: 19, maxNativeZoom: 19,
     }),
+    // IGN Géoportaille (pilote 30/09) : Licence Ouverte 2.0 (Etalab), SANS
+    // clé — tuiles WMTS testées jusqu'à z19. Couverture France seule (DOM
+    // compris) : Esri satellite reste le fond pour l'étranger.
+    'ign-ortho': () => L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/jpeg', {
+        attribution: 'IGN — Géoportaille — Licence Ouverte 2.0', maxZoom: 19, maxNativeZoom: 19,
+    }),
+    'ign-plan': () => L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png', {
+        attribution: 'IGN — Géoportaille — Licence Ouverte 2.0', maxZoom: 19, maxNativeZoom: 19,
+    }),
     osm: () => L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors', maxZoom: 19,
     }),
@@ -589,6 +598,8 @@ function _mountBasemapSwitcher(bar) {
     const currentBase = (savedBase && BASEMAPS[savedBase]) ? savedBase : 'satellite';
     const options = [
         ['satellite', 'Satellite'],
+        ['ign-ortho', isFr ? 'IGN Ortho' : 'IGN Aerial'],
+        ['ign-plan',  isFr ? 'IGN Plan'  : 'IGN Plan'],
         ['osm',       isFr ? 'Plan'   : 'Map'],
         ['terrain',   isFr ? 'Relief' : 'Terrain'],
     ];
