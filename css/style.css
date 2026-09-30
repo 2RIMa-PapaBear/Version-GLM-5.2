@@ -2282,6 +2282,15 @@ body.map-overlay-open { overflow: hidden; }
      * 30/09 : la fenêtre pleine largeur cachait les icônes hors écran) :
      * tout débordement horizontal est rogné au viewport. */
     html, body { max-width: 100vw; overflow-x: hidden; }
+    /* Devis carburant du cadre Centrage (retour pilote 30/09) : libellé et
+     * valeur empilés sur DEUX LIGNES par cellule — côte à côte en insécable,
+     * ils chevauchaient les colonnes voisines sur téléphone. */
+    .wb-duration-group .wb-fuel-cell {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+        padding: 5px 8px;
+    }
     .map-layers-bar {
         gap: 6px;
         padding: 6px;
