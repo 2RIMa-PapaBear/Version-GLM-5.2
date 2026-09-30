@@ -1,0 +1,123 @@
+# ============================================================================
+# AIRAC QUOTIDIEN — fréquences eAIP SIA + SUP série A + garde-fous.
+#
+#   QUOTIDIEN, 06:10 UTC — les extractions courtes qui doivent suivre le
+#   cycle AIRAC AU JOUR DE SA BASCULE (retour pilote 30/09 : « automatise
+#   ça » — l'hebdomadaire laissait freq-sia au cycle précédent du jeudi au
+#   lundi suivant, bandeau AIRAC rouge 4 jours).
+#   - fetch-freq-sia.mjs sort IMMÉDIATEMENT (exit 0, zéro téléchargement)
+#     tant que l'édition en vigueur est déjà extraite : le run quotidien
+#     ne coûte rien hors bascule.
+#   - fetch-sup-sia.mjs : Suppléments AIP série A (courts, utiles chaque
+#     jour).
+#   - Puis commit + push si changement → le déploiement FTP s'enchaîne
+#     (needs/uses : un push au GITHUB_TOKEN n'amorce pas de workflow).
+#   - Garde-fous SÉPARÉS (sans needs sur le déploiement) : la base XML SIA
+#     et les obstacles doivent être régénérés après téléchargement manuel —
+#     ces jobs échouent (→ notification GitHub) le jour où ils prennent du
+#     retard sur le cycle en vigueur.
+# ============================================================================
+name: AIRAC eAIP (maj quotidienne)
+
+on:
+  schedule:
+    - cron: '10 6 * * *'   # quotidien, 06:10 UTC ≈ 08:10 Paris (été)
+  workflow_dispatch:
+
+concurrency:
+  group: update-airac-eaip
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 200
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: Version-2.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Fréquences officielles SIA (eAIP, à chaque nouvel AIRAC)
+        run: node scripts/fetch-freq-sia.mjs
+
+      - name: Sup AIP série A (SIA)
+        run: node scripts/fetch-sup-sia.mjs
+
+      - name: Commit + push (freq-sia + sup AIP)
+        run: |
+          git config user.name "airac-bot"
+          git config user.email "airac-bot@users.noreply.github.com"
+          git add data/freq-sia.json data/sup-sia.json
+          if git diff --cached --quiet; then
+            echo "Aucun changement freq-sia/sup — cycle déjà extrait."
+          else
+            git commit -m "AIRAC: fréquences eAIP + sup AIP ($(date -u +%F))"
+            git fetch origin Version-2.0
+            if ! git rebase origin/Version-2.0; then
+              git rebase --abort || true
+              git merge origin/Version-2.0 || true
+              # Conflits : les données du run sont les plus fraîches (le bot
+              # est l'écrivain exclusif de ces fichiers) — elles gagnent.
+              git diff --name-only --diff-filter=U | xargs -r git checkout --ours --
+              git add -A
+              git commit --no-edit || true
+            fi
+            ok=0
+            for i in 1 2 3; do
+              if git push origin Version-2.0; then ok=1; break; fi
+              echo "  … push rejeté (essai $i/3) — ré-intégration dans 20 s"
+              sleep 20
+              git fetch origin Version-2.0
+              git rebase origin/Version-2.0 || { git rebase --abort || true; break; }
+            done
+            [ "$ok" = "1" ] || { echo "::error::Push toujours rejeté — données NON publiées."; exit 1; }
+          fi
+
+  deploy:
+    needs: update
+    uses: ./.github/workflows/deploy-ftp.yml
+    secrets: inherit
+
+  # Garde-fou base XML SIA (terrains/pistes/espaces/services — régénérée
+  # après téléchargement MANUEL du XML dans « telechargement AIRAC/ »).
+  airac-sia-xml:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: Version-2.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Fraîcheur base XML SIA vs cycle AIRAC
+        run: node scripts/check-sia-airac.mjs
+
+  # Garde-fou obstacles SIA (export AIXM OM téléchargé MANUELLEMENT).
+  airac-obstacles:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: Version-2.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Fraîcheur obstacles SIA vs cycle AIRAC
+        run: node scripts/check-obstacles-airac.mjs
