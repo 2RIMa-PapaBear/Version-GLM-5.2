@@ -49,6 +49,7 @@ const LINE = [148, 163, 184];
 const ROUTE = [3, 105, 161];        // #0369A1 — la route domine les zones
 const AMBER = [180, 83, 9];         // #B45309 — waypoints / dégagement
 const PAPER = [253, 252, 248];      // fond blanc cassé (repli sans tuiles)
+const MIL_RED = [224, 48, 32];      // #E03020 = OACI_STYLES.militaire — étiquettes terrain militaire (pilote 30/09)
 
 /** Zone utile de la carte sur la page (exposée pour que les collecteurs
  *  calculent l'emprise au même ratio que la page réelle). */
@@ -367,7 +368,9 @@ function _oaciLabel3(doc, p, x, y) {
     doc.rect(bx, byBot - H, W, H, 'F');
     doc.setGState(new doc.GState({ opacity: 1 }));
     let ty = byBot - 1.2;
-    doc.setTextColor(...INK);
+    // Terrain MILITAIRE : police au rouge du pictogramme (jumeau exact de
+    // la classe .oaci-mil de la carte régionale — pilote 30/09).
+    doc.setTextColor(...(String(p.oaci?.icon || '').startsWith('militaire') ? MIL_RED : INK));
     for (let i = lines.length - 1; i >= 0; i--) {
         const l = lines[i];
         doc.setFont('helvetica', l.font);

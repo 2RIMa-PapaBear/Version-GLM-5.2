@@ -101,7 +101,7 @@ if (typeof document !== 'undefined') {
     loadFreqSources().then(() => {
         for (const [mk, info] of _oaciLabelMarkers) {
             const el = mk.getElement();
-            if (el) el.innerHTML = _oaciLabelHtml(info.icao, info.name);
+            if (el) el.innerHTML = _oaciLabelHtml(info.icao, info.name, null, info.sym);
         }
     }).catch(() => { /* étiquettes sans fréquence — repli silencieux */ });
 }
@@ -1484,21 +1484,24 @@ function _oaciFreqText(icao) {
 
 // Exportée pour les tests (underscore, convention _setSources) : `apt`
 // (enregistrement airports.json) optionnel — fourni par les tests purs,
-// chargé depuis la base par l'appelant navigateur.
-export function _oaciLabelHtml(icao, name, apt) {
+// chargé depuis la base par l'appelant navigateur. `sym` (classement
+// classifyOaciSymbol de l'appelant) optionnel : terrain MILITAIRE → la
+// police passe au ROUGE du pictogramme (demande pilote 30/09).
+export function _oaciLabelHtml(icao, name, apt, sym = null) {
     const rec = apt ?? getAirportByICAO(icao);
     const elev = Number.isFinite(rec?.elevation) ? String(Math.round(rec.elevation)) : '';
     const data = [elev, _oaciFreqText(icao)].filter(Boolean).join(' ');
+    const mil = String(sym?.icon || '').startsWith('militaire') ? ' oaci-mil' : '';
     // .oaci-in : enveloppe positionnelle (ancrage bas-gauche constant,
     // cf. CSS) — les 3 lignes restent centrées entre elles comme la carte.
-    return `<div class="oaci-in">`
+    return `<div class="oaci-in${mil}">`
         + `<div class="oaci-code">${escapeHtml(icao)}</div>`
         + (name ? `<div class="oaci-name">${escapeHtml(name)}</div>` : '')
         + (data ? `<div class="oaci-data">${data}</div>` : '')
         + `</div>`;
 }
 
-function _addOaciLabel(lat, lon, icao, name) {
+function _addOaciLabel(lat, lon, icao, name, sym = null) {
     if (!_map) return null;
     const marker = L.marker([lat, lon], {
         interactive: false,
@@ -1517,8 +1520,8 @@ function _addOaciLabel(lat, lon, icao, name) {
         }),
     }).addTo(_map);
     const el = marker.getElement();
-    if (el) el.innerHTML = _oaciLabelHtml(icao, name);
-    _oaciLabelMarkers.set(marker, { icao, name });
+    if (el) el.innerHTML = _oaciLabelHtml(icao, name, null, sym);
+    _oaciLabelMarkers.set(marker, { icao, name, sym });
     return marker;
 }
 
@@ -1635,7 +1638,7 @@ function _addAirportMarker(lat, lon, icao, name, cat, isCurrent, rawMetar = null
     }).addTo(_map);
 
     // Bloc identification « carte OACI » à droite de la pastille.
-    marker.oaciLabel = _addOaciLabel(lat, lon, icao, name);
+    marker.oaciLabel = _addOaciLabel(lat, lon, icao, name, sym);
 
     // Pistes des VOISINS (retour pilote 27/09 : même représentation que le
     // terrain actif) — tracé approximé LOCALEMENT depuis la base (caps/

@@ -3407,6 +3407,13 @@ html.theme-light .data-age-badge.age-old   { color: #B91C1C; background: rgba(23
     font-size: 10px;
     font-variant-numeric: tabular-nums;
 }
+/* Terrain MILITAIRE : la police de l'étiquette prend le ROUGE du
+ * pictogramme OACI (#E03020 = OACI_STYLES.militaire, oaci-symbols.js —
+ * demande pilote 30/09). Le halo blanc (hérité) conserve la lisibilité
+ * sur le fond satellite. */
+.leaflet-container .oaci-label .oaci-in.oaci-mil {
+    color: #E03020;
+}
 .leaflet-container.hide-oaci-labels .oaci-label { display: none; }
 
 /* Icône aérodrome « carte OACI » pivotée au cap réel de la piste

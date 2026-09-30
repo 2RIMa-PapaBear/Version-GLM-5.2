@@ -68,6 +68,27 @@ describe('Étiquettes OACI (légende SCAN-OACI 1/500 000)', () => {
         assert.ok(vide.includes('LFZZ') && vide.includes('Nulle Part'));
     });
 
+    test('terrain MILITAIRE : classe oaci-mil — police au rouge du pictogramme (pilote 30/09)', () => {
+        const html = _oaciLabelHtml('LFRH', 'Lorient Lann Bihoué', { elevation: 159 },
+            { icon: 'militaire-piste-dur', statut: 'MIL (saisie pilote)' });
+        assert.ok(html.includes('class="oaci-in oaci-mil"'));
+        assert.ok(html.includes('<div class="oaci-code">LFRH</div>'));   // contenu inchangé
+    });
+
+    test('terrain MILITAIRE en bande : oaci-mil aussi (revêtement herbe)', () => {
+        const html = _oaciLabelHtml('LFXX', 'Base Bande', { elevation: 300 },
+            { icon: 'militaire-bande', statut: 'MIL' });
+        assert.ok(html.includes('oaci-mil'));
+    });
+
+    test('terrain CIVIL ou MIXTE : pas de oaci-mil (police normale)', () => {
+        assert.ok(!_oaciLabelHtml('LFBI', 'Poitiers Biard', { elevation: 423 },
+            { icon: 'civil-piste-dur', statut: 'CAP' }).includes('oaci-mil'));
+        assert.ok(!_oaciLabelHtml('LFRZ', 'Quimper', { elevation: 293 },
+            { icon: 'mixte-piste-dur', statut: 'MIX' }).includes('oaci-mil'));
+        assert.ok(!_oaciLabelHtml('LFZZ', 'Nulle Part', {}).includes('oaci-mil'));   // sans symbole
+    });
+
     test('nom échappé (anti-XSS)', () => {
         const html = _oaciLabelHtml('LFBI', '<script>x</script>', { elevation: 423 });
         assert.ok(!html.includes('<script>'));
