@@ -276,6 +276,7 @@ npm run deploy:test -- --mirror      # supprime aussi les fichiers distants disp
 
 ## Journal des versions
 <!-- debut journal -->
+- **2026-09-30** — Fond de carte par défaut : IGN Plan (préférence mémorisée prioritaire) (pilote 30/09)
 - **2026-09-30** — Fonds de carte IGN Géoportaille sans clé (Licence Ouverte 2.0) : Ortho + Plan dans le sélecteur (pilote 30/09)
 - **2026-09-30** — Carte : étiquettes des terrains militaires au rouge du pictogramme OACI — carte régionale + carte PDF du dossier (pilote 30/09)
 - **2026-09-30** — Rose des vents : nom du terrain en clair en tête de cadre — une ligne centrée, repli code/mémo (pilote 30/09)
@@ -317,7 +318,7 @@ npm run deploy:test -- --mirror      # supprime aussi les fichiers distants disp
 
 
 <!-- fin journal -->
-<!-- docs:lastSha=703fa6d0bcc3cec28e7c00792fc4af15882de529 -->
+<!-- docs:lastSha=d204aeb0a3fc18826af19ed8d81dfb74f50eabe2 -->
 
 
 

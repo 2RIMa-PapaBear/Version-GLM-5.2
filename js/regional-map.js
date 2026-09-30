@@ -243,9 +243,10 @@ function _ensureMapReady(lat, lon) {
             registerMap(_map);
             window.__regionalMap = _map;
 
-            // Fond de carte : mémorisé dans localStorage, satellite par défaut.
+            // Fond de carte : mémorisé dans localStorage, IGN Plan par défaut
+            // (pilote 30/09 — Licence Ouverte, lisible pour le repérage VFR).
             const savedBase = localStorage.getItem('mt-basemap');
-            const baseKey = (savedBase && BASEMAPS[savedBase]) ? savedBase : 'satellite';
+            const baseKey = (savedBase && BASEMAPS[savedBase]) ? savedBase : 'ign-plan';
             _currentBaseLayer = BASEMAPS[baseKey]().addTo(_map);
             el.dataset.baseLayer = baseKey;
 
@@ -593,9 +594,10 @@ function _mountBasemapSwitcher(bar) {
     // bar=null → contrôle flottant BAS GAUCHE de la carte (retour pilote
     // 28/09) ; sinon groupe de la barre de couches.
     group.className = bar ? 'precip-control-group' : 'basemap-floating';
-    // Récupère le fond mémorisé pour pré-sélectionner le <select>.
+    // Récupère le fond mémorisé pour pré-sélectionner le <select>
+    // (même défaut que la carte : IGN Plan — pilote 30/09).
     const savedBase = localStorage.getItem('mt-basemap');
-    const currentBase = (savedBase && BASEMAPS[savedBase]) ? savedBase : 'satellite';
+    const currentBase = (savedBase && BASEMAPS[savedBase]) ? savedBase : 'ign-plan';
     const options = [
         ['satellite', 'Satellite'],
         ['ign-ortho', isFr ? 'IGN Ortho' : 'IGN Aerial'],
