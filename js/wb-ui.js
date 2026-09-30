@@ -360,7 +360,7 @@ function _recalc(body, ac, isFr) {
                     + cell(`${isFr ? 'Roulage' : 'Taxi'} ${req.groundMin} min`, `${req.groundL} L`)
                     + cell(`${isFr ? 'Réserve' : 'Reserve'} ${req.reserveMin} min`, `${req.reserveL} L`)
                     + (req.unusableL > 0 ? cell(isFr ? 'Inutilisable' : 'Unusable', `${req.unusableL} L`) : '')
-                    + cell(isFr ? 'Total requis' : 'Total req.', `${req.totalL} L`, true);
+                    + cell(isFr ? 'Total min. requis' : 'Total min. req.', `${req.totalL} L`, true);
             } else devisEl.innerHTML = '';
         }
     }
