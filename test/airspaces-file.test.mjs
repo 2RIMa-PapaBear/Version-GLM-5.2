@@ -2,7 +2,7 @@
 // expansion du format compact en forme openAIP.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { _expandFileItem, _decodeType, _rdpKey, _dropOpenAipDuplicates, _isZrt } from '../js/airspaces.js';
+import { _expandFileItem, _decodeType, _rdpKey, _dropOpenAipDuplicates, _isZrt, _siaOnlyFrance } from '../js/airspaces.js';
 
 test('_expandFileItem : polygone compact → forme openAIP complète', () => {
     const c = {
@@ -215,6 +215,37 @@ test('_expandFileItem : activité officielle des zones R/D/P transportée', () =
     assert.equal(it.activity, 'Parachutage');
     const sans = _expandFileItem({ i: 'x', n: 'TMA RENNES 2', ty: 5, ic: null, lo: null, up: null, f: null, g: null });
     assert.equal(sans.activity, null, 'champ absent → null');
+});
+
+// RÈGLE N°1 (pilote 30/09, répétée) : en France, UNIQUEMENT les
+// références SIA — une zone openAIP réglementée (R/D/P/parachutage)
+// dans la couverture SIA n'est jamais rendue, jumeau SIA ou pas
+// (LF-P81/P6.1/P6.2 Flamanville-Cherbourg : contours openAIP fautifs).
+// L'étranger et les familles non publiées par le SIA (ATZ…) restent.
+test('_siaOnlyFrance : openAIP réglementé en France écarté, même sans jumeau SIA', () => {
+    const zone = (lat, lon, type) => ({
+        type,
+        name: 'ZONE QUELCONQUE',
+        geometry: { type: 'Polygon', coordinates: [[[lon, lat], [lon + 0.1, lat], [lon + 0.1, lat + 0.1], [lon, lat]]] },
+    });
+    const frDanger = zone(47.0, 2.0, 2);      // DANGER openAIP en France → écarté
+    const etranger = zone(30.0, 5.0, 2);      // DANGER openAIP hors couverture → conservé
+    const atz = zone(47.0, 2.0, 13);          // ATZ en France (SIA n'en publie pas) → conservé
+    const sia = { ...zone(47.0, 2.0, 2), _sia: true };   // référence SIA → conservée
+    const out = _siaOnlyFrance([frDanger, etranger, atz, sia]);
+    assert.deepEqual(out, [etranger, atz, sia]);
+});
+
+test('_siaOnlyFrance : couverture SIA = [41,-63,52,12] — bord DOM compris', () => {
+    // Point-à-rayon : les zones DOM (ex. Guadeloupe ~16N) sont HORS
+    // couverture → openAIP conservé ; Corse 42N/9E dedans → écarté.
+    const zone = (lat, lon) => ({
+        type: 3, name: 'P X',
+        geometry: { type: 'Polygon', coordinates: [[[lon, lat], [lon + 0.1, lat], [lon + 0.1, lat + 0.1], [lon, lat]]] },
+    });
+    const out = _siaOnlyFrance([zone(16.2, -61.5), zone(42.0, 9.0)]);
+    assert.equal(out.length, 1);
+    assert.ok(Math.abs(out[0].geometry.coordinates[0][0][1] - 16.2) < 1e-9, 'seule la zone hors couverture survit');
 });
 
 test('_expandFileItem : code horaire SIA (hor) transporté', () => {

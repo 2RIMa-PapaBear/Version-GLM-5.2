@@ -87,19 +87,30 @@ export function normalizeZones(items, { notams = [], now = Date.now(), services 
         // court-long-court ; CTR pointillé long.
         const DARK = [26, 26, 26];
         const SIVC = [43, 93, 52];
+        // Familles à MARQUES INTÉRIEURES (pilote 30/09) : P = croix « XXX »,
+        // R/D/CBA frontalières (RESTRICTED/DANGER/A/B/C) = hachures « /// »
+        // — ligne fine PLEINE de la couleur de famille, plus de bande.
+        const MARKED = new Set(['PROHIBITED', 'RESTRICTED', 'DANGER', 'A', 'B', 'C']);
+        const SLASH = new Set(['RESTRICTED', 'DANGER', 'A', 'B', 'C']);
         const lineStyle = kind === 'SIV'
             ? { color: SIVC, w: 2.0, dash: [2, 4.5] }
             : (kind === 'RMZ' || kind === 'TMZ')
-                ? { color: DARK, w: 0.5, dash: [3, 3, 8, 3] }
+                ? { color: DARK, w: 1.0, dash: [3, 3, 8, 3] }   // ×2 (pilote 30/09)
                 : kind === 'CTR'
                     ? { color: DARK, w: 0.5, dash: [8, 3] }
-                    : { color: DARK, w: 0.5, dash: null };
-        const BANDED = { CTR: 5, TMA: 5, RESTRICTED: 5, DANGER: 5, PROHIBITED: 6 };
+                    : MARKED.has(kind)
+                        ? { color, w: 0.55, dash: null }
+                        : { color: DARK, w: 0.5, dash: null };
+        const BANDED = { CTR: 5, TMA: 5 };   // P/R/D : marques intérieures, pas de bande
         out.push({
             rings,
             color, fill: color,
             lineStyle,
             bandW: BANDED[kind] ?? 0,
+            // Zones P : croix ; R/D/CBA : hachures — tracées par
+            // flight-map-pdf.js (_crossSegments2D, comme l'écran).
+            crosses: kind === 'PROHIBITED',
+            slashes: SLASH.has(kind),
             weight: PRINT_WEIGHT[kind] ?? 0.7,
             // SIV : pointillé PERMANENT (représentation SIA) ; les autres
             // familles ne le deviennent que par la sémantique AZBA.

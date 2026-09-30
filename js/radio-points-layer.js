@@ -339,8 +339,14 @@ export function createRadioPointsController(map, deps = {}) {
                     deps.airspace.setGroup(group, e.target.checked);
                     // Cocher un groupe AFFICHE ses zones immédiatement — la
                     // visibilité de la couche passe à ON en interne (retour
-                    // pilote 27/09).
+                    // pilote 27/09). Symétrique : décocher le DERNIER groupe
+                    // éteint la couche — sinon le bouton « Espaces » restait
+                    // allumé (jaune) sans rien afficher sur la carte.
                     if (e.target.checked && !deps.airspace.visible) deps.airspace.toggle(true);
+                    else if (!e.target.checked && deps.airspace.visible) {
+                        const left = Object.values(deps.airspace.getGroups());
+                        if (left.length > 0 && left.every(v => !v)) deps.airspace.toggle(false);
+                    }
                 }
             }
             // Le menu RESTE OUVERT : sélectionner PLUSIEURS cases d'affilée

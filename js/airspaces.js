@@ -115,29 +115,42 @@ export const AIRSPACE_STYLE = {
               line: '#1A1A1A', lineW: 1.2, bandW: 10 },
     ATZ:    { color: '#FBBF24', fill: 'rgba(251,191,36,0.08)', weight: 1.2, label: 'ATZ' },
     ACRO:   { color: '#A855F7', fill: 'rgba(168,85,247,0.08)', weight: 1, label: 'Voltige' },
-    'A':    { color: '#DC2626', fill: 'rgba(220,38,38,0.10)',  weight: 1.5, label: 'A' },
-    'B':    { color: '#DC2626', fill: 'rgba(220,38,38,0.10)',  weight: 1.5, label: 'B' },
-    'C':    { color: '#F97316', fill: 'rgba(249,115,22,0.10)', weight: 1.5, label: 'C' },
+    'A':    { color: '#DC2626', fill: 'rgba(220,38,38,0.10)',  weight: 1.5, label: 'A',
+              line: '#DC2626', lineW: 1.2, slashes: true },
+    'B':    { color: '#DC2626', fill: 'rgba(220,38,38,0.10)',  weight: 1.5, label: 'B',
+              line: '#DC2626', lineW: 1.2, slashes: true },
+    'C':    { color: '#F97316', fill: 'rgba(249,115,22,0.10)', weight: 1.5, label: 'C',
+              line: '#F97316', lineW: 1.2, slashes: true },
     'D':    { color: '#FBBF24', fill: 'rgba(251,191,36,0.10)', weight: 1.5, label: 'D' },
     'E':    { color: '#38BDF8', fill: 'rgba(56,189,248,0.06)', weight: 1, label: 'E' },
     'G':    { color: '#94A3B8', fill: 'rgba(148,163,184,0.04)', weight: 0.8, label: 'G' },
-    // RMZ & TMZ : trait NOIR en tirets alternés « court long court » aux
-    // cotes des CTR (long 14, espace 5, court 5 — retour pilote 27/09) ;
+    // RMZ & TMZ : trait NOIR en tirets alternés « court long court »
+    // (long 14, espace 5, court 5 — retour pilote 27/09), ÉPAISSEUR
+    // DOUBLÉE (1.2 → 2.4 — pilote 30/09 « trait TMZ et RMZ ×2 ») ;
     // couleur de famille alignée au noir dans le menu.
     RMZ:    { color: '#1A1A1A', fill: 'rgba(26,26,26,0.06)', weight: 1.5, label: 'RMZ',
-              line: '#1A1A1A', lineW: 1.2, dashArray: '5 5 14 5' },
-    // TMZ : MÊME trait que les RMZ (noir, court-long-court — retour pilote
-    // 27/09 « RMZ et TMZ partagent le même trait »).
+              line: '#1A1A1A', lineW: 2.4, dashArray: '5 5 14 5' },
+    // TMZ : MÊME trait que les RMZ (noir, court-long-court ×2 — retour
+    // pilote 27/09 « RMZ et TMZ partagent le même trait »).
     TMZ:    { color: '#1A1A1A', fill: 'rgba(26,26,26,0.06)', weight: 1.5, label: 'TMZ',
-              line: '#1A1A1A', lineW: 1.2, dashArray: '5 5 14 5' },
+              line: '#1A1A1A', lineW: 2.4, dashArray: '5 5 14 5' },
     'GLIDER': { color: '#4ADE80', fill: 'rgba(74,222,128,0.08)', weight: 1, label: 'Planel' },
     'DROP': { color: '#94A3B8', fill: 'rgba(148,163,184,0.08)', weight: 1, label: 'Parachut.' },
+    // Zones R/D/CBA frontalières (pilote 30/09) : MÊME ligne fine PLEINE
+    // que les zones P (couleur de famille) + HACHURES « ////// » rouges
+    // en contact avec la limite, côte à côte vers l'intérieur — plus de
+    // bande intérieure (bandW retiré), le symbole porteur est la rangée
+    // d'hachures (_crossSegments2D en mode slash).
     'RESTRICTED': { color: '#EF4444', fill: 'rgba(239,68,68,0.18)', weight: 2, label: 'Réglementée',
-              line: '#1A1A1A', lineW: 1.2, bandW: 12 },
+              line: '#EF4444', lineW: 1.2, slashes: true },
     'DANGER': { color: '#EF4444', fill: 'rgba(239,68,68,0.12)', weight: 2, label: 'Dangereuse',
-              line: '#1A1A1A', lineW: 1.2, bandW: 12 },
+              line: '#EF4444', lineW: 1.2, slashes: true },
+    // Zones P (pilote 30/09) : LIGNE FINE ROUGE PLEINE + croix « XXX »
+    // rouges côte à côte vers l'INTÉRIEUR (comme la carte papier) — plus
+    // de bande intérieure (bandW retiré), le symbole porteur est la rangée
+    // de croix (_crossSegments2D ci-dessous).
     'PROHIBITED': { color: '#DC2626', fill: 'rgba(220,38,38,0.25)', weight: 2.5, label: 'Interdite',
-              line: '#1A1A1A', lineW: 1.2, bandW: 14 },
+              line: '#DC2626', lineW: 1.2, crosses: true },
     // STRICT SIA (décision pilote 09/09) : TOUS les espaces contrôlés en
     // BLEU (CTR, TMA/CTA, SIV) — la distinction passe par les étiquettes,
     // comme sur la carte papier. SIV : remplissage plus léger + contour
@@ -323,7 +336,7 @@ async function _loadSiaItems() {
         // v3 : + champ hor (code d'horaire d'activation — H24, NOTAM…),
         // absent des caches v2 — nouveau clé = les clients re-téléchargent
         // sans attendre le TTL de 7 j.
-        const cached = await _idbGet('sia:airspaces:v4');
+        const cached = await _idbGet('sia:airspaces:v5');
         if (cached?.data && Date.now() - cached.ts < CELL_TTL_MS) { _siaItems = stamp(cached.data); _siaOk = true; return _siaItems; }
         try {
             const res = await fetch(`data/sia-airspaces.json?t=${cached?.ts || 0}`, { signal: AbortSignal.timeout(15000) });
@@ -331,7 +344,7 @@ async function _loadSiaItems() {
             const d = await res.json();
             _siaItems = stamp(d.items.map(_expandFileItem));
             _siaOk = true;
-            _idbPut('sia:airspaces:v4', _siaItems);
+            _idbPut('sia:airspaces:v5', _siaItems);
         } catch {
             // Échec réseau : repli sur le cache IDB s'il existe (base alors
             // encore disponible, périmée mais consultable) — sinon la base
@@ -555,12 +568,32 @@ export function _dropOpenAipDuplicates(items, sia) {
     });
 }
 
+// RÈGLE N°1 (pilote 30/09, répétée) — FRANCE : UNIQUEMENT LES RÉFÉRENCES
+// SIA. Toute zone openAIP d'une famille réglementée (R/D/P/parachutage)
+// dont la géométrie est dans la couverture SIA est écartée, jumeau SIA
+// ou pas — openAIP y a livré des contours faux (cercles à bosses
+// sub-pixel : LF-P81/P6.1/P6.2 Flamanville-Cherbourg), des doublons et
+// des fréquences communautaires erronées. Si le SIA ne publie pas la
+// zone, elle ne s'affiche pas (voulu). Les familles que le SIA ne
+// publie pas (ATZ, RMZ/TMZ…) et l'étranger restent openAIP. Exporté
+// pour les tests.
+const _REGULATED_KINDS = new Set(['RESTRICTED', 'DANGER', 'PROHIBITED', 'DROP']);
+export function _siaOnlyFrance(items) {
+    return items.filter(z => {
+        if (z._sia || !_REGULATED_KINDS.has(_decodeType(z))) return true;
+        const st = _geomStats(z);
+        return !(st && siaCoversPoint(st.cy, st.cx));
+    });
+}
+
 async function _loadCellsGrid(minLat, minLon, maxLat, maxLon) {
     // Base officielle SIA : prioritaire dans la couverture (France) — les
     // zones openAIP homologues sont écartées pour éviter les doublons
     // (par nom exact, ET par désignateur R/D/P pour les zones
-    // réglementées) — mais les familles que le SIA ne publie pas (ATZ…)
-    // et l'étranger viennent TOUJOURS des cellules openAIP.
+    // réglementées) — et RÈGLE 1 : les familles réglementées openAIP de
+    // la couverture SIA ne s'affichent JAMAIS, jumeau ou pas ; les
+    // familles que le SIA ne publie pas (ATZ…) et l'étranger viennent
+    // TOUJOURS des cellules openAIP.
     await _loadSiaItems();
     const sia = _siaItemsForArea(minLat, minLon, maxLat, maxLon);
 
@@ -575,7 +608,7 @@ async function _loadCellsGrid(minLat, minLon, maxLat, maxLon) {
         if (r) items.push(...r);
         else missing.push(cells[i]);
     });
-    if (sia.length) return { items: dropZrt(_dropOpenAipDuplicates(items, sia)), missing };
+    if (sia.length) return { items: dropZrt(_siaOnlyFrance(_dropOpenAipDuplicates(items, sia))), missing };
     return { items: dropZrt(items), missing };
 }
 
@@ -859,6 +892,13 @@ export function _geometryToLatLngs(geometry, radiusKm = 5) {
     return rings;
 }
 
+// ---------------------------------------------------------------------------
+// Zones P — croix « XXX » intérieures : noyau géométrique PUR dans
+// zone-crosses.js (SANS dépendance DOM — importé aussi par la carte
+// PDF imprimable, qui ne doit pas tirer la chaîne applicative).
+export { _crossSegments2D, _pZoneCrossSegments } from './zone-crosses.js';
+import { _pZoneCrossSegments } from './zone-crosses.js';
+
 function _pointInRing(lat, lng, ring) {
     let inside = false;
     for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -895,6 +935,9 @@ export function createAirspaceController(map) {
     // Bandes intérieures « carte OACI » : [{ poly, ring }] — l'inset (px →
     // mètres selon le zoom) est recalculé à chaque zoomend.
     let bandLayers = [];
+    // Croix « XXX » des zones P : [{ poly, ring }] — mêmes règles de
+    // recalcul au zoom que les bandes (updateCrosses).
+    let crossLayers = [];
 
     let _loadEpoch = 0;   // annule les rendus d'un chargement dépassé (pan rapide)
 
@@ -1010,6 +1053,38 @@ export function createAirspaceController(map) {
         });
     }
 
+    // Cotes ÉCRAN des croix de zones P (px) : diagonale de la croix, pas de
+    // la rangée, décalage vers l'intérieur, épaisseur du trait. Pilote
+    // 30/09 : les croix SE TOUCHENT entre elles (pas = size·√½), SONT EN
+    // CONTACT avec la limite (inset = demi-emprise + un cheveu couvert par
+    // l'épaisseur du trait — contact peint, jamais de franchissement) et
+    // leur trait a la MÊME ÉPAISSEUR que la limite (lineW 1.2).
+    const P_CROSS_PX = { size: 12, spacing: 12 * Math.SQRT1_2, inset: 12 * Math.SQRT1_2 / 2 + 0.3, weight: 1.2 };
+    // Spécification en MÈTRES au zoom courant (mêmes facteurs d'échelle
+    // que les bandes : rien à z6-, 50 % à z7…) — null = pas de croix.
+    function _crossSpec() {
+        const z = map.getZoom();
+        const f = z <= 6 ? 0 : (ZOOM_BAND_SCALE[z] ?? 1);
+        if (!f) return null;
+        const mpp = 156543.03392 * Math.cos(map.getCenter().lat * Math.PI / 180) / 2 ** z;
+        return {
+            size: P_CROSS_PX.size * f * mpp,
+            spacing: P_CROSS_PX.spacing * f * mpp,
+            inset: P_CROSS_PX.inset * f * mpp,
+        };
+    }
+    function updateCrosses() {
+        const spec = _crossSpec();
+        for (const c of crossLayers) {
+            if (spec) {
+                c.poly.setLatLngs(_pZoneCrossSegments(c.ring, spec, c.slash));
+                c.poly.setStyle({ opacity: 0.95 });
+            } else {
+                c.poly.setStyle({ opacity: 0 });   // z6- : trait seul
+            }
+        }
+    }
+
     function _render(items) {
         // Retire les clipPath SVG des bandes du rendu précédent (sinon ils
         // s'accumulent dans <defs> à chaque re-rendu — l'élément clipPath
@@ -1018,6 +1093,7 @@ export function createAirspaceController(map) {
         layerGroup.clearLayers();
         polyMeta.clear();
         bandLayers = [];
+        crossLayers = [];
         highlighted = null;
         if (!Array.isArray(items)) return;
 
@@ -1126,6 +1202,23 @@ export function createAirspaceController(map) {
                         _clipBandInside(band, ring);
                         bandLayers.push({ poly: band, bandW: st.bandW || 12 });
                     }
+                }
+                // Zones P : croix « XXX » · zones R/D/CBA : HACHURES
+                // « ////// » (pilote 30/09, même moteur) — une SEULE
+                // multi-polyligne par anneau (2 segments par croix, 1 par
+                // hachure), cotes recalculées au zoom comme les bandes.
+                // Jamais interactive : le contour porte la souris et les
+                // infobulles.
+                if (st.crosses || st.slashes) {
+                    const slash = !!st.slashes;
+                    const spec = _crossSpec();
+                    const xl = L.polyline(spec ? _pZoneCrossSegments(ring, spec, slash) : [], {
+                        color: st.color, weight: P_CROSS_PX.weight,
+                        opacity: spec ? 0.95 : 0,
+                        interactive: false, lineCap: 'butt',
+                    });
+                    layerGroup.addLayer(xl);
+                    crossLayers.push({ poly: xl, ring, slash });
                 }
                 const poly = L.polygon(ring, {
                     color: st.line || st.color,   // trait FIN de limite (carte OACI)
@@ -1288,6 +1381,7 @@ export function createAirspaceController(map) {
 
     function onMapMove() {
         updateBands();
+        updateCrosses();
         if (visible && map.getZoom() >= MIN_ZOOM) {
             loadForBounds(map.getBounds());
         }
@@ -1342,6 +1436,8 @@ export function createAirspaceController(map) {
             controlsEl = null;
             highlighted = null;
             polyMeta.clear();
+            bandLayers = [];
+            crossLayers = [];
         },
     };
 }

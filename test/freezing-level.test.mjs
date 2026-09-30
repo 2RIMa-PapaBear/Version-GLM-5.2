@@ -115,3 +115,40 @@ describe('freezing-level — approche plafond vs isotherme 0°C', () => {
         assert.equal(m.message, 'GIVRAGE PROBABLE — plafond 1000 ft au-dessus de l\'isotherme 0°C (800 ft)');
     });
 });
+
+describe('freezing-level — isotherme HAUTE : hors altitudes VFR usuelles (pilote 30/09)', () => {
+
+    test('isotherme 12000 ft + plafond au-dessus : PLUS de NO-GO givrage cellule', () => {
+        // Avant : marge 0 < 2000 → danger → NO-GO. Non-sens opérationnel :
+        // peu d'avions VFR volent à 12 000 ft. Désormais 'ok' + info.
+        const r = evaluateIcingRisk(12000, 'BKN120', null, null);
+        assert.equal(r.level, 'ok');
+        assert.equal(r.message, 'Isotherme 0°C à 12000 ft — air négatif hors altitudes VFR usuelles');
+        // Marge large (plafond 15000) : idem, la caution disparaît aussi.
+        const c = evaluateIcingRisk(12000, 'BKN150', null, null);
+        assert.equal(c.level, 'ok');
+        assert.equal(c.message, 'Isotherme 0°C à 12000 ft — air négatif hors altitudes VFR usuelles');
+    });
+
+    test('isotherme 10000 ft : dernier palier évalué (limite incluse), 10500 épargné', () => {
+        // 10000 ≤ VFR_ICING_MAX_FT : encore évalué — plafond 11000, marge
+        // 1000 < 2000 → danger (franchissement montagne plausible).
+        const d = evaluateIcingRisk(10000, 'BKN110', null, null);
+        assert.equal(d.level, 'danger');
+        // 10500 > seuil : plus d'alerte.
+        const o = evaluateIcingRisk(10500, 'BKN115', null, null);
+        assert.equal(o.level, 'ok');
+    });
+
+    test('isotherme haute + T/Td au sol critiques : givrage CARBURATION conservé', () => {
+        // T = 0, Td = 0 (saturé au sol) : la thermo (carburation, niveau
+        // sol) reste évaluée quelle que soit l'altitude de l'isotherme.
+        const r = evaluateIcingRisk(12000, 'BKN020', 0, 0);
+        assert.equal(r.level, 'danger');
+        assert.equal(r.message, 'GIVRAGE PROBABLE — T 0°C, Td 0°C');
+        // T chaude au sol : ok, message générique (plafond sous l'isotherme).
+        const ok = evaluateIcingRisk(12000, 'BKN020', 10, null);
+        assert.equal(ok.level, 'ok');
+        assert.equal(ok.message, 'Isotherme 0°C à 12000 ft — plafond sous l\'isotherme');
+    });
+});

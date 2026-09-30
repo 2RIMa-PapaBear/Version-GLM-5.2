@@ -28,7 +28,9 @@
 //   alternates [{lat,lon,code,name?,diversion, freq?}]   freq = A/A-AFIS
 //          du terrain (« 122.605 AFIS », 22/09, airspace-freq.js)
 //   zones [{rings:[[lat,lon]…]…, color, fill, dashed, label, sub, kind,
-//           freq?}]   freq = 3e ligne « 125.15 QUIMPER TWR » (22/09,
+//           crosses?, slashes?, freq?}]   crosses = zone P → croix « XXX »
+//           intérieures ; slashes = R/D/CBA → hachures « /// » (pilote
+//           30/09) ; freq = 3e ligne « 125.15 QUIMPER TWR » (22/09,
 //           SIV/CTR/TMA/CTA — airspace-freq.js, jamais inventée)
 //   legend [{label,color,dashed}], legendNote
 
@@ -41,6 +43,7 @@ const TILE = 256;        // tuile Web Mercator
 
 import { radionavFreqText, TACAN_PDF_PATH, VORTACAN_PDF_PATH } from './oaci-radionav.js';
 import { oaciSymbolDrawPdf } from './oaci-symbols.js';
+import { _crossSegments2D } from './zone-crosses.js';   // croix des zones P — module PUR (sans DOM)
 
 const INK = [17, 24, 39];
 const MUTED = [100, 116, 139];
@@ -483,6 +486,26 @@ export function drawFlightMapPage(doc, d) {
         doc.setLineDashPattern(dash || [], 0);
         for (const ring of dec) _ringPath(doc, ring, xy, 'S');
         doc.setLineDashPattern([], 0);
+        // Zones P : croix « XXX » · R/D/CBA : HACHURES « /// » (pilote
+        // 30/09, même moteur et même symbole que la carte écran) — noyau
+        // 2D en points d'impression (axe y du PDF vers le bas : invariant
+        // par réflexion, aucun drapeau nécessaire). Marques qui SE
+        // TOUCHENT (pas = size·√½), EN CONTACT avec la limite (inset =
+        // demi-emprise + un cheveu couvert par l'épaisseur du trait) et
+        // trait de la MÊME ÉPAISSEUR que la limite.
+        if (zone.crosses || zone.slashes) {
+            const PC = { size: 4.6, spacing: 4.6 * Math.SQRT1_2, inset: 4.6 * Math.SQRT1_2 / 2 + 0.15 };
+            doc.setDrawColor(...(stroke.color || _hex(zone.color)));
+            doc.setLineWidth(stroke.w);
+            doc.setLineDashPattern([], 0);
+            for (const ring of dec) {
+                const pts = ring.map((p) => xy(p[0], p[1]));
+                for (const seg of _crossSegments2D(pts, PC, !!zone.slashes)) {
+                    doc.lines([[seg[1][0] - seg[0][0], seg[1][1] - seg[0][1]]],
+                        seg[0][0], seg[0][1], [1, 1], 'S', false);
+                }
+            }
+        }
         // Candidat étiquette : centre de la bbox de l'anneau externe.
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         for (const p of dec[0]) {

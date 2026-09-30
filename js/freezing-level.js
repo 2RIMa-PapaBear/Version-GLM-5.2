@@ -4,6 +4,14 @@ import { memoGet, fetchOpenMeteo } from './core.js';
 const _cache = new Map();
 const TTL_MS = 30 * 60 * 1000;
 
+// Plafond opérationnel VFR pour le givrage CELLULE : au-delà, l'air négatif
+// au-dessus de l'isotherme n'est atteignable qu'à des niveaux que l'aviation
+// légère ne pratique quasiment jamais (retour pilote 30/09 : NO-GO « givrage »
+// affiché avec une isotherme 0°C à 12 000 ft = non-sens opérationnel). Le
+// givrage CARBURATION (analyse T/Td au sol, approche thermo) reste évalué
+// quelle que soit l'altitude de l'isotherme.
+const VFR_ICING_MAX_FT = 10000;
+
 export async function fetchFreezingLevel(icao) {
     if (!icao) return null;
 
@@ -116,8 +124,12 @@ export function evaluateIcingRisk(freezingLevelFt, nuageStr, tempC = null, tdC =
     }
 
     // Approche plafond vs isotherme : on ne l'applique que si la thermo n'a pas déjà
-    // remonté un danger (pour éviter un double signal dans le message).
-    if (ceilingFt != null && ceilingFt >= freezingLevelFt && level !== 'danger') {
+    // remonté un danger (pour éviter un double signal dans le message), ET si
+    // l'isotherme est à une altitude que le VFR pratique réellement : isotherme
+    // au-delà de VFR_ICING_MAX_FT → l'air négatif près du nuage est hors de
+    // portée du vol VFR usuel, aucune alerte cellule (retour pilote 30/09).
+    if (ceilingFt != null && ceilingFt >= freezingLevelFt
+        && freezingLevelFt <= VFR_ICING_MAX_FT && level !== 'danger') {
         // Plafond AU-DESSUS de l'isotherme 0°C : sous ce plafond, le vol VFR peut
         // se faire en air négatif à proximité de l'eau surfondue du nuage (c'est
         // LA configuration de givrage cellule du VFR). Un plafond sous l'isotherme
@@ -139,9 +151,17 @@ export function evaluateIcingRisk(freezingLevelFt, nuageStr, tempC = null, tdC =
     // Message final : si niveau ok, message informatif (isotherme 0°C / sous le plafond).
     let message;
     if (level === 'ok') {
-        message = ceilingFt != null && ceilingFt < freezingLevelFt
-            ? (isFr ? `${fl0Msg} — plafond sous l'isotherme` : `${fl0Msg} — ceiling below freezing level`)
-            : (isFr ? `${fl0Msg} — pas de risque détecté` : `${fl0Msg} — no risk detected`);
+        if (ceilingFt != null && ceilingFt < freezingLevelFt) {
+            message = isFr ? `${fl0Msg} — plafond sous l'isotherme` : `${fl0Msg} — ceiling below freezing level`;
+        } else if (ceilingFt != null && ceilingFt >= freezingLevelFt && freezingLevelFt > VFR_ICING_MAX_FT) {
+            // Plafond au-dessus d'une isotherme HAUTE : l'air négatif n'est
+            // pas à portée du VFR usuel — info plutôt qu'alerte.
+            message = isFr
+                ? `${fl0Msg} — air négatif hors altitudes VFR usuelles`
+                : `${fl0Msg} — negative air beyond usual VFR altitudes`;
+        } else {
+            message = isFr ? `${fl0Msg} — pas de risque détecté` : `${fl0Msg} — no risk detected`;
+        }
     } else {
         message = detail;
     }

@@ -28,7 +28,10 @@ const xml = fs.readFileSync(args.xml, 'latin1');
 // Noms officiels AIXM (repli RadioNav absent — 115 navaids, ex. BZH Brest) :
 // --aixm=<fichier> ou AIXM4.5_all_FR_OM_<même date>.xml à côté du XML_SIA.
 const aixmPath = args.aixm || args.xml.replace(/XML_SIA_([\d-]+)\.xml/, 'AIXM4.5_all_FR_OM_$1.xml');
-const aixmNames = fs.existsSync(aixmPath) ? parseAixmNavaidNames(fs.readFileSync(aixmPath, 'latin1')) : {};
+// LU MAIS PAS PARSÉ ICI : parseAixmNavaidNames vient de l'import dynamique
+// de scripts/lib/sia-navaids.mjs (plus bas) — l'ancienne ligne l'appelait
+// avant l'import et plantait dès que le companion AIXM était présent.
+const aixmRaw = fs.existsSync(aixmPath) ? fs.readFileSync(aixmPath, 'latin1') : null;
 const effDate = (xml.match(/effDate="(\d{4}-\d{2}-\d{2})"/) || [])[1] || 'inconnue';
 console.log(`Export SIA du ${effDate} (${(xml.length / 1e6).toFixed(1)} Mo)`);
 
@@ -104,7 +107,18 @@ each('Partie', (attrs, body) => {
         .map(l => l.split(',').map(Number))
         .filter(c => c.length === 2 && Number.isFinite(c[0]) && Number.isFinite(c[1]))
         .map(([lat, lon]) => [Math.round(lon * 1e4) / 1e4, Math.round(lat * 1e4) / 1e4]));
-    const ring = _geomCoherent(anchors, geom) ? geom : anchors;
+    let ring = _geomCoherent(anchors, geom) ? geom : anchors;
+    // Cercles « cwa » à ancre UNIQUE (P 81 Cherbourg, P 2 Civaux… : le
+    // Contour ne publie que le CENTRE, la Geometrie densifiée EST le
+    // contour complet) : l'ancienne garde rejetait la partie (ancres < 3
+    // → anneau impossible) et la zone disparaissait SILENCIEUSEMENT de la
+    // base — ~80 zones R/D/P françaises manquantes, comblées par openAIP
+    // (interdit depuis, règle pilote 30/09). RATTRAPAGE : anneaux fermés
+    // de la Geometrie acceptés quand les ancres seules ne font pas un
+    // anneau.
+    if (ring.length < 3 && geom.length >= 3
+        && Math.abs(geom[0][0] - geom[geom.length - 1][0]) < 1e-4
+        && Math.abs(geom[0][1] - geom[geom.length - 1][1]) < 1e-4) ring = geom;
     if (ring.length >= 3) esp.parties.push({ nom: txt(body, 'NomPartie') || '', ring });
 });
 console.log(`  espaces: ${espaces.size}, parties avec contour: ${[...espaces.values()].reduce((a, e) => a + e.parties.length, 0)}`);
@@ -227,6 +241,7 @@ console.log(`fréquences organismes : ${services.size} services → data/freq-se
 // ---------------------------------------------------------------------------
 const { parseSiaNavaids, parseSiaVrps, parseAixmNavaidNames, mergeIntoRadioPoints, applySiaVrps, verifySiaLayer }
     = await import(pathToFileURL(path.join(ROOT, 'scripts', 'lib', 'sia-navaids.mjs')).href);
+const aixmNames = parseAixmNavaidNames(aixmRaw || '');
 const siaNav = parseSiaNavaids(xml);
 const siaVrps = parseSiaVrps(xml);
 const siaLayerSnapshot = {
