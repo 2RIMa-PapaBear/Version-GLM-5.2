@@ -92,8 +92,10 @@ async function main() {
     console.log(`OK : ${OUT} — ${items.length} Sup en vigueur (dont ${vfr} VFR, ${items.length - vfr} IFR seules)`);
 }
 
-const isMain = import.meta.url === pathToFileURLSafe(process.argv[1] || '');
-function pathToFileURLSafe(p) {
-    try { return new URL('file:///' + String(p).replace(/\\/g, '/')).href; } catch { return ''; }
-}
+// Forme canonique (cf. fetch-freq-sia.mjs) : résolution du chemin + décodage
+// URL — l'ancienne comparaison à un file:/// fabriqué à la main ne matchait
+// JAMAIS en CI (chemin relatif non résolu, espaces non encodés) : main() ne
+// démarrait pas et l'étape sortait verte en no-op — SUP figées 15 j (audit
+// 01/10, fiche M1).
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) main().catch((e) => { console.error('ÉCHEC :', e.message); process.exit(1); });

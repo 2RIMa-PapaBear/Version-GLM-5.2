@@ -296,31 +296,40 @@ function _render(data) {
     matched.sort((a, b) => (b.rel.n - a.rel.n) || (b.s.num > a.s.num ? 1 : -1));
 
     const nMatch = matched.filter(x => x.rel.n).length;
+    // Âge de la base : la date RÉELLE du crawler, jamais « maintenant » en
+    // repli (audit 01/10 fiche M1 : un fallback Date.now() affichait une
+    // fraîcheur mensongère). UTC marqué, règle S7. ≥ 3 j sans mise à jour =
+    // avertissement orange (le robot quotidien rafraîchit toutes les ~24 h).
+    const genMs = data?.generatedAt ? Date.parse(data.generatedAt) : NaN;
+    const genD = new Date(genMs);
+    const genTxt = Number.isFinite(genMs)
+        ? `${String(genD.getUTCFullYear())}-${String(genD.getUTCMonth() + 1).padStart(2, '0')}-${String(genD.getUTCDate()).padStart(2, '0')} ${String(genD.getUTCHours()).padStart(2, '0')}:${String(genD.getUTCMinutes()).padStart(2, '0')} UTC`
+        : (isFr ? 'date inconnue' : 'unknown date');
+    const ageJ = Number.isFinite(genMs) ? (Date.now() - genMs) / 86400e3 : Infinity;
+    const staleHtml = ageJ >= 3
+        ? ` <b style="color:#F59E0B;">⚠ ${isFr ? `base ancienne (${Math.floor(ageJ)} j sans mise à jour)` : `stale base (${Math.floor(ageJ)} d)`}</b>`
+        : '';
     _panel.querySelector('.sup-summary').innerHTML = isFr
-        ? `${escapeHtml(items.length)} Sup SIA en vigueur (maj ${escapeHtml(new Date(data?.generatedAt || Date.now()).toLocaleDateString())})`
+        ? `${escapeHtml(items.length)} Sup SIA en vigueur (base du ${genTxt}${staleHtml})`
             + ` — affichées : ${matched.length}${nMatch ? ` dont <b style="color:#FBBF24;">${nMatch} pour votre vol</b>` : ''}`
-        : `${items.length} SIA SUP in force — shown: ${matched.length}`;
+        : `${items.length} SIA SUP in force (base ${genTxt}${staleHtml}) — shown: ${matched.length}`;
 
     body.innerHTML = matched.length ? matched.map(({ s, rel }) => {
         const m = rel.i, rg = rel.r;
         return `
         <div class="sup-row${rel.n ? ' sup-match' : ''}">
             <div class="sup-line1">
-                <b class="sup-num">${_esc(s.num)}</b>
-                <span class="sup-dates">${_esc(s.start || '?')} → ${_esc(s.end || '?')}</span>
+                <b class="sup-num">${escapeHtml(s.num)}</b>
+                <span class="sup-dates">${escapeHtml(s.start || '?')} → ${escapeHtml(s.end || '?')}</span>
                 <span class="sup-chips">${s.vfr ? '<i>VFR</i>' : ''}${s.ifr ? '<i>IFR</i>' : ''}${s.airac ? '<i>AIRAC</i>' : ''}</span>
                 ${rel.n ? `<span class="sup-plan">${isFr ? 'votre vol' : 'your flight'} · ${[...m, ...rg].join(' ')}</span>` : ''}
-                ${/^https:\/\/www\.sia\.aviation-civile\.gouv\.fr\//.test(s.url || '') ? `<a class="sup-pdf" href="${_esc(s.url)}" target="_blank" rel="noopener" title="${isFr ? 'PDF officiel SIA (nouvel onglet)' : 'Official SIA PDF (new tab)'}">PDF ↗</a>` : ''}
+                ${/^https:\/\/www\.sia\.aviation-civile\.gouv\.fr\//.test(s.url || '') ? `<a class="sup-pdf" href="${escapeHtml(s.url)}" target="_blank" rel="noopener" title="${isFr ? 'PDF officiel SIA (nouvel onglet)' : 'Official SIA PDF (new tab)'}">PDF ↗</a>` : ''}
             </div>
-            <div class="sup-subject">${_esc(s.subject)}</div>
+            <div class="sup-subject">${escapeHtml(s.subject)}</div>
         </div>`;
     }).join('')
         : `<div class="sup-empty">${isFr ? 'Aucune Sup ne correspond aux filtres.' : 'No SUP matches the filters.'}</div>`;
     _renduPourIcao = state.requestedIcao || null;
-}
-
-function _esc(s) {
-    return String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 /** Montre le panneau (idempotent). Panneau de DONNÉES : modes local ET nav. */

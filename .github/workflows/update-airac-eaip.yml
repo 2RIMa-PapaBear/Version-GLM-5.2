@@ -52,6 +52,21 @@ jobs:
       - name: Sup AIP série A (SIA)
         run: node scripts/fetch-sup-sia.mjs
 
+      - name: Garde fraîcheur SUP (anti no-op)
+        # Audit 01/10 fiche M1 : un bug du garde isMain faisait sortir l'étape
+        # SUP VERTE sans jamais exécuter le crawler (base figée 15 j, pipeline
+        # vert). Le crawler vient de tourner : sa base DOIT porter un
+        # generatedAt de la dernière heure — sinon échec bruyant.
+        run: |
+          ts=$(node -e "console.log(Date.parse(require('./data/sup-sia.json').generatedAt||'')||0)")
+          now=$(date +%s000)
+          age=$(( (now - ts) / 60000 ))
+          echo "generatedAt il y a ${age} min"
+          if [ "$age" -gt 60 ]; then
+            echo "::error::data/sup-sia.json n'a pas été réécrit (âge ${age} min > 60) — le crawler est-il en no-op ?"
+            exit 1
+          fi
+
       - name: Commit + push (freq-sia + sup AIP)
         run: |
           git config user.name "airac-bot"
