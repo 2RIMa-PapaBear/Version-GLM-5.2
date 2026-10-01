@@ -41,6 +41,7 @@
  * ================================================================ */
 
 import { state, fetchAvecRelais, parseMetarQnhOat, parseWindGroupToKt, findActiveValueAtHour } from './core.js';
+import { parseWindLoose } from './metar.js';   // W11 : décodage source unique
 import { densityAltitude, getPerformanceData } from './density-altitude.js';
 import { getAirportByICAO } from './ui-module.js';
 import { getActiveAircraft } from './aircraft-fleet.js';
@@ -627,7 +628,19 @@ export function _calcRunwaySlopePct(icao, rwyName) {
 
         // Trouve la paire de pistes contenant le numéro en service.
         const num = String(rwyName).split('/')[0].trim();
-        const rwy = rwys.find(r => (r.d || '').includes(num)) || rwys.find(r => r.main);
+        let rwy = rwys.find(r => (r.d || '').includes(num));
+        // A11-v4 (audit 27/09) : repli sur une autre paire UNIQUEMENT si
+        // c'est la même bande physique (même numéro, suffixe L/R/C ignoré —
+        // « 05R » → « 05L/23R » quand la parallèle manque dans la base).
+        // Une bande DIFFÉRENTE n'a aucune raison de partager le relief :
+        // l'ancien repli silencieux sur la piste principale risquait une
+        // pente au mauvais signe — on préfère null (pas de correction).
+        if (!rwy) {
+            const base = num.replace(/[LRC]$/i, '');
+            rwy = rwys.find(r => String(r.d || '').split('/')
+                .some(x => x.replace(/[LRC]$/i, '') === base)) || null;
+        }
+        if (!rwy) return null;
         if (rwy?.t1?.altFt == null || rwy?.t2?.altFt == null) return null;
         if (!Number.isFinite(rwy.t1.altFt) || !Number.isFinite(rwy.t2.altFt)) return null;
         if (!Number.isFinite(rwy.len) || rwy.len <= 0) return null;
@@ -764,18 +777,13 @@ export function evaluateLandingPerformance(icao) {
  * Extrait {dir, speed} d'une chaîne de vent — accepte le format du parseur
  * « 340° 09KT » (degré + espace, avec variation « 300V010 » en suffixe) ET
  * le format brut « 34009KT ». Retourne {dir: null, speed} pour VRB.
+ * W11 (audit 27/09) : délègue au décodeur unique metar.parseWindLoose —
+ * l'ancien regex local acceptait les groupes SANS unité et lisait
+ * « 12012MPS » comme 12 KT (silencieusement faux hors d'Europe).
  */
 export function _parseWindForAxial(ventStr) {
-    if (!ventStr) return null;
-    const s = String(ventStr);
-    // VRB (variable) : pas de direction → pas de vent axial calculable.
-    if (/^VRB/i.test(s)) {
-        const mv = s.match(/VRB\s*(\d{2,3})/i);
-        return mv ? { dir: null, speed: parseInt(mv[1], 10) } : null;
-    }
-    // Directionnelle : 3 chiffres puis optionnellement ° et/ou espace puis 2-3 chiffres.
-    const m = s.match(/(\d{3})[°\s]*(\d{2,3})/);
-    return m ? { dir: parseInt(m[1], 10), speed: parseInt(m[2], 10) } : null;
+    const w = parseWindLoose(ventStr);
+    return w ? { dir: w.dir, speed: w.speed } : null;
 }
 
 /**

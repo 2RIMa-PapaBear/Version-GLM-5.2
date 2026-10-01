@@ -1,12 +1,12 @@
 // Widgets données décryptées : Vent / Visi+Plafond / T°+Td+givrage / QNH.
 //
 // Présente en lecture rapide les valeurs clés du METAR (ou de l'heure cible d'un TAF).
-// Dépendances : parseWindString (engine.js), parseVisiToMeters/getCeiling/findActiveValueAtHour
+// Dépendances : parseWindLoose (metar.js), parseVisiToMeters/getCeiling/findActiveValueAtHour
 // (core.js), CAT_COLORS (core.js), evaluateIcingRisk/fetchFreezingLevel (freezing-level.js).
 // IMPORTANT : aucun import depuis ui-module.js (évite le cycle d'import).
 
 import { state, I18N, CAT_COLORS, parseVisiToMeters, getCeiling, findActiveValueAtHour, escapeHtml } from './core.js';
-import { parseWindString } from './engine.js';
+import { parseWindLoose } from './metar.js';   // W11 : décodage source unique
 import { evaluateIcingRisk, fetchFreezingLevel } from './freezing-level.js';
 import { evaluateCarbIcing } from './carb-icing.js';
 
@@ -67,7 +67,7 @@ function _renderWindWidget(windStr) {
     const el = document.getElementById('widget-wind');
     if (!el) return;
     if (!windStr) { _emptyWidget('widget-wind', 'wind', tr.lblWidgetWind); return; }
-    const w = parseWindString(windStr);
+    const w = parseWindLoose(windStr);
     if (!w || (w.speed == null && !w.variable)) { _emptyWidget('widget-wind', 'wind', tr.lblWidgetWind); return; }
     const isCalm = w.speed === 0 && !w.variable;
     const dirLabel = w.variable ? tr.lblWidgetVariable : (w.dir != null ? `${w.dir}°` : '--');

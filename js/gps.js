@@ -17,9 +17,12 @@
 //     pas l'icône). Angle = cap sol GPS, pris par le plus court chemin.
 //   - ENREGISTREMENT AUTO de chaque session de suivi : points horodatés
 //     (lat, lon, alt GPS, vitesse, cap). Chrono de vol déclenché à la
-//     première vitesse > 35 kt (FT_START_MS). Vitesse/cap calculés entre
-//     fixations quand le téléphone ne les fournit pas — dérivation bornée à
-//     10 s d'écart (fiche 13 audit 27/09 : au-delà, invalidée et signalée).
+//     1ʳᵉ vitesse au-dessus du seuil DÉRIVÉ DE LA FLOTTE (VR de l'avion
+//     actif − 5 kt, 50 kt sans avion — N10, audit 27/09 : ce commentaire
+//     citait encore « > 35 kt », valeur d'avant la dérivation). Vitesse/cap
+//     calculés entre fixations quand le téléphone ne les fournit pas —
+//     dérivation bornée à 10 s d'écart (fiche 13 audit 27/09 : au-delà,
+//     invalidée et signalée).
 //   - HISTORIQUE IndexedDB (« mt-gps-test/vols », 50 derniers) + panneau
 //     « Vols » : revoir les vols passés, exporter .GPX (1.1), .KML ou .CSV
 //     (G1000), supprimer. La route PRÉVUE du plan courant accompagne la

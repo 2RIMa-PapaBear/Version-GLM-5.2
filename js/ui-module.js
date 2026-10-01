@@ -1,7 +1,8 @@
 import { I18N, PALETTE, UNIFIED_RED, REGEX_BLOCKS_PATTERN, parseVisiToMeters, getCeiling, findActiveValueAtHour, CAT_COLORS, catColorRgba, getNearestAirport, getFlightCategory } from './core.js';
 import { state, memoGet } from './core.js';
 import { escapeHtml } from './core.js';
-import { dessinerGraphique, updateWindCompass, calculateFlightCategoryRobust, parseWindString, selectBestRunway, getForecastAtHour } from './engine.js';
+import { dessinerGraphique, updateWindCompass, calculateFlightCategoryRobust, selectBestRunway, getForecastAtHour } from './engine.js';
+import { parseWindLoose } from './metar.js';   // W11 : décodage source unique
 import { displayWeatherAlerts } from './weather.js';
 import { updateDecryptedWidgets, showDecryptedWidgets } from './widgets.js';
 import { idbGetAirports, idbPutAirports, AIRPORTS_DB_VERSION } from './db.js';
@@ -292,7 +293,7 @@ function demarrerHorlogeLocale(icao) {
 export function updateFlightCategoryBadge(catObj, iconName, showAnim, isMetar, isTafFuture, runways, forcedId, windStr, visiStr, nuageStr, tempoCatObj = null, tempoProbLabel = '') {
     const b = document.getElementById('flight-cat-badge'); if (!b) return;
 
-    const speed = windStr ? (parseWindString(windStr)?.speed || 0) : 0;
+    const speed = windStr ? (parseWindLoose(windStr)?.speed || 0) : 0;
     const visiM = parseVisiToMeters(visiStr || '');
     const ceilFt = getCeiling(nuageStr || '') * 100;
 

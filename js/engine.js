@@ -6,6 +6,7 @@
 import { I18N, PALETTE, UNIFIED_RED, REGEX_BLOCKS_PATTERN, sunCacheGet, sunCacheSet } from './core.js';
 import { state } from './core.js';
 import { parseVisiToMeters, parseWindGroupToKt, getCeiling, getFlightCategory, getWeatherIcon, inferStartYear, traduireCode, findActiveValueAtHour, surfaceLabel, SOFT_SURFACES, memoGet, escapeHtml } from './core.js';
+import { parseWindLoose, parseRvr } from './metar.js';
 import { getDeclinationForIcao } from './magvar.js';
 import { themeTokens } from './night-mode.js';
 import { siaRunwayFor, siaSurfaceCode } from './sia-data.js';
@@ -31,14 +32,14 @@ function _parseVent(seg) {
     // Fiche n°15 (audit 27/09) : le groupe vent OACI peut être en KT, MPS ou
     // KMH selon la région émettrice — parseWindGroupToKt (core.js) normalise
     // tout en KT. Les valeurs converties sont RE-PADÉES (dir sur 3 chiffres,
-    // vitesses sur 2) : parseWindString exige ces largeurs, sans quoi
+    // vitesses sur 2) : parseWindLoose (metar.js) exige ces largeurs, sans quoi
     // « 90° 8KT » nettoyé en « 908KT » ne rematcherait pas.
     const w = parseWindGroupToKt(seg);
     if (!w) return '';
     let base = (w.variable ? 'VRB' : String(w.dir).padStart(3, '0') + '°') + ' '
         + String(w.speed).padStart(2, '0') + (w.gust != null ? 'G' + String(w.gust).padStart(2, '0') : '') + 'KT';
     // Variation de direction METAR : "170V250" suit immédiatement le groupe vent.
-    // On la réinjecte pour que parseWindString et la rose des vents puissent la représenter.
+    // On la réinjecte pour que parseWindLoose et la rose des vents puissent la représenter.
     if (w.varFrom != null) base += ` ${w.varFrom}V${w.varTo}`;
     return base;
 }
@@ -50,7 +51,16 @@ function _parseVisi(seg) {
     // METAR français concernés.
     const mVi = seg.match(/\s(\d{4}|[PM]?\d+SM|[PM]?\d+\s\d+\/\d+SM|[PM]?\d+\/\d+SM)(?:NDZ|ND)?\s/); if (!mVi) return '';
     let valVisi = mVi[1]; const visiM = parseVisiToMeters(valVisi);
-    if (valVisi === '9999') valVisi = '> 10 km'; else if (/^\d{4}$/.test(valVisi)) valVisi += ' m'; else if (valVisi.includes('SM')) { const clean = valVisi.replace(/^P/, '> ').replace(/^M/, '< ').replace('SM', ' SM'); valVisi = `${clean} (${(visiM / 1000).toFixed(1)} km)`; }
+    if (valVisi === '9999') valVisi = '> 10 km'; else if (/^\d{4}$/.test(valVisi)) valVisi += ' m'; else if (valVisi.includes('SM')) { const clean = valVisi.replace(/^P/, '> ').replace(/^M/, '< ').replace('SM', ' SM'); valVisi = `${clean} (${visiM == null ? '?' : (visiM / 1000).toFixed(1)} km)`; }
+    // W12 (audit 27/09) : la portée visuelle de piste (RVR, Rxx/) suit la
+    // visibilité — METAR uniquement (un TAF n'en publie pas), parseRvr ne
+    // matche alors rien.
+    const rvr = parseRvr(seg);
+    if (rvr.length) {
+        valVisi += ' · ' + rvr.map(r =>
+            `RVR ${r.rwy} : ${r.lessThan ? '< ' : r.moreThan ? '> ' : ''}${r.minM} m${r.maxM !== r.minM ? `–${r.maxM}` : ''}`
+        ).join(' · ');
+    }
     return valVisi;
 }
 
@@ -223,26 +233,10 @@ export function analyserTAF(rawText) {
     return { isMetar: false, code: codeOACI, validity: validStr, startH: globalStartH, endH: globalEndH, base: processedData, tempo: tempoLayers, tafTemps, startYear, startMonth, startDay };
 }
 
+/* W11 (audit 27/09, clos 01/10) : le décodage vit dans js/metar.js.
+ * Alias de compat — les appels internes utilisent parseWindLoose. */
 export function parseWindString(str) {
-    if (!str) return null;
-    // _parseVent insère "°" et un espace : "270° 15KT" ou "VRB 10G20KT",
-    // et peutSuffixer la variation : "210° 06KT 170V250".
-    // On retire le ° et l'espace pour que le regex classique fonctionne.
-    const cleanStr = str.toUpperCase().replace(/\s+/g, '').replace(/°/g, '');
-    const match = cleanStr.match(/(VRB|\d{3})(\d{2,3})(?:G(\d{2,3}))?KT/);
-    if (match) {
-        // Variation de direction METAR (ex. 170V250) : bornes du secteur balayé.
-        const varMatch = cleanStr.match(/KT(\d{3})V(\d{3})/);
-        return {
-            variable: match[1] === 'VRB',
-            dir: match[1] === 'VRB' ? null : parseInt(match[1], 10),
-            speed: parseInt(match[2], 10) || 0,
-            gust: match[3] ? parseInt(match[3], 10) : null,
-            varFrom: varMatch ? parseInt(varMatch[1], 10) : null,
-            varTo: varMatch ? parseInt(varMatch[2], 10) : null
-        };
-    }
-    return null;
+    return parseWindLoose(str);
 }
 
 export function selectBestRunway(runways, wind, forcedId = null, magDeclination = 0) {
@@ -721,7 +715,7 @@ export function renderWindCompass(containerId, windStr, runways = null, forcedId
     if (!host) return;
     const T = themeTokens();   // couleurs du thème (graduations, textes)
     const isFr = state.lang === 'fr';
-    const wind = parseWindString(windStr);
+    const wind = parseWindLoose(windStr);
 
     // Nom en clair du terrain représenté, en tête de cadre (une ligne,
     // centrée — retour pilote 30/09). Même résolution que la barre d'infos
@@ -952,7 +946,7 @@ export function publishActiveRunway(apt) {
             }
         }
     }
-    const rwyData = selectBestRunway(apt.runways, parseWindString(windStr), state.forcedRunway,
+    const rwyData = selectBestRunway(apt.runways, parseWindLoose(windStr), state.forcedRunway,
         getDeclinationForIcao(state.requestedIcao || parsed.code));
     state.activeRunwayName = rwyData.active?.name || null;
 }

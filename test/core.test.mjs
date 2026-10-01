@@ -26,9 +26,13 @@ describe('parseVisiToMeters', () => {
         assert.equal(parseVisiToMeters('CAVOK'), 10000);
     });
 
-    test('retourne 10000 pour null/vide', () => {
-        assert.equal(parseVisiToMeters(''), 10000);
-        assert.equal(parseVisiToMeters(null), 10000);
+    test('null/vide → null = INCONNUE (o4, audit 01/10 : plus de 10 km implicite)', () => {
+        // Ce test encodait l'ANCIEN défaut (repli 10 km sur chaîne vide) —
+        // la règle « absent = inconnu, jamais 10 km implicite » s'applique
+        // désormais à la source, tous appelants gardés en amont.
+        assert.equal(parseVisiToMeters(''), null);
+        assert.equal(parseVisiToMeters('   '), null);
+        assert.equal(parseVisiToMeters(null), null);
     });
 
     test('parse les mètres à 4 chiffres', () => {

@@ -428,43 +428,12 @@ export function memoSet(icao, val) {
 }
 export function memoGet(icao) { return state.memo[icao]; }
 
-export function parseVisiToMeters(visiStr) {
-    if (!visiStr) return 10000;
-    if (visiStr.includes('9999') || visiStr.includes('CAVOK')) return 10000;
-    const smMatch = visiStr.match(/([PM]?)(\d+)?\s?(?:(\d+)\/(\d+))?SM/);
-    if (smMatch) {
-        const whole = parseInt(smMatch[2]) || 0;
-        const num   = parseInt(smMatch[3]) || 0;
-        const den   = parseInt(smMatch[4]) || 1;
-        return Math.round((whole + num / den) * 1609.34);
-    }
-    const mMatch = visiStr.match(/(\d{4})/);
-    return mMatch ? parseInt(mMatch[1], 10) : 10000;
-}
+// W11 (audit 27/09, clos 01/10) : le décodage METAR vit dans js/metar.js
+// (module pur, source unique). Re-exports de compat — les imports depuis
+// core.js restent valides ; les NOUVEAUX développements importent metar.js.
+export { parseVisiToMeters, parseWindGroupToKt, getCeiling, parseWindLoose, parseRvr } from './metar.js';
 
-/* Groupe vent d'un METAR/TAF brut, toutes unités OACI (fiche n°15, audit
- * 27/09) : KT, MPS (Russie, Chine…) ou KMH selon la région émettrice.
- * Point d'entrée unique — tout est CONVERTI EN KT, unité attendue par
- * l'ensemble de l'app (rose des vents, piste en service, go-nogo, perfs
- * décollage) : MPS ×1.94384, KMH ÷1.852, arrondi à l'entier le plus proche.
- * Retourne { variable, dir, speed, gust, varFrom, varTo } (kt) ou null. */
-export function parseWindGroupToKt(raw) {
-    const txt = String(raw || '').toUpperCase();
-    const m = txt.match(/\b(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?(KT|MPS|KMH)\b/);
-    if (!m) return null;
-    const k = m[4] === 'MPS' ? 1.94384 : m[4] === 'KMH' ? 1 / 1.852 : 1;
-    const toKt = v => k === 1 ? parseInt(v, 10) : Math.round(parseInt(v, 10) * k);
-    // Variation de direction METAR (« 180V240 ») collée derrière le groupe vent.
-    const vMatch = txt.match(/\b(?:\d{3}|VRB)\d{2,3}(?:G\d{2,3})?(?:KT|MPS|KMH)\s(\d{3})V(\d{3})\b/);
-    return {
-        variable: m[1] === 'VRB',
-        dir: m[1] === 'VRB' ? null : parseInt(m[1], 10),
-        speed: toKt(m[2]),
-        gust: m[3] ? toKt(m[3]) : null,
-        varFrom: vMatch ? parseInt(vMatch[1], 10) : null,
-        varTo: vMatch ? parseInt(vMatch[2], 10) : null
-    };
-}
+/* Groupe vent : voir js/metar.js (W11) — implémentation source unique. */
 
 export function findActiveValueAtHour(blocks, targetHour) {
     if (!blocks || !blocks.length) return null;
@@ -475,26 +444,7 @@ export function findActiveValueAtHour(blocks, targetHour) {
     return null;
 }
 
-export function getCeiling(nuageStr) {
-    if (!nuageStr || nuageStr.includes('CAVOK') || nuageStr.includes('NSC') || nuageStr.includes('SKC') || nuageStr.includes('NCD')) return 999;
-    if (nuageStr.includes('VV///')) return 0;
-
-    let lowest = 999;
-    const regexRaw = /(BKN|OVC|VV)(\d{3})(?!ft)/g;
-    let match;
-    while ((match = regexRaw.exec(nuageStr)) !== null) {
-        const alt = parseInt(match[2], 10);
-        if (alt < lowest) lowest = alt;
-    }
-
-    const regexParsed = /(BKN|OVC|VV)\s+(\d+)ft/g;
-    while ((match = regexParsed.exec(nuageStr)) !== null) {
-        const alt = parseInt(match[2], 10) / 100;
-        if (alt < lowest) lowest = alt;
-    }
-
-    return lowest;
-}
+/* Plafond : voir js/metar.js (W11) — implémentation source unique. */
 
 /* ----------------------------------------------------------------
  * QNH (hPa) + TEMPÉRATURE (°C) numériques d'un METAR brut —

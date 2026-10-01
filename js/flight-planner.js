@@ -620,7 +620,9 @@ export async function computeMultiLegFlightPlan(route, params) {
         legDistNm.push(distNm);
 
         totalDistanceNm += distNm;
-        totalTimeMin += legTimeMin;
+        // N16 (audit 27/09) : le total somme les temps ARRONDIS affichés par
+        // tronçon — Σ colonne « temps » = total, sinon ±1 min d'écart à l'écran.
+        totalTimeMin += Math.round(legTimeMin);
         totalTripFuelL += fuel.tripFuelL;
     }
 

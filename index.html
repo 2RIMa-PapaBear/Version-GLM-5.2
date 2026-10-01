@@ -4,9 +4,12 @@
     <meta charset="UTF-8">
     <!-- CSP (audit 26/09) : filet anti-exfiltration/injection — scripts
          limités à nous + cdnjs (suncalc SRI), connexions réseau limitées
-         aux hôtes météo/cartes effectivement utilisés. 'unsafe-inline'
-         requis (script anti-flash nuit, styles inline des widgets). -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://meteo-relais.papabear56.workers.dev https://api.open-meteo.com https://api.core.openaip.net https://api.rainviewer.com https://aviationweather.gov https://nominatim.openstreetmap.org https://corsproxy.io https://script.google.com https://s3.amazonaws.com https://davidmegginson.github.io https://*.opentopomap.org; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; manifest-src 'self'">
+         aux hôtes météo/cartes effectivement utilisés. S15 (audit 27/09) :
+         script-src SANS 'unsafe-inline' — plus aucun script inline ni
+         handler onclick (anti-flash et chargeur externalisés :
+         js/anti-flash.js + js/lib-loader.js) ; 'unsafe-inline' reste
+         uniquement pour style-src (styles inline des widgets). -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://meteo-relais.papabear56.workers.dev https://api.open-meteo.com https://api.core.openaip.net https://api.rainviewer.com https://aviationweather.gov https://nominatim.openstreetmap.org https://corsproxy.io https://script.google.com https://s3.amazonaws.com https://davidmegginson.github.io https://*.opentopomap.org; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; manifest-src 'self'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Prévol — Briefing VFR complet : météo, log de nav, suivi GPS</title>
     <meta name="description" content="Briefing VFR complet : météo temps réel (METAR, TAF), planification de vol, log de nav imprimable, dossier de vol et suivi GPS en direct. Gratuit, PC et mobile.">
@@ -48,13 +51,7 @@
     <link rel="stylesheet" href="css/style.css?v=1.461">
     <link rel="stylesheet" href="css/wind-compass-styles.css?v=1.461">
     <link rel="stylesheet" href="css/fonts.css?v=1.461">
-    <script>
-        // Anti-flash mode nuit : applique la classe AVANT le premier rendu
-        // pour éviter une explosion de lumière blanche destructrice pour la
-        // vision nocturne déjà adaptée du pilote. Doit rester synchrone et
-        // bloquant (pas de module, pas d'async).
-        try { if (localStorage.getItem('night-mode-enabled') === '1') document.documentElement.classList.add('night-mode'); } catch (e) {}
-    </script>
+    <script src="js/anti-flash.js?v=1.461"></script>
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -124,7 +121,7 @@
                     <i data-lucide="moon" class="theme-ic-dark icon-sm" style="display:none;"></i>
                     <span class="theme-lbl">Clair</span>
                 </button>
-                <button id="btn-notice" class="btn-help" title="Ouvrir la notice complète" onclick="window.location.href = document.documentElement.lang === 'en' ? 'notice-en.html' : 'notice-fr.html'">
+                <button id="btn-notice" class="btn-help" title="Ouvrir la notice complète">
 					<i data-lucide="book-open" class="icon-sm"></i> <span id="lbl-notice">Notice</span>
 				</button>
             </div>
@@ -301,34 +298,6 @@
 
     <script type="module" src="js/app.js?v=1.461"></script>
     <script type="module" src="js/gps.js?v=1.461"></script>
-    <script>
-        // Libs lourdes chargées À LA DEMANDE (perf : −521 Ko au démarrage de l'app).
-        // Leaflet (+ CSS + plugin rotate) : à l'ouverture de la carte régionale
-        // (js/regional-map.js). jsPDF : à la première génération de PDF
-        // (js/flight-planner-ui.js). Sans ?v= : le réseau-first du SW garantit
-        // la fraîcheur, le CACHE bumpé par déploiement purge les entrées vieilles.
-        // async=false → les scripts s'exécutent dans l'ordre de la liste.
-        window.__libPromises = {};
-        window.__chargerLib = function (urls) {
-            return Promise.all((Array.isArray(urls) ? urls : [urls]).map(function (u) {
-                if (!window.__libPromises[u]) {
-                    window.__libPromises[u] = new Promise(function (resolve, reject) {
-                        var el;
-                        if (u.endsWith('.css')) {
-                            el = document.createElement('link');
-                            el.rel = 'stylesheet'; el.href = u;
-                        } else {
-                            el = document.createElement('script');
-                            el.src = u; el.async = false;
-                        }
-                        el.onload = function () { resolve(u); };
-                        el.onerror = function () { delete window.__libPromises[u]; reject(new Error('chargement impossible : ' + u)); };
-                        document.head.appendChild(el);
-                    });
-                }
-                return window.__libPromises[u];
-            }));
-        };
-    </script>
+    <script src="js/lib-loader.js?v=1.461"></script>
 </body>
 </html>

@@ -4,7 +4,7 @@
 
 import { I18N, parseVisiToMeters, parseWindGroupToKt, getCeiling, findActiveValueAtHour } from './core.js';
 import { state } from './core.js';
-import { parseWindString } from './engine.js';
+import { parseWindLoose } from './metar.js';   // W11 : décodage source unique
 
 const STORAGE_KEY = 'metar-alert-thresholds';
 
@@ -414,7 +414,7 @@ export function analyzeForecastAlerts(parsedData, targetHour) {
     const v = { windSpd: null, windGust: null, visi: null, ceiling: null, cb: false, tcu: false, ts: false, gr: false, fz: false };
 
     if (activeVent) {
-        const wind = parseWindString(activeVent);
+        const wind = parseWindLoose(activeVent);
         if (wind) { v.windSpd = wind.speed; v.windGust = wind.gust; }
     }
 

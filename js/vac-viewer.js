@@ -88,6 +88,30 @@ async function _idbPut(key, value) {
     } catch { /* quota : la carte ne sera simplement pas hors ligne */ }
 }
 
+/** A12-v5 (audit 27/09) : supprime les VAC mises en cache d'un cycle AIRAC
+ *  antérieur au cycle en vigueur (une bascule = ~120 Mo de PDF orphelins).
+ *  Clé « <ICAO>:VAC:<AAAA-MM-JJ> » — comparaison lexicale fiable sur l'ISO. */
+async function _purgeVacCyclesAnterieurs(airacEnVigueur) {
+    if (!airacEnVigueur) return;
+    const db = await _idbOpen();
+    const keys = await new Promise((resolve, reject) => {
+        const req = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).getAllKeys();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => reject(req.error);
+    });
+    const vieux = keys.filter(k => typeof k === 'string' && k.includes(':VAC:')
+        && k.slice(k.lastIndexOf(':VAC:') + 5) < airacEnVigueur);
+    if (!vieux.length) { db.close(); return; }
+    await new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, 'readwrite');
+        for (const k of vieux) tx.objectStore(IDB_STORE).delete(k);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+    console.info(`VAC : ${vieux.length} carte(s) du ou des cycles précédents purgée(s) du cache`);
+}
+
 /** Carte VAC du terrain : cache IndexedDB (cycle courant) sinon fichier
  * local du site. Retourne { blob, airac, offline } ou null. */
 export async function fetchVac(icao) {
@@ -96,6 +120,12 @@ export async function fetchVac(icao) {
     const airac = idx?.airac || null;
     if (!idx?.icacos?.includes(code)) return null;
     const cle = `${code}:VAC:${airac}`;
+
+    // A12-v5 (audit 27/09) : les cycles précédents (~120 Mo de PDF) restaient
+    // à vie dans IndexedDB — on purge les clés « :VAC: » d'un cycle ANTÉRIEUR
+    // au cycle en vigueur. Au premier échec réseau on garde le repli périmé
+    // plus bas, la purge ne s'exécute que quand l'index du JOUR est chargé.
+    _purgeVacCyclesAnterieurs(airac).catch(() => {});
 
     const cached = await _idbGet(cle);
     if (cached?.blob instanceof Blob) {

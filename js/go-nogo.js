@@ -1,6 +1,7 @@
 import { state, I18N, parseVisiToMeters, getCeiling, memoGet, getFlightCategory, findActiveValueAtHour } from './core.js';
 import { airspaceContextFor } from './vfr-minima.js';
-import { parseWindString, selectBestRunway } from './engine.js';
+import { selectBestRunway } from './engine.js';
+import { parseWindLoose } from './metar.js';   // W11 : décodage source unique
 import { analyzeWeatherAlerts, analyzeForecastAlerts, openThresholdsModal } from './weather.js';
 import { getAirportByICAO } from './ui-module.js';
 import { getPerformanceData, densityAltitude, evaluateDensityAltitude } from './density-altitude.js';
@@ -230,7 +231,16 @@ export function evaluateGoNoGo() {
 
     if (state._freezingLevel != null) {
         const nuageStr = parsed.base?.nuage?.[0]?.val || '';
-        const icing = evaluateIcingRisk(state._freezingLevel, nuageStr);
+        // N6 (audit 27/09) : la voie THERMO est enfin alimentée ici — T et
+        // Td du METAR affiché (« 15°C / 8°C »), Td en repli sur le point de
+        // rosée Open-Meteo stocké par refreshFreezingLevel. Sans T lisible,
+        // la logique historique plafond-vs-isotherme décide seule.
+        const tempStr = parsed.base?.temp?.[0]?.val || '';
+        const tM = tempStr.match(/(-?\d+)\s*°C\s*\/\s*(-?\d+)\s*°C/);
+        const tempC = tM ? parseInt(tM[1], 10) : null;
+        const tdC = tM ? parseInt(tM[2], 10)
+            : (typeof state._freezingDewC === 'number' ? state._freezingDewC : null);
+        const icing = evaluateIcingRisk(state._freezingLevel, nuageStr, tempC, tdC);
         if (icing && icing.level !== 'ok') {
             if (icing.level === 'danger') {
                 if (verdict !== 'NO-GO') verdict = 'NO-GO';
@@ -240,7 +250,7 @@ export function evaluateGoNoGo() {
     }
 
     const windStr = parsed.base?.vent?.[0]?.val;
-    const wind = windStr ? parseWindString(windStr) : null;
+    const wind = windStr ? parseWindLoose(windStr) : null;
     if (wind && apt && apt.runways && wind.dir !== null) {
 
         const dec = getDeclinationForIcao(icao);
@@ -330,9 +340,11 @@ export async function refreshFreezingLevel(icao) {
     if (!icao || icao === _freezingIcao && state._freezingLevel != null) return;
     _freezingIcao = icao;
     state._freezingLevel = null;
+    state._freezingDewC = null;   // N6 : le point de rosée suit l'isotherme
     const fl = await fetchFreezingLevel(icao);
     if (fl && _freezingIcao === icao) {
         state._freezingLevel = fl.altFt;
+        state._freezingDewC = fl.dewPointC;
         renderGoNoGo();
     }
 }

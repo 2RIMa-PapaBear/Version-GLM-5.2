@@ -109,9 +109,16 @@ function _distM(a, b) {
 }
 
 export function exportPts(pts) {
+    // N12 (audit 27/09) : la précision GPS (accuracy) sert ENFIN — un fix à
+    // ±100 m et plus (récepteur décroché, premier fix cold-start) est écarté
+    // de l'export plutôt que d'injecter un saut dans la trace ; il ne devient
+    // jamais non plus la référence de distance du point suivant. Le dernier
+    // point reste toujours garanti plus bas.
+    const ACC_MAX_M = 100;
     const out = [];
     let ref = null;
     for (const p of pts) {
+        if (p.acc != null && p.acc > ACC_MAX_M) continue;
         const moving = p.spd != null && p.spd >= EXPORT_SPEED_MS;
         const far = !ref || _distM(ref, [p.lat, p.lon]) >= EXPORT_DIST_M;
         if (moving || far) { out.push(p); ref = [p.lat, p.lon]; }

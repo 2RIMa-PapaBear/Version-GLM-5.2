@@ -3,27 +3,35 @@ import { getOfficialDeclination } from './sia-data.js';
 
 const _sessionCache = new Map();
 
-const LS_KEY = 'magvar-cache';
+// N5+N11 (audit 27/09) : chaque ENTRÉE porte sa propre date (l'ancien
+// horodatage GLOBAL était reprisé par n'importe quelle écriture — une
+// valeur de 2024 servait au-delà des 30 j dès qu'on consultait autre
+// chose), et la clé lat/lon est fine au CENTIÈME de degré (≈ 1 km ; avant
+// : arrondi au degré ≈ 60 NM). Format v2 incompatible : l'ancien cache
+// sans dates est ignoré et se reconstruit.
+const LS_KEY = 'magvar-cache-v2';
 const LS_TTL_MS = 30 * 86400e3;   // audit 26/09 : sans TTL, une valeur de 2024 servait indéfiniment
 
 function _readLs() {
     try {
         const cache = JSON.parse(localStorage.getItem(LS_KEY)) || {};
-        // Cache global daté : périmé (ou ancien format sans date) → ignoré,
-        // réécrit au prochain calcul.
-        const ts = Number(cache.__ts);
-        if (!Number.isFinite(ts) || Date.now() - ts > LS_TTL_MS) return {};
+        // Entrée PÉRIMÉE (> 30 j, ou ancien format sans date) → éjectée,
+        // recalculée au prochain besoin.
+        const now = Date.now();
+        for (const k of Object.keys(cache)) {
+            const ts = Number(cache[k]?.ts);
+            if (!Number.isFinite(ts) || now - ts > LS_TTL_MS) delete cache[k];
+        }
         return cache;
     } catch {
         return {};
     }
 }
 
-function _writeLs(icao, dec) {
+function _writeLs(key, dec) {
     try {
         const cache = _readLs();
-        cache[icao.toUpperCase()] = dec;
-        cache.__ts = Date.now();
+        cache[key] = { v: dec, ts: Date.now() };
         localStorage.setItem(LS_KEY, JSON.stringify(cache));
     } catch {
 
@@ -42,14 +50,14 @@ export function getDeclinationForIcao(icao) {
     const sia = getOfficialDeclination(key);
     if (typeof sia === 'number') {
         _sessionCache.set(key, sia);
-        _writeLs(icao, sia);
+        _writeLs(key, sia);
         return sia;
     }
 
     const lsCache = _readLs();
-    if (typeof lsCache[key] === 'number') {
-        _sessionCache.set(key, lsCache[key]);
-        return lsCache[key];
+    if (typeof lsCache[key]?.v === 'number') {
+        _sessionCache.set(key, lsCache[key].v);
+        return lsCache[key].v;
     }
 
     // Calcul synchrone via la lib geomag (WMM2020, chargée en <script> dans index.html).
@@ -66,14 +74,14 @@ export async function getDeclinationForIcaoAsync(icao) {
     const sia = getOfficialDeclination(key);
     if (typeof sia === 'number') {
         _sessionCache.set(key, sia);
-        _writeLs(icao, sia);
+        _writeLs(key, sia);
         return sia;
     }
 
     const lsCache = _readLs();
-    if (typeof lsCache[key] === 'number') {
-        _sessionCache.set(key, lsCache[key]);
-        return lsCache[key];
+    if (typeof lsCache[key]?.v === 'number') {
+        _sessionCache.set(key, lsCache[key].v);
+        return lsCache[key].v;
     }
 
     _fetchAndCache(icao);
@@ -92,6 +100,10 @@ function _getCoords(icao) {
 // WMM (World Magnetic Model) embarqué dans vendor/geomag.js (lib MIT, ~9 Ko).
 // Précision : ~±1° (modèle WMM2020 extrapolé ; suffisant en VFR où la tolérance
 // de nav est de ±5°). La lib expose window.geomag.field(lat, lon, altM) → { declination }.
+// N14 (audit 27/09) : le 3ᵉ argument n'est PAS des mètres — la lib attend un
+// nombre de RAYONS TERRESTRES ; on passe TOUJOURS 0 (sol) et on n'y touche
+// jamais : l'effet de l'altitude sur la déclinaison est négligeable en
+// aviation légère, et toute autre valeur serait une erreur d'unité latente.
 function _fetchAndCache(icao) {
     if (!icao) return;
     const { lat, lon } = _getCoords(icao);
@@ -101,7 +113,7 @@ function _fetchAndCache(icao) {
             const result = window.geomag.field(lat, lon, 0);
             const dec = result?.declination;
             if (typeof dec === 'number' && !isNaN(dec)) {
-                _writeLs(icao, dec);
+                _writeLs(icao.toUpperCase(), dec);
                 _sessionCache.set(icao.toUpperCase(), dec);
             }
         }
@@ -115,8 +127,8 @@ export async function preloadDeclination(icao) {
     const key = icao.toUpperCase();
     if (_sessionCache.has(key)) return;
     const lsCache = _readLs();
-    if (typeof lsCache[key] === 'number') {
-        _sessionCache.set(key, lsCache[key]);
+    if (typeof lsCache[key]?.v === 'number') {
+        _sessionCache.set(key, lsCache[key].v);
         return;
     }
     _fetchAndCache(icao);
@@ -124,10 +136,12 @@ export async function preloadDeclination(icao) {
 
 export function getMagneticDeclination(lat, lon) {
     if (lat == null || lon == null) return 0;
-    const key = `${lat.toFixed(0)},${lon.toFixed(0)}`;
+    // N11 (audit 27/09) : clé au CENTIÈME de degré (≈ 1 km) — l'arrondi au
+    // degré (~60 NM) faisait servir la déclinaison d'un point lointain.
+    const key = `${lat.toFixed(2)},${lon.toFixed(2)}`;
     if (_sessionCache.has(key)) return _sessionCache.get(key);
     const lsCache = _readLs();
-    if (typeof lsCache[key] === 'number') return lsCache[key];
+    if (typeof lsCache[key]?.v === 'number') return lsCache[key].v;
     // Calcul direct via la lib geomag (évite de dépendre d'un ICAO).
     try {
         if (typeof window !== 'undefined' && window.geomag && typeof window.geomag.field === 'function') {
@@ -167,5 +181,5 @@ export function injectMagvar(icao, dec) {
     if (!icao || typeof dec !== 'number' || isNaN(dec)) return;
     const key = icao.toUpperCase();
     _sessionCache.set(key, dec);
-    _writeLs(icao, dec);
+    _writeLs(key, dec);
 }

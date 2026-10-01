@@ -320,7 +320,12 @@ function _loadCellItems(lat, lon) {
  *  La base OFFICIELLE SIA (data/sia-airspaces.json, export XML AIRAC)
  *  PRIME sur openAIP pour toute vue dans la couverture SIA : les zones
  *  openAIP de la même zone sont alors écartées (doublons évités). */
-const SIA_COVERAGE = [41, -63, 52, 12];   // France métropole + DOM proches
+// A15-v5 (audit 27/09) : bbox de la base XML SIA = MÉTROPOLE élargie
+// (Lat 41–52 : Corse incluse ; Lon −63–12 : marge océanique). Les DOM
+// (Guadeloupe ~16°N, Réunion ~21°S…) sont HORS bbox ET hors base : un
+// point là-bas est « non couvert SIA » → repli conservateur contrôlé de
+// vfr-minima (drapeau unknown), jamais une absence silencieuse de zones.
+const SIA_COVERAGE = [41, -63, 52, 12];
 let _siaItems = null;
 let _siaPending = null;
 let _siaOk = false;   // base chargée (réseau OU cache IDB) — voir siaAirspacesOk()
@@ -791,6 +796,12 @@ export function _decodeIcaoClass(as) {
 // Limites verticales openAIP : lowerLimit/upperLimit { value, unit,
 // referenceDatum } — unit 6 = FL, unit 1 = ft, unit 0 = m ; referenceDatum
 // 1 = AGL. (L'ancien format `lower`/`upper` en mètres est encore accepté.)
+// A15-v5 (audit 27/09) : la conversion FL→ft applique le calage ALTIMÉTRIQUE
+// STANDARD 1013,25 hPa implicite — un FL est par définition une surface de
+// pression, l'app travaille en ft AMSL « standard » (suffisant en VFR :
+// l'écart réel ~27 ft/hPa de QNH ne déplace pas une zone dans les filtres
+// d'affichage ; les ALTITUDES de vol du plan, elles, sont QNH-corrigées
+// ailleurs). Le FL n'est JAMAIS recalculé avec le QNH du jour ici.
 export function _limitFt(lim) {
     if (!lim || !isFinite(lim.value)) return null;
     if (lim.unit === 6) return lim.value * 100;                      // FL → ft

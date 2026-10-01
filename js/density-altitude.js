@@ -108,6 +108,15 @@ export function getPerformanceData() {
     if (!parsed) return null;
 
     const icao = state.requestedIcao || parsed.code;
+    // A13-v4 (audit 27/09) : le QNH/OAT vient du METAR AFFICHÉ (parsed) et
+    // l'élévation du terrain DEMANDÉ — si les deux diffèrent (transition
+    // d'affichage), on REFUSE plutôt que de mélanger deux terrains dans la
+    // même densité-altitude (la voie brute fiable existe pour le dossier :
+    // evaluateTakeoffFromRaw, takeoff-performance.js).
+    if (state.requestedIcao && parsed.code
+        && String(state.requestedIcao).toUpperCase() !== String(parsed.code).toUpperCase()) {
+        return null;
+    }
     const apt = getAirportByICAO(icao);
     // airports.json contient désormais l'élévation (ft) pour ~100% des terrains
     // (fusion depuis Airports.json/Runways.json). On l'utilise en priorité — pas

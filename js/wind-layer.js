@@ -123,7 +123,10 @@ export function mountWindLayer(map, bar) {
     if (!map || !bar || bar.querySelector('.wind-layer-btn')) return;
     const isFr = state.lang === 'fr';
 
-    const ALTS = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4500];
+    // N9 (audit 27/09) : la liste s'arrêtait à 4500 ft — un plan volé à
+    // 6000 ft (ou plus, jusqu'à la limite VFR/givrage ~10 000) faisait
+    // retomber le sélecteur à 2000. Niveaux VFR usuels couverts.
+    const ALTS = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4500, 5500, 6500, 7500, 8500, 9500];
 
     const group = document.createElement('div');
     group.className = 'precip-control-group wind-ctl-group';
@@ -154,8 +157,11 @@ export function mountWindLayer(map, bar) {
         // Le sélecteur affiche TOUJOURS l'altitude courante (y compris quand
         // c'est le plan qui l'a changée — bidirectionnel).
         if (altSelect && String(altSelect.value) !== String(altFt)) {
-            const match = [...altSelect.options].some(o => String(o.value) === String(altFt));
-            altSelect.value = match ? String(altFt) : String(2000);
+            // N9 : repli sur le niveau le PLUS PROCHE (un plan à 6200 ft
+            // suit 6500, plus un saut à 2000), et non plus sur 2000.
+            const opts = [...altSelect.options].map(o => +o.value);
+            const nearest = opts.reduce((a, b) => Math.abs(b - altFt) < Math.abs(a - altFt) ? b : a, opts[0] ?? 2000);
+            altSelect.value = String(opts.includes(+altFt) ? altFt : nearest);
         }
         // Mais on ne DESSINE que si la couche est ACTIVE (retour pilote
         // 15/09 : au recalcul du plan — événement plan-alt — ou au changement

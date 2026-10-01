@@ -75,6 +75,11 @@ const PRECACHE = [
     'js/gps.js',
     'js/data-age.js',
     'js/notam.js',
+    // S15 (audit 27/09) : externalisés d'inline — l'anti-flash DOIT être
+    // en cache pour jouer avant le premier rendu hors ligne, le chargeur
+    // de libs pour la carte hors ligne.
+    'js/anti-flash.js',
+    'js/lib-loader.js',
     'css/style.css',
 ];
 
