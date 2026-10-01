@@ -45,7 +45,7 @@ export function getDeclinationForIcao(icao) {
     if (_sessionCache.has(key)) return _sessionCache.get(key);
 
     // Déclinaison OFFICIELLE SIA (France, AdMagVar millésimé — ex. 0,24°
-    // 2025) en priorité sur le modèle WMM2020 ; null tant que sia-data
+    // 2025) en priorité sur le repli WMM2025 ; null tant que sia-data
     // n'est pas chargé ou hors France.
     const sia = getOfficialDeclination(key);
     if (typeof sia === 'number') {
@@ -60,7 +60,7 @@ export function getDeclinationForIcao(icao) {
         return lsCache[key].v;
     }
 
-    // Calcul synchrone via la lib geomag (WMM2020, chargée en <script> dans index.html).
+    // Calcul synchrone via la lib geomag (WMM2025, chargée en <script> dans index.html).
     // Indépendant du réseau : garantit une valeur réelle même si OpenAIP ne répond pas.
     _fetchAndCache(icao);
     return _sessionCache.get(key) ?? 0;
@@ -97,13 +97,18 @@ function _getCoords(icao) {
 }
 
 // Calcule la déclinaison (°, convention : + = Est, - = Ouest) via le modèle
-// WMM (World Magnetic Model) embarqué dans vendor/geomag.js (lib MIT, ~9 Ko).
-// Précision : ~±1° (modèle WMM2020 extrapolé ; suffisant en VFR où la tolérance
-// de nav est de ±5°). La lib expose window.geomag.field(lat, lon, altM) → { declination }.
-// N14 (audit 27/09) : le 3ᵉ argument n'est PAS des mètres — la lib attend un
-// nombre de RAYONS TERRESTRES ; on passe TOUJOURS 0 (sol) et on n'y touche
-// jamais : l'effet de l'altitude sur la déclinaison est négligeable en
-// aviation légère, et toute autre valeur serait une erreur d'unité latente.
+// WMM2025 (World Magnetic Model 2025-2030, coefficients officiels NOAA du
+// 13/11/2024) embarqué dans vendor/geomag.js (lib MIT patchée localement,
+// migration N13 du 01/10/2026). Précision : ~±0,3° en France — validée à
+// l'époque 2025.0 contre les déclinaisons OFFICIELLES SIA AdMagVar embarquées
+// (biais 0,017° / RMSE 0,019° / max 0,030° sur 444 terrains ; test
+// geomag.test.mjs), et contre les 100 points de test NOAA (médiane 0,000°).
+// L'ancien WMM2020 extrapolé surestimait la déclinaison Est de ~+0,4° en
+// 2026. La lib expose window.geomag.field(lat, lon, altKm, dateMs?) ;
+// N14 (audit 27/09, corrigé le 01/10) : le 3ᵉ argument est en KILOMÈTRES
+// (analyse dimensionnelle du code + preuve sur les points NOAA à 8-65 km) —
+// on passe TOUJOURS 0 (sol) : l'effet de l'altitude est négligeable en
+// aviation légère.
 function _fetchAndCache(icao) {
     if (!icao) return;
     const { lat, lon } = _getCoords(icao);
