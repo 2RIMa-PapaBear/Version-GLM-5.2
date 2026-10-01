@@ -5,6 +5,7 @@ import { horLabel, MAX_BASE_FT, isRdpZone } from './airspace-profile.js';
 import { bigDataUrl } from './data-base.js';
 import { getCurrentNotams } from './notam.js';
 import { zoneActivation, zoneActiveToday } from './azba.js';
+import { airacInForce } from './sia-data.js';   // fraîcheur du cache zones par cycle AIRAC
 
 const BASE_URL = 'https://api.core.openaip.net/api/airspaces';
 
@@ -333,24 +334,29 @@ async function _loadSiaItems() {
         const stamp = (arr) => { for (const it of arr) it._sia = true; return arr; };
         // v2 : la base du 29/08 corrige la géométrie (contours densifiés
         // SIA — cercles cwa rendus en triangles avant).
-        // v3 : + champ hor (code d'horaire d'activation — H24, NOTAM…),
-        // absent des caches v2 — nouveau clé = les clients re-téléchargent
-        // sans attendre le TTL de 7 j.
-        const cached = await _idbGet('sia:airspaces:v5');
-        if (cached?.data && Date.now() - cached.ts < CELL_TTL_MS) { _siaItems = stamp(cached.data); _siaOk = true; return _siaItems; }
+        // v3 : + champ hor (code d'horaire d'activation — H24, NOTAM…).
+        // v5 : + A5/A6 (classe OACI, horaire texte).
+        // v6 : le cache emporte l'AIRAC — un cache du cycle précédent se
+        // re-télécharge LE JOUR de la bascule (retour pilote 01/10 : le
+        // TTL de 7 j seul laissait des zones périmées après la bascule).
+        const cached = await _idbGet('sia:airspaces:v6');
+        const frais = cached?.data?.items?.length
+            && Date.now() - cached.ts < CELL_TTL_MS
+            && !(cached.data.airac && cached.data.airac < airacInForce());
+        if (frais) { _siaItems = stamp(cached.data.items); _siaOk = true; return _siaItems; }
         try {
             const res = await fetch(`data/sia-airspaces.json?t=${cached?.ts || 0}`, { signal: AbortSignal.timeout(15000) });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const d = await res.json();
             _siaItems = stamp(d.items.map(_expandFileItem));
             _siaOk = true;
-            _idbPut('sia:airspaces:v5', _siaItems);
+            _idbPut('sia:airspaces:v6', { items: _siaItems, airac: d.airac });
         } catch {
             // Échec réseau : repli sur le cache IDB s'il existe (base alors
             // encore disponible, périmée mais consultable) — sinon la base
             // est INDISPONIBLE (siaAirspacesOk() reste false).
-            _siaOk = !!(cached?.data?.length);
-            _siaItems = stamp(cached?.data || []);
+            _siaOk = !!(cached?.data?.items?.length);
+            _siaItems = stamp(cached?.data?.items || []);
         }
         return _siaItems;
     })();

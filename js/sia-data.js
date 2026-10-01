@@ -95,7 +95,12 @@ export async function loadSiaAux() {
         }
         const use = async (key, file) => {
             const cached = await _idbGet(key);
-            if (cached?.data && Date.now() - cached.ts < TTL_MS) return cached.data;
+            // Fraîcheur : âge < TTL ET cycle pas dépassé (un cache du cycle
+            // précédent se re-télécharge LE JOUR de la bascule AIRAC —
+            // retour pilote 01/10 : le TTL seul laissait le bandeau
+            // « CYCLE PÉRIMÉ » pendant des jours).
+            if (cached?.data && Date.now() - cached.ts < TTL_MS
+                && !(cached.data.airac && cached.data.airac < airacInForce())) return cached.data;
             try {
                 const res = await fetch(`${file}?t=${cached?.ts || 0}`, { signal: AbortSignal.timeout(10000) });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -158,6 +163,19 @@ export function airacCycleInfo(airacDateStr, nowMs = Date.now()) {
     const effectiveMs = Date.UTC(+m[1], +m[2] - 1, +m[3]);
     const nextMs = effectiveMs + 28 * 86400e3;
     return { effectiveMs, nextMs, expired: nowMs >= nextMs };
+}
+
+/** Cycle AIRAC en vigueur à l'instant `nowMs` (série SIA observée :
+ *  ancre 2026-07-09, pas de 28 j — même formule que les scripts serveur
+ *  fetch-freq-sia / check-sia-airac). Pur, testé sous Node. Sert aux
+ *  CACHES CLIENT : un cache dont le cycle est inférieur au cycle en
+ *  vigueur est PÉRIMÉ LE JOUR DE LA BASCULE — on re-télécharge au lieu
+ *  d'attendre le TTL de 7 j (retour pilote 01/10 : bandeau « CYCLE
+ *  PÉRIMÉ » pendant des jours alors que le serveur était à jour). */
+export function airacInForce(nowMs = Date.now()) {
+    const ANCHOR = Date.UTC(2026, 6, 9);
+    const k = Math.max(0, Math.floor((nowMs - ANCHOR) / (28 * 86400e3)));
+    return new Date(ANCHOR + k * 28 * 86400e3).toISOString().slice(0, 10);
 }
 
 /** Terrain officiel (France) : {code, elevFt, magVar, magVarYear, …} ou null. */

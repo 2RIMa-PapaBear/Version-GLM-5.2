@@ -82,3 +82,25 @@ test('sia-data : déclinaison et élévation officielles', () => {
         if (typeof t.magVar === 'number') assert.ok(Math.abs(t.magVar) < 10, `${t.code} magVar suspecte : ${t.magVar}`);
     }
 });
+
+// airacInForce (retour pilote 01/10) : les caches client doivent savoir,
+// SEULS et sans réseau, quel cycle est en vigueur — ancre série SIA
+// 2026-07-09, pas de 28 j. Points de bascule exacts à l'heure près.
+test('sia-data : airacInForce — cycle en vigueur à la date près', async () => {
+    const { airacInForce } = await import('../js/sia-data.js');
+    const D = (s) => Date.parse(s);
+    // Avant l'ancre : ancre elle-même.
+    assert.equal(airacInForce(D('2026-01-01T00:00:00Z')), '2026-07-09');
+    // Veille / jour / veille de la bascule 10-01 (obtenue à 09-03 + 28 j).
+    assert.equal(airacInForce(D('2026-09-30T23:59:59Z')), '2026-09-03');
+    assert.equal(airacInForce(D('2026-10-01T00:00:00Z')), '2026-10-01');
+    assert.equal(airacInForce(D('2026-10-28T23:59:59Z')), '2026-10-01');
+    assert.equal(airacInForce(D('2026-10-29T00:00:00Z')), '2026-10-29');
+    // Cohérence avec airacCycleInfo : un cycle « en vigueur » n'est jamais
+    // marqué expiré, le suivant l'est dès son jour J+28.
+    const { airacCycleInfo } = await import('../js/sia-data.js');
+    const now = D('2026-10-01T12:00:00Z');
+    assert.equal(airacCycleInfo(airacInForce(now), now).expired, false);
+    const vieux = airacCycleInfo('2026-09-03', now);
+    assert.equal(vieux.expired, true, 'le cycle 09-03 est périmé le 01/10');
+});

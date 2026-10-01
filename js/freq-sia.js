@@ -24,9 +24,16 @@ let _siaAa = null;          // idem, AFIS + A/A du XML_SIA
 let _overrides = null;      // { airports: {OACI: [...]}, services: {NOM: "fréq"} }
 let _loading = null;
 
+import { airacInForce } from './sia-data.js';
+
 async function _fetchJsonCached(url, idbKey) {
     const cached = await _idbGet(idbKey);
-    if (cached?.data && Date.now() - cached.ts < TTL_MS) return cached.data;
+    // Fraîcheur : âge < TTL ET cycle pas dépassé — un cache du cycle
+    // précédent se re-télécharge LE JOUR de la bascule AIRAC (retour
+    // pilote 01/10 : le TTL seul laissait le bandeau « CYCLE PÉRIMÉ »
+    // pendant des jours alors que le serveur était à jour).
+    if (cached?.data && Date.now() - cached.ts < TTL_MS
+        && !(cached.data.airac && cached.data.airac < airacInForce())) return cached.data;
     try {
         // ?v= (version du CONTENU, bumpée à chaque évolution intra-cycle) :
         // une URL inédite ne peut être servie par AUCUN cache — HTTP
