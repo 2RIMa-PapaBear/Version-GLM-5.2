@@ -192,7 +192,11 @@ par un correctif déjà publié ; le reste est OUVERT.
 ### Sorties / socle (volet 6)
 - **S9** QR de partage via tiers (api.qrserver.com : l'URL du plan part chez le tiers ;
   piste encodeur QR local ~10 Ko).
-- **S10** Mode cockpit : grossissement marginal — à juger en QA visuelle à 2 m.
+- **S10 — ANNULÉ (décision pilote 01/10)** Mode cockpit : grossissement
+  marginal — la QA visuelle de clôture n'aura pas lieu, le mode cockpit
+  reste tel quel (aucun changement de code en suspens). Dernière case du
+  tableau des audits : celui-ci est désormais TOUT fermé (hors saisies
+  POH atterrissage des autres avions de flotte, hors audit).
 - **S11** Commentaires obsolètes « ±50 NM » dans navlog-pdf (réel 25 NM/8) — cosmétique.
 - **S12** Alternates : le PDF montre plus que l'écran en aller-retour (conservateur) —
   harmoniser.
