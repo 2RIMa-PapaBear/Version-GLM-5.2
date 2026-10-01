@@ -320,8 +320,11 @@ describe('base avions — Dynamic WT9 LSA (fiche complète)', () => {
         const wt9 = res.find(a => a.type === 'WT9-LSA');
         assert.ok(wt9, 'WT9 LSA trouvé');
         assert.equal(wt9.name, 'Dynamic WT9 LSA');
-        assert.equal(wt9.groundRoll, 540);
-        assert.equal(wt9.fiftyFt, 1148);
+        // A12-v4 (sourcé 01/10, feu vert pilote) : 650 ft = POH public WT9
+        // (UL 472,5 ; l'ancien 540 non sourcé) — le test verrouille la SOURCE.
+        assert.equal(wt9.groundRoll, 650);
+        assert.equal(wt9.fiftyFt, 1148);   // conservé (pilote) — à confirmer POH F-HAYA
+        assert.equal(wt9.wb.stations.find(s => s.name === 'Bagages').maxKg, 10);   // POH (pilote 01/10)
         assert.equal(wt9.ldgRoll, 246);
         assert.equal(wt9.ldgFifty, 863);
         assert.equal(wt9.safetyMargin, 15);

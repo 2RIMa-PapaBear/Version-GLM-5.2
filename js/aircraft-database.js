@@ -155,7 +155,11 @@ export const AIRCRAFT_DB = [
     // VR 50 kt (pilote).
     {
         name: 'Dynamic WT9 LSA', type: 'WT9-LSA',
-        groundRoll: 540, fiftyFt: 1148,
+        // A12-v4 (audit 27/09, sourcé 01/10 sur feu vert pilote) : roulement
+        // 650 ft = POH PUBLIC WT9 (condition UL 472,5 — l'ancien 540 ft était
+        // non sourcé, −17 %) ; 1 148 ft au 50 ft conservé (pilote) — À
+        // CONFIRMER POH F-HAYA ; atterrissage 246/863 = POH exact (audit).
+        groundRoll: 650, fiftyFt: 1148,
         safetyMargin: 15, cruiseSpeedKt: 100, fuelBurnLph: 18,
         unusableFuelL: 6,    // 6 L inutilisables (pilote 17/09) → 113 L utilisables sur 119 de capacité
         xwindLimitKt: 25, reserveExtraMin: 5,
@@ -172,7 +176,9 @@ export const AIRCRAFT_DB = [
             stations: [
                 { name: 'Pilote', armMm: 3130, maxKg: 130, fuel: false },
                 { name: 'Passager 1', armMm: 3130, maxKg: 130, fuel: false },
-                { name: 'Bagages', armMm: 3795, maxKg: 40, fuel: false },
+                // A12-v4 : 10 kg = POH WT9 (validation pilote 01/10 — l'ancien
+                // 40 kg était un défaut générique non sourcé). Bras 3 795 mm inchangé.
+                { name: 'Bagages', armMm: 3795, maxKg: 10, fuel: false },
                 { name: 'Carburant', armMm: 2580, maxKg: 119, fuel: true },
             ],
         },
