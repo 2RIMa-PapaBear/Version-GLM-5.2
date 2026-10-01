@@ -21,7 +21,7 @@
 // cache IndexedDB existant et force un re-téléchargement.
 // Penser aussi à aligner le ?v= du <link rel=preload> dans index.html.
 // ----------------------------------------------------------------
-export const AIRPORTS_DB_VERSION = '1.15.0';
+export const AIRPORTS_DB_VERSION = '1.16.0';   // m5 (01/10) : +LFHB/LFTB (hydrobases, absentes d'OurAirports)
 
 // ----------------------------------------------------------------
 // LocalStorage — fuseaux horaires par aéroport

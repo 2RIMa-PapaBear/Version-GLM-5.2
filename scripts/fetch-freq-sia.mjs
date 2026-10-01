@@ -190,7 +190,16 @@ async function getOpenAipKey() {
     return mod.OPENAIP_API_KEY;
 }
 
+// o3 (audit 01/10) : l'eAIP balise ses révisions AIRAC — une valeur
+// modifiée paraît en DOUBLE dans le HTML, l'ancienne dans <del>…</del> et
+// la nouvelle dans <ins>…</ins>. Les balises parties, strip() laissait
+// « 121.200 121.205 MHz » : le regex ancré une-seule-valeur ne matchait
+// plus et TOUTE la fiche sortait sans fréquences (LFPT/LFRQ/LFRZ perdues
+// du cycle 10-01 — fréquences amendées seules touchées). Un texte <del>
+// est HORS VIGUEUR : on le jette AVANT de retirer les balises, pour toute
+// cellule (indicatifs, horaires, remarques).
 const strip = (html) => html
+    .replace(/<del\b[^>]*>[\s\S]*?<\/del>/gi, '')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ')
     .replace(/&lt;/g, '<')

@@ -1,10 +1,10 @@
 {
- "generatedAt": "2026-10-01T05:30:46.253Z",
+ "generatedAt": "2026-10-01T17:16:17.044Z",
  "airac": "2026-10-01",
  "source": "SIA eAIP France AD 2.17/2.18",
  "counts": {
-  "airports": 138,
-  "frequencies": 1115,
+  "airports": 141,
+  "frequencies": 1183,
   "failed": 0
  },
  "airports": {
@@ -63,6 +63,20 @@
     "rem": null
    },
    {
+    "type": "TWR",
+    "name": "LE TOUQUET Tour",
+    "value": "118.455",
+    "hor": "HO",
+    "rem": null
+   },
+   {
+    "type": "VDF",
+    "name": "LE TOUQUET Gonio",
+    "value": "118.455",
+    "hor": "HO",
+    "rem": null
+   },
+   {
     "type": "ATIS",
     "name": "LE TOUQUET",
     "value": "123.130",
@@ -70,11 +84,18 @@
     "rem": "TEL 03 21 06 62 84"
    },
    {
+    "type": "A/A",
+    "name": "LE TOUQUET",
+    "value": "118.455",
+    "hor": "HX",
+    "rem": null
+   },
+   {
     "type": "LOC 13 (I.E.",
     "name": "LT",
     "value": "110.15",
     "hor": "H24",
-    "rem": "50°30'41.8\"N 001°37'58.5\"E 15 ft 133°/297 m DTHR 31 132°/297 m DTHR 31"
+    "rem": "50°30'41.8\"N 001°37'58.5\"E 15 ft 132°/297 m DTHR 31"
    }
   ],
   "LFAV": [
@@ -283,11 +304,46 @@
     "rem": "Fréquence supplétive/Auxiliary frequency. Sur instruction CTL"
    },
    {
+    "type": "APP",
+    "name": "AQUITAINE Approche",
+    "value": "129.880",
+    "hor": "H24",
+    "rem": "Secteurs/Sectors BW 1 et/and 2."
+   },
+   {
+    "type": "APP",
+    "name": "MERIGNAC Approche",
+    "value": "121.205",
+    "hor": "H24",
+    "rem": "Sur instruction CTL"
+   },
+   {
     "type": "TWR",
     "name": "MERIGNAC Sol",
     "value": "121.730",
     "hor": "H24",
     "rem": "Sur instruction CTL"
+   },
+   {
+    "type": "TWR",
+    "name": "MERIGNAC Sol",
+    "value": "121.905",
+    "hor": "H24",
+    "rem": null
+   },
+   {
+    "type": "TWR",
+    "name": "MERIGNAC Tour",
+    "value": "118.305",
+    "hor": "H24",
+    "rem": null
+   },
+   {
+    "type": "VDF",
+    "name": "MERIGNAC Gonio",
+    "value": "118.305",
+    "hor": "H24",
+    "rem": null
    },
    {
     "type": "VDF",
@@ -318,6 +374,13 @@
     "rem": null
    },
    {
+    "type": "VDF",
+    "name": "MERIGNAC Gonio",
+    "value": "129.880",
+    "hor": "H24",
+    "rem": null
+   },
+   {
     "type": "ATIS",
     "name": "MERIGNAC",
     "value": "131.155",
@@ -329,7 +392,7 @@
     "name": "BEI",
     "value": "111.15",
     "hor": "H24",
-    "rem": "44°49'56.3\"N 44°49'56.4\"N 000°43'58.2\"W 000°43'58.4\"W 160 163 ft 286º/296m THR 11 286º/300m THR 11"
+    "rem": "44°49'56.4\"N 000°43'58.4\"W 163 ft 286º/300m THR 11"
    }
   ],
   "LFBE": [
@@ -1068,6 +1131,13 @@
    {
     "type": "APP",
     "name": "TOULOUSE Approche",
+    "value": "124.980",
+    "hor": "H24",
+    "rem": "Fréquence supplétive/Auxiliary frequency."
+   },
+   {
+    "type": "APP",
+    "name": "TOULOUSE Approche",
     "value": "125.180",
     "hor": "H24",
     "rem": "Secteur OUEST - Contrôle en TMA. Appareils non-équipés 8,33 KHz : voir AD 2 LFBO.23. Secteurs AW 1 à 4. West sector - Control within TMA. Aircraft non 8.33 KHz-"
@@ -1110,6 +1180,20 @@
    {
     "type": "VDF",
     "name": "TOULOUSE Gonio",
+    "value": "118.105",
+    "hor": "H24",
+    "rem": null
+   },
+   {
+    "type": "VDF",
+    "name": "TOULOUSE Gonio",
+    "value": "120.355",
+    "hor": "H24",
+    "rem": null
+   },
+   {
+    "type": "VDF",
+    "name": "TOULOUSE Gonio",
     "value": "121.250",
     "hor": "H24",
     "rem": null
@@ -1118,6 +1202,20 @@
     "type": "VDF",
     "name": "TOULOUSE Gonio",
     "value": "123.850",
+    "hor": "H24",
+    "rem": null
+   },
+   {
+    "type": "VDF",
+    "name": "TOULOUSE Gonio",
+    "value": "125.180",
+    "hor": "H24",
+    "rem": null
+   },
+   {
+    "type": "VDF",
+    "name": "TOULOUSE Gonio",
+    "value": "129.305",
     "hor": "H24",
     "rem": null
    },
@@ -1203,6 +1301,20 @@
   ],
   "LFBR": [
    {
+    "type": "TWR",
+    "name": "MURET Sol",
+    "value": "121.755",
+    "hor": "HX",
+    "rem": "HOR ATS / ATS SKED"
+   },
+   {
+    "type": "TWR",
+    "name": "MURET Tour",
+    "value": "123.205",
+    "hor": "HO",
+    "rem": "HOR ATS / ATS SKED"
+   },
+   {
     "type": "VDF",
     "name": "MURET Gonio",
     "value": "123.200",
@@ -1241,6 +1353,20 @@
    }
   ],
   "LFBT": [
+   {
+    "type": "TWR",
+    "name": "LOURDES Sol",
+    "value": "121.805",
+    "hor": "HX",
+    "rem": null
+   },
+   {
+    "type": "TWR",
+    "name": "LOURDES Tour",
+    "value": "119.055",
+    "hor": "HX",
+    "rem": null
+   },
    {
     "type": "ATIS",
     "name": "LOURDES",
@@ -1362,6 +1488,34 @@
   ],
   "LFBZ": [
    {
+    "type": "FIS",
+    "name": "BIARRITZ Information",
+    "value": "119.180",
+    "hor": "HO",
+    "rem": null
+   },
+   {
+    "type": "APP",
+    "name": "BIARRITZ Approche",
+    "value": "125.605",
+    "hor": "HO",
+    "rem": "Secteur/Sector BZ."
+   },
+   {
+    "type": "TWR",
+    "name": "BIARRITZ Sol",
+    "value": "121.955",
+    "hor": "HO",
+    "rem": null
+   },
+   {
+    "type": "TWR",
+    "name": "BIARRITZ Tour",
+    "value": "118.705",
+    "hor": "HO",
+    "rem": null
+   },
+   {
     "type": "VDF",
     "name": "BIARRITZ Gonio",
     "value": "118.700",
@@ -1387,7 +1541,7 @@
     "name": "BZ",
     "value": "111.35",
     "hor": "H24",
-    "rem": "43°28'05.6\"N 001°32'20.2\"W 234 243 ft 268°/139 m THR 09"
+    "rem": "43°28'05.6\"N 001°32'20.2\"W 243 ft 268°/139 m THR 09"
    }
   ],
   "LFCC": [
@@ -1433,6 +1587,20 @@
   ],
   "LFCR": [
    {
+    "type": "TWR",
+    "name": "RODEZ Tour",
+    "value": "118.130",
+    "hor": "HO",
+    "rem": null
+   },
+   {
+    "type": "VDF",
+    "name": "RODEZ Gonio",
+    "value": "118.130",
+    "hor": "HO",
+    "rem": null
+   },
+   {
     "type": "VDF",
     "name": "RODEZ Gonio",
     "value": "133.725",
@@ -1447,11 +1615,18 @@
     "rem": "TEL : 05 65 77 17 49 Diffusion des paramètres de DEP et ARR. / DEP and ARR parameters broadcasting."
    },
    {
+    "type": "A/A",
+    "name": "RODEZ",
+    "value": "118.130",
+    "hor": "HX",
+    "rem": "Absence ATS."
+   },
+   {
     "type": "LOC 31 (I.E.",
     "name": "RDE",
     "value": "110.75",
     "hor": "H24",
-    "rem": "44°24'51.9\"N 002°28'16.9\"E 1914 ft 25 310°/130 m THR 13 307°/132 m THR 13"
+    "rem": "44°24'51.9\"N 002°28'16.9\"E 1914 ft 25 307°/132 m THR 13"
    }
   ],
   "LFCY": [
@@ -2137,9 +2312,30 @@
   ],
   "LFLB": [
    {
+    "type": "FIS",
+    "name": "CHAMBERY Information",
+    "value": "123.705",
+    "hor": "HO",
+    "rem": null
+   },
+   {
     "type": "APP",
     "name": "CHAMBERY Approche",
     "value": "121.205",
+    "hor": "HO",
+    "rem": null
+   },
+   {
+    "type": "APP",
+    "name": "CHAMBERY Approche",
+    "value": "123.705",
+    "hor": "HO",
+    "rem": null
+   },
+   {
+    "type": "TWR",
+    "name": "CHAMBERY Tour",
+    "value": "118.305",
     "hor": "HO",
     "rem": null
    },
@@ -2149,6 +2345,13 @@
     "value": "127.100",
     "hor": "HO",
     "rem": "TEL : 04 85 44 09 66"
+   },
+   {
+    "type": "A/A",
+    "name": "CHAMBERY",
+    "value": "123.705",
+    "hor": "HX",
+    "rem": "Absence ATS"
    }
   ],
   "LFLC": [
@@ -2385,6 +2588,13 @@
     "rem": null
    },
    {
+    "type": "TWR",
+    "name": "SAINT EX Tour",
+    "value": "133.155",
+    "hor": "H24",
+    "rem": "Fréquence supplétive/Auxiliary frequency. TWR"
+   },
+   {
     "type": "VDF",
     "name": "SAINT EX Gonio",
     "value": "120.450",
@@ -2508,6 +2718,27 @@
     "value": "121.730",
     "hor": "HO",
     "rem": null
+   },
+   {
+    "type": "TWR",
+    "name": "ANNECY Tour",
+    "value": "118.205",
+    "hor": "HO",
+    "rem": null
+   },
+   {
+    "type": "AFIS",
+    "name": "ANNECY Information",
+    "value": "118.205",
+    "hor": "",
+    "rem": "NOTAM"
+   },
+   {
+    "type": "A/A",
+    "name": "ANNECY",
+    "value": "118.205",
+    "hor": "HX",
+    "rem": "Absence ATS."
    }
   ],
   "LFLS": [
@@ -2517,6 +2748,20 @@
     "value": "121.930",
     "hor": "HO",
     "rem": "Contrôle ACFT au sol."
+   },
+   {
+    "type": "TWR",
+    "name": "GRENOBLE Tour",
+    "value": "119.305",
+    "hor": "HO",
+    "rem": null
+   },
+   {
+    "type": "VDF",
+    "name": "GRENOBLE Gonio",
+    "value": "119.305",
+    "hor": "HO",
+    "rem": null
    },
    {
     "type": "ATIS",
@@ -2675,7 +2920,21 @@
     "name": "AIX Sol",
     "value": "121.605",
     "hor": "HO",
-    "rem": "Auto-information en Français uniquement. / Auto-information in French only."
+    "rem": null
+   },
+   {
+    "type": "TWR",
+    "name": "AIX Tour",
+    "value": "118.755",
+    "hor": "HO",
+    "rem": null
+   },
+   {
+    "type": "VDF",
+    "name": "AIX Gonio",
+    "value": "118.755",
+    "hor": "HO",
+    "rem": null
    },
    {
     "type": "ATIS",
@@ -2783,6 +3042,13 @@
     "value": "123.000",
     "hor": "HOR ATS",
     "rem": null
+   },
+   {
+    "type": "VDF",
+    "name": "LE LUC Gonio",
+    "value": "124.285",
+    "hor": "HOR ATS",
+    "rem": "AUTO-INFO Jour-Nuit/AUTO-INFO Day-Night"
    },
    {
     "type": "ATIS",
@@ -3921,7 +4187,7 @@
     "name": "SALON Approche",
     "value": "142.450",
     "hor": "HOR ATS",
-    "rem": "Commune veillée\\\\Common monitored Commune veillée. / Common monitored."
+    "rem": "Commune veillée. / Common monitored."
    },
    {
     "type": "APP",
@@ -4466,14 +4732,14 @@
     "name": "BI",
     "value": "109.95",
     "hor": "H24",
-    "rem": "49°27'34.3\"N 002°06'03.8\"E 350 360 ft 302°/245 m THR 12"
+    "rem": "49°27'34.3\"N 002°06'03.8\"E 360 ft 302°/245 m THR 12"
    },
    {
     "type": "LOC 12 (III.",
     "name": "BVT",
     "value": "111.15",
     "hor": "H24",
-    "rem": "49°26'41.4\"N 002°08'05.6\"E 304 312 ft 25 NM 122°/276 m THR 30"
+    "rem": "49°26'41.4\"N 002°08'05.6\"E 312 ft 25 NM 122°/276 m THR 30"
    }
   ],
   "LFOE": [
@@ -4869,11 +5135,39 @@
   ],
   "LFOK": [
    {
+    "type": "TWR",
+    "name": "VATRY Tour",
+    "value": "129.405",
+    "hor": "HO",
+    "rem": null
+   },
+   {
+    "type": "AFIS",
+    "name": "VATRY Information",
+    "value": "129.405",
+    "hor": "HO",
+    "rem": "Hors HOR ATC. / Outside ATC SKED."
+   },
+   {
+    "type": "VDF",
+    "name": "VATRY Gonio",
+    "value": "129.405",
+    "hor": "HO",
+    "rem": null
+   },
+   {
     "type": "ATIS",
     "name": "VATRY",
     "value": "136.380",
     "hor": "HO",
     "rem": "TEL: 03 26 26 15 67."
+   },
+   {
+    "type": "A/A",
+    "name": "VATRY",
+    "value": "129.405",
+    "hor": "HX",
+    "rem": "Absence ATS."
    },
    {
     "type": "LOC 28 (I.B.",
@@ -5481,6 +5775,27 @@
    {
     "type": "APP",
     "name": "ORLY Approche",
+    "value": "123.880",
+    "hor": "HO",
+    "rem": "Aéronefs d'état ne disposant pas d'équipement de radiocommunication compatible en espacement 8.33 KHZ, voir AD 2.23.9"
+   },
+   {
+    "type": "APP",
+    "name": "ORLY Approche",
+    "value": "124.455",
+    "hor": "HO",
+    "rem": null
+   },
+   {
+    "type": "APP",
+    "name": "ORLY Approche",
+    "value": "127.755",
+    "hor": "HO",
+    "rem": "FREQ réservée aux DEP. Aéronefs d'état ne disposant pas d'équipement de radiocommunication compatible en espacement 8.33 KHZ, voir AD 2.23.9"
+   },
+   {
+    "type": "APP",
+    "name": "ORLY Approche",
     "value": "128.380",
     "hor": "HO",
     "rem": "Fréquence supplétive reservée aux DEP/Auxiliary frequency only for DEP."
@@ -5507,6 +5822,34 @@
     "rem": "Fréquence supplétive/Auxiliary frequency."
    },
    {
+    "type": "TWR",
+    "name": "ORLY Tour",
+    "value": "118.705",
+    "hor": "HO",
+    "rem": null
+   },
+   {
+    "type": "TWR",
+    "name": "ORLY Tour",
+    "value": "120.505",
+    "hor": "HO",
+    "rem": "Fréquence supplétive/Auxilliary frequency."
+   },
+   {
+    "type": "TWR",
+    "name": "ORLY Tour",
+    "value": "135.005",
+    "hor": "HO",
+    "rem": "FREQ \" FIRE \"."
+   },
+   {
+    "type": "VDF",
+    "name": "ORLY Gonio",
+    "value": "118.705",
+    "hor": "H24",
+    "rem": null
+   },
+   {
     "type": "VDF",
     "name": "ORLY Gonio",
     "value": "118.855",
@@ -5519,6 +5862,27 @@
     "value": "121.500",
     "hor": "H24",
     "rem": "Fréquence détresse / Distress frequency"
+   },
+   {
+    "type": "VDF",
+    "name": "ORLY Gonio",
+    "value": "123.880",
+    "hor": "H24",
+    "rem": null
+   },
+   {
+    "type": "VDF",
+    "name": "ORLY Gonio",
+    "value": "124.455",
+    "hor": "H24",
+    "rem": null
+   },
+   {
+    "type": "VDF",
+    "name": "ORLY Gonio",
+    "value": "127.755",
+    "hor": "H24",
+    "rem": null
    },
    {
     "type": "VDF",
@@ -5561,6 +5925,29 @@
     "value": "111.75",
     "hor": "H24",
     "rem": "48°43'06.9\"N 002°21'14.9\"E 274 ft 254°/340 m THR 07"
+   }
+  ],
+  "LFPT": [
+   {
+    "type": "TWR",
+    "name": "PONTOISE Tour",
+    "value": "121.205",
+    "hor": "HO",
+    "rem": "25NM/FL40."
+   },
+   {
+    "type": "VDF",
+    "name": "PONTOISE Gonio",
+    "value": "121.205",
+    "hor": "HO",
+    "rem": "Couverture: 25NM/FL40."
+   },
+   {
+    "type": "ATIS",
+    "name": "PONTOISE",
+    "value": "124.130",
+    "hor": "HO",
+    "rem": "TEL : 01 30 30 52 08"
    }
   ],
   "LFPV": [
@@ -5906,7 +6293,7 @@
     "rem": null
    },
    {
-    "type": "LOC 24 (I) L",
+    "type": "LOC 23 (I)",
     "name": "PB",
     "value": "110.15",
     "hor": "H24",
@@ -6057,6 +6444,20 @@
     "rem": null
    },
    {
+    "type": "TWR",
+    "name": "MERVILLE Tour",
+    "value": "119.080",
+    "hor": "HO",
+    "rem": null
+   },
+   {
+    "type": "VDF",
+    "name": "MERVILLE Gonio",
+    "value": "119.080",
+    "hor": "HO",
+    "rem": null
+   },
+   {
     "type": "ATIS",
     "name": "MERVILLE",
     "value": "127.905",
@@ -6064,11 +6465,18 @@
     "rem": null
    },
    {
+    "type": "A/A",
+    "name": "MERVILLE",
+    "value": "119.080",
+    "hor": "HX",
+    "rem": "Absence ATS."
+   },
+   {
     "type": "LOC 22 (I.E.",
     "name": "MER",
     "value": "109.35",
     "hor": "H24",
-    "rem": "50°36'37.9\"N 002°37'58.0\"E 71 ft 217°/240 m DTHR04 216°/240 m DTHR04"
+    "rem": "50°36'37.9\"N 002°37'58.0\"E 71 ft 216°/240 m DTHR04"
    }
   ],
   "LFRB": [
@@ -6223,7 +6631,7 @@
     "name": "DV",
     "value": "111.55",
     "hor": "H24",
-    "rem": "49°22'18.3\"N 000°08'06.2\"E 478 ft 297°/298 m THR 12 296°/298 m THR 12"
+    "rem": "49°22'18.3\"N 000°08'06.2\"E 478 ft 296°/298 m THR 12"
    }
   ],
   "LFRH": [
@@ -6830,6 +7238,22 @@
     "rem": "Absence AFIS"
    }
   ],
+  "LFRQ": [
+   {
+    "type": "TWR",
+    "name": "QUIMPER Tour",
+    "value": "118.630",
+    "hor": "",
+    "rem": "NOTAM Canal 8.33"
+   },
+   {
+    "type": "A/A",
+    "name": "QUIMPER",
+    "value": "118.630",
+    "hor": "",
+    "rem": "OTHER Absence ATS"
+   }
+  ],
   "LFRS": [
    {
     "type": "FIS",
@@ -7006,6 +7430,22 @@
     "rem": "Absence ATS."
    }
   ],
+  "LFRZ": [
+   {
+    "type": "TWR",
+    "name": "SAINT NAZAIRE Tour",
+    "value": "118.955",
+    "hor": "HO",
+    "rem": "Canal 8.33"
+   },
+   {
+    "type": "A/A",
+    "name": "SAINT NAZAIRE",
+    "value": "118.955",
+    "hor": "HO",
+    "rem": "Absence ATS"
+   }
+  ],
   "LFSB": [
    {
     "type": "FIS",
@@ -7017,9 +7457,23 @@
    {
     "type": "FIS",
     "name": "BALE Information",
+    "value": "130.905",
+    "hor": "H24",
+    "rem": "Canal 8.33. Appareils non-équipés 8.33 kHz : voir AD 2 LFSB.23 / 8.33 frequency. Non-8.33 kHz aircraft : see AD 2 LFSB.23"
+   },
+   {
+    "type": "FIS",
+    "name": "BALE Information",
     "value": "134.680",
     "hor": "H24",
     "rem": "Canal 8.33. RAI : activation/désactivation des secteurs T1/T2/T3 (espaces délégués Zürich). Appareils non-équipés 8.33 KHz : voir AD 2 LFSB.23 8.33 frequency. R"
+   },
+   {
+    "type": "FIS",
+    "name": "BALE Information",
+    "value": "135.855",
+    "hor": "H24",
+    "rem": "Canal 8.33. Appareils non-équipés 8.33 kHz : voir AD 2 LFSB.23 / 8.33 frequency. Non-8.33 kHz aircraft : see AD 2 LFSB.23"
    },
    {
     "type": "APP",
@@ -7048,6 +7502,13 @@
     "value": "129.250",
     "hor": "H24",
     "rem": "Canal 25. Supplétive sur instruction ATC / 25 kHz frequency. Auxiliary FREQ on ATC instruction"
+   },
+   {
+    "type": "APP",
+    "name": "BALE Approche",
+    "value": "130.905",
+    "hor": "H24",
+    "rem": "Canal 8.33. Sur instruction ATC. Appareils non-équipés 8.33 kHz : voir AD 2 LFSB.23 / 8.33 frequency. On ATC instruction. Non-8.33 kHz aircraft : see AD 2 LFSB."
    },
    {
     "type": "APP",
@@ -7094,6 +7555,13 @@
    {
     "type": "TWR",
     "name": "BALE Tour",
+    "value": "118.305",
+    "hor": "H24",
+    "rem": "Canal 8.33. Pour décollage et approche finale. / 8.33 kHz frequency. For take off and final approach."
+   },
+   {
+    "type": "TWR",
+    "name": "BALE Tour",
     "value": "129.250",
     "hor": "H24",
     "rem": "Canal 25. Supplétive sur instruction ATC / 25 kHz frequency. Auxiliary FREQ on ATC instruction"
@@ -7101,9 +7569,23 @@
    {
     "type": "VDF",
     "name": "BALE Gonio",
+    "value": "118.305",
+    "hor": "H24",
+    "rem": "Canal 8.33 / 8.33 kHz frequency."
+   },
+   {
+    "type": "VDF",
+    "name": "BALE Gonio",
     "value": "128.910",
     "hor": "H24",
     "rem": "Canal 8.33"
+   },
+   {
+    "type": "VDF",
+    "name": "BALE Gonio",
+    "value": "130.905",
+    "hor": "H24",
+    "rem": "Canal 8.33. Appareils non-équipés 8.33 kHz : voir AD 2 LFSB.23 / 8.33 frequency. Non-8.33 kHz aircraft : see AD 2 LFSB.23"
    },
    {
     "type": "VDF",

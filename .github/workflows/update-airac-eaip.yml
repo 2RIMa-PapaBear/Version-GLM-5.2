@@ -104,7 +104,14 @@ jobs:
 
   # Garde-fou base XML SIA (terrains/pistes/espaces/services — régénérée
   # après téléchargement MANUEL du XML dans « telechargement AIRAC/ »).
+  # m4 (audit 01/10) : APRÈS update — le 01/10 05:28Z, les deux gardes
+  # partaient EN PARALLÈLE de la mise à jour et lisaient freq-sia/VAC
+  # encore au cycle précédent pendant que l'update commitait la bascule :
+  # run rouge pour rien. needs: update ne bloque pas le déploiement
+  # (deploy ne needs que update), les gardes alertent sur un retard
+  # PERSISTANT, pas sur la course du jour J.
   airac-sia-xml:
+    needs: update
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -122,6 +129,7 @@ jobs:
 
   # Garde-fou obstacles SIA (export AIXM OM téléchargé MANUELLEMENT).
   airac-obstacles:
+    needs: update
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

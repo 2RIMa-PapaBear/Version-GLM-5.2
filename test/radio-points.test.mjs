@@ -7,9 +7,46 @@ import assert from 'node:test';
 import { strictEqual, deepStrictEqual, ok, equal } from 'node:assert';
 import {
     classifyNavaid, parseRadioPoints, parseObstacles, filterBbox, visibleKinds,
-    formatFreq, loadRadioPoints, loadObstacles, WEEK_MS, LAYER_MIN_ZOOM,
+    formatFreq, loadRadioPoints, loadObstacles, airacCacheOk, WEEK_MS, LAYER_MIN_ZOOM,
     OBSTACLE_CATS,
 } from '../js/radio-points.js';
+
+// m2 (audit 01/10) : horloge post-bascule (cycle en vigueur 2026-10-01,
+// série ancrée 2026-07-09 + 28 j — cf. test/sia-data.test.mjs).
+const APRES_BASCULE = Date.UTC(2026, 9, 1, 12);      // 01/10/2026
+const AVANT_BASCULE = Date.UTC(2026, 8, 15, 12);     // 15/09/2026 (cycle 09-03)
+
+test('airacCacheOk : un cache du cycle précédent est périmé le jour de la bascule', () => {
+    const vieux = { siaAirac: '2026-09-03', siaVrpAirac: '2026-09-03' };
+    ok(!airacCacheOk(vieux, ['siaAirac', 'siaVrpAirac'], APRES_BASCULE),
+        'cache 09-03 rejeté le 01/10 (cycle 10-01 en vigueur)');
+    ok(airacCacheOk(vieux, ['siaAirac', 'siaVrpAirac'], AVANT_BASCULE),
+        'le même cache était valide avant la bascule (cycle 09-03)');
+    const frais = { siaAirac: '2026-10-01', siaVrpAirac: '2026-10-01' };
+    ok(airacCacheOk(frais, ['siaAirac', 'siaVrpAirac'], APRES_BASCULE), 'cache du cycle en vigueur');
+});
+
+test('airacCacheOk : marqueur absent = pas d ancre (TTL seul) ; obstacles', () => {
+    ok(airacCacheOk({ generatedAt: 'x' }, ['siaAirac', 'siaVrpAirac'], APRES_BASCULE),
+        'données openAIP pures sans part SIA : ancre neutre');
+    ok(!airacCacheOk({ airac: '2026-09-03' }, ['airac'], APRES_BASCULE),
+        'obstacles du cycle précédent rejetés à la bascule');
+    ok(airacCacheOk({ airac: '2026-10-01' }, ['airac'], APRES_BASCULE), 'obstacles à jour');
+    equal(airacCacheOk(null, ['airac'], APRES_BASCULE), false, 'pas de cache → pas frais');
+});
+
+test('parseRadioPoints/parseObstacles portent les marqueurs de cycle jusqu au cache', () => {
+    const p = parseRadioPoints({
+        generatedAt: '2026-09-27T00:00:00.000Z',
+        siaAirac: '2026-10-01', siaVrpAirac: '2026-10-01',
+        navaids: [[1, 'AAA', 1, 2, 110, 2]], vrps: [],
+    });
+    equal(p.siaAirac, '2026-10-01', 'siaAirac conservé');
+    equal(p.siaVrpAirac, '2026-10-01', 'siaVrpAirac conservé');
+    const o = parseObstacles({ generatedAt: 'x', airac: '2026-10-01', obstacles: [] });
+    equal(o.airac, '2026-10-01', 'obstacles : airac conservé');
+});
+
 
 test('classifyNavaid : bande kHz = NDB, bande 108-118 MHz = VOR', () => {
     equal(classifyNavaid(355, 1), 'NDB', '355 kHz');

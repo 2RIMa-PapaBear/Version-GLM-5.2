@@ -21,8 +21,12 @@
  * indifférenciés : l'API n'expose pas de DME isolés).
  *
  * Module SANS dépendance (fonctions pures + IndexedDB optionnel) :
- * testable sous Node, insérable dans la carte régionale.
+ * testable sous Node, insérable dans la carte régionale. Seule exception
+ * (m2, audit 01/10) : airacInForce de sia-data.js — pur, lui-même sans
+ * import statique, Node-safe — pour l'ancre de fraîcheur AIRAC des caches.
  * ================================================================ */
+
+import { airacInForce } from './sia-data.js';
 
 export const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 export const RADIO_POINTS_URL = 'data/radio-points.json';
@@ -96,7 +100,30 @@ export function parseRadioPoints(json) {
         if (!name || !Number.isFinite(lat) || !Number.isFinite(lon)) continue;
         vrp.push({ name: String(name), lat, lon, cc: cc || '', desc: desc || null, sia: cc === 'FR' && !!desc });
     }
-    return { ...buckets, generatedAt: json.generatedAt || '', counts: json.counts || {} };
+    // Les marqueurs de cycle SIA voyagent JUSQU'AU CACHE (m2, audit 01/10) :
+    // c'est eux qui ancrent la fraîcheur AIRAC côté client.
+    return {
+        ...buckets, generatedAt: json.generatedAt || '', counts: json.counts || {},
+        siaAirac: json.siaAirac || '', siaVrpAirac: json.siaVrpAirac || '',
+    };
+}
+
+/**
+ * Fraîcheur AIRAC d'un cache parsé (m2, audit 01/10) : chaque marqueur PRÉSENT
+ * doit être ≥ au cycle en vigueur — un cache du cycle précédent est périmé
+ * LE JOUR de la bascule (même règle que freq-sia / zones v6 / rubriques AD,
+ * commit 9d13400a : le TTL de 7 j seul laissait traîner l'ancien cycle).
+ * Marqueur ABSENT (données openAIP pures, sans part SIA) : pas d'ancre, le
+ * TTL seul décide. Pur, testé sous Node.
+ * @param {Object|null} parsed Objet retourné par parseRadioPoints/parseObstacles.
+ * @param {string[]} keys Champs d'ancre ('siaAirac', 'siaVrpAirac', 'airac').
+ * @param {number} [nowMs] Horloge injectable pour les tests.
+ * @returns {boolean}
+ */
+export function airacCacheOk(parsed, keys, nowMs) {
+    if (!parsed) return false;
+    const ref = airacInForce(nowMs ?? Date.now());
+    return keys.every(k => !parsed[k] || !(parsed[k] < ref));
 }
 
 /**
@@ -210,13 +237,16 @@ async function _idbPut(entry, key = RP_CACHE_KEY) {
 
 // Clé suffixée par révision : les données SIA évoluent sans que le délai de
 // fraîcheur (7 j) soit écoulé — chaque changement de base impose une nouvelle
-// clé pour forcer le re-téléchargement (v5 : TACAN + VOR-TACAN 29/09).
-const RP_CACHE_KEY = 'data-v5';
+// clé pour forcer le re-téléchargement (v5 : TACAN + VOR-TACAN 29/09 ;
+// v6 : marqueurs de cycle au cache + ancre airacInForce, 01/10).
+const RP_CACHE_KEY = 'data-v6';
 
 // Cache obstacles : même base IndexedDB, clé distincte — suffixée -sia pour
-// invalider le format openAIP précédent (jamais déployé, préversion locale).
-const _idbGetObstacles = () => _idbGet('obstacles-sia');
-const _idbPutObstacles = (entry) => _idbPut(entry, 'obstacles-sia');
+// invalider le format openAIP précédent (jamais déployé, préversion locale),
+// -sia2 : ancre AIRAC au cache (01/10), les anciennes entrées n'ont pas
+// forcément le champ airac.
+const _idbGetObstacles = () => _idbGet('obstacles-sia2');
+const _idbPutObstacles = (entry) => _idbPut(entry, 'obstacles-sia2');
 
 /**
  * Charge les points mondiaux : cache IndexedDB si frais (< 7 jours),
@@ -232,7 +262,11 @@ export async function loadRadioPoints(opts = {}) {
     const now = opts.now ?? Date.now();
 
     const cached = await _idbGet();
-    if (cached?.parsed && (now - cached.ts) < WEEK_MS) {
+    // m2 (audit 01/10) : périmé AUSSI si le cache est d'un cycle AIRAC
+    // précédent — même frais de moins de 7 j (le TTL seul laissait traîner
+    // l'ancien cycle jusqu'à une semaine après la bascule).
+    if (cached?.parsed && (now - cached.ts) < WEEK_MS
+        && airacCacheOk(cached.parsed, ['siaAirac', 'siaVrpAirac'], now)) {
         return { ...cached.parsed, stale: false };
     }
 
@@ -265,7 +299,8 @@ export async function loadObstacles(opts = {}) {
     const now = opts.now ?? Date.now();
 
     const cached = await _idbGetObstacles();
-    if (cached?.parsed && (now - cached.ts) < WEEK_MS) {
+    if (cached?.parsed && (now - cached.ts) < WEEK_MS
+        && airacCacheOk(cached.parsed, ['airac'], now)) {
         return { ...cached.parsed, stale: false };
     }
     if (!doFetch) return cached?.parsed ? { ...cached.parsed, stale: true } : null;

@@ -160,6 +160,26 @@ test('parseAdFrequencies : lignes AD 2.18 → liste dédupliquée', () => {
     assert.equal(dup.length, 3);
 });
 
+// o3 (audit 01/10) : l'eAIP balise ses révisions AIRAC — la valeur ancienne
+// reste dans <del>…</del> à côté de la nouvelle dans <ins>…</ins> (capture
+// LFPT 10-01, TWR 121.200 → 121.205) : strip() doit jeter le texte <del>
+// (hors vigueur), sinon « 121.200 121.205 MHz » ne matche plus la cellule
+// fréquence et la fiche entière sort vide (LFPT/LFRQ/LFRZ perdues).
+const AD_REV_HTML = `<table>
+<tr><td rowspan="1" colspan="1"><span id="x">TWR</span></td>
+<td><span id="y"><del>PONTOISE Ancien (FR)</del> PONTOISE Tour (FR)</span><span class="foreign"><br>PONTOISE Tower (EN)</span></td>
+<td><span><del>121.200</del> <ins>121.205</ins></span> <span id="z--FREQUENCY.UOM_FREQ">MHz</span></td>
+<td><span>HO</span></td><td><span>25NM/FL40.</span></td></tr>
+</table>`;
+
+test('parseAdFrequencies : balisage de révision AIRAC del/ins — la valeur EN VIGUEUR seule', () => {
+    const out = parseAdFrequencies(AD_REV_HTML);
+    assert.equal(out.length, 1);
+    assert.equal(out[0].value, '121.205', 'valeur <ins> en vigueur, pas la <del>');
+    assert.equal(out[0].name, 'PONTOISE Tour', 'indicatif amendé sans doublon de l ancien');
+    assert.equal(out[0].type, 'TWR');
+});
+
 test('base XML AFIS/A-A : toutes les fréquences A/A de France (LFRP/LFRW/LFOM/LFEV/LFEQ)', async () => {
     const { readFile } = await import('node:fs/promises');
     const d = JSON.parse(await readFile(new URL('../data/freq-aa-sia.json', import.meta.url), 'utf8'));

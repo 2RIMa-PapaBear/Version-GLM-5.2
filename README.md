@@ -276,6 +276,7 @@ npm run deploy:test -- --mirror      # supprime aussi les fichiers distants disp
 
 ## Journal des versions
 <!-- debut journal -->
+- **2026-10-01** — Plan de correction audit 01/10 (m2-m5+o3-o5) : m2 caches VRP/obstacles ancrés par CYCLE AIRAC (airacCacheOk, marqueurs portés au cache,…
 - **2026-10-01** — Journal des versions (2) : repli ancré sur la DATE de la plus récente entrée — un pull --rebase de pub réécrit les SHA et tuait lastSha à…
 - **2026-10-01** — Journal des versions : SHA mort après filter-repo (d204aeb0 disparu) → update-docs repliait en silence « déjà à jour » (même panne que le…
 - **2026-10-01** — SUP AIP figées depuis le 16/09 — RÉPARÉES (fiche M1 audit 01/10) : garde isMain du crawler jamais matchée en CI depuis sa naissance (17/09)…
@@ -290,9 +291,8 @@ npm run deploy:test -- --mirror      # supprime aussi les fichiers distants disp
 - **2026-09-30** — Carte : étiquettes des terrains militaires au rouge du pictogramme OACI — carte régionale + carte PDF du dossier (pilote 30/09)
 - **2026-09-30** — Fonds de carte IGN Géoportaille sans clé (Licence Ouverte 2.0) : Ortho + Plan dans le sélecteur (pilote 30/09)
 - **2026-09-30** — Fond de carte par défaut : IGN Plan (préférence mémorisée prioritaire) (pilote 30/09)
-- **2026-09-29** — TACAN intégrés : symbole copie conforme TACAN_2 (vectorisation du pilote, validée 29/09)
 <!-- fin journal -->
-<!-- docs:lastSha=1221f0ceb9d06dbb193df7b36f391a27e4f31590 -->
+<!-- docs:lastSha=327829d121f56cca66bd317eea6f59f0a0debd16 -->
 
 
 
