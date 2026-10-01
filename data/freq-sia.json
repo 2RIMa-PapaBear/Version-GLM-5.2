@@ -1,10 +1,10 @@
 {
- "generatedAt": "2026-09-27T08:27:30.834Z",
- "airac": "2026-09-03",
+ "generatedAt": "2026-10-01T05:30:46.253Z",
+ "airac": "2026-10-01",
  "source": "SIA eAIP France AD 2.17/2.18",
  "counts": {
-  "airports": 141,
-  "frequencies": 1139,
+  "airports": 138,
+  "frequencies": 1115,
   "failed": 0
  },
  "airports": {
@@ -1068,13 +1068,6 @@
    {
     "type": "APP",
     "name": "TOULOUSE Approche",
-    "value": "124.975",
-    "hor": "H24",
-    "rem": "Fréquence supplétive/Auxiliary frequency."
-   },
-   {
-    "type": "APP",
-    "name": "TOULOUSE Approche",
     "value": "125.180",
     "hor": "H24",
     "rem": "Secteur OUEST - Contrôle en TMA. Appareils non-équipés 8,33 KHz : voir AD 2 LFBO.23. Secteurs AW 1 à 4. West sector - Control within TMA. Aircraft non 8.33 KHz-"
@@ -1117,20 +1110,6 @@
    {
     "type": "VDF",
     "name": "TOULOUSE Gonio",
-    "value": "118.100",
-    "hor": "H24",
-    "rem": null
-   },
-   {
-    "type": "VDF",
-    "name": "TOULOUSE Gonio",
-    "value": "120.350",
-    "hor": "H24",
-    "rem": null
-   },
-   {
-    "type": "VDF",
-    "name": "TOULOUSE Gonio",
     "value": "121.250",
     "hor": "H24",
     "rem": null
@@ -1139,20 +1118,6 @@
     "type": "VDF",
     "name": "TOULOUSE Gonio",
     "value": "123.850",
-    "hor": "H24",
-    "rem": null
-   },
-   {
-    "type": "VDF",
-    "name": "TOULOUSE Gonio",
-    "value": "125.175",
-    "hor": "H24",
-    "rem": null
-   },
-   {
-    "type": "VDF",
-    "name": "TOULOUSE Gonio",
-    "value": "129.300",
     "hor": "H24",
     "rem": null
    },
@@ -1238,20 +1203,6 @@
   ],
   "LFBR": [
    {
-    "type": "TWR",
-    "name": "MURET Sol",
-    "value": "121.750",
-    "hor": "HX",
-    "rem": null
-   },
-   {
-    "type": "TWR",
-    "name": "MURET Tour",
-    "value": "123.200",
-    "hor": "HO",
-    "rem": null
-   },
-   {
     "type": "VDF",
     "name": "MURET Gonio",
     "value": "123.200",
@@ -1264,6 +1215,13 @@
     "value": "124.580",
     "hor": "HO",
     "rem": "TEL : 05 34 46 08 36"
+   },
+   {
+    "type": "A/A",
+    "name": "MURET",
+    "value": "123.205",
+    "hor": "",
+    "rem": "OTHER Hors HOR ATS / Outside ATS SKED"
    }
   ],
   "LFBS": [
@@ -1475,20 +1433,6 @@
   ],
   "LFCR": [
    {
-    "type": "TWR",
-    "name": "RODEZ Tour",
-    "value": "118.125",
-    "hor": "HO",
-    "rem": null
-   },
-   {
-    "type": "VDF",
-    "name": "RODEZ Gonio",
-    "value": "118.125",
-    "hor": "HO",
-    "rem": null
-   },
-   {
     "type": "VDF",
     "name": "RODEZ Gonio",
     "value": "133.725",
@@ -1503,18 +1447,11 @@
     "rem": "TEL : 05 65 77 17 49 Diffusion des paramètres de DEP et ARR. / DEP and ARR parameters broadcasting."
    },
    {
-    "type": "A/A",
-    "name": "RODEZ",
-    "value": "118.125",
-    "hor": "HX",
-    "rem": "Absence ATS."
-   },
-   {
     "type": "LOC 31 (I.E.",
     "name": "RDE",
     "value": "110.75",
     "hor": "H24",
-    "rem": "44°24'51.9\"N 002°28'16.9\"E 1914 ft 25 310°/130 m THR 13"
+    "rem": "44°24'51.9\"N 002°28'16.9\"E 1914 ft 25 310°/130 m THR 13 307°/132 m THR 13"
    }
   ],
   "LFCY": [
@@ -2741,25 +2678,18 @@
     "rem": "Auto-information en Français uniquement. / Auto-information in French only."
    },
    {
-    "type": "TWR",
-    "name": "AIX Tour",
-    "value": "118.750",
-    "hor": "HO",
-    "rem": "Auto-information en Français uniquement. / Auto-information in French only."
-   },
-   {
-    "type": "VDF",
-    "name": "AIX Gonio",
-    "value": "118.750",
-    "hor": "HO",
-    "rem": null
-   },
-   {
     "type": "ATIS",
     "name": "AIX",
     "value": "136.230",
     "hor": "H24",
     "rem": null
+   },
+   {
+    "type": "A/A",
+    "name": "AIX",
+    "value": "118.755",
+    "hor": "HX",
+    "rem": "Absence ATC"
    }
   ],
   "LFMC": [
@@ -2853,13 +2783,6 @@
     "value": "123.000",
     "hor": "HOR ATS",
     "rem": null
-   },
-   {
-    "type": "VDF",
-    "name": "LE LUC Gonio",
-    "value": "123.500",
-    "hor": "HOR ATS",
-    "rem": "AUTO-INFO Jour-Nuit/AUTO-INFO Day-Night"
    },
    {
     "type": "ATIS",
@@ -4485,6 +4408,13 @@
    {
     "type": "APP",
     "name": "BEAUVAIS Approche",
+    "value": "121.405",
+    "hor": "HO",
+    "rem": "Fréquence supplétive/Auxiliary frequency."
+   },
+   {
+    "type": "APP",
+    "name": "BEAUVAIS Approche",
     "value": "123.985",
     "hor": "HO",
     "rem": "Canal 8.33 Secteurs/Sectors WEST et/and EAST."
@@ -4492,9 +4422,23 @@
    {
     "type": "TWR",
     "name": "BEAUVAIS Tour",
+    "value": "121.405",
+    "hor": "HO",
+    "rem": null
+   },
+   {
+    "type": "TWR",
+    "name": "BEAUVAIS Tour",
     "value": "123.985",
     "hor": "HO",
     "rem": "Fréquence supplétive/Auxiliary frequency. Canal 8.33"
+   },
+   {
+    "type": "VDF",
+    "name": "BEAUVAIS Gonio",
+    "value": "121.405",
+    "hor": "HO",
+    "rem": "Fréquence supplétive/Auxiliary frequency."
    },
    {
     "type": "VDF",
@@ -4511,18 +4455,25 @@
     "rem": "Canal 8.33. TEL : 03 44 84 69 41"
    },
    {
+    "type": "A/A",
+    "name": "BEAUVAIS",
+    "value": "121.405",
+    "hor": "HX",
+    "rem": "Absence ATS"
+   },
+   {
     "type": "LOC 30 (I.E.",
     "name": "BI",
     "value": "109.95",
     "hor": "H24",
-    "rem": "49°27'34.3\"N 002°06'03.8\"E 350 ft 307°/150 m THR 12 302°/245 m THR 12"
+    "rem": "49°27'34.3\"N 002°06'03.8\"E 350 360 ft 302°/245 m THR 12"
    },
    {
     "type": "LOC 12 (III.",
     "name": "BVT",
     "value": "111.15",
     "hor": "H24",
-    "rem": "49°26'41.4\"N 002°08'05.6\"E 304 ft 25 NM 124°/276 m THR 30 122°/276 m THR 30"
+    "rem": "49°26'41.4\"N 002°08'05.6\"E 304 312 ft 25 NM 122°/276 m THR 30"
    }
   ],
   "LFOE": [
@@ -5530,27 +5481,6 @@
    {
     "type": "APP",
     "name": "ORLY Approche",
-    "value": "123.875",
-    "hor": "HO",
-    "rem": "Aéronefs d'état ne disposant pas d'équipement de radiocommunication compatible en espacement 8.33 KHZ, voir AD 2.23.9"
-   },
-   {
-    "type": "APP",
-    "name": "ORLY Approche",
-    "value": "124.450",
-    "hor": "HO",
-    "rem": null
-   },
-   {
-    "type": "APP",
-    "name": "ORLY Approche",
-    "value": "127.750",
-    "hor": "HO",
-    "rem": "FREQ réservée aux DEP. Aéronefs d'état ne disposant pas d'équipement de radiocommunication compatible en espacement 8.33 KHZ, voir AD 2.23.9"
-   },
-   {
-    "type": "APP",
-    "name": "ORLY Approche",
     "value": "128.380",
     "hor": "HO",
     "rem": "Fréquence supplétive reservée aux DEP/Auxiliary frequency only for DEP."
@@ -5577,34 +5507,6 @@
     "rem": "Fréquence supplétive/Auxiliary frequency."
    },
    {
-    "type": "TWR",
-    "name": "ORLY Tour",
-    "value": "118.700",
-    "hor": "HO",
-    "rem": null
-   },
-   {
-    "type": "TWR",
-    "name": "ORLY Tour",
-    "value": "120.500",
-    "hor": "HO",
-    "rem": "Fréquence supplétive/Auxilliary frequency."
-   },
-   {
-    "type": "TWR",
-    "name": "ORLY Tour",
-    "value": "135.000",
-    "hor": "HO",
-    "rem": "FREQ \" FIRE \"."
-   },
-   {
-    "type": "VDF",
-    "name": "ORLY Gonio",
-    "value": "118.700",
-    "hor": "H24",
-    "rem": null
-   },
-   {
     "type": "VDF",
     "name": "ORLY Gonio",
     "value": "118.855",
@@ -5617,27 +5519,6 @@
     "value": "121.500",
     "hor": "H24",
     "rem": "Fréquence détresse / Distress frequency"
-   },
-   {
-    "type": "VDF",
-    "name": "ORLY Gonio",
-    "value": "123.875",
-    "hor": "H24",
-    "rem": null
-   },
-   {
-    "type": "VDF",
-    "name": "ORLY Gonio",
-    "value": "124.450",
-    "hor": "H24",
-    "rem": null
-   },
-   {
-    "type": "VDF",
-    "name": "ORLY Gonio",
-    "value": "127.750",
-    "hor": "H24",
-    "rem": null
    },
    {
     "type": "VDF",
@@ -5680,29 +5561,6 @@
     "value": "111.75",
     "hor": "H24",
     "rem": "48°43'06.9\"N 002°21'14.9\"E 274 ft 254°/340 m THR 07"
-   }
-  ],
-  "LFPT": [
-   {
-    "type": "TWR",
-    "name": "PONTOISE Tour",
-    "value": "121.200",
-    "hor": "HO",
-    "rem": "25NM/FL40."
-   },
-   {
-    "type": "VDF",
-    "name": "PONTOISE Gonio",
-    "value": "121.200",
-    "hor": "HO",
-    "rem": "Couverture: 25NM/FL40."
-   },
-   {
-    "type": "ATIS",
-    "name": "PONTOISE",
-    "value": "124.125",
-    "hor": "HO",
-    "rem": "TEL : 01 30 30 52 08"
    }
   ],
   "LFPV": [
@@ -6365,7 +6223,7 @@
     "name": "DV",
     "value": "111.55",
     "hor": "H24",
-    "rem": "49°22'18.3\"N 000°08'06.2\"E 478 ft 297°/298 m THR 12"
+    "rem": "49°22'18.3\"N 000°08'06.2\"E 478 ft 297°/298 m THR 12 296°/298 m THR 12"
    }
   ],
   "LFRH": [
@@ -6972,22 +6830,6 @@
     "rem": "Absence AFIS"
    }
   ],
-  "LFRQ": [
-   {
-    "type": "TWR",
-    "name": "QUIMPER Tour",
-    "value": "118.625",
-    "hor": "",
-    "rem": "NOTAM"
-   },
-   {
-    "type": "A/A",
-    "name": "QUIMPER",
-    "value": "118.625",
-    "hor": "",
-    "rem": "OTHER Absence ATS"
-   }
-  ],
   "LFRS": [
    {
     "type": "FIS",
@@ -7162,22 +7004,6 @@
     "value": "122.605",
     "hor": "HX",
     "rem": "Absence ATS."
-   }
-  ],
-  "LFRZ": [
-   {
-    "type": "TWR",
-    "name": "SAINT NAZAIRE Tour",
-    "value": "118.950",
-    "hor": "HO",
-    "rem": null
-   },
-   {
-    "type": "A/A",
-    "name": "SAINT NAZAIRE",
-    "value": "118.950",
-    "hor": "HO",
-    "rem": "Absence ATS"
    }
   ],
   "LFSB": [
@@ -8312,7 +8138,6 @@
    "AD_2_LFAY_ADC_01.pdf",
    "AD_2_LFAY_DATA_01.pdf",
    "AD_2_LFAY_DATA_RWY30_RNP_A_CODE.pdf",
-   "AD_2_LFAY_IAC_RWY30_NDB_B.pdf",
    "AD_2_LFAY_IAC_RWY30_RNP_A.pdf"
   ],
   "LFBA": [
@@ -8422,6 +8247,8 @@
   ],
   "LFBF": [
    "AD_2_LFBF_ADC_01.pdf",
+   "AD_2_LFBF_APDC_01.pdf",
+   "AD_2_LFBF_APDC_02.pdf",
    "AD_2_LFBF_DATA_01.pdf",
    "AD_2_LFBF_DATA_RWY11_RNP_CODE.pdf",
    "AD_2_LFBF_DATA_RWY11_RNP_FASDB.pdf",
@@ -8569,7 +8396,7 @@
   ],
   "LFBO": [
    "AD_2_LFBO_ADC_01.pdf",
-   "AD_2_LFBO_ADC_TEXT01.pdf",
+   "AD_2_LFBO_ADC_TEXT_01.pdf",
    "AD_2_LFBO_AMSR_01.pdf",
    "AD_2_LFBO_APDC_01.pdf",
    "AD_2_LFBO_APDC_02.pdf",
@@ -8618,6 +8445,7 @@
    "AD_2_LFBO_MIA_TEXT_01.pdf",
    "AD_2_LFBO_MIA_TEXT_02.pdf",
    "AD_2_LFBO_MIA_TEXT_03.pdf",
+   "AD_2_LFBO_MVA_01.pdf",
    "AD_2_LFBO_PATC_RWY14R.pdf",
    "AD_2_LFBO_STAR_RWY14_HLDGCONV.pdf",
    "AD_2_LFBO_STAR_RWY14_RNAV.pdf",
@@ -8636,12 +8464,10 @@
    "AD_2_LFBP_DATA_STAR_RWY_ALL_RNAV_CODE_01.pdf",
    "AD_2_LFBP_IAC_RWY13_VPT_A.pdf",
    "AD_2_LFBP_IAC_RWY31_FNA_ILS_CAT_1_2_3_LOC.pdf",
-   "AD_2_LFBP_IAC_RWY31_FNA_NDB_Z.pdf",
    "AD_2_LFBP_IAC_RWY31_FNA_RNP.pdf",
    "AD_2_LFBP_IAC_RWY31_INA_CONV_PU.pdf",
    "AD_2_LFBP_IAC_RWY31_INA_RNAV_BAGRO.pdf",
    "AD_2_LFBP_IAC_RWY31_INA_RNAV_OSVEG.pdf",
-   "AD_2_LFBP_IAC_RWY31_NDB_X.pdf",
    "AD_2_LFBP_IAC_RWY31_NDB_Y.pdf",
    "AD_2_LFBP_IAC_RWY31_NDB_Z.pdf",
    "AD_2_LFBP_MVA_01.pdf",
@@ -10109,6 +9935,7 @@
    "AD_2_LFPB_IAC_RWY_WEST_INA_RNAV_MOBRO_MOPAR.pdf",
    "AD_2_LFPB_IAC_RWY_WEST_INA_RNAV_OKABO.pdf",
    "AD_2_LFPB_IAC_RWY_WEST_INA_RNAV_VEBEK.pdf",
+   "AD_2_LFPB_MVA_01.pdf",
    "AD_2_LFPB_SID_RWY07_CONV_POGO_EAST_LFPN_LFPV_INSTR_01.pdf",
    "AD_2_LFPB_SID_RWY07_RNAV_INSTR_01.pdf",
    "AD_2_LFPB_SID_RWY07_RNAV_INSTR_02.pdf",
@@ -10278,6 +10105,7 @@
    "AD_2_LFPG_IAC_RWY_WEST_INA_RNAV_MOPAR_01.pdf",
    "AD_2_LFPG_IAC_RWY_WEST_INA_RNAV_MOPAR_02.pdf",
    "AD_2_LFPG_IAC_RWY_WEST_INA_RNAV_OKIPA.pdf",
+   "AD_2_LFPG_MVA_01.pdf",
    "AD_2_LFPG_PATC_RWY08L.pdf",
    "AD_2_LFPG_PATC_RWY08R.pdf",
    "AD_2_LFPG_PATC_RWY09L.pdf",
@@ -10422,6 +10250,7 @@
    "AD_2_LFPO_DATA_02.pdf",
    "AD_2_LFPO_DATA_03.pdf",
    "AD_2_LFPO_DATA_04.pdf",
+   "AD_2_LFPO_DATA_RWY02_FNA_ILS_CAT1_LOC_CODE.pdf",
    "AD_2_LFPO_DATA_RWY02_FNA_RNP_CODE.pdf",
    "AD_2_LFPO_DATA_RWY02_INA_RNAV_CODE_GNSS.pdf",
    "AD_2_LFPO_DATA_RWY02_RNP_FASDB.pdf",
@@ -10503,6 +10332,7 @@
    "AD_2_LFPO_IAC_RWY_WEST_INA_RNAV_MOLBA.pdf",
    "AD_2_LFPO_IAC_RWY_WEST_INA_RNAV_ODILO.pdf",
    "AD_2_LFPO_IAC_RWY_WEST_INA_RNAV_VEBEK.pdf",
+   "AD_2_LFPO_MVA_01.pdf",
    "AD_2_LFPO_PATC_RWY06.pdf",
    "AD_2_LFPO_PATC_RWY07.pdf",
    "AD_2_LFPO_PATC_RWY24.pdf",
@@ -10832,6 +10662,7 @@
    "AD_2_LFRG_IAC_RWY30_ILS_Y_LOC_Y.pdf",
    "AD_2_LFRG_IAC_RWY30_ILS_Z_LOC_Z.pdf",
    "AD_2_LFRG_IAC_RWY30_RNP.pdf",
+   "AD_2_LFRG_IAC_RWY30_VOR.pdf",
    "AD_2_LFRG_IAC_RWY30_VOR_Y.pdf",
    "AD_2_LFRG_IAC_RWY30_VOR_Z.pdf",
    "AD_2_LFRG_MIA_TEXT_01.pdf",
@@ -11048,6 +10879,7 @@
   ],
   "LFRZ": [
    "AD_2_LFRZ_ADC_01.pdf",
+   "AD_2_LFRZ_APDC_01.pdf",
    "AD_2_LFRZ_DATA_01.pdf",
    "AD_2_LFRZ_DATA_RWY07_RNP_AR_CODE.pdf",
    "AD_2_LFRZ_DATA_RWY25_RNP_CODE.pdf",
