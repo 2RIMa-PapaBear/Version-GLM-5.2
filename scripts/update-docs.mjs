@@ -88,10 +88,11 @@ function majDoc({ file, ancreFin, entree, habillage }) {
     let lastSha = m[1] === 'aucun' ? null : m[1];
     // SHA MORT (filter-repo 01/10 : d204aeb0 disparu) : git log/rev-list
     // échouaient sur le range, le catch vidait les entrées → « déjà à jour »
-    // en silence, journal figé — même panne que le 06/09. Un lastSha inconnu
-    // vaut NULL : repli HEAD~40 + dédoublonnage ci-dessous contre les
-    // entrées déjà journalisées.
-    if (lastSha && !gitOk(`rev-parse --verify --quiet ${lastSha}^{commit}`)) {
+    // en silence, journal figé — même panne que le 06/09. Un lastSha qui
+    // n'est pas un ancêtre de HEAD vaut NULL : repli HEAD~40 + dédoublonnage
+    // ci-dessous. (NB : PAS de ^{commit} — le caret est mangé par cmd.exe
+    // sous execSync Windows, la validation échouait alors TOUJOURS.)
+    if (lastSha && !gitOk(`merge-base --is-ancestor ${lastSha} HEAD`)) {
         console.warn(`  ${file} : lastSha ${lastSha.slice(0, 8)} inconnu (filter-repo ?) — repli sur l'historique récent, doublons filtrés`);
         lastSha = null;
     }
@@ -101,10 +102,18 @@ function majDoc({ file, ancreFin, entree, habillage }) {
             const set = new Set(git(`rev-list ${lastSha}..HEAD`).split('\n').filter(Boolean));
             entrees = entrees.filter(e => set.has(e.sha));
         } catch { entrees = []; }
+    } else {
+        // Repli : ancre DATE (la plus récente entrée du journal), pas SHA —
+        // un pull --rebase de pub réécrit les SHA et tuerait lastSha à
+        // chaque livraison. Ne journaliser que les commits AUSSI récents ou
+        // plus récents ; les entrées anciennes rabattues hors MAX_ENTREES
+        // ne se réinsèrent ainsi jamais en boucle.
+        const d = s.slice(s.indexOf(habillage.debut)).match(/\d{4}-\d{2}-\d{2}/);
+        if (d) entrees = entrees.filter(e => e.date >= d[0]);
     }
     entrees = entrees.map(e => ({ ...e, version: versionDuCommit(e.sha) }));
-    // Repli sans lastSha : une entrée déjà présente au caractère près (date +
-    // version + sujet tronqué déterministes) n'est pas réinsérée.
+    // Ceinture : une entrée déjà présente au caractère près (date + version +
+    // sujet tronqué déterministes) n'est jamais réinsérée.
     entrees = entrees.filter(e => !s.includes(entree(e)));
     if (!entrees.length) { console.log(`  ${file} : déjà à jour`); return; }
 

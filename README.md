@@ -276,13 +276,8 @@ npm run deploy:test -- --mirror      # supprime aussi les fichiers distants disp
 
 ## Journal des versions
 <!-- debut journal -->
+- **2026-10-01** — Journal des versions (2) : repli ancré sur la DATE de la plus récente entrée — un pull --rebase de pub réécrit les SHA et tuait lastSha à…
 - **2026-10-01** — Journal des versions : SHA mort après filter-repo (d204aeb0 disparu) → update-docs repliait en silence « déjà à jour » (même panne que le…
-- **2026-09-30** — Fond de carte par défaut : IGN Plan (préférence mémorisée prioritaire) (pilote 30/09)
-- **2026-09-30** — Fonds de carte IGN Géoportaille sans clé (Licence Ouverte 2.0) : Ortho + Plan dans le sélecteur (pilote 30/09)
-- **2026-09-30** — Carte : étiquettes des terrains militaires au rouge du pictogramme OACI — carte régionale + carte PDF du dossier (pilote 30/09)
-- **2026-09-30** — Rose des vents : nom du terrain en clair en tête de cadre — une ligne centrée, repli code/mémo (pilote 30/09)
-- **2026-09-29** — TACAN intégrés : symbole copie conforme TACAN_2 (vectorisation du pilote, validée 29/09)
-- **2026-09-29** — Nuit aéronautique : libellé clarifié « coucher +30 min → lever −30 min » (option 1 validée pilote 29/09)
 - **2026-10-01** — SUP AIP figées depuis le 16/09 — RÉPARÉES (fiche M1 audit 01/10) : garde isMain du crawler jamais matchée en CI depuis sa naissance (17/09)…
 - **2026-10-01** — Audit 3e passage (delta) 01/10 — rapport : CONFORME sauf 1 MAJEUR (SUP figées 16/09, crawler no-op en CI) ; 72 recalculs indépendants verts…
 - **2026-10-01** — Retrait du one-shot bascule AIRAC 10-01 — bascule faite et vérifiée (toutes bases 10-01 en prod) ; son commit de référence a937cce3 a…
@@ -291,50 +286,13 @@ npm run deploy:test -- --mirror      # supprime aussi les fichiers distants disp
 - **2026-10-01** — AIRAC: fréquences eAIP + sup AIP (2026-10-01)
 - **2026-09-30** — CI: job QUOTIDIEN AIRAC eAIP (freq-sia + sup AIP + garde-fous) — la bascule de cycle suivie au jour J au lieu du lundi suivant ; obstacles…
 - **2026-09-30** — Zones P croix XXX + R/D/CBA hachures ///// (ligne fine rouge, contact, orientation par la ligne, cercles OK) · Règle SIA stricte France…
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+- **2026-09-30** — Rose des vents : nom du terrain en clair en tête de cadre — une ligne centrée, repli code/mémo (pilote 30/09)
+- **2026-09-30** — Carte : étiquettes des terrains militaires au rouge du pictogramme OACI — carte régionale + carte PDF du dossier (pilote 30/09)
+- **2026-09-30** — Fonds de carte IGN Géoportaille sans clé (Licence Ouverte 2.0) : Ortho + Plan dans le sélecteur (pilote 30/09)
+- **2026-09-30** — Fond de carte par défaut : IGN Plan (préférence mémorisée prioritaire) (pilote 30/09)
+- **2026-09-29** — TACAN intégrés : symbole copie conforme TACAN_2 (vectorisation du pilote, validée 29/09)
 <!-- fin journal -->
-<!-- docs:lastSha=464edb44d95edfd23c56188882f2e82a4e5084bb -->
+<!-- docs:lastSha=1221f0ceb9d06dbb193df7b36f391a27e4f31590 -->
 
 
 
