@@ -15,6 +15,7 @@
 // ============================================================================
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -33,14 +34,17 @@ zip = path.resolve(zip);
 console.log(`ZIP : ${zip} (${(fs.statSync(zip).size / 1e9).toFixed(2)} Go)`);
 
 // Listing (noms + cycles) : l'airac vient du chemin FRANCE/AIRAC-<date>.
-const listing = execFileSync('C:\Windows\System32\tar.exe', ['-tf', zip], { encoding: 'utf8', maxBuffer: 1 << 28 }).split('\n');
+// (chemin en SLASHES : l'ancien 'C:\Windows\...''était lu avec \t = TAB
+// par JS → spawnSync ENOENT — le script ne tournait plus sous Node.)
+const TAR = 'C:/Windows/System32/tar.exe';
+const listing = execFileSync(TAR, ['-tf', zip], { encoding: 'utf8', maxBuffer: 1 << 28 }).split('\n');
 const vacs = listing.filter(p => /^Atlas-VAC\/PDF_AIPparSSection\/VAC\/AD\/AD-2\.[A-Z0-9]{4}\.pdf$/.test(p));
 const airac = (listing.find(p => /FRANCE\/AIRAC-\d{4}-\d{2}-\d{2}\//.test(p))?.match(/AIRAC-(\d{4}-\d{2}-\d{2})/)?.[1]) || 'inconnue';
 console.log(`${vacs.length} cartes VAC · édition AIRAC ${airac}`);
 
 // Extraction ciblée dans un dossier temp.
-const tmp = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'vac-'));
-execFileSync('C:\Windows\System32\tar.exe', ['-xf', zip, '-C', tmp, 'Atlas-VAC/PDF_AIPparSSection/VAC/AD'], { stdio: 'inherit' });
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vac-'));
+execFileSync(TAR, ['-xf', zip, '-C', tmp, 'Atlas-VAC/PDF_AIPparSSection/VAC/AD'], { stdio: 'inherit' });
 fs.mkdirSync(DIR, { recursive: true });
 const src = path.join(tmp, 'Atlas-VAC', 'PDF_AIPparSSection', 'VAC', 'AD');
 const icacos = [];

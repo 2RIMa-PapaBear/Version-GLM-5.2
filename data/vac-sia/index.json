@@ -1,7 +1,7 @@
 {
- "generatedAt": "2026-09-06T06:46:06.312Z",
- "airac": "2026-09-03",
- "count": 421,
+ "generatedAt": "2026-10-01T11:05:34.646Z",
+ "airac": "2026-10-01",
+ "count": 420,
  "icacos": [
   "LFAB",
   "LFAC",
@@ -422,7 +422,6 @@
   "LFYG",
   "LFYR",
   "LFYS",
-  "LFYV",
-  "SIV"
+  "LFYV"
  ]
 }
