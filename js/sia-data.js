@@ -166,16 +166,24 @@ export function airacCycleInfo(airacDateStr, nowMs = Date.now()) {
 }
 
 /** Cycle AIRAC en vigueur à l'instant `nowMs` (série SIA observée :
- *  ancre 2026-07-09, pas de 28 j — même formule que les scripts serveur
- *  fetch-freq-sia / check-sia-airac). Pur, testé sous Node. Sert aux
+ *  ancre 2026-07-09, pas de 28 j). Pur, testé sous Node. Sert aux
  *  CACHES CLIENT : un cache dont le cycle est inférieur au cycle en
  *  vigueur est PÉRIMÉ LE JOUR DE LA BASCULE — on re-télécharge au lieu
  *  d'attendre le TTL de 7 j (retour pilote 01/10 : bandeau « CYCLE
- *  PÉRIMÉ » pendant des jours alors que le serveur était à jour). */
+ *  PÉRIMÉ » pendant des jours alors que le serveur était à jour).
+ *
+ *  o2 (audit 01/10) : SOURCE UNIQUE — les scripts serveur (fetch-freq-sia,
+ *  check-sia-airac, check-obstacles-airac) importent l'ancre et le pas
+ *  d'ICI au lieu de porter chacun sa copie (4 formules identiques à
+ *  maintenir devenaient 4 façons de diverger à la prochaine mutation
+ *  d'ancre). Ce module est sans import statique : importable navigateur
+ *  ET Node (les scripts l'appellent via ../js/sia-data.js). */
+export const AIRAC_ANCHOR_MS = Date.UTC(2026, 6, 9);   // 2026-07-09 : cycle de la série SIA
+export const AIRAC_DAY_MS = 28 * 86400e3;
+
 export function airacInForce(nowMs = Date.now()) {
-    const ANCHOR = Date.UTC(2026, 6, 9);
-    const k = Math.max(0, Math.floor((nowMs - ANCHOR) / (28 * 86400e3)));
-    return new Date(ANCHOR + k * 28 * 86400e3).toISOString().slice(0, 10);
+    const k = Math.max(0, Math.floor((nowMs - AIRAC_ANCHOR_MS) / AIRAC_DAY_MS));
+    return new Date(AIRAC_ANCHOR_MS + k * AIRAC_DAY_MS).toISOString().slice(0, 10);
 }
 
 /** Terrain officiel (France) : {code, elevFt, magVar, magVarYear, …} ou null. */

@@ -37,8 +37,9 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 // téléchargement) tant que l'édition en vigueur est déjà extraite. Le CDN du
 // SIA bannit TEMPORAIREMENT l'IP après des rafales (404 erratiques ~30 s) :
 // sondes uniques et espacées, repli sur l'édition déjà connue.
-const AIRAC_ANCHOR = Date.UTC(2026, 6, 9);
-const AIRAC_DAY_MS = 28 * 86400000;
+// o2 (audit 01/10) : ancre/pas/fonction importés de la SOURCE UNIQUE
+// js/sia-data.js (plus de copie locale — 4 exemplaires identiques avant).
+import { AIRAC_ANCHOR_MS as AIRAC_ANCHOR, AIRAC_DAY_MS, airacInForce } from '../js/sia-data.js';
 
 function baseUrlOf(date) {
     const d = new Date(date + 'T00:00:00Z');
@@ -51,11 +52,8 @@ function baseUrlOf(date) {
 }
 
 /** Édition AIRAC en VIGUEUR aujourd'hui (la plus récente d'entrée en
- *  vigueur, sans anticipation des cycles futurs). */
-function airacInForce() {
-    const k = Math.max(0, Math.floor((Date.now() - AIRAC_ANCHOR) / AIRAC_DAY_MS));
-    return new Date(AIRAC_ANCHOR + k * AIRAC_DAY_MS).toISOString().slice(0, 10);
-}
+ *  vigueur, sans anticipation des cycles futurs) — source unique
+ *  js/sia-data.js, importée ci-dessus. */
 
 async function probeEdition(date) {
     const { folder, base } = baseUrlOf(date);

@@ -23,17 +23,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+// o2 (audit 01/10) : SOURCE UNIQUE de l'ancre/pas AIRAC — js/sia-data.js.
+import { airacInForce as _airacInForce } from '../js/sia-data.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-// Même ancre/pas que fetch-freq-sia.mjs (série SIA observée).
-const AIRAC_ANCHOR = Date.UTC(2026, 6, 9);
-const AIRAC_DAY_MS = 28 * 86400000;
-
-/** AIRAC en vigueur aujourd'hui selon la série SIA (repli sans freq-sia.json). */
+/** AIRAC en vigueur aujourd'hui selon la série SIA (repli sans freq-sia.json).
+ *  Délègue à la source unique — re-exporté pour les tests. */
 export function airacInForce(now = Date.now()) {
-    const k = Math.max(0, Math.floor((now - AIRAC_ANCHOR) / AIRAC_DAY_MS));
-    return new Date(AIRAC_ANCHOR + k * AIRAC_DAY_MS).toISOString().slice(0, 10);
+    return _airacInForce(now);
 }
 
 /**
