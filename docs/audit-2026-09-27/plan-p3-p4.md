@@ -1,7 +1,16 @@
 # P3/P4 du 2ᵉ audit multi-agents (27/09) — liste consolidée avec statut au 27/09 après-midi
 
-> **JOURNAL DES CORRECTIONS (mise à jour 27/09 soir)** — lire avec les statuts
+> **JOURNAL DES CORRECTIONS (mise à jour 01/10 nuit)** — lire avec les statuts
 > ci-dessous, qui ne reflètent plus les derniers lots :
+> - **A12-v4 SOURCÉ SUR MANUELS RÉELS (01/10 nuit)** : le « POH public
+>   UL 472,5 : 650 ft » cité par le volet 4 était une attribution ERRONÉE —
+>   le MV public « UL/Club » 03/2016 (MTOW 472,5 kg, liens pilote) donne
+>   décollage **246/826 ft** (revêtu) ou 282/866 (herbe) et
+>   **bagages 20 kg** en soute (pas 10). Décisions pilote : bagages
+>   **40→20 kg** (MV public §2) ; décollage **650/1 148 conservé**
+>   (conservateur, non sourcé — à remplacer par les valeurs du manuel de
+>   vol LSA 600 kg de F-HAYA quand relevées) ; atterrissage 246/863 =
+>   MV public UL/Club (caveat version 472,5 kg vs LSA 600).
 > - **Lot 3 P3 (NON COMMITÉ à ce jour)** : A9-v4 (garde `runwayBelongsToAirport`
 >   à l'affichage), A10-v4 (setRunwayLength supprimée, messages « longueur de
 >   piste inconnue »), N4-v1 (GS=0 → repli TAS signalé par `gsFallback` + ⚠),

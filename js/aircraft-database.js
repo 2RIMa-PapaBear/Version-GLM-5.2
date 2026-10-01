@@ -155,14 +155,24 @@ export const AIRCRAFT_DB = [
     // VR 50 kt (pilote).
     {
         name: 'Dynamic WT9 LSA', type: 'WT9-LSA',
-        // A12-v4 (audit 27/09, sourcé 01/10 sur feu vert pilote) : roulement
-        // 650 ft = POH PUBLIC WT9 (condition UL 472,5 — l'ancien 540 ft était
-        // non sourcé, −17 %) ; 1 148 ft au 50 ft conservé (pilote) — À
-        // CONFIRMER POH F-HAYA ; atterrissage 246/863 = POH exact (audit).
+        // A12-v4 (audit 27/09, sourcage vérifié 01/10 nuit sur les manuels
+        // RÉELS — MV public « UL/Club » 03/2016 (MTOW 472,5 kg) + manuel
+        // d'entretien Finesse Max, liens pilote) : 650/1 148 = valeurs
+        // CONSERVATRICES NON SOURCÉES, conservées sur décision pilote en
+        // attendant la relève de son manuel de vol LSA 600 kg (F-HAYA).
+        // Pour mémoire, le MV public UL/Club 472,5 kg donne : décollage
+        // 246 ft / 826 ft (revêtu, volets 15°, 15 °C) ou 282/866 (herbe),
+        // atterrissage 863 ft après 50 ft / roulement 246 ft — OPTIMISTES pour un LSA 600 kg
+        // (−21 % de masse), donc non retenues. L'ancienne note « POH public
+        // UL 472,5 : 650 ft » de l'audit était une attribution ERRONÉE
+        // (valeur inexistante dans ce manuel).
         groundRoll: 650, fiftyFt: 1148,
         safetyMargin: 15, cruiseSpeedKt: 100, fuelBurnLph: 18,
-        unusableFuelL: 6,    // 6 L inutilisables (pilote 17/09) → 113 L utilisables sur 119 de capacité
+        unusableFuelL: 6,    // MV public §2 : 119 L dont 113 utilisables ✓ (pilote 17/09)
         xwindLimitKt: 25, reserveExtraMin: 5,
+        // Atterrissage 246/863 = MV public UL/Club 472,5 kg (freinage,
+        // volets 40°) — repris tel quel (audit « POH exact »), même caveat
+        // de version que le décollage.
         ldgRoll: 246, ldgFifty: 863,
         wb: {
             units: { mass: 'kg', arm: 'm' },
@@ -176,9 +186,11 @@ export const AIRCRAFT_DB = [
             stations: [
                 { name: 'Pilote', armMm: 3130, maxKg: 130, fuel: false },
                 { name: 'Passager 1', armMm: 3130, maxKg: 130, fuel: false },
-                // A12-v4 : 10 kg = POH WT9 (validation pilote 01/10 — l'ancien
-                // 40 kg était un défaut générique non sourcé). Bras 3 795 mm inchangé.
-                { name: 'Bagages', armMm: 3795, maxKg: 10, fuel: false },
+                // A12-v4 : 20 kg = MV public « UL/Club » 03/2016 §2
+                // (« bagages 20 kg max en soute ») — validation pilote
+                // 01/10 nuit. NB : la limite du manuel LSA 600 kg de F-HAYA
+                // reste à relever si différente. Bras 3 795 mm inchangé.
+                { name: 'Bagages', armMm: 3795, maxKg: 20, fuel: false },
                 { name: 'Carburant', armMm: 2580, maxKg: 119, fuel: true },
             ],
         },

@@ -320,16 +320,18 @@ describe('base avions — Dynamic WT9 LSA (fiche complète)', () => {
         const wt9 = res.find(a => a.type === 'WT9-LSA');
         assert.ok(wt9, 'WT9 LSA trouvé');
         assert.equal(wt9.name, 'Dynamic WT9 LSA');
-        // A12-v4 (sourcé 01/10, feu vert pilote) : 650 ft = POH public WT9
-        // (UL 472,5 ; l'ancien 540 non sourcé) — le test verrouille la SOURCE.
+        // A12-v4 (sourcage vérifié 01/10 nuit sur manuels réels) :
+        // 650/1 148 = conservateur NON sourcé, gardé sur décision pilote en
+        // attente du manuel de vol LSA 600 kg F-HAYA (le MV public UL/Club
+        // 472,5 kg donne 246/826 — optimiste, non retenu).
         assert.equal(wt9.groundRoll, 650);
-        assert.equal(wt9.fiftyFt, 1148);   // conservé (pilote) — à confirmer POH F-HAYA
-        assert.equal(wt9.wb.stations.find(s => s.name === 'Bagages').maxKg, 10);   // POH (pilote 01/10)
+        assert.equal(wt9.fiftyFt, 1148);
         assert.equal(wt9.ldgRoll, 246);
         assert.equal(wt9.ldgFifty, 863);
         assert.equal(wt9.safetyMargin, 15);
         assert.equal(wt9.cruiseSpeedKt, 100);
         assert.equal(wt9.fuelBurnLph, 18);
+        assert.equal(wt9.wb.stations.find(s => s.name === 'Bagages').maxKg, 20);   // MV public UL/Club §2 (pilote 01/10 nuit)
         assert.equal(wt9.unusableFuelL, 6, '6 L inutilisables (pilote) → 113 L utilisables sur 119 de capacité');
         assert.equal(wt9.xwindLimitKt, 25);
         assert.equal(wt9.reserveExtraMin, 5);
