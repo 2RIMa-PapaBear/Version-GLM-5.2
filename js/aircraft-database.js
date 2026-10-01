@@ -155,46 +155,40 @@ export const AIRCRAFT_DB = [
     // VR 50 kt (pilote).
     {
         name: 'Dynamic WT9 LSA', type: 'WT9-LSA',
-        // A12-v4 SOURCÉ SUR LE MANUEL DE VOL (01/10 nuit, instruction pilote
-        // « prends toutes les infos du manuel ») : MV public « WT9 Dynamic
-        // UL/Club » rév. 16.03.2016, extrait de sa COUCHE TEXTE (les lectures
-        // d'image ont induit l'audit ET la passe 1 en erreur — le « 20 kg
-        // bagages » était une erreur de lecture d'image : le texte dit
-        // 10,0 kg, §2.7 ET pictogramme §2.15 ; le « 650 ft » de l'audit
-        // n'existe pas dans le manuel) :
-        //   §5.2.3 décollage (revêtu, volets 15°, 15 °C, 0 m, MTOW 472,5 kg)
-        //     → roulement 246 ft (75 m), passage 15 m 826 ft (252 m) ;
-        //     herbe 282 ft / 866 ft (le manuel imprime « 1280 ft (264 m) »,
-        //     incohérence interne du document — colonne mètres retenue).
-        //   §5.2.4 atterrissage (volets 35°, 1,3 VS0, freinage) → 863 ft
-        //     après 50 ft / roulement 246 ft (herbe 892/276).
-        //   §4.5.5 rotation 49-51 kt selon la masse (« VR 50 kt pilote »
-        //     confirmé), approche 65-70 kt, finale 65 kt volets 35° (finesse 8).
-        //   §5.2.6 croisière (2000 ft) : 75 % = 231 km/h (124 kt) à 18 L/h,
-        //     65 % = 119 kt à 17 L/h, 55 % = 111 kt à 15 L/h — l'app planifie
-        //     100 kt / 18 L/h, enveloppe CONSERVATRICE du tableau.
-        //   VNE 280 km/h (151 kt), VNO 250, VFE 140 (76 kt), arc vert
-        //   72-230 km/h ; VFR jour, IFR/givrage interdits, remorquage 750 kg
-        //   sans passager.
-        // CAVEAT VERSION : ce MV décrit l'UL/Club 472,5 kg (à vide max
-        // 309,5 kg) — F-HAYA est un LSA 600 kg (à vide 354 kg) : distances
-        // réelles supérieures (masse) ; à remplacer par les valeurs du
-        // manuel de vol LSA de l'avion quand relevées.
-        groundRoll: 246, fiftyFt: 826,
+        // A12-v4 DÉFINITIVEMENT SOURCÉ (01/10 nuit, passe finale) sur le
+        // POH DE LA BONNE VERSION : « Pilot's Operating Handbook — WT9
+        // Dynamic LSA / Club, FG912T » (AS-POH-03-000, rév. 12.12.2013,
+        // lien pilote), couche texte — MTOW 600,0 kg = F-HAYA. Les deux
+        // passes précédentes avaient utilisé le MV public UL/Club 472,5 kg
+        // (seul public) : ses 246/826 et ses 10 kg de bagages étaient les
+        // valeurs de la version 472,5 !
+        //   §5.2.3 DÉCOLLAGE (revêtu, 0 m ISA, 15 °C, volets 15°, 600 kg) :
+        //     roulement 482 ft (147 m), passage 15 m 1 027 ft (313 m) ;
+        //     herbe 568/1 142 ft.
+        //   §5.2.4 ATTERRISSAGE (volets 35°, 1,3 VS0, freinage, 600 kg) :
+        //     863 ft après 50 ft / roulement 246 ft (herbe 892/276) — les
+        //     mêmes valeurs que le MV UL, confirmées à 600 kg.
+        //   §5.2.5 montée 896 ft/min à 70 KIAS (volets rentrés, 600 kg) ;
+        //     §5.2.2 décrochage 48/45/41 KIAS (volets 0/15/35).
+        //   §2.2 VNE 276 km/h (149 kt), VA 99, VFE 79, VSO 41 KIAS.
+        //   §2.7 sièges 120 kg, PILOTE SEUL MINI 54 kg, BAGAGES 40,0 kg
+        //     (limite LSA — le 10 kg du MV public était la limite UL/Club) ;
+        //     §2.15(a) traversier démontré 24 kt.
+        //   §2.13 réservoirs 2×63 L, 2,9 L inutilisables par réservoir
+        //     (120,2 L utilisables sur 126) ; l'AVION du pilote : 119 L dont
+        //     113 utilisables (sa mesure 17/09, ≈ les 5,8 L du constructeur).
+        //   VR 49-51 kt (MV UL §4.5.5 ; « 50 kt pilote ») — non publié dans
+        //     le POH LSA ; croisière §5.2.6 UL : 75 % = 124 kt à 18 L/h,
+        //     l'app planifie 100 kt/18 L/h (enveloppe conservatrice).
+        //   W&B (§2.8/§6) : bras constructeur crew 720 / fuel 240 / bagage
+        //     1 100 mm du RP, MAC 1 185 mm, CG à vide 12±2 %, bande en vol
+        //     20-30 % MAC — la base garde la PESÉE F-HAYA (à vide 354 kg,
+        //     ses bras), cohérence vérifiée audit 27/09.
+        groundRoll: 482, fiftyFt: 1027,
         safetyMargin: 15, cruiseSpeedKt: 100, fuelBurnLph: 18,
-        // §2.13 : réservoirs 2×37 ou 2×63 L, inutilisable 1,9/2,9 L par
-        // réservoir (5,8 L sur la config 126 L) ; l'AVION du pilote : 119 L
-        // dont 113 utilisables (sa mesure 17/09, cohérente avec les 5,8 L).
         unusableFuelL: 6,
-        // §2.15(a) : vent traversier DÉMONTRÉ 12,4 m/s = 24 kt.
         xwindLimitKt: 24, reserveExtraMin: 5,
         ldgRoll: 246, ldgFifty: 863,
-        // W&B : bras/enveloppe/masse à vide = PESÉE F-HAYA (LSA 600) — le MV
-        // public confirme MAC 1185 mm et la bande CG en vol 20-30 % MAC
-        // (§2.8/§6.3, cohérence vérifiée par l'audit 27/09). Postes §2.7 :
-        // masse max PAR SIÈGE 120 kg (l'ancienne valeur 130 excédait la
-        // limite) ; pilote seul mini 65 kg (garde CG — pas de champ mini au
-        // schéma, noté ici) ; bagages 10,0 kg en soute (§2.7 + pictogramme).
         wb: {
             units: { mass: 'kg', arm: 'm' },
             emptyMassKg: 354, emptyArmMm: 2641,
@@ -207,7 +201,7 @@ export const AIRCRAFT_DB = [
             stations: [
                 { name: 'Pilote', armMm: 3130, maxKg: 120, fuel: false },
                 { name: 'Passager 1', armMm: 3130, maxKg: 120, fuel: false },
-                { name: 'Bagages', armMm: 3795, maxKg: 10, fuel: false },
+                { name: 'Bagages', armMm: 3795, maxKg: 40, fuel: false },
                 { name: 'Carburant', armMm: 2580, maxKg: 119, fuel: true },
             ],
         },

@@ -320,24 +320,26 @@ describe('base avions — Dynamic WT9 LSA (fiche complète)', () => {
         const wt9 = res.find(a => a.type === 'WT9-LSA');
         assert.ok(wt9, 'WT9 LSA trouvé');
         assert.equal(wt9.name, 'Dynamic WT9 LSA');
-        // A12-v4 FINAL (01/10 nuit, MV public UL/Club rév. 16.03.2016,
-        // couche TEXTE — les lectures d'image avaient induit en erreur) :
-        // §5.2.3 décollage revêtu 246/826 ft (volets 15°, 472,5 kg) ;
-        // §2.7 sièges 120 kg, bagages soute 10,0 kg (×2 : §2.7 + picto) ;
-        // §2.15(a) traversier démontré 24 kt. Caveat : MV version UL/Club
-        // 472,5 kg, F-HAYA = LSA 600 kg (relevée LSA à faire).
-        assert.equal(wt9.groundRoll, 246);
-        assert.equal(wt9.fiftyFt, 826);
+        // A12-v4 FINAL FINAL (01/10 nuit, POH DE LA BONNE VERSION —
+        // « WT9 Dynamic LSA / Club FG912T » AS-POH-03-000 rév. 12.12.2013,
+        // MTOW 600 = F-HAYA, couche texte) : §5.2.3 décollage revêtu
+        // **482/1 027 ft** (volets 15°, ISA 0 m, 600 kg ; herbe 568/1 142) ;
+        // §2.7 sièges 120 kg, BAGAGES 40,0 kg (limite LSA — le 10 kg était
+        // la limite de la version UL/Club 472,5 !), pilote seul mini 54 kg ;
+        // §2.15(a) traversier démontré 24 kt ; atterrissage 246/863 confirmé
+        // à 600 kg (§5.2.4) ; VNE 276 km/h (149 kt).
+        assert.equal(wt9.groundRoll, 482);
+        assert.equal(wt9.fiftyFt, 1027);
         assert.equal(wt9.ldgRoll, 246);
         assert.equal(wt9.ldgFifty, 863);
         assert.equal(wt9.xwindLimitKt, 24);
         assert.equal(wt9.safetyMargin, 15);
-        assert.equal(wt9.cruiseSpeedKt, 100);   // enveloppe conservatrice du §5.2.6 (75 % = 124 kt)
-        assert.equal(wt9.fuelBurnLph, 18);       // §5.2.6 : 18 L/h à 75 %
+        assert.equal(wt9.cruiseSpeedKt, 100);   // enveloppe conservatrice (75 % = 124 kt)
+        assert.equal(wt9.fuelBurnLph, 18);       // 18 L/h à 75 %
         const st = n => wt9.wb.stations.find(s => s.name === n);
-        assert.equal(st('Bagages').maxKg, 10);   // §2.7 + pictogramme §2.15
-        assert.equal(st('Pilote').maxKg, 120);   // §2.7 (l'ancien 130 excédait la limite)
-        assert.equal(wt9.unusableFuelL, 6, '6 L inutilisables (pilote, ≈ les 5,8 L du §2.13 config 126 L) → 113 L utilisables sur 119');
+        assert.equal(st('Bagages').maxKg, 40);   // §2.7 LSA 600 (le 10 = version UL/Club)
+        assert.equal(st('Pilote').maxKg, 120);   // §2.7
+        assert.equal(wt9.unusableFuelL, 6, '6 L inutilisables (pilote, ≈ les 2×2,9 L du §2.13 LSA) → 113 L utilisables sur 119');
         assert.equal(wt9.reserveExtraMin, 5);
     });
 
