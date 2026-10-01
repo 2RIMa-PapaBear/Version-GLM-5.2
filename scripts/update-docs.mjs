@@ -25,6 +25,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MAX_ENTREES = 15;
 
 const git = (args) => execSync(`git ${args}`, { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 26 }).trim();
+const gitOk = (args) => { try { git(args); return true; } catch { return false; } };
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /** Commits de changement (bumps exclus) entre lastSha..HEAD, croissant. */
@@ -84,7 +85,16 @@ function majDoc({ file, ancreFin, entree, habillage }) {
     }
 
     const m = s.match(/<!-- docs:lastSha=([0-9a-f]+|aucun) -->/);
-    const lastSha = m[1] === 'aucun' ? null : m[1];
+    let lastSha = m[1] === 'aucun' ? null : m[1];
+    // SHA MORT (filter-repo 01/10 : d204aeb0 disparu) : git log/rev-list
+    // échouaient sur le range, le catch vidait les entrées → « déjà à jour »
+    // en silence, journal figé — même panne que le 06/09. Un lastSha inconnu
+    // vaut NULL : repli HEAD~40 + dédoublonnage ci-dessous contre les
+    // entrées déjà journalisées.
+    if (lastSha && !gitOk(`rev-parse --verify --quiet ${lastSha}^{commit}`)) {
+        console.warn(`  ${file} : lastSha ${lastSha.slice(0, 8)} inconnu (filter-repo ?) — repli sur l'historique récent, doublons filtrés`);
+        lastSha = null;
+    }
     let entrees = commitsDepuis(lastSha);
     if (lastSha) {
         try {
@@ -93,6 +103,9 @@ function majDoc({ file, ancreFin, entree, habillage }) {
         } catch { entrees = []; }
     }
     entrees = entrees.map(e => ({ ...e, version: versionDuCommit(e.sha) }));
+    // Repli sans lastSha : une entrée déjà présente au caractère près (date +
+    // version + sujet tronqué déterministes) n'est pas réinsérée.
+    entrees = entrees.filter(e => !s.includes(entree(e)));
     if (!entrees.length) { console.log(`  ${file} : déjà à jour`); return; }
 
     const bloc = entrees.slice().reverse().map(entree).join('\n');
