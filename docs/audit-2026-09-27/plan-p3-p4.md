@@ -1,8 +1,21 @@
 # P3/P4 du 2ᵉ audit multi-agents (27/09) — liste consolidée avec statut au 27/09 après-midi
 
-> **JOURNAL DES CORRECTIONS (mise à jour 01/10 nuit)** — lire avec les statuts
+> **JOURNAL DES CORRECTIONS (mise à jour 01/10 nuit, 2ᵉ passe)** — lire avec les statuts
 > ci-dessous, qui ne reflètent plus les derniers lots :
-> - **A12-v4 SOURCÉ SUR MANUELS RÉELS (01/10 nuit)** : le « POH public
+> - **A12-v4 CLOS SUR LE MV RÉEL (01/10 nuit, passe finale « prends toutes
+>   les infos »)** : extraction de la COUCHE TEXTE du MV public « UL/Club »
+>   rév. 16.03.2016 (liens pilote). La passe 1 s'était trompée en lisant les
+>   IMAGES (le « 20 kg bagages » était une erreur de lecture d'image : le
+>   TEXTE dit **10,0 kg**, §2.7 ET pictogramme §2.15 — l'AUDIT avait donc
+>   raison sur les 10 kg ; son « 650 ft » restait introuvable, le vrai
+>   §5.2.3 dit **246/826 ft** revêtu). APPLIQUÉ : décollage **246/826**
+>   (volets 15°, 472,5 kg), atterrissage 863/246 confirmé (volets 35°),
+>   sièges **130→120 kg** (§2.7), traversier **25→24 kt** (§2.15a), VR
+>   49-51 kt (§4.5.5, « 50 kt pilote » confirmé), croisière/reservoirs
+>   annotés (§5.2.6, §2.13 : 5,8 L inutilisables sur 126 L). CAVEAT : MV
+>   version UL/Club 472,5 kg, F-HAYA = LSA 600 kg — relève du manuel LSA
+>   à faire pour les distances.
+> - **A12-v4 passe 1 (remplacée ci-dessus)** : le « POH public
 >   UL 472,5 : 650 ft » cité par le volet 4 était une attribution ERRONÉE —
 >   le MV public « UL/Club » 03/2016 (MTOW 472,5 kg, liens pilote) donne
 >   décollage **246/826 ft** (revêtu) ou 282/866 (herbe) et

@@ -320,20 +320,24 @@ describe('base avions — Dynamic WT9 LSA (fiche complète)', () => {
         const wt9 = res.find(a => a.type === 'WT9-LSA');
         assert.ok(wt9, 'WT9 LSA trouvé');
         assert.equal(wt9.name, 'Dynamic WT9 LSA');
-        // A12-v4 (sourcage vérifié 01/10 nuit sur manuels réels) :
-        // 650/1 148 = conservateur NON sourcé, gardé sur décision pilote en
-        // attente du manuel de vol LSA 600 kg F-HAYA (le MV public UL/Club
-        // 472,5 kg donne 246/826 — optimiste, non retenu).
-        assert.equal(wt9.groundRoll, 650);
-        assert.equal(wt9.fiftyFt, 1148);
+        // A12-v4 FINAL (01/10 nuit, MV public UL/Club rév. 16.03.2016,
+        // couche TEXTE — les lectures d'image avaient induit en erreur) :
+        // §5.2.3 décollage revêtu 246/826 ft (volets 15°, 472,5 kg) ;
+        // §2.7 sièges 120 kg, bagages soute 10,0 kg (×2 : §2.7 + picto) ;
+        // §2.15(a) traversier démontré 24 kt. Caveat : MV version UL/Club
+        // 472,5 kg, F-HAYA = LSA 600 kg (relevée LSA à faire).
+        assert.equal(wt9.groundRoll, 246);
+        assert.equal(wt9.fiftyFt, 826);
         assert.equal(wt9.ldgRoll, 246);
         assert.equal(wt9.ldgFifty, 863);
+        assert.equal(wt9.xwindLimitKt, 24);
         assert.equal(wt9.safetyMargin, 15);
-        assert.equal(wt9.cruiseSpeedKt, 100);
-        assert.equal(wt9.fuelBurnLph, 18);
-        assert.equal(wt9.wb.stations.find(s => s.name === 'Bagages').maxKg, 20);   // MV public UL/Club §2 (pilote 01/10 nuit)
-        assert.equal(wt9.unusableFuelL, 6, '6 L inutilisables (pilote) → 113 L utilisables sur 119 de capacité');
-        assert.equal(wt9.xwindLimitKt, 25);
+        assert.equal(wt9.cruiseSpeedKt, 100);   // enveloppe conservatrice du §5.2.6 (75 % = 124 kt)
+        assert.equal(wt9.fuelBurnLph, 18);       // §5.2.6 : 18 L/h à 75 %
+        const st = n => wt9.wb.stations.find(s => s.name === n);
+        assert.equal(st('Bagages').maxKg, 10);   // §2.7 + pictogramme §2.15
+        assert.equal(st('Pilote').maxKg, 120);   // §2.7 (l'ancien 130 excédait la limite)
+        assert.equal(wt9.unusableFuelL, 6, '6 L inutilisables (pilote, ≈ les 5,8 L du §2.13 config 126 L) → 113 L utilisables sur 119');
         assert.equal(wt9.reserveExtraMin, 5);
     });
 

@@ -155,25 +155,46 @@ export const AIRCRAFT_DB = [
     // VR 50 kt (pilote).
     {
         name: 'Dynamic WT9 LSA', type: 'WT9-LSA',
-        // A12-v4 (audit 27/09, sourcage vérifié 01/10 nuit sur les manuels
-        // RÉELS — MV public « UL/Club » 03/2016 (MTOW 472,5 kg) + manuel
-        // d'entretien Finesse Max, liens pilote) : 650/1 148 = valeurs
-        // CONSERVATRICES NON SOURCÉES, conservées sur décision pilote en
-        // attendant la relève de son manuel de vol LSA 600 kg (F-HAYA).
-        // Pour mémoire, le MV public UL/Club 472,5 kg donne : décollage
-        // 246 ft / 826 ft (revêtu, volets 15°, 15 °C) ou 282/866 (herbe),
-        // atterrissage 863 ft après 50 ft / roulement 246 ft — OPTIMISTES pour un LSA 600 kg
-        // (−21 % de masse), donc non retenues. L'ancienne note « POH public
-        // UL 472,5 : 650 ft » de l'audit était une attribution ERRONÉE
-        // (valeur inexistante dans ce manuel).
-        groundRoll: 650, fiftyFt: 1148,
+        // A12-v4 SOURCÉ SUR LE MANUEL DE VOL (01/10 nuit, instruction pilote
+        // « prends toutes les infos du manuel ») : MV public « WT9 Dynamic
+        // UL/Club » rév. 16.03.2016, extrait de sa COUCHE TEXTE (les lectures
+        // d'image ont induit l'audit ET la passe 1 en erreur — le « 20 kg
+        // bagages » était une erreur de lecture d'image : le texte dit
+        // 10,0 kg, §2.7 ET pictogramme §2.15 ; le « 650 ft » de l'audit
+        // n'existe pas dans le manuel) :
+        //   §5.2.3 décollage (revêtu, volets 15°, 15 °C, 0 m, MTOW 472,5 kg)
+        //     → roulement 246 ft (75 m), passage 15 m 826 ft (252 m) ;
+        //     herbe 282 ft / 866 ft (le manuel imprime « 1280 ft (264 m) »,
+        //     incohérence interne du document — colonne mètres retenue).
+        //   §5.2.4 atterrissage (volets 35°, 1,3 VS0, freinage) → 863 ft
+        //     après 50 ft / roulement 246 ft (herbe 892/276).
+        //   §4.5.5 rotation 49-51 kt selon la masse (« VR 50 kt pilote »
+        //     confirmé), approche 65-70 kt, finale 65 kt volets 35° (finesse 8).
+        //   §5.2.6 croisière (2000 ft) : 75 % = 231 km/h (124 kt) à 18 L/h,
+        //     65 % = 119 kt à 17 L/h, 55 % = 111 kt à 15 L/h — l'app planifie
+        //     100 kt / 18 L/h, enveloppe CONSERVATRICE du tableau.
+        //   VNE 280 km/h (151 kt), VNO 250, VFE 140 (76 kt), arc vert
+        //   72-230 km/h ; VFR jour, IFR/givrage interdits, remorquage 750 kg
+        //   sans passager.
+        // CAVEAT VERSION : ce MV décrit l'UL/Club 472,5 kg (à vide max
+        // 309,5 kg) — F-HAYA est un LSA 600 kg (à vide 354 kg) : distances
+        // réelles supérieures (masse) ; à remplacer par les valeurs du
+        // manuel de vol LSA de l'avion quand relevées.
+        groundRoll: 246, fiftyFt: 826,
         safetyMargin: 15, cruiseSpeedKt: 100, fuelBurnLph: 18,
-        unusableFuelL: 6,    // MV public §2 : 119 L dont 113 utilisables ✓ (pilote 17/09)
-        xwindLimitKt: 25, reserveExtraMin: 5,
-        // Atterrissage 246/863 = MV public UL/Club 472,5 kg (freinage,
-        // volets 40°) — repris tel quel (audit « POH exact »), même caveat
-        // de version que le décollage.
+        // §2.13 : réservoirs 2×37 ou 2×63 L, inutilisable 1,9/2,9 L par
+        // réservoir (5,8 L sur la config 126 L) ; l'AVION du pilote : 119 L
+        // dont 113 utilisables (sa mesure 17/09, cohérente avec les 5,8 L).
+        unusableFuelL: 6,
+        // §2.15(a) : vent traversier DÉMONTRÉ 12,4 m/s = 24 kt.
+        xwindLimitKt: 24, reserveExtraMin: 5,
         ldgRoll: 246, ldgFifty: 863,
+        // W&B : bras/enveloppe/masse à vide = PESÉE F-HAYA (LSA 600) — le MV
+        // public confirme MAC 1185 mm et la bande CG en vol 20-30 % MAC
+        // (§2.8/§6.3, cohérence vérifiée par l'audit 27/09). Postes §2.7 :
+        // masse max PAR SIÈGE 120 kg (l'ancienne valeur 130 excédait la
+        // limite) ; pilote seul mini 65 kg (garde CG — pas de champ mini au
+        // schéma, noté ici) ; bagages 10,0 kg en soute (§2.7 + pictogramme).
         wb: {
             units: { mass: 'kg', arm: 'm' },
             emptyMassKg: 354, emptyArmMm: 2641,
@@ -184,13 +205,9 @@ export const AIRCRAFT_DB = [
                 [600, 2824], [465.3, 2824], [445, 2810], [405, 2713],
             ],
             stations: [
-                { name: 'Pilote', armMm: 3130, maxKg: 130, fuel: false },
-                { name: 'Passager 1', armMm: 3130, maxKg: 130, fuel: false },
-                // A12-v4 : 20 kg = MV public « UL/Club » 03/2016 §2
-                // (« bagages 20 kg max en soute ») — validation pilote
-                // 01/10 nuit. NB : la limite du manuel LSA 600 kg de F-HAYA
-                // reste à relever si différente. Bras 3 795 mm inchangé.
-                { name: 'Bagages', armMm: 3795, maxKg: 20, fuel: false },
+                { name: 'Pilote', armMm: 3130, maxKg: 120, fuel: false },
+                { name: 'Passager 1', armMm: 3130, maxKg: 120, fuel: false },
+                { name: 'Bagages', armMm: 3795, maxKg: 10, fuel: false },
                 { name: 'Carburant', armMm: 2580, maxKg: 119, fuel: true },
             ],
         },
