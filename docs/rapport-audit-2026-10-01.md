@@ -301,24 +301,47 @@ crépuscules civils ✓, clearance 1 000 ft sous la base ✓). Variations du jou
 | WMM / déclinaisons | conforme (tolérances) | o6 quantifié |
 | Reste de la matrice 28/09 | inchangé conforme | — |
 
-## 8. Plan de correction priorisé
+## 8. Plan de correction priorisé — EXÉCUTÉ
 
-1. **M1** — garde `isMain` de fetch-sup-sia (S) + relance job + contrôle
-   generatedAt ; durcissement badge d'âge SUP (S). → le seul point qui
-   « saigne ».
-2. **m2** — ancre `airacInForce` sur caches VRP/obstacles (S).
-3. **m4** — `needs: update` des garde-fous AIRAC (S).
-4. **m3** — `_esc` sup-sia → core.escapeHtml (S).
-5. **m5** — LFHB/LFTB dans airports.json (S).
+1. **M1 — CORRIGÉ/PUBLIÉ le 01/10 au soir** : garde isMain canonique, base
+   régénérée (116 SUP, +11/−16), badge d'âge UTC + ⚠ ≥3 j (fini le repli
+   Date.now() mensonger), garde CI anti-no-op (échec si generatedAt > 60 min).
+   Run CI 36896244602 vert, prod vérifiée. Au passage : m3 réglé le même jour.
+2. **m2 — CORRIGÉ le 01/10** : `airacCacheOk` (pur) + marqueurs
+   siaAirac/siaVrpAirac portés jusqu'au cache par `parseRadioPoints`,
+   obstacles ancrés sur `airac` ; clés IDB `data-v6` / `obstacles-sia2`
+   (re-téléchargement immédiat pour les clients existants). +3 tests.
+3. **m4 — CORRIGÉ le 01/10** : `needs: update` sur airac-sia-xml et
+   airac-obstacles — plus de course contre la mise à jour le jour de
+   bascule (run de validation 36898565962 vert, ordre update → gardes →
+   deploy confirmé).
+4. **m3 — CORRIGÉ le 01/10** (avec M1) : `_esc` sup-sia remplacé par
+   l'import core.escapeHtml existant (5 appels).
+5. **m5 — CORRIGÉ le 01/10** : LFHB Biscarosse Hydrobase et LFTB Marignane
+   Berre ajoutées à `data/airports.json` (coordonnées/élévations SIA 10-01,
+   surface W, version base 1.16 → cache IDB invalidé).
 6. P4 connus (N13 WMM2025, W11 unification décodeurs, o4 parseVisiToMeters…)
    — cadence au choix du pilote ; rien de nouveau au-dessus du mineur.
-7. Nettoyages : o5 (69 Mo 09-03), o1 (surveiller cron 06:10Z), o3 (terrains
-   freq-sia).
+7. Nettoyages : **o5 FAIT** (2 XML 09-03, 70 Mo, supprimés) ; **o1 VÉRIFIÉ**
+   (cron actif — run `schedule` du 01/10 à 13:04Z vert, latence GitHub ~7 h) ;
+   **o3 RÉSOLU le 01/10 — requalifié anomalie RÉELLE en cours de route** :
+   l'eAIP balise ses révisions AIRAC (ancienne valeur en `<del>`, nouvelle en
+   `<ins>`) ; `strip()` gardait les deux textes → cellule « 121.200 121.205
+   MHz » ne matchait plus le parseur → fiches à fréquences amendées VIDES.
+   Les 3 terrains disparus étaient ceux aux fréquences changées au 10-01
+   (LFPT Pontoise, LFRQ Quimper, LFRZ Saint-Nazaire — dont un contrôlé).
+   Fix : le texte `<del>` (hors vigueur) est jeté avant l'effacement des
+   balises, pour toutes les cellules. Ré-extraction : **141 terrains,
+   1 183 fréquences** (vs 138/1 115 — +68 lignes amendées récupérées sur
+   l'ensemble des fiches), LFPT TWR 121.205 en vigueur. +1 test de
+   régression (fixture del/ins). Demain 06:10Z, le robot quotidien
+   re-testera automatiquement l'extracteur.
 
 ---
 
 ## 9. Environnement
 
-Node 24.14 (fuseau Europe/Paris), `npm test` 747/747 ;
+Node 24.14 (fuseau Europe/Paris), `npm test` 747/747 (751 après exécution du
+plan, §8) ;
 scripts de recalcul écrits hors dépôt (tmp ZCode) ; production interrogée en
 lecture seule (`papabear56.pages-perso.free.fr`).
