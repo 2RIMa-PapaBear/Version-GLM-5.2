@@ -321,7 +321,7 @@ async function _generateNavLogPdfInto(tab, { file = false, local = false } = {})
     // carte + collecte = ~200 Ko de JS (jsPDF chargé lui aussi à la volée
     // par l'app) inutiles au démarrage — le boot passe de 69 modules à
     // l'essentiel.
-    const { drawNavLogPdf, drawNotamAnnex, drawFileCover, drawWeatherPage, drawVacPages, drawElevationProfilePage } = await import('./navlog-pdf.js');
+    const { drawNavLogPdf, drawNotamAnnex, drawFileCover, drawWeatherPage, drawVacPages, drawElevationProfilePage, drawSigwxPages } = await import('./navlog-pdf.js');
     const { drawFlightMapPage } = await import('./flight-map-pdf.js');
     const { buildFlightMapData } = await import('./flight-map-collect.js');
     let stash = state._lastNavPlan;
@@ -807,6 +807,17 @@ async function _generateNavLogPdfInto(tab, { file = false, local = false } = {})
             }
             await addTafBlock(local ? (isFr3 ? 'Terrain' : 'Field') : (isFr3 ? 'Arrivée' : 'Destination'), toIcao);
             drawWeatherPage(doc, { isFr: isFr3, generatedLabel, dep, terrains });
+            // ---- Cartes TEMSI / WinTEM / fronts (pilote 02/10) : À LA
+            // SUITE de la page météo — une page PLEINE par carte couvrant
+            // la fenêtre de vol (génération → arrivée prévue), TEMSI en
+            // paysage, WinTEM et fronts en portrait, sans déformation,
+            // toutes horodatées (échéance UTC + locale + date). Chaque
+            // source dégrade seule — jamais de dossier en échec.
+            try {
+                const { collectSigwxCharts } = await import('./sigwx-dossier.js');
+                const charts = await collectSigwxCharts({ totalMin: totalMin || 0, isFr: isFr3 });
+                if (charts.length) drawSigwxPages(doc, charts, isFr3);
+            } catch (e) { console.warn('cartes TEMSI/WinTEM/fronts ignorées :', e.message); }
             // ORDRE PILOTE 16/09 : garde / log / météo / NOTAM. La garde et
             // la météo sont générées à la suite du log — une SEULE remontée
             // suffit (la garde en page 1, la météo reste juste après le

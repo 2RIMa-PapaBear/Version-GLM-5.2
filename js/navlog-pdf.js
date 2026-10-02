@@ -2404,3 +2404,53 @@ export function drawWeatherPage(doc, d) {
     // NOTAM, qui force aussi sa propre couleur depuis le retour 16/09).
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9); _setInk(doc, INK);
 }
+
+/** Cartes TEMSI / WinTEM / FRONTS du dossier (pilote 02/10) : à la
+ *  suite de la page « Météo au dossier », une page PLEINE par carte
+ *  couvrant la fenêtre de vol, SANS DÉFORMATION :
+ *    - TEMSI  → page PAYSAGE (la carte est plus large que haute) ;
+ *    - WinTEM → page PORTRAIT ;
+ *    - fronts → page PORTRAIT.
+ *  Chaque page est HORODATÉE : bande de titre = couche à gauche,
+ *  échéance UTC (+ heure locale) et date à droite.
+ *  charts : [{kind:'temsi'|'wintem'|'fronts', title, when,
+ *             img, fmt, w, h}] — collectés par sigwx-dossier.js. */
+export function drawSigwxPages(doc, charts, isFr = true) {
+    for (const c of charts || []) {
+        const paysage = c.kind === 'temsi';
+        const pw = paysage ? PAGE.h : PAGE.w;   // 595.32 | 419.53
+        const ph = paysage ? PAGE.w : PAGE.h;   // 419.53 | 595.32
+        doc.addPage([pw, ph], paysage ? 'landscape' : 'portrait');
+        const M = 14;
+
+        // Bande de titre horodatée (même langage que les pages VAC).
+        doc.setFillColor(...DARK);
+        doc.rect(M, M, pw - 2 * M, 13, 'F');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+        doc.setTextColor(255, 255, 255);
+        doc.text(String(c.title || c.kind || ''), M + 6, M + 9.2);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+        doc.text(String(c.when || ''), pw - M - 6, M + 9.2, { align: 'right' });
+
+        // Image pleine page SANS déformation : ajustée à la zone puis
+        // centrée. Dimensions VALIDÉES (fiche 21) : 0/NaN/±Infinity ou
+        // négatif → repli pleine zone plutôt qu'un flux PDF corrompu.
+        const area = { x: M, y: M + 13 + 5, w: pw - 2 * M, h: ph - (M + 13 + 5) - M - 9 };
+        const dim = Number.isFinite(c.w) && c.w > 0 && Number.isFinite(c.h) && c.h > 0;
+        const w = dim ? c.w : area.w;
+        const h = dim ? c.h : area.h;
+        const sc = dim ? Math.min(area.w / w, area.h / h) : 1;
+        try {
+            doc.addImage(c.img, c.fmt || 'JPEG',
+                area.x + (area.w - w * sc) / 2, area.y + (area.h - h * sc) / 2, w * sc, h * sc);
+        } catch (e) { console.warn('carte TEMSI/WinTEM/fronts non insérée :', e.message); }
+
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(5.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text(isFr
+            ? 'Source : Météo-France (AEROWEB). Document d\u2019aide à la préparation — vérifiez la météo avant le vol.'
+            : 'Source: Météo-France (AEROWEB). Preparation aid — check the weather before flight.',
+            pw / 2, ph - 4, { align: 'center' });
+        doc.setTextColor(...INK);
+    }
+}

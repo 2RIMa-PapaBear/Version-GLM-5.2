@@ -375,10 +375,10 @@ export async function showFlightFile(forceIcao) {
         <button id="ff-print" class="btn-primary" ${printReady ? '' : 'disabled'}
             title="${inp.mode === 'nav'
                 ? (printReady
-                    ? (isFr ? 'Générer le PDF du dossier de vol (log de nav + VAC + NOTAM).' : 'Generate the flight file PDF (nav log + VAC + NOTAM).')
-                    : (isFr ? 'Choisissez une destination pour générer le PDF du dossier (log de nav + VAC + NOTAM).' : 'Set a destination to generate the flight file PDF (nav log + VAC + NOTAM).'))
+                    ? (isFr ? 'Générer le PDF du dossier de vol (log de nav + cartes TEMSI/WinTEM/fronts + VAC + NOTAM).' : 'Generate the flight file PDF (nav log + TEMSI/WinTEM/fronts charts + VAC + NOTAM).')
+                    : (isFr ? 'Choisissez une destination pour générer le PDF du dossier (log de nav + cartes TEMSI/WinTEM/fronts + VAC + NOTAM).' : 'Set a destination to generate the flight file PDF (nav log + TEMSI/WinTEM/fronts charts + VAC + NOTAM).'))
                 : (printReady
-                    ? (isFr ? 'Imprimer le dossier de vol local (page de garde, log terrain, météo, NOTAM, carte, VAC, centrage).' : 'Print the local flight file (cover, field log, weather, NOTAM, map, VAC, balance).')
+                    ? (isFr ? 'Imprimer le dossier de vol local (page de garde, log terrain, météo, cartes TEMSI/WinTEM/fronts, NOTAM, carte, VAC, centrage).' : 'Print the local flight file (cover, field log, weather, TEMSI/WinTEM/fronts charts, NOTAM, map, VAC, balance).')
                     : (isFr
                         ? 'Le dossier s\u2019imprime quand les rubriques Météo, NOTAM, Carburant, Perfs et Centrage sont au vert — la VAC est facultative.'
                         : 'The dossier prints once Weather, NOTAM, Fuel, Runway perf and Balance tiles are green — VAC is optional.'))}"
