@@ -745,7 +745,14 @@ export function evaluateLandingPerformance(icao) {
     const apt = getAirportByICAO(icao);
     if (rwyWind && rwyWind.dir != null && apt?.runways) {
         const dec = getDeclinationForIcao(icao) || 0;
-        const sel = selectBestRunway(apt.runways, rwyWind, null, dec);
+        // Retour pilote 02/10 : en vol LOCAL on décolle ET on atterrit sur le
+        // terrain affiché — la piste CHOISIE pour le décollage (bulle de la
+        // rose, state.forcedRunway) doit piloter AUSSI le calcul
+        // d'atterrissage. Même sémantique que le décollage (fiche 14) : le
+        // forçage impose la PAIRE, selectBestRunway rend l'extrémité face au
+        // vent de CETTE paire ; forçage inconnu de ce terrain → repli au
+        // vent (comportement d'avant). La pente suit (slopeRwy ci-dessous).
+        const sel = selectBestRunway(apt.runways, rwyWind, state.forcedRunway, dec);
         if (sel?.active) {
             const magWindDir = (((rwyWind.dir - dec) % 360) + 360) % 360;
             const angle = (magWindDir - sel.active.hdg) * Math.PI / 180;
