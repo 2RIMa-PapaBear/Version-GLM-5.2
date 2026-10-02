@@ -75,12 +75,13 @@ export async function fetchTemsiList() {
     }
 }
 
-/** Image d'une échéance → objectURL (cache IDB par type+date). null en échec. */
-export async function fetchTemsiImage(type, utc) {
+/** Image d'une échéance → Blob (cache IDB par type+date). null en échec.
+ *  Exporté pour le dossier de vol (pages TEMSI/WinTEM pleines, 02/10). */
+export async function fetchTemsiImageBlob(type, utc) {
     const key = `temsi:img:${type}:${utc}`;
     const hit = await _idbGet(key);
     if (hit?.blob instanceof Blob && Date.now() - hit.ts < IMG_TTL_MS) {
-        return URL.createObjectURL(hit.blob);
+        return hit.blob;
     }
     try {
         const r = await fetch(`${RELAY_TEMSI}?img=${encodeURIComponent(type)}&date=${utc}`,
@@ -89,11 +90,17 @@ export async function fetchTemsiImage(type, utc) {
         const blob = await r.blob();
         if (!blob.size || !/^image\//.test(blob.type)) throw new Error('réponse non image');
         await _idbPut(key, { ts: Date.now(), blob });
-        return URL.createObjectURL(blob);
+        return blob;
     } catch (e) {
         console.warn('TEMSI image indisponible :', e.message);
         return null;
     }
+}
+
+/** Image d'une échéance → objectURL (cache IDB par type+date). null en échec. */
+export async function fetchTemsiImage(type, utc) {
+    const blob = await fetchTemsiImageBlob(type, utc);
+    return blob ? URL.createObjectURL(blob) : null;
 }
 
 /** UTC « 20260916150000 » → { utc: '15h00', loc: '17h00' } (heure locale). */

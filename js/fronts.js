@@ -76,12 +76,13 @@ export async function fetchFrontsList() {
     }
 }
 
-/** Image d'une échéance → objectURL (cache IDB par type+date). null en échec. */
-export async function fetchFrontsImage(type, utc) {
+/** Image d'une échéance → Blob (cache IDB par type+date). null en échec.
+ *  Exporté pour le dossier de vol (pages fronts pleines, 02/10). */
+export async function fetchFrontsImageBlob(type, utc) {
     const key = `fronts:img:${type}:${utc}`;
     const hit = await _idbGet(key);
     if (hit?.blob instanceof Blob && Date.now() - hit.ts < IMG_TTL_MS) {
-        return URL.createObjectURL(hit.blob);
+        return hit.blob;
     }
     try {
         const r = await fetch(`${RELAY_FRONTS}?img=${encodeURIComponent(type)}&date=${utc}`,
@@ -90,11 +91,17 @@ export async function fetchFrontsImage(type, utc) {
         const blob = await r.blob();
         if (!blob.size || !/^image\//.test(blob.type)) throw new Error('réponse non image');
         await _idbPut(key, { ts: Date.now(), blob });
-        return URL.createObjectURL(blob);
+        return blob;
     } catch (e) {
         console.warn('fronts image indisponible :', e.message);
         return null;
     }
+}
+
+/** Image d'une échéance → objectURL (cache IDB par type+date). null en échec. */
+export async function fetchFrontsImage(type, utc) {
+    const blob = await fetchFrontsImageBlob(type, utc);
+    return blob ? URL.createObjectURL(blob) : null;
 }
 
 // ---- Panneau (DOM) ----------------------------------------------------------

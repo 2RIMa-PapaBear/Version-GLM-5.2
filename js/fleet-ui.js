@@ -414,8 +414,59 @@ function _renderSuggest(query) {
 function _applySuggestion(ac) {
     const nameEl = document.getElementById('fleet-name');
     if (!ac) return;
-    // On ne remplit que les champs vides : ne pas écraser ce que le pilote
-    // a déjà saisi (ex: s'il a déjà mis son immatriculation ou ajusté la marge).
+
+    // MODE ÉDITION — ré-appliquer un profil est un geste EXPLICITE de
+    // migration (caveat B2 : les avions déjà en flotte gardent les valeurs
+    // copiées à leur création). La règle « champs vides seulement » rendait
+    // ce parcours IMPOSSIBLE : en édition le formulaire est déjà plein des
+    // anciennes valeurs, la sélection n'appliquait RIEN. On remplace donc
+    // les valeurs du modèle (distances, limites, centrage) après
+    // confirmation — le nom de l'avion ET la masse/bras à vide (pesée du
+    // pilote) sont conservés.
+    const editId = document.getElementById('fleet-edit-id')?.value;
+    if (editId) {
+        const existing = getFleet().find(a => a.id === editId);
+        if (existing) {
+            const isFr = state.lang === 'fr';
+            const msg = isFr
+                ? `Appliquer le profil « ${ac.name} » ?\n\nLes distances, limites et la configuration de centrage seront REMPLACÉS par les valeurs du modèle. Le nom de l'avion et sa masse/bras à vide (votre pesée) sont conservés.`
+                : `Apply the “${ac.name}” profile?\n\nDistances, limits and the weight & balance setup will be REPLACED by the template values. The aircraft name and its empty weight/arm (your weighing) are kept.`;
+            if (!confirm(msg)) { _hideSuggest(); return; }
+            const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ''; };
+            document.getElementById('fleet-type') && (document.getElementById('fleet-type').value = ac.type || '');
+            set('fleet-roll', ac.groundRoll);
+            set('fleet-50ft', ac.fiftyFt);
+            set('fleet-ldg-roll', ac.ldgRoll);
+            set('fleet-ldg-50ft', ac.ldgFifty);
+            set('fleet-cruise', ac.cruiseSpeedKt);
+            set('fleet-burn', ac.fuelBurnLph);
+            set('fleet-unusable', ac.unusableFuelL);
+            set('fleet-xwind', ac.xwindLimitKt);
+            set('fleet-reserve-extra', ac.reserveExtraMin);
+            set('fleet-margin', ac.safetyMargin != null ? ac.safetyMargin : 20);
+            if (ac.wb) {
+                _wbDraft = _wbDraftFrom(ac);
+                // Pesée du pilote préservée : la masse/bras à vide du modèle
+                // est générique, celle de l'avion existant est LA bonne.
+                const ex = existing.wb;
+                if (ex && Number.isFinite(ex.emptyMassKg)) {
+                    const u = ac.wb.units;
+                    _wbDraft.emptyMass = String(+massFromKg(ex.emptyMassKg, u.mass).toFixed(1));
+                    _wbDraft.emptyArm = ex.emptyArmMm != null
+                        ? String(+armFromMm(ex.emptyArmMm, u.arm).toFixed(armDecimals(u.arm))) : _wbDraft.emptyArm;
+                }
+                _wbTouched = true;
+                _renderWbSection();
+            }
+            _hideSuggest();
+            nameEl?.focus();
+            return;
+        }
+    }
+
+    // MODE AJOUT — comportement inchangé : on ne remplit que les champs
+    // vides, pour ne pas écraser ce que le pilote a déjà saisi (ex: s'il a
+    // déjà mis son immatriculation ou ajusté la marge).
     if (nameEl && !nameEl.value.trim()) nameEl.value = ac.name;
     const typeEl = document.getElementById('fleet-type');
     if (typeEl && !typeEl.value.trim()) typeEl.value = ac.type;
@@ -447,8 +498,8 @@ function _applySuggestion(ac) {
     }
 
     // Centrage : repris tel quel si la section n'a pas été touchée et si
-    // l'avion édité n'en a pas déjà un (en ajout, edit-id est vide).
-    const editId = document.getElementById('fleet-edit-id')?.value;
+    // l'avion édité n'en a pas déjà un (en ajout, edit-id est vide — en
+    // édition le cas est traité plus haut et on n'arrive pas ici).
     const editedHasWb = !!editId && !!getFleet().find(a => a.id === editId)?.wb;
     if (ac.wb && !_wbTouched && !editedHasWb) {
         _wbDraft = _wbDraftFrom(ac);
