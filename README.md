@@ -276,6 +276,7 @@ npm run deploy:test -- --mirror      # supprime aussi les fichiers distants disp
 
 ## Journal des versions
 <!-- debut journal -->
+- **2026-10-03** — URGENT — boucle infinie de recalculs coupant le zoom de la carte régionale (retour pilote 03/10 soir : « zoom dézoom en permanence ») : le…
 - **2026-10-03** — Centrage & carburant (pilote 03/10, 9 correctifs) — carburant embarqué BLOQUÉ au plafond utilisable de la fiche avion : toute valeur…
 - **2026-10-03** — Cadres du briefing réordonnables à la main (pilote 03/10) — 9 cadres (Performances piste, Centrage, Info terrain, Fréquences, Alternates,…
 - **2026-10-03** — URGENT (retour pilote 03/10) : fréquence radio PAR SECTEUR sur le profil d'élévation et la page PDF — l'organisme groupé collait la…
@@ -290,7 +291,7 @@ npm run deploy:test -- --mirror      # supprime aussi les fichiers distants disp
 - **2026-10-01** — Journal des versions : SHA mort après filter-repo (d204aeb0 disparu) → update-docs repliait en silence « déjà à jour » (même panne que le…
 - **2026-10-01** — SUP AIP figées depuis le 16/09 — RÉPARÉES (fiche M1 audit 01/10) : garde isMain du crawler jamais matchée en CI depuis sa naissance (17/09)…
 - **2026-10-01** — A12-v4 FINAL FINAL — le pilote fournit le POH DE LA BONNE VERSION : « WT9 Dynamic LSA / Club FG912T » (AS-POH-03-000 rév. 12.12.2013,…
-- **2026-10-01** — S10 ANNULÉ (décision pilote 01/10) : la QA visuelle du mode cockpit n'aura pas lieu — le tableau des trois audits est désormais TOUT fermé
+
 
 
 
@@ -298,7 +299,7 @@ npm run deploy:test -- --mirror      # supprime aussi les fichiers distants disp
 
 
 <!-- fin journal -->
-<!-- docs:lastSha=0ec1c82f999ac1eeb39daec364e38ec1babe13ca -->
+<!-- docs:lastSha=92c5ba14a501e6d4f37daf8fcea21713ec5b9e4c -->
 
 
 

@@ -181,8 +181,11 @@ function _notifyFleetChanged() {
 export function setActiveAircraft(id) {
     const fleet = getFleet();
     if (fleet.some(a => a.id === id)) {
-        _writeLs(LS_ACTIVE, id);
-        _notifyFleetChanged();
+        // Seul un VRAI changement d'avion actif notifie (anti-bruit).
+        if (getActiveAircraftId() !== id) {
+            _writeLs(LS_ACTIVE, id);
+            _notifyFleetChanged();
+        }
     }
 }
 
@@ -212,7 +215,15 @@ export function updateAircraft(id, data) {
     const fleet = getFleet();
     const idx = fleet.findIndex(a => a.id === id);
     if (idx === -1) return null;
-    fleet[idx] = _sanitize({ ...fleet[idx], ...data, id });
+    const merged = _sanitize({ ...fleet[idx], ...data, id });
+    // Sans changement effectif : PAS d'écriture ni d'événement. Le
+    // planificateur persiste vitesse/conso via _writePerf à CHAQUE calcul
+    // du plan — si ces mutations identiques émettaient « fleet-changed »,
+    // l'écouteur relançait le plan → _writePerf → … en boucle (~3,4
+    // calculs/s), recadrant la carte régionale en continu (retour pilote
+    // 03/10 soir : « zoom dézoom en permanence »).
+    if (JSON.stringify(merged) === JSON.stringify(fleet[idx])) return fleet[idx];
+    fleet[idx] = merged;
     _writeLs(LS_FLEET, fleet);
     _notifyFleetChanged();
     return fleet[idx];

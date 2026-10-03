@@ -833,18 +833,29 @@ document.addEventListener('DOMContentLoaded', async function () {
     // le plan de navigation et les widgets dérivés se recalculent. Sans ça,
     // un devis restait calé sur une fiche périmée (retour pilote 03/10 :
     // « réserve 35 min » fantôme après édition de la réserve perso).
+    // Garde anti-récursion : si la chaîne de recalcul re-mute la flotte
+    // (_writePerf persiste vitesse/conso à chaque calcul), l'événement
+    // revenu est ignoré — sinon boucle infinie de recalculs et la carte
+    // régionale recadrée en continu (retour pilote 03/10 soir).
+    let _fleetRefreshBusy = false;
     document.addEventListener('fleet-changed', () => {
-        const icao = state.requestedIcao;
-        if (icao) {
-            showTakeoffWidget(icao);
-            refreshWbWidget(icao);
-        }
-        // Recalcul du plan : même destination → pas de remise à zéro des
-        // waypoints (handleDestinationChange ne vide que sur un CHANGEMENT
-        // d'arrivée) ; showFlightPlanner relit conso/réserve de la fiche.
-        const to = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
-        if (getFlightMode() === 'nav' && /^[A-Z][A-Z0-9]{3}$/.test(to)) {
-            handleDestinationChange();
+        if (_fleetRefreshBusy) return;
+        _fleetRefreshBusy = true;
+        try {
+            const icao = state.requestedIcao;
+            if (icao) {
+                showTakeoffWidget(icao);
+                refreshWbWidget(icao);
+            }
+            // Recalcul du plan : même destination → pas de remise à zéro des
+            // waypoints (handleDestinationChange ne vide que sur un CHANGEMENT
+            // d'arrivée) ; showFlightPlanner relit conso/réserve de la fiche.
+            const to = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
+            if (getFlightMode() === 'nav' && /^[A-Z][A-Z0-9]{3}$/.test(to)) {
+                handleDestinationChange();
+            }
+        } finally {
+            _fleetRefreshBusy = false;
         }
     });
     document.getElementById('btn-theme').addEventListener('click', toggleTheme);
