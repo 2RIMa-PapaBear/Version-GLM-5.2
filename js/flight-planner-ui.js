@@ -1109,6 +1109,10 @@ function _wireLeg2(container, ctx) {
                 // posée — les autres points restent de passage).
                 state.routePoses = [...new Set([...(state.routePoses || []).map(c => String(c).toUpperCase()), cur])];
                 toInput.value = dest2;
+                // Signale à handleDestinationChange que ce changement de
+                // destination POSE une étape (waypoints + posées tout juste
+                // écrits ci-dessus) : il ne doit pas les remettre à zéro.
+                toInput.dataset.leg2Posee = '1';
                 toInput.dispatchEvent(new Event('input', { bubbles: true }));
                 return;   // plan recalculé de bout en bout — le bloc se re-rendra
             }
@@ -1324,29 +1328,29 @@ function _renderResult(container, plan, isFr, isNight, alt, tas, burn) {
             <div class="fp-grid fp-grid-${4 + (fuel.diversion ? 1 : 0) + (fuel.unusableL > 0 ? 1 : 0)}" style="margin-top:6px;">
                 <div class="fp-cell">
                     <div class="fp-label">${isFr ? 'Trajet' : 'Trip'}</div>
-                    <div class="fp-value">${fuel.tripFuelL} L</div>
+                    <div class="fp-value">${fuel.tripFuelL}L</div>
                 </div>
                 ${fuel.diversion ? `
                 <div class="fp-cell" title="${isFr ? 'Rejoindre le terrain de dégagement depuis l\u2019arrivée (navigation + intégration)' : 'Reach the alternate field from destination (navigation + integration)'} : ${fuel.diversion.distNm} NM · ${fuel.diversion.timeMin ?? '—'} min">
                     <div class="fp-label">${isFr ? 'Dégagement' : 'Alternate'} ${fuel.diversion.icao}</div>
-                    <div class="fp-value">${fuel.diversion.fuelL != null ? fuel.diversion.fuelL : '—'} L</div>
+                    <div class="fp-value">${fuel.diversion.fuelL != null ? fuel.diversion.fuelL : '—'}L</div>
                 </div>` : ''}
                 <div class="fp-cell" title="${isFr ? 'Roulage départ + intégration + roulage arrivée (forfaits mini)' : 'Taxi-out + integration + taxi-in (minimum allowances)'}">
                     <div class="fp-label">${isFr ? 'Roulage + intégr.' : 'Taxi + integ.'} (${fuel.groundMin ?? 0}min)</div>
-                    <div class="fp-value">${fuel.groundL ?? 0} L</div>
+                    <div class="fp-value">${fuel.groundL ?? 0}L</div>
                 </div>
                 <div class="fp-cell">
                     <div class="fp-label">${isFr ? 'Réserve' : 'Reserve'} (${fuel.reserveMin ?? (isNight ? RESERVES.NIGHT_MIN : RESERVES.DAY_MIN)}min)</div>
-                    <div class="fp-value">${fuel.reserveL} L</div>
+                    <div class="fp-value">${fuel.reserveL}L</div>
                 </div>
                 ${fuel.unusableL > 0 ? `
                 <div class="fp-cell" title="${isFr ? 'Carburant inutilisable du manuel de vol (jamais consommable, mais embarqué dans le réservoir)' : 'Unusable fuel from the POH (never burnable, but on board in the tank)'}">
-                    <div class="fp-label">${isFr ? 'Inutilisable' : 'Unusable'}</div>
-                    <div class="fp-value">${fuel.unusableL} L</div>
+                    <div class="fp-label">${isFr ? 'Inut.' : 'Unusable'}</div>
+                    <div class="fp-value">${fuel.unusableL}L</div>
                 </div>` : ''}
                 <div class="fp-cell">
                     <div class="fp-label">${isFr ? 'Total requis' : 'Total req.'}</div>
-                    <div class="fp-value" style="color:var(--primary); font-weight:800; font-size:15px;">${fuel.totalL} L</div>
+                    <div class="fp-value" style="color:var(--primary); font-weight:800; font-size:15px;">${fuel.totalL}L</div>
                 </div>
             </div>
         </div>

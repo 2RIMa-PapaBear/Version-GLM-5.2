@@ -121,7 +121,7 @@ function _render(body, ac, isFr) {
     // Grille « chargement du jour » : 4 cellules MAX par ligne ; le carburant
     // complète la ligne des postes dès qu'une colonne est libre (retour
     // pilote 19/09), sinon il ouvre la ligne suivante avec la durée (vol
-    // local) / la consommée (navigation) et les postes restants.
+    // local) et les postes restants.
     const stCell = (s) => `
         <label class="wb-load">
             <span class="wb-load-lab"><span class="lab">${escapeHtml(s.name)}</span>${s.maxKg ? ` <span class="val">Max ${_m(s.maxKg, u.mass)}</span>` : ''}</span>
@@ -143,17 +143,21 @@ function _render(body, ac, isFr) {
                 ? 'Total fuel at takeoff — pre-filled from the nav plan (trip + reserve), editable.'
                 : 'Total fuel at takeoff — free entry, saved for this aircraft.')}${unusableL > 0 && fuelSt?.maxKg && unusableL < fuelSt.maxKg ? (isFr
                 ? ` Inutilisable du manuel de vol : ${unusableL} L — plafond = capacité ${fuelSt.maxKg} − ${unusableL} = ${usableL} L utilisables.`
-                : ` Unusable fuel from the POH: ${unusableL} L — cap = capacity ${fuelSt.maxKg} − ${unusableL} = ${usableL} L usable.`) : ''}">
+                : ` Unusable fuel from the POH: ${unusableL} L — cap = capacity ${fuelSt.maxKg} − ${unusableL} = ${usableL} L usable.`) : ''}${fuelMaxL ? (isFr
+                ? ' Blocage (pilote 03/10) : toute saisie au-delà de ce plafond est ramenée au max.'
+                : ' Hard cap (pilot 03/10): any entry beyond this limit snaps back to the max.') : ''}">
             <span class="wb-load-lab"><span class="lab">${isFr ? 'Carburant embarqué (L)' : 'Fuel on board (L)'}</span>${fuelMaxL ? ` <span class="val">Max ${fuelMaxL}</span>` : ''}</span>
-            <input type="number" step="any" min="0" id="wb-fuel-l" data-key="fuel" data-max="${fuelMaxL || ''}" value="${loads.fuelL || ''}" placeholder="0">
+            <input type="number" step="any" min="0"${fuelMaxL ? ` max="${fuelMaxL}"` : ''} id="wb-fuel-l" data-key="fuel" data-max="${fuelMaxL || ''}" value="${loads.fuelL || ''}" placeholder="0">
             <input type="range" name="wb-load-range" aria-label="Réglage de la masse" class="wb-load-range" data-key="fuel" min="0" max="${fuelMaxL ? Math.max(1, Math.round(fuelMaxL)) : 200}" step="1" value="${Math.round(loads.fuelL || 0)}">
         </label>` : '';
-    const burnCell = (fuelSt && isNav) ? `
-        <label class="wb-load wb-load-fuel" title="${isFr ? 'Essence consommée jusqu\u2019à destination, issue du plan de vol (trajet, sans la réserve) — non modifiable. Le point Arrivée est calculé avec le carburant restant (embarqué − consommée).' : 'Fuel burned to destination, from the flight plan (trip, no reserve) — read-only. The landing point uses the remaining fuel (on board − burned).'}">
-            <span class="wb-load-lab"><span class="lab">${isFr ? 'Consommée (L)' : 'Burned (L)'}</span> <span class="val dim">${isFr ? 'plan de vol' : 'flight plan'}</span></span>
-            <input type="hidden" id="wb-burn-l" data-key="burn" value="${loads.burnL || ''}">
-            <div class="wb-burn-ro">${loads.burnL || 0}</div>
-        </label>` : '';
+    // Essence consommée (navigation) : la CELLULE visible « Consommée
+    // (L) » est retirée (retour pilote 03/10 — le devis du plan repris
+    // ci-dessous affiche le trajet, l'info était dupliquée) ; le champ
+    // caché subsiste : _recalc le relit pour le point Arrivée et le
+    // graphe (embarqué − consommée).
+    const burnHidden = (fuelSt && isNav)
+        ? `<input type="hidden" id="wb-burn-l" data-key="burn" value="${loads.burnL || ''}">`
+        : '';
     // Vol local : devis carburant par DURÉE ESTIMÉE (A4) — durée + ROZ 30 min
     // (majorée de la réserve perso de l'avion) ; le requis s'affiche et le
     // champ « Carburant embarqué » passe en rouge s'il est insuffisant.
@@ -177,6 +181,14 @@ function _render(body, ac, isFr) {
             </div>
             <div class="wb-fuel-grid" id="wb-local-devis"></div>
         </div>` : '';
+    // Devis carburant du PLAN en navigation (retour pilote 03/10 : « cette
+    // ligne doit être reprise dans centrage, mise en forme identique au
+    // mode local ») — même cadre une-ligne que le devis local, sans la
+    // tête « durée » (elle vient du plan de vol). Rempli par _recalc.
+    const devisNav = (fuelSt && isNav) ? `
+        <div class="wb-duration-group" title="${isFr ? 'Carburant requis du plan de vol : trajet + dégagement éventuel + roulage et intégration + réserve finale + inutilisable du manuel de vol (fenêtre Flotte).' : 'Required fuel from the flight plan: trip + alternate if any + taxi and integration + final reserve + unusable fuel from the POH (Fleet window).'}">
+            <div class="wb-fuel-grid" id="wb-local-devis"></div>
+        </div>` : '';
     const line1 = stations.slice(0, 4);
     const rest = stations.slice(4);
     // Carburant en bout de la ligne des postes s'il reste une colonne ;
@@ -190,8 +202,9 @@ function _render(body, ac, isFr) {
         </div>
         <div class="fleet-wb-sub">${isFr ? `CHARGEMENT DU JOUR (${u.mass.toUpperCase()})` : `TODAY'S LOADING (${u.mass.toUpperCase()})`}</div>
         ${line1.length ? `<div class="wb-load-grid">${line1.map(stCell).join('')}${fuelUp ? fuelCell : ''}</div>` : ''}
-        ${(rest.length || (!fuelUp && fuelCell) || burnCell) ? `<div class="wb-load-grid">${rest.map(stCell).join('')}${fuelUp ? '' : fuelCell}${burnCell}</div>` : ''}
-        ${durationGroup}
+        ${(rest.length || (!fuelUp && fuelCell)) ? `<div class="wb-load-grid">${rest.map(stCell).join('')}${fuelUp ? '' : fuelCell}</div>` : ''}
+        ${burnHidden}
+        ${durationGroup}${devisNav}
         <div class="wb-chart-host"></div>
         <div class="wb-results">
             <div class="wb-res"><span class="wb-dot wb-dot-to"></span><span class="wb-res-val" id="wb-res-to"></span></div>
@@ -310,6 +323,14 @@ function _render(body, ac, isFr) {
     }
 }
 
+/** Flash ambre d'une saisie carburant rabattue au plafond capacité. */
+function _flashClamped(input) {
+    input.classList.remove('wb-fuel-clamped');
+    void input.offsetWidth;   // relance l'animation si déjà jouée
+    input.classList.add('wb-fuel-clamped');
+    setTimeout(() => input.classList.remove('wb-fuel-clamped'), 900);
+}
+
 /** Relit les saisies, recalcule, rafraîchit graphe + résultats + verdict. */
 function _recalc(body, ac, isFr) {
     const wb = ac.wb;
@@ -330,12 +351,25 @@ function _recalc(body, ac, isFr) {
         const over = max > 0 && isFinite(v) && v > massFromKg(max, u.mass) + 1e-9;
         inp.classList.toggle('wb-over', over);
     });
-    const fl = _num(body.querySelector('#wb-fuel-l')?.value);
+    const fuelIn = body.querySelector('#wb-fuel-l');
     const bl = _num(body.querySelector('#wb-burn-l')?.value);
+    // Blocage à la capacité de la fiche avion (retour pilote 03/10) :
+    // impossible d'embarquer plus que le plafond utilisable des réservoirs.
+    // Toute valeur au-delà — frappe, curseur, prédéfini du plan de vol,
+    // état sauvegardé d'une fiche précédente — est rabattue au max et le
+    // champ clignote ambre une fois pour montrer le rabattement.
+    let fl = _num(fuelIn?.value);
+    if (fuelIn) {
+        const maxL = _num(fuelIn.dataset.max);
+        if (maxL > 0 && isFinite(fl) && fl > maxL + 1e-9) {
+            fl = maxL;
+            fuelIn.value = String(maxL);
+            _flashClamped(fuelIn);
+        }
+    }
     loads.fuelL = (isFinite(fl) && fl > 0) ? fl : 0;
     loads.burnL = (isFinite(bl) && bl > 0) ? bl : 0;
     // Carburant : pastille ambre si la capacité (max du poste, en litres) est dépassée.
-    const fuelIn = body.querySelector('#wb-fuel-l');
     if (fuelIn) {
         const maxL = _num(fuelIn.dataset.max);
         fuelIn.classList.toggle('wb-over', maxL > 0 && isFinite(fl) && fl > maxL + 1e-9);
@@ -351,17 +385,60 @@ function _recalc(body, ac, isFr) {
         // de navigation.
         const devisEl = body.querySelector('#wb-local-devis');
         if (devisEl) {
+            const cell = (lab, val, strong) =>
+                `<div class="wb-fuel-cell${strong ? ' wb-fuel-total' : ''}"><span>${lab}</span><b>${val}</b></div>`;
+            // « Inutilisable » raccourci en « Inut. » (retour pilote 03/10 :
+            // gagner de la place) — le mot complet reste en infobulle.
+            const inutTitle = isFr
+                ? 'Carburant inutilisable du manuel de vol — jamais consommable, mais embarqué dans le réservoir.'
+                : 'Unusable fuel from the POH — never burnable, but on board in the tank.';
+            const inutLab = isFr ? 'Inut.' : 'Unusable';
             if (req && req.local) {
                 devisEl.classList.toggle('wb-fuel-grid-5', req.unusableL > 0);
-                const cell = (lab, val, strong) =>
-                    `<div class="wb-fuel-cell${strong ? ' wb-fuel-total' : ''}"><span>${lab}</span><b>${val}</b></div>`;
+                devisEl.classList.remove('wb-fuel-grid-6');
                 devisEl.innerHTML =
-                    cell(`${isFr ? 'Durée' : 'Duration'} ${req.tripMin} min`, `${req.tripFuelL} L`)
-                    + cell(`${isFr ? 'Roulage' : 'Taxi'} ${req.groundMin} min`, `${req.groundL} L`)
-                    + cell(`${isFr ? 'Réserve' : 'Reserve'} ${req.reserveMin} min`, `${req.reserveL} L`)
-                    + (req.unusableL > 0 ? cell(isFr ? 'Inutilisable' : 'Unusable', `${req.unusableL} L`) : '')
-                    + cell(isFr ? 'Total min. requis' : 'Total min. req.', `${req.totalL} L`, true);
-            } else devisEl.innerHTML = '';
+                    cell(`${isFr ? 'Durée' : 'Duration'} ${req.tripMin} min`, `${req.tripFuelL}L`)
+                    + cell(`${isFr ? 'Roulage' : 'Taxi'} ${req.groundMin} min`, `${req.groundL}L`)
+                    + cell(`${isFr ? 'Réserve' : 'Reserve'} ${req.reserveMin} min`, `${req.reserveL}L`)
+                    + (req.unusableL > 0 ? cell(inutLab, `${req.unusableL}L`) : '')
+                    + cell(isFr ? 'Total min. requis' : 'Total min. req.', `${req.totalL}L`, true);
+            } else if (req) {
+                // Navigation (retour pilote 03/10) : le devis du plan de vol,
+                // même mise en forme une-ligne que le devis local — libellés
+                // repris tels quels de la ligne « Carburant » du planificateur.
+                // Six cellules (dégagement présent) : libellés RACCOURCIS pour
+                // tenir sur la ligne (le détail complet reste en infobulle).
+                const n = (req.diversion?.fuelL ? 1 : 0) + (req.unusableL > 0 ? 1 : 0) + 4;
+                const court = n >= 6;
+                const cellT = (lab, val, title, strong) =>
+                    `<div class="wb-fuel-cell${strong ? ' wb-fuel-total' : ''}"${title ? ` title="${title}"` : ''}><span>${lab}</span><b>${val}</b></div>`;
+                let html = cell(isFr ? 'Trajet' : 'Trip', `${req.tripFuelL}L`);
+                if (req.diversion?.fuelL) {
+                    const dt = isFr
+                        ? `Terrain de dégagement ${req.diversion.icao} — rejoint depuis l'arrivée (${req.diversion.distNm ?? '?'} NM)`
+                        : `Alternate ${req.diversion.icao} — reached from destination (${req.diversion.distNm ?? '?'} NM)`;
+                    html += court
+                        ? cellT(`${isFr ? 'Dégag.' : 'Alt.'} ${escapeHtml(req.diversion.icao || '')}`, `${req.diversion.fuelL}L`, dt)
+                        : cellT(`${isFr ? 'Dégagement' : 'Alternate'} ${escapeHtml(req.diversion.icao || '')}`, `${req.diversion.fuelL}L`, dt);
+                }
+                const rt = isFr
+                    ? 'Roulage départ + intégration + roulage arrivée (forfaits mini)'
+                    : 'Taxi-out + integration + taxi-in (minimum allowances)';
+                html += (court
+                    ? cellT(`${isFr ? 'Roulage' : 'Taxi'} ${req.groundMin ?? 0}'`, `${req.groundL ?? 0}L`, rt)
+                    : cellT(`${isFr ? 'Roulage + intégr.' : 'Taxi + integ.'} (${req.groundMin ?? 0}min)`, `${req.groundL ?? 0}L`, rt))
+                    + (court
+                        ? cellT(`${isFr ? 'Réserve' : 'Reserve'} ${req.reserveMin ?? 0}'`, `${req.reserveL}L`)
+                        : cellT(`${isFr ? 'Réserve' : 'Reserve'} (${req.reserveMin ?? 0}min)`, `${req.reserveL}L`));
+                if (req.unusableL > 0) html += cellT(inutLab, `${req.unusableL}L`, inutTitle);
+                html += cell(isFr ? 'Total requis' : 'Total req.', `${req.totalL}L`, true);
+                devisEl.classList.toggle('wb-fuel-grid-5', n === 5);
+                devisEl.classList.toggle('wb-fuel-grid-6', n === 6);
+                devisEl.innerHTML = html;
+            } else {
+                devisEl.classList.remove('wb-fuel-grid-5', 'wb-fuel-grid-6');
+                devisEl.innerHTML = '';
+            }
         }
     }
     writeWbLoads(ac.id, loads);

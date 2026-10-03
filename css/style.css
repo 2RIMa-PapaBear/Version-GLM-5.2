@@ -1838,11 +1838,25 @@ body.map-overlay-open { overflow: hidden; }
    vol en cite une : la grille passe alors à 5 colonnes. */
 .wb-fuel-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.45fr);
     gap: 6px 8px;
     margin-top: 8px;
 }
-.wb-fuel-grid.wb-fuel-grid-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+/* 5 cellules (inutilisable cité) : la colonne TOTAL gratte de la place
+ * sur les quatre autres — sinon « Total min. requis 34.5L » déborde de
+ * son cadre (retour pilote 03/10). */
+.wb-fuel-grid.wb-fuel-grid-5 { grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.45fr); }
+/* 6 cellules (devis navigation avec dégagement, repris au centrage) :
+ * même principe, colonne TOTAL élargie. */
+.wb-fuel-grid.wb-fuel-grid-6 { grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(0, 1.25fr); }
+/* …et sur UNE SEULE LIGNE (retour pilote 03/10) : six cellules sur la
+ * largeur du cadre imposent police et marges compactes, sinon les
+ * libellés longs (« Roulage + intégr. ») ellipsent. */
+.wb-duration-group .wb-fuel-grid.wb-fuel-grid-6 { gap: 6px 6px; }
+.wb-duration-group .wb-fuel-grid-6 .wb-fuel-cell { gap: 4px; padding: 4px 6px; }
+.wb-duration-group .wb-fuel-grid-6 .wb-fuel-cell span { font-size: 8.5px; letter-spacing: 0.3px; }
+.wb-duration-group .wb-fuel-grid-6 .wb-fuel-cell b { font-size: 12px; }
+.wb-duration-group .wb-fuel-grid-6 .wb-fuel-cell.wb-fuel-total b { font-size: 13.5px; }
 @media (max-width: 700px) {
     .wb-fuel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -1920,14 +1934,21 @@ body.map-overlay-open { overflow: hidden; }
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    padding: 4px 10px;
+    gap: 5px;
+    padding: 4px 7px;
     min-height: 26px;
 }
 .wb-duration-group .wb-fuel-cell span,
 .wb-duration-group .wb-fuel-cell b { white-space: nowrap; line-height: 1; }
-.wb-duration-group .wb-fuel-cell span { font-size: 9.5px; }
-.wb-duration-group .wb-fuel-cell b { font-size: 13.5px; }
+/* Filet (pilote 03/10) : un libellé trop long s'ellipse au lieu de
+ * pousser la valeur hors du cadre. */
+.wb-duration-group .wb-fuel-cell span {
+    font-size: 9.5px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.wb-duration-group .wb-fuel-cell b { font-size: 13.5px; flex-shrink: 0; }
 .wb-duration-group .wb-fuel-cell.wb-fuel-total b { font-size: 15.5px; }
 .wb-fuel-cell {
     background: var(--inner-bg);
@@ -1963,18 +1984,6 @@ body.map-overlay-open { overflow: hidden; }
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-/* Essence consommée (mode navigation) : lecture seule, issue du plan de vol —
-   même gabarit visuel que le champ carburant, bordure en pointillés. */
-.wb-burn-ro {
-    background: var(--input-bg, #0F172A);
-    border: 1px dashed var(--border-color);
-    color: var(--text-color);
-    border-radius: 6px;
-    padding: 6px 9px;
-    font-family: 'DM Mono', monospace;
-    font-size: 13px;
-    font-weight: 500;
 }
 .wb-load input[type="range"] {
     width: 100%;
@@ -2019,6 +2028,15 @@ body.map-overlay-open { overflow: hidden; }
 .wb-load input.wb-over {
     border-color: #F59E0B;
     background: rgba(251, 191, 36, 0.08);
+}
+/* Blocage à la capacité (pilote 03/10) : flash ambre quand une saisie
+ * au-delà du plafond réservoirs est rabattue au max (js/wb-ui.js). */
+@keyframes wb-fuel-clamp-flash {
+    0% { box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.65); border-color: #F59E0B; }
+    100% { box-shadow: 0 0 0 3px rgba(251, 191, 36, 0); }
+}
+.wb-load input.wb-fuel-clamped {
+    animation: wb-fuel-clamp-flash 0.8s ease-out;
 }
 /* Sécurité carburant (navigation) : embarqué insuffisant vs requis du plan. */
 .wb-load input.wb-under {
@@ -2289,7 +2307,8 @@ body.map-overlay-open { overflow: hidden; }
      * « -5 » (5 colonnes) PRIME la règle 2 colonnes par spécificité : le
      * texte sortait encore — 2 colonnes imposées aussi pour elle. */
     .wb-fuel-grid,
-    .wb-fuel-grid.wb-fuel-grid-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .wb-fuel-grid.wb-fuel-grid-5,
+    .wb-fuel-grid.wb-fuel-grid-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .wb-duration-group .wb-fuel-cell {
         flex-direction: column;
         align-items: flex-start;

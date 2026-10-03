@@ -161,6 +161,20 @@ export function getActiveAircraftId() {
 }
 
 /**
+ * Signale une mutation de la flotte (ajout, édition, suppression,
+ * changement d'avion actif, import). Les widgets qui dérivent de la
+ * fiche — plan de navigation (conso, réserve perso), perf piste,
+ * centrage — écoutent « fleet-changed » pour se recalculer : sans ça,
+ * un devis restait calé sur une fiche périmée (retour pilote 03/10 :
+ * « réserve 35 min » fantôme après édition de la réserve perso).
+ */
+function _notifyFleetChanged() {
+    if (typeof document !== 'undefined') {
+        document.dispatchEvent(new CustomEvent('fleet-changed'));
+    }
+}
+
+/**
  * Définit l'avion actif par son id.
  * @param {string} id
  */
@@ -168,6 +182,7 @@ export function setActiveAircraft(id) {
     const fleet = getFleet();
     if (fleet.some(a => a.id === id)) {
         _writeLs(LS_ACTIVE, id);
+        _notifyFleetChanged();
     }
 }
 
@@ -181,6 +196,7 @@ export function addAircraft(data) {
     const aircraft = { id: _uid(), ..._sanitize(data) };
     fleet.push(aircraft);
     _writeLs(LS_FLEET, fleet);
+    _notifyFleetChanged();
     return aircraft;
 }
 
@@ -198,6 +214,7 @@ export function updateAircraft(id, data) {
     if (idx === -1) return null;
     fleet[idx] = _sanitize({ ...fleet[idx], ...data, id });
     _writeLs(LS_FLEET, fleet);
+    _notifyFleetChanged();
     return fleet[idx];
 }
 
@@ -217,6 +234,7 @@ export function deleteAircraft(id) {
     if (getActiveAircraftId() === id) {
         _writeLs(LS_ACTIVE, fleet[0].id);
     }
+    _notifyFleetChanged();
     return true;
 }
 
@@ -269,6 +287,7 @@ export function importFleetData(data) {
     if (!norm) return false;
     _writeLs(LS_FLEET, norm.fleet);
     _writeLs(LS_ACTIVE, norm.activeId);
+    _notifyFleetChanged();
     return true;
 }
 

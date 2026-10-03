@@ -101,16 +101,22 @@ export function handleDestinationChange() {
     // libres restent posés sur la carte, réutilisables via leur popup « + Plan »).
     // EXCEPTION aller-retour (retour pilote 25/09) : destination = départ →
     // les étapes déjà posées jalonnent toujours la boucle, on les GARDE.
+    // EXCEPTION 2ᵉ étape (03/10) : quand le champ « 2ᵉ ÉTAPE » change la
+    // destination, il vient de POSER l'ancienne arrivée en étape intermédiaire
+    // (waypoints + posées) — ce remplacement ne doit pas être effacé ici
+    // (sinon la « vraie étape » du 25/09 ne survit jamais au recalul).
+    const viaLeg2 = toInput.dataset.leg2Posee === '1';
+    delete toInput.dataset.leg2Posee;
     if (validDest && toIcao !== _lastPlannedDest) {
         const boucle = toIcao === depForNav.toUpperCase();
-        if (!boucle) {
+        if (!boucle && !viaLeg2) {
             const wpInput = document.getElementById('fp-waypoints');
             if (wpInput && wpInput.value.trim()) wpInput.value = '';
             state.route = null;
             state.routePoses = [];
         } else {
-            // Boucle : les étapes restent, mais la séquence doit être
-            // reconstruite vers la NOUVELLE arrivée (l'ancienne se
+            // Boucle OU 2ᵉ étape : les étapes restent, mais la séquence doit
+            // être reconstruite vers la NOUVELLE arrivée (l'ancienne se
             // terminait par la destination précédente — le champ
             // n'émettra un recalcul que s'il est retouché).
             const wpInput = document.getElementById('fp-waypoints');
@@ -821,6 +827,25 @@ document.addEventListener('DOMContentLoaded', async function () {
     window.addEventListener('navplan-changed', () => {
         const icao = state.requestedIcao;
         if (icao) refreshWbWidget(icao);
+    });
+    // Fiche avion modifiée (fenêtre Flotte : édition, ajout, suppression,
+    // changement d'avion actif, import — aircraft-fleet.js émet l'événement) :
+    // le plan de navigation et les widgets dérivés se recalculent. Sans ça,
+    // un devis restait calé sur une fiche périmée (retour pilote 03/10 :
+    // « réserve 35 min » fantôme après édition de la réserve perso).
+    document.addEventListener('fleet-changed', () => {
+        const icao = state.requestedIcao;
+        if (icao) {
+            showTakeoffWidget(icao);
+            refreshWbWidget(icao);
+        }
+        // Recalcul du plan : même destination → pas de remise à zéro des
+        // waypoints (handleDestinationChange ne vide que sur un CHANGEMENT
+        // d'arrivée) ; showFlightPlanner relit conso/réserve de la fiche.
+        const to = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
+        if (getFlightMode() === 'nav' && /^[A-Z][A-Z0-9]{3}$/.test(to)) {
+            handleDestinationChange();
+        }
     });
     document.getElementById('btn-theme').addEventListener('click', toggleTheme);
     document.getElementById('btn-cockpit-mode')?.addEventListener('click', toggleCockpitMode);

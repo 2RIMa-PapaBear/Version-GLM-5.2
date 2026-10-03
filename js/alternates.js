@@ -361,8 +361,15 @@ export async function showAlternates(icao) {
     // substitution « * »). Classe .mode-nav posée par flight-mode.js (pas
     // d'import ici : flight-mode importe déjà ce module — cycle évité).
     const toVal = (document.getElementById('route-to-input')?.value || '').trim().toUpperCase();
+    // ALLER-RETOUR étapé (retour pilote 03/10) : destination = départ MAIS
+    // des étapes posées → c'est toujours une route (state.route =
+    // [départ, étapes…, départ]) : les alternates de trajet — et leurs
+    // boutons « terrain de dégagement » — doivent être proposés, sinon le
+    // panneau retombe en rendu local SANS bouton alors qu'un dégagement
+    // reste actif au planificateur (impossible à changer).
+    const boucleEtapee = toVal === depIcao && Array.isArray(state.route) && state.route.length >= 3;
     if (document.body.classList.contains('mode-nav')
-        && /^[A-Z][A-Z0-9]{3}$/.test(toVal) && toVal !== depIcao) {
+        && /^[A-Z][A-Z0-9]{3}$/.test(toVal) && (toVal !== depIcao || boucleEtapee)) {
         const pts = _routePtsFromUI(depIcao, toVal);
         if (pts) {
             const token = ++_altSeq;
@@ -375,6 +382,14 @@ export async function showAlternates(icao) {
             }
         }
         // Trajet non exploitable (coords manquantes, réseau…) : widget local.
+    }
+
+    // Repli LOCAL alors qu'on est en navigation (retour pilote 03/10) : un
+    // dégagement resté d'une route précédente ne doit pas rester affiché au
+    // planificateur sans pouvoir être changé ici — on le retire proprement.
+    if (document.body.classList.contains('mode-nav') && state.diversionIcao) {
+        state.diversionIcao = null;
+        document.dispatchEvent(new CustomEvent('diversion-changed', { detail: {} }));
     }
 
     const apt = getAirportByICAO(icao);
