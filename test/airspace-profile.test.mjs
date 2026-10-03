@@ -267,3 +267,26 @@ test('A8 (audit 27/09) : R/D/P à plancher élevé toujours retenues', () => {
     const res2 = computeRouteAirspaces(ROUTE, [rdp], { cruiseAltFt: 3500 });
     assert.ok(res2.some(g => /R 999/.test(g.name)), 'R/D/P retenue hors tranche croisière');
 });
+
+// Fréquence PAR SECTEUR (retour pilote 03/10, « à corriger d'urgence ») :
+// un organisme à secteurs change de fréquence en route — RENNES INFO :
+// NORD 126.950, SUD 134.000. L'ancien code collait la fréquence du
+// PREMIER secteur à tout le groupe → le SUD affichait 126.950.
+test('computeRouteAirspaces : fréquence portée par SEGMENT, pas par groupe', () => {
+    // NORD à l'ouest (lon 1-1.5, frac 0.33-0.5), SUD à l'est (lon 1.6-2.1) :
+    // ordre délibéré NORD D'ABORD — c'est le cas qui affichait 126.950.
+    const items = [
+        zone('SIV RENNES NORD', '126.950', 1000, 5000, SQ(1.0, 1.5), 'RENNES INFO'),
+        zone('SIV RENNES SUD A', '134.000', 1000, 5000, SQ(1.6, 2.1), 'RENNES INFO'),
+    ];
+    const groups = computeRouteAirspaces(ROUTE, items);
+    assert.equal(groups.length, 1, 'un seul organisme RENNES INFO');
+    const g = groups[0];
+    assert.equal(g.freq, '126.950', 'le groupe garde un repère (première fréquence)');
+    const nord = g.segs.find(s => /NORD/.test(s.zone));
+    const sud = g.segs.find(s => /SUD/.test(s.zone));
+    assert.ok(nord && sud, 'les deux secteurs sont présents');
+    assert.equal(nord.freq, '126.950');
+    assert.equal(sud.freq, '134.000', 'le SUD porte SA fréquence, pas celle du NORD');
+    assert.ok(sud.fa > nord.fb, 'secteurs disjoints le long de la route');
+});

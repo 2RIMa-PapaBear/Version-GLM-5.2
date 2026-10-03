@@ -1652,10 +1652,17 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr, CH = 128) {
     // celle du secteur sous-jacent sur le même tronçon — les frontières
     // de secteurs APP/FIS/SIV coïncident géographiquement avec celles des
     // TMA (vérifié RENNES : même bascule à 34,7 %).
+    // PAR SECTEUR d'abord (retour pilote 03/10) : la fréquence du groupe
+    // seule prêtait celle du premier secteur à tout l'organisme (RENNES
+    // INFO : NORD 126.950 affiché sur le SUD, réel 134.000).
     const _freqByIdx = [];
     if (_zones) for (const g of _zones) {
-        if (!g.freq) continue;
-        for (const [fa, fb] of g.ranges) _freqByIdx.push({ fa, fb, freq: g.freq });
+        const segF = (g.segs || []).filter(s => s.freq);
+        if (segF.length) {
+            for (const s of segF) _freqByIdx.push({ fa: s.fa, fb: s.fb, freq: s.freq });
+        } else if (g.freq) {
+            for (const [fa, fb] of g.ranges) _freqByIdx.push({ fa, fb, freq: g.freq });
+        }
     }
     const _borrowFreq = (fa, fb) => {
         let best = 0, freq = null;
@@ -1746,8 +1753,10 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr, CH = 128) {
                     // ACTIVITÉ officielle + code d'horaire d'activation SIA
                     // des zones R/D/P (« Parachutage · H24 », « Tir · NOTAM »).
                     // Uniquement si le cadre est assez haut pour deux lignes.
+                    // Fréquence du SECTEUR (s.freq) avant celle du groupe
+                    // (RENNES INFO : NORD ≠ SUD — retour pilote 03/10).
                     const freq = !twoLines ? null
-                        : (g.freq || (/^(TMA|CTA|CTR)\b/i.test(zone) ? _borrowFreq(s.fa, s.fb) : null));
+                        : (s.freq || g.freq || (/^(TMA|CTA|CTR)\b/i.test(zone) ? _borrowFreq(s.fa, s.fb) : null));
                     const sub = freq || (/^(R|D|P)\b/i.test(zone)
                         ? ([s.act, s.hor ? String(s.hor).toUpperCase() : null].filter(Boolean).join(' · ') || null)
                         : null);
@@ -2005,9 +2014,12 @@ function _drawElevationChart(doc, pr, L, R, yTopSection, fr, CH = 128) {
             const x0 = Math.max(xL, xOf(s.fa)), x1 = Math.min(xR, xOf(s.fb));
             if (x1 - x0 < 3) continue;
             doc.setFont('helvetica', 'bold'); doc.setFontSize(6);
-            // « partie A » → « A » (nom SIA compacté), fréquence en fin.
+            // « partie A » → « A » (nom SIA compacté), fréquence en fin —
+            // celle du SECTEUR avant celle du groupe (RENNES INFO : NORD
+            // 126.950 / SUD 134.000 — retour pilote 03/10).
             const words = zone.replace(/\s+partie\s+/i, ' ').split(/\s+/);
-            if (g.freq) words.push(String(g.freq));
+            const fq = s.freq || g.freq;
+            if (fq) words.push(String(fq));
             const maxW = x1 - x0 - 1.5;
             const linesTxt = [];
             let cur = '';

@@ -490,8 +490,11 @@ function _drawZoneTooltip({ g, seg }, cw, xOf) {
     const zone = seg.zone && seg.zone.toUpperCase() !== g.name.toUpperCase() ? seg.zone : null;
     // Code d'horaire d'activation SIA (« H24 », « Activation par NOTAM »…)
     // accolé à la 3e ligne : l'ouverture d'une zone conditionnelle compte
-    // autant que sa fréquence.
-    let line3 = g.freq ? `${g.freq} MHz` : (seg.act || `${nm} NM`);
+    // autant que sa fréquence. Fréquence du SECTEUR survolé (s.freq) — pas
+    // celle du groupe : un organisme change de fréquence par secteur
+    // (RENNES INFO NORD 126.950 / SUD 134.000 — retour pilote 03/10).
+    const fq = seg.freq || g.freq;
+    let line3 = fq ? `${fq} MHz` : (seg.act || `${nm} NM`);
     if (seg.hor) line3 += `  ·  ${horLabel(seg.hor, true, seg.horTxt)}`;
     const lines = [
         g.name,

@@ -248,7 +248,11 @@ export function computeRouteAirspaces(points, items, opts) {
         // fréquences différentes (certaines nulles) — deux groupes
         // « LA ROCHELLE » dessinaient chaque secteur DEUX fois sur le
         // profil (TMA LA ROCHELLE 1/3, TMA AQUITAINE 2.1/2.2, D 18 A3…).
-        // La fréquence du groupe = la première non nulle rencontrée.
+        // La fréquence du groupe reste « la première non nulle » (repère),
+        // mais la fréquence VRAIE voyage PAR SEGMENT : un organisme à
+        // secteurs peut en changer en route (RENNES INFO : NORD 126.950,
+        // SUD 134.000 — retour pilote 03/10 « à corriger d'urgence », le
+        // profil affichait la fréquence du NORD sur le SUD).
         const key = String(name || '').replace(/\s+/g, ' ').trim().toUpperCase();
         let g = byKey.get(key);
         if (!g) { g = { name, freq: null, lo: Infinity, up: -Infinity, ranges: [], segs: [] }; byKey.set(key, g); }
@@ -260,7 +264,7 @@ export function computeRouteAirspaces(points, items, opts) {
         // d'horaire d'activation SIA (« H24 », « NOTAM »…) : portés au
         // segment pour l'infobulle du profil écran et les cadres du PDF.
         for (const [fa, fb] of ranges) {
-            g.segs.push({ fa, fb, up, zone, act: as.activity || null, hor: as.hor || null, horTxt: as.horTxt || null });
+            g.segs.push({ fa, fb, up, zone, freq, act: as.activity || null, hor: as.hor || null, horTxt: as.horTxt || null });
         }
     }
 
@@ -281,8 +285,9 @@ export function computeRouteAirspaces(points, items, opts) {
                 overl.up = Math.max(overl.up, s.up);
                 overl.act ??= s.act;
                 overl.hor ??= s.hor;
+                overl.freq ??= s.freq;
             } else {
-                list.push({ fa: s.fa, fb: s.fb, up: s.up, zone: s.zone, act: s.act, hor: s.hor });
+                list.push({ fa: s.fa, fb: s.fb, up: s.up, zone: s.zone, freq: s.freq, act: s.act, hor: s.hor });
                 byZone.set(zk, list);
             }
         }
