@@ -276,6 +276,7 @@ npm run deploy:test -- --mirror      # supprime aussi les fichiers distants disp
 
 ## Journal des versions
 <!-- debut journal -->
+- **2026-10-03** — Cadres du briefing réordonnables à la main (pilote 03/10) — 9 cadres (Performances piste, Centrage, Info terrain, Fréquences, Alternates,…
 - **2026-10-03** — URGENT (retour pilote 03/10) : fréquence radio PAR SECTEUR sur le profil d'élévation et la page PDF — l'organisme groupé collait la…
 - **2026-10-02** — Cartes TEMSI/WinTEM/fronts dans le dossier de vol (pilote 02/10) — pages pleines À LA SUITE de la page Météo au dossier, une page par carte…
 - **2026-10-02** — Vol local (retour pilote 02/10) : l'atterrissage suit la piste CHOISIE pour le décollage — evaluateLandingPerformance transmet…
@@ -290,13 +291,13 @@ npm run deploy:test -- --mirror      # supprime aussi les fichiers distants disp
 - **2026-10-01** — A12-v4 FINAL FINAL — le pilote fournit le POH DE LA BONNE VERSION : « WT9 Dynamic LSA / Club FG912T » (AS-POH-03-000 rév. 12.12.2013,…
 - **2026-10-01** — S10 ANNULÉ (décision pilote 01/10) : la QA visuelle du mode cockpit n'aura pas lieu — le tableau des trois audits est désormais TOUT fermé
 - **2026-10-01** — Audit 3e passage (delta) 01/10 — rapport : CONFORME sauf 1 MAJEUR (SUP figées 16/09, crawler no-op en CI) ; 72 recalculs indépendants verts…
-- **2026-10-01** — Retrait du one-shot bascule AIRAC 10-01 — bascule faite et vérifiée (toutes bases 10-01 en prod) ; son commit de référence a937cce3 a…
+
 
 
 
 
 <!-- fin journal -->
-<!-- docs:lastSha=6766c91e74955749fcee017ce6c3a6cb0334ae10 -->
+<!-- docs:lastSha=b0d7a25bdcf7e8e431d8bc104c48b8b889dfc71b -->
 
 
 

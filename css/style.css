@@ -3476,3 +3476,55 @@ html.theme-light .data-age-badge.age-old   { color: #B91C1C; background: rgba(23
     font-family: 'DM Sans', Verdana, sans-serif;
     cursor: pointer;
 }
+
+/* ================================================================
+ * PANEL ORDER — cadres du briefing réordonnables (retour pilote 03/10)
+ * Poignée sur les cadres : Performances piste, Centrage, Info
+ * terrain, Fréquences, Alternates, Calcul de navigation, Sup AIP,
+ * NOTAM, Carte régionale (js/panel-order.js).
+ * ================================================================ */
+.collapsible-header.panel-order-header,
+.regional-map-header.panel-order-header,
+.alternates-header.panel-order-header {
+    cursor: grab;
+}
+.panel-order-grip {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    width: 10px;
+    margin-right: -2px;
+    color: var(--text-muted);
+    opacity: 0.45;
+    transition: opacity 0.2s;
+}
+.collapsible-header:hover .panel-order-grip,
+.regional-map-header:hover .panel-order-grip,
+.alternates-header:hover .panel-order-grip {
+    opacity: 1;
+}
+body.panel-order-moving {
+    user-select: none;
+    cursor: grabbing;
+}
+body.panel-order-moving * {
+    cursor: grabbing !important;
+}
+/* Cadre soulevé : sort du flux (position:fixed), suit le pointeur. */
+.panel-order-dragging {
+    position: fixed;
+    z-index: 1000;
+    margin: 0;
+    opacity: 0.96;
+    pointer-events: none;
+    border-radius: 10px;
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+    will-change: transform;
+}
+/* Créneau d'accueil dans la colonne pendant le déplacement. */
+.panel-order-placeholder {
+    flex-shrink: 0;
+    border: 2px dashed rgba(91, 141, 239, 0.55);
+    border-radius: 10px;
+    background: rgba(91, 141, 239, 0.07);
+}

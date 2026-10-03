@@ -1,3 +1,7 @@
+// Poignée de réordonnancement des cadres déplaçables du briefing
+// (no-op pour les autres panneaux — cf. js/panel-order.js).
+import { decorateOrderable } from './panel-order.js';
+
 /* ================================================================
  * COLLAPSIBLE — Helper de widgets repliables
  * ================================================================
@@ -105,6 +109,10 @@ export function makeCollapsible(container, title, icon) {
             } catch { /* quota */ }
         }
     });
+
+    // Poignée de réordonnancement (uniquement pour les cadres
+    // concernés — les autres panneaux passent sans effet).
+    decorateOrderable(container);
 
     if (window.lucide) window.lucide.createIcons({ root: container });
 

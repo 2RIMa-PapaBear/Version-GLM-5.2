@@ -30,6 +30,7 @@ import { showFlightPlanner, parseWaypointsField, formatWaypointsField } from './
 import { clearElevationChart, refreshElevationChart } from './elevation-chart.js';
 import { greatCircleDistanceNm, cheapestWaypointInsertion } from './flight-planner.js';
 import { initCockpitMode, toggleCockpitMode } from './cockpit-mode.js';
+import { initPanelOrder } from './panel-order.js';
 import { openShareModal, hasPermalink, readPermalink } from './permalink.js';
 import { initWatchdog, openWatchdogPanel, getWatchdogSettings } from './watchdog.js';
 import { fetchAirportByIcao } from './openaip.js';
@@ -678,6 +679,10 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // Mode cockpit (Briefing express).
     initCockpitMode();
+
+    // Réordonnancement libre des cadres du briefing (poignée des
+    // panneaux de données — ordre persisté, cf. js/panel-order.js).
+    initPanelOrder();
 
     // Surveillance des favoris (watchdog) — démarre si activé.
     initWatchdog();
